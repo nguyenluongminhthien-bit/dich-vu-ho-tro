@@ -18,6 +18,7 @@ import DocumentFormModal from './components/DocumentFormModal';
 import UserFormModal from './components/UserFormModal';
 import DocumentList from './components/DocumentList';
 import DocumentPreviewModal from './components/DocumentPreviewModal';
+import ChangePasswordModal from './components/ChangePasswordModal';
 
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -39,7 +40,8 @@ const App: React.FC = () => {
     staff: { isOpen: false, data: null },
     vehicle: { isOpen: false, data: null },
     doc: { isOpen: false, data: null },
-    user: { isOpen: false, data: null }
+    user: { isOpen: false, data: null },
+    password: { isOpen: false, data: null }
   });
 
   // Load user từ localStorage và fetch data ngay khi mount
@@ -294,7 +296,7 @@ const App: React.FC = () => {
         return <VehicleList vehicles={filteredVehicles} units={units} isReadOnly={isReadOnly} onAdd={() => openModal('vehicle')} onEdit={(v) => openModal('vehicle', v)} onDelete={(id) => handleCRUD('Xe', 'delete', id, setVehicles)} />;
       case 'documents': return <DocumentList docs={documents} units={units} title="Văn bản Thông báo" filterType="ThongBao" isReadOnly={isReadOnly} onAdd={() => openModal('doc')} onEdit={(d) => openModal('doc', d)} onDelete={(id) => handleCRUD('VanBan', 'delete', id, setDocuments)} currentUser={currentUser} />;
       case 'rules': return <DocumentList docs={documents} units={units} title="Quy định - Quy trình" filterType="QuyDinh" isReadOnly={isReadOnly} onAdd={() => openModal('doc')} onEdit={(d) => openModal('doc', d)} onDelete={(id) => handleCRUD('QDQT', 'delete', id, setDocuments)} currentUser={currentUser} />;
-      case 'system': return <SystemList users={users} logs={logs} onAddUser={() => openModal('user')} onEditUser={(u) => openModal('user', u)} />;
+      case 'system': return <SystemList users={users} logs={logs} currentUser={currentUser} onAddUser={() => openModal('user')} onEditUser={(u) => openModal('user', u)} onChangePassword={(u) => openModal('password', u)} checkPermission={(code) => checkUnitPermission(currentUser, code)} />;
       default: return <Dashboard units={filteredUnits} personnel={filteredPersonnel} vehicles={filteredVehicles} documents={documents} />;
     }
   };
@@ -361,6 +363,16 @@ const App: React.FC = () => {
       <VehicleFormModal isOpen={modals.vehicle.isOpen} onClose={() => closeModal('vehicle')} onSave={(d) => handleCRUD('Xe', modals.vehicle.data ? 'update' : 'save', d, setVehicles)} initialData={modals.vehicle.data} units={filteredUnits} />
       <DocumentFormModal isOpen={modals.doc.isOpen} onClose={() => closeModal('doc')} onSave={(d) => handleCRUD(d.loai === 'ThongBao' ? 'VanBan' : 'QDQT', modals.doc.data ? 'update' : 'save', d, setDocuments)} initialData={modals.doc.data} defaultType={currentView === 'documents' ? 'ThongBao' : 'QuyDinh'} units={units} />
       <UserFormModal isOpen={modals.user.isOpen} onClose={() => closeModal('user')} onSave={(d) => handleCRUD('Users', modals.user.data ? 'update' : 'save', d, setUsers)} initialData={modals.user.data} units={units} />
+      <ChangePasswordModal 
+        isOpen={modals.password.isOpen} 
+        onClose={() => closeModal('password')} 
+        targetUser={modals.password.data}
+        onSave={(newPass) => {
+          if (modals.password.data) {
+            handleCRUD('Users', 'update', { ...modals.password.data, password: newPass }, setUsers);
+          }
+        }}
+      />
     </div>
   );
 };

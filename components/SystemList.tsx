@@ -1,16 +1,25 @@
 
 import React, { useState } from 'react';
-import { User, Log } from '../types';
-import { Search, Shield, Clock, Plus, Edit2 } from 'lucide-react';
+import { User, Log, Role } from '../types';
+import { Search, Shield, Clock, Plus, Edit2, KeyRound } from 'lucide-react';
 
 interface SystemListProps {
   users: User[];
   logs: Log[];
+  currentUser: User | null;
   onAddUser: () => void;
   onEditUser: (user: User) => void;
+  onChangePassword: (user: User) => void;
+  checkPermission: (targetUnitCode: string) => boolean;
 }
 
-const UserTableRow: React.FC<{ user: User; onEdit: (user: User) => void }> = ({ user, onEdit }) => (
+const UserTableRow: React.FC<{ 
+  user: User; 
+  currentUser: User | null;
+  onEdit: (user: User) => void; 
+  onChangePass: (user: User) => void;
+  canEdit: boolean;
+}> = ({ user, currentUser, onEdit, onChangePass, canEdit }) => (
   <tr className="hidden md:table-row hover:bg-gray-50 transition-colors">
     <td className="p-4">
       <p className="font-bold text-gray-900 text-sm">{user.hoTen}</p>
@@ -22,23 +31,47 @@ const UserTableRow: React.FC<{ user: User; onEdit: (user: User) => void }> = ({ 
     <td className="p-4 text-sm font-bold text-gray-700">{user.maDonVi}</td>
     <td className="p-4 text-sm font-medium text-gray-500">{user.phanQuyen}</td>
     <td className="p-4 text-right">
-      <button onClick={() => onEdit(user)} className="p-2 text-gray-400 hover:text-primary transition-colors">
-        <Edit2 className="w-4 h-4" />
-      </button>
+      <div className="flex justify-end gap-2">
+        {canEdit && (
+          <>
+            <button onClick={() => onChangePass(user)} className="p-2 text-gray-400 hover:text-yellow-600 transition-colors" title="Đổi mật khẩu">
+              <KeyRound className="w-4 h-4" />
+            </button>
+            <button onClick={() => onEdit(user)} className="p-2 text-gray-400 hover:text-primary transition-colors" title="Sửa thông tin">
+              <Edit2 className="w-4 h-4" />
+            </button>
+          </>
+        )}
+      </div>
     </td>
   </tr>
 );
 
-const UserCard: React.FC<{ user: User; onEdit: (user: User) => void }> = ({ user, onEdit }) => (
+const UserCard: React.FC<{ 
+  user: User; 
+  currentUser: User | null;
+  onEdit: (user: User) => void; 
+  onChangePass: (user: User) => void;
+  canEdit: boolean;
+}> = ({ user, currentUser, onEdit, onChangePass, canEdit }) => (
   <div className="md:hidden p-4 border-b border-gray-100 hover:bg-gray-50 transition-colors">
     <div className="flex justify-between items-start mb-2">
       <div className="min-w-0">
         <p className="font-bold text-gray-900 text-sm truncate">{user.hoTen}</p>
         <p className="text-xs text-gray-400 truncate">{user.email}</p>
       </div>
-      <button onClick={() => onEdit(user)} className="p-2 text-gray-400 hover:text-primary transition-colors shrink-0">
-        <Edit2 className="w-4 h-4" />
-      </button>
+      <div className="flex gap-1">
+        {canEdit && (
+          <>
+            <button onClick={() => onChangePass(user)} className="p-2 text-gray-400 hover:text-yellow-600 transition-colors" title="Đổi mật khẩu">
+              <KeyRound className="w-4 h-4" />
+            </button>
+            <button onClick={() => onEdit(user)} className="p-2 text-gray-400 hover:text-primary transition-colors shrink-0" title="Sửa thông tin">
+              <Edit2 className="w-4 h-4" />
+            </button>
+          </>
+        )}
+      </div>
     </div>
     <div className="flex flex-wrap gap-2 items-center">
       <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-700 border border-blue-200 uppercase">{user.vaiTro}</span>
@@ -86,8 +119,20 @@ const LogCard: React.FC<{ log: Log }> = ({ log }) => (
   </div>
 );
 
-const SystemList: React.FC<SystemListProps> = ({ users, logs, onAddUser, onEditUser }) => {
+const SystemList: React.FC<SystemListProps> = ({ users, logs, currentUser, onAddUser, onEditUser, onChangePassword, checkPermission }) => {
   const [activeTab, setActiveTab] = useState<'users' | 'logs'>('users');
+
+  const canManageUser = (targetUser: User) => {
+    if (!currentUser) return false;
+    if (currentUser.vaiTro === Role.ADMIN) return true;
+    // Tự sửa mình
+    if (currentUser.email === targetUser.email) return true;
+    // Cty sửa đơn vị trực thuộc
+    if (currentUser.vaiTro === Role.CTY) {
+      return checkPermission(targetUser.maDonVi);
+    }
+    return false;
+  };
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 h-full flex flex-col overflow-hidden">
@@ -132,13 +177,27 @@ const SystemList: React.FC<SystemListProps> = ({ users, logs, onAddUser, onEditU
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {users.map((u, index) => (
-                  <UserTableRow key={u.id || `${u.email}-${index}`} user={u} onEdit={onEditUser} />
+                  <UserTableRow 
+                    key={u.id || `${u.email}-${index}`} 
+                    user={u} 
+                    currentUser={currentUser}
+                    onEdit={onEditUser} 
+                    onChangePass={onChangePassword}
+                    canEdit={canManageUser(u)}
+                  />
                 ))}
               </tbody>
             </table>
             <div className="md:hidden divide-y divide-gray-100">
               {users.map((u, index) => (
-                <UserCard key={u.id || `${u.email}-${index}`} user={u} onEdit={onEditUser} />
+                <UserCard 
+                  key={u.id || `${u.email}-${index}`} 
+                  user={u} 
+                  currentUser={currentUser}
+                  onEdit={onEditUser} 
+                  onChangePass={onChangePassword}
+                  canEdit={canManageUser(u)}
+                />
               ))}
             </div>
           </div>
