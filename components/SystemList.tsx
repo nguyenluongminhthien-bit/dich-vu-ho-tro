@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { User, Log, Role } from '../types';
-import { Search, Shield, Clock, Plus, Edit2, KeyRound } from 'lucide-react';
+import { Search, Shield, Clock, Plus, Edit2, KeyRound, Trash2 } from 'lucide-react';
 
 interface SystemListProps {
   users: User[];
@@ -9,6 +9,7 @@ interface SystemListProps {
   currentUser: User | null;
   onAddUser: () => void;
   onEditUser: (user: User) => void;
+  onDeleteUser: (user: User) => void;
   onChangePassword: (user: User) => void;
   checkPermission: (targetUnitCode: string) => boolean;
 }
@@ -18,8 +19,9 @@ const UserTableRow: React.FC<{
   currentUser: User | null;
   onEdit: (user: User) => void; 
   onChangePass: (user: User) => void;
+  onDelete: (user: User) => void;
   canEdit: boolean;
-}> = ({ user, currentUser, onEdit, onChangePass, canEdit }) => (
+}> = ({ user, currentUser, onEdit, onChangePass, onDelete, canEdit }) => (
   <tr className="hidden md:table-row hover:bg-gray-50 transition-colors">
     <td className="p-4">
       <p className="font-bold text-gray-900 text-sm">{user.hoTen}</p>
@@ -40,6 +42,17 @@ const UserTableRow: React.FC<{
             <button onClick={() => onEdit(user)} className="p-2 text-gray-400 hover:text-primary transition-colors" title="Sửa thông tin">
               <Edit2 className="w-4 h-4" />
             </button>
+            <button 
+              onClick={() => {
+                if (window.confirm(`Bạn có chắc chắn muốn xóa tài khoản ${user.email}?`)) {
+                  onDelete(user);
+                }
+              }} 
+              className="p-2 text-gray-400 hover:text-red-600 transition-colors" 
+              title="Xóa tài khoản"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
           </>
         )}
       </div>
@@ -52,8 +65,9 @@ const UserCard: React.FC<{
   currentUser: User | null;
   onEdit: (user: User) => void; 
   onChangePass: (user: User) => void;
+  onDelete: (user: User) => void;
   canEdit: boolean;
-}> = ({ user, currentUser, onEdit, onChangePass, canEdit }) => (
+}> = ({ user, currentUser, onEdit, onChangePass, onDelete, canEdit }) => (
   <div className="md:hidden p-4 border-b border-gray-100 hover:bg-gray-50 transition-colors">
     <div className="flex justify-between items-start mb-2">
       <div className="min-w-0">
@@ -68,6 +82,17 @@ const UserCard: React.FC<{
             </button>
             <button onClick={() => onEdit(user)} className="p-2 text-gray-400 hover:text-primary transition-colors shrink-0" title="Sửa thông tin">
               <Edit2 className="w-4 h-4" />
+            </button>
+            <button 
+              onClick={() => {
+                if (window.confirm(`Bạn có chắc chắn muốn xóa tài khoản ${user.email}?`)) {
+                  onDelete(user);
+                }
+              }} 
+              className="p-2 text-gray-400 hover:text-red-600 transition-colors shrink-0" 
+              title="Xóa tài khoản"
+            >
+              <Trash2 className="w-4 h-4" />
             </button>
           </>
         )}
@@ -119,16 +144,21 @@ const LogCard: React.FC<{ log: Log }> = ({ log }) => (
   </div>
 );
 
-const SystemList: React.FC<SystemListProps> = ({ users, logs, currentUser, onAddUser, onEditUser, onChangePassword, checkPermission }) => {
+const SystemList: React.FC<SystemListProps> = ({ users, logs, currentUser, onAddUser, onEditUser, onDeleteUser, onChangePassword, checkPermission }) => {
   const [activeTab, setActiveTab] = useState<'users' | 'logs'>('users');
 
   const canManageUser = (targetUser: User) => {
     if (!currentUser) return false;
-    if (currentUser.vaiTro === Role.ADMIN) return true;
+    
+    // Normalize role check (case insensitive)
+    const userRole = String(currentUser.vaiTro || '').toLowerCase();
+    if (userRole === 'admin' || userRole === 'quản trị') return true;
+
     // Tự sửa mình
-    if (currentUser.email === targetUser.email) return true;
+    if (currentUser.email.toLowerCase().trim() === targetUser.email.toLowerCase().trim()) return true;
+
     // Cty sửa đơn vị trực thuộc
-    if (currentUser.vaiTro === Role.CTY) {
+    if (userRole === 'cty') {
       return checkPermission(targetUser.maDonVi);
     }
     return false;
@@ -183,6 +213,7 @@ const SystemList: React.FC<SystemListProps> = ({ users, logs, currentUser, onAdd
                     currentUser={currentUser}
                     onEdit={onEditUser} 
                     onChangePass={onChangePassword}
+                    onDelete={onDeleteUser}
                     canEdit={canManageUser(u)}
                   />
                 ))}
@@ -196,6 +227,7 @@ const SystemList: React.FC<SystemListProps> = ({ users, logs, currentUser, onAdd
                   currentUser={currentUser}
                   onEdit={onEditUser} 
                   onChangePass={onChangePassword}
+                  onDelete={onDeleteUser}
                   canEdit={canManageUser(u)}
                 />
               ))}

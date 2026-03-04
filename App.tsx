@@ -296,7 +296,7 @@ const App: React.FC = () => {
         return <VehicleList vehicles={filteredVehicles} units={units} isReadOnly={isReadOnly} onAdd={() => openModal('vehicle')} onEdit={(v) => openModal('vehicle', v)} onDelete={(id) => handleCRUD('Xe', 'delete', id, setVehicles)} />;
       case 'documents': return <DocumentList docs={documents} units={units} title="Văn bản Thông báo" filterType="ThongBao" isReadOnly={isReadOnly} onAdd={() => openModal('doc')} onEdit={(d) => openModal('doc', d)} onDelete={(id) => handleCRUD('VanBan', 'delete', id, setDocuments)} currentUser={currentUser} />;
       case 'rules': return <DocumentList docs={documents} units={units} title="Quy định - Quy trình" filterType="QuyDinh" isReadOnly={isReadOnly} onAdd={() => openModal('doc')} onEdit={(d) => openModal('doc', d)} onDelete={(id) => handleCRUD('QDQT', 'delete', id, setDocuments)} currentUser={currentUser} />;
-      case 'system': return <SystemList users={users} logs={logs} currentUser={currentUser} onAddUser={() => openModal('user')} onEditUser={(u) => openModal('user', u)} onChangePassword={(u) => openModal('password', u)} checkPermission={(code) => checkUnitPermission(currentUser, code)} />;
+      case 'system': return <SystemList users={users} logs={logs} currentUser={currentUser} onAddUser={() => openModal('user')} onEditUser={(u) => openModal('user', u)} onDeleteUser={(u) => handleCRUD('Users', 'delete', u.id, setUsers)} onChangePassword={(u) => openModal('password', u)} checkPermission={(code) => checkUnitPermission(currentUser, code)} />;
       default: return <Dashboard units={filteredUnits} personnel={filteredPersonnel} vehicles={filteredVehicles} documents={documents} />;
     }
   };

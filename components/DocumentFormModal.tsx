@@ -153,6 +153,29 @@ const DocumentFormModal: React.FC<DocumentFormModalProps> = ({ isOpen, onClose, 
                 <label className="block text-[10px] font-bold text-gray-700 mb-1 uppercase">Người lấy số</label>
                 <input name="nguoiLaySo" value={formData.nguoiLaySo || ''} onChange={handleChange} className={INPUT_CLASS} placeholder="Họ tên người đăng ký số" />
               </div>
+              <div>
+                <label className="block text-[10px] font-bold text-gray-700 mb-1 uppercase">Bộ phận</label>
+                <div className="relative">
+                  <input 
+                    list="dept-options" 
+                    name="boPhan" 
+                    value={formData.boPhan || ''} 
+                    onChange={handleChange} 
+                    className={INPUT_CLASS} 
+                    placeholder="Nhập hoặc chọn bộ phận..." 
+                  />
+                  <datalist id="dept-options">
+                    <option value="HCNS" />
+                    <option value="Kế toán" />
+                    <option value="Kinh doanh" />
+                    <option value="Dịch vụ" />
+                    <option value="Kho" />
+                    <option value="Marketing" />
+                    <option value="CSKH" />
+                    <option value="CNTT" />
+                  </datalist>
+                </div>
+              </div>
             </div>
           </div>
 

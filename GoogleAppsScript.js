@@ -182,7 +182,8 @@ const CONFIG = {
       'nguoilayso': 'nguoiLaySo',
       'phamvi': 'phamVi',
       'hieuluc': 'hieuLuc',
-      'linkfile': 'linkFile'
+      'linkfile': 'linkFile',
+      'bophan': 'boPhan'
     },
     QDQT: {
       'idqd': 'id',

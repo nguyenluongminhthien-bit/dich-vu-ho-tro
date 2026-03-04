@@ -3,7 +3,7 @@ import { DonVi, NhanSu, Xe, VanBan, User, Log } from '../types';
 import { mockDonVi, mockNhanSu, mockXe, mockVanBan, mockUsers, mockLogs } from './mockData';
 
 // URL MỚI CỦA BẠN
-const API_URL: string = 'https://script.google.com/macros/s/AKfycbyTHb5Q_GDpToUsxxUOb1rt8wo-N0kNtxdO1hSarJFnV9oCI0PotJ0XZ7nyIvOZA2mT/exec'; 
+const API_URL: string = 'https://script.google.com/macros/s/AKfycbwd2OGkx0KB3N9PRoazaqdwKpagPFsXp84-Ni96fNhpLJV3n45R_9eZglR2XYSvbec/exec'; 
 
 export interface AppData {
   units: DonVi[];

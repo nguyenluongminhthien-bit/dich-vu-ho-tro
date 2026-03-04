@@ -34,6 +34,7 @@ const DocumentTableRow = memo(({ d, onPreview, onEdit, onDelete, isReadOnly, han
       <td className="p-4">
         <div className="text-sm font-bold text-gray-800">{String(d.soHieu)}</div>
         <div className="text-[10px] font-bold text-blue-500 uppercase">{String(d.donViTrinh || '---')}</div>
+        {d.boPhan && <div className="text-[10px] font-medium text-gray-500 mt-0.5">BP: {d.boPhan}</div>}
       </td>
       <td className="p-4 text-sm text-gray-500">{String(d.ngayBanHanh)}</td>
       <td className="p-4">
@@ -141,6 +142,7 @@ const DocumentCard = memo(({ d, onEdit, isReadOnly, handleAction, isConfidential
         <div>
           <div className="text-sm font-bold text-gray-900">{d.soHieu}</div>
           <div className="text-[10px] font-bold text-blue-500 uppercase">{d.donViTrinh}</div>
+          {d.boPhan && <div className="text-[10px] font-medium text-gray-500 mt-0.5">BP: {d.boPhan}</div>}
         </div>
         <div className="text-xs text-gray-500">{d.ngayBanHanh}</div>
       </div>
@@ -188,6 +190,7 @@ const DocumentList: React.FC<DocumentListProps> = ({ docs, units, title, filterT
   
   const [filterUnit, setFilterUnit] = useState('');
   const [filterSubType, setFilterSubType] = useState('');
+  const [filterDept, setFilterDept] = useState('');
   const [filterMonth, setFilterMonth] = useState('');
   const [filterYear, setFilterYear] = useState('');
   const [activeTab, setActiveTab] = useState<'ThongBao' | 'CongVanDen' | 'CongVanDi'>('ThongBao');
@@ -214,6 +217,11 @@ const DocumentList: React.FC<DocumentListProps> = ({ docs, units, title, filterT
 
   const unitOptions = useMemo(() => {
     const list = docs.filter(d => d.loai === filterType).map(d => d.donViTrinh);
+    return Array.from(new Set(list)).filter(Boolean);
+  }, [docs, filterType]);
+
+  const deptOptions = useMemo(() => {
+    const list = docs.filter(d => d.loai === filterType).map(d => d.boPhan);
     return Array.from(new Set(list)).filter(Boolean);
   }, [docs, filterType]);
 
@@ -324,6 +332,7 @@ const DocumentList: React.FC<DocumentListProps> = ({ docs, units, title, filterT
       const soHieu = safeLower(d.soHieu);
       const matchSearch = search === '' || noiDungTen.includes(search) || soHieu.includes(search);
       const matchUnit = filterUnit === '' || String(d.donViTrinh || '') === filterUnit;
+      const matchDept = filterDept === '' || String(d.boPhan || '') === filterDept;
       const subType = filterType === 'ThongBao' ? d.loaiVanBan : d.dmQuyTrinh;
       const matchSubType = filterSubType === '' || String(subType || '') === filterSubType;
       const dateParts = String(d.ngayBanHanh || '').split('/');
@@ -331,14 +340,14 @@ const DocumentList: React.FC<DocumentListProps> = ({ docs, units, title, filterT
       const year = dateParts?.[2];
       const matchMonth = filterMonth === '' || month === filterMonth;
       const matchYear = filterYear === '' || year === filterYear;
-      return matchSearch && matchUnit && matchSubType && matchMonth && matchYear;
+      return matchSearch && matchUnit && matchDept && matchSubType && matchMonth && matchYear;
     }).sort((a, b) => {
       const dateA = parseDate(a.d.ngayBanHanh);
       const dateB = parseDate(b.d.ngayBanHanh);
       if (dateA !== dateB) return dateB - dateA;
       return b.index - a.index;
     }).map(item => item.d);
-  }, [docs, filterType, debouncedSearch, filterUnit, filterSubType, filterMonth, filterYear, activeTab, currentUser, unitMap]);
+  }, [docs, filterType, debouncedSearch, filterUnit, filterDept, filterSubType, filterMonth, filterYear, activeTab, currentUser, unitMap]);
 
   const tabCounts = useMemo(() => {
     if (filterType !== 'ThongBao') return { thongBao: 0, congVanDen: 0, congVanDi: 0 };
@@ -425,6 +434,17 @@ const DocumentList: React.FC<DocumentListProps> = ({ docs, units, title, filterT
             >
               <option value="">Tất cả Đơn vị</option>
               {unitOptions.map(u => <option key={String(u)} value={String(u)}>{String(u)}</option>)}
+            </select>
+          </div>
+          <div className="relative">
+            <Tag className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <select 
+              className="w-full pl-9 pr-4 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary/20 outline-none text-black appearance-none"
+              value={filterDept}
+              onChange={(e) => { setFilterDept(e.target.value); setVisibleCount(20); }}
+            >
+              <option value="">Tất cả Bộ phận</option>
+              {deptOptions.map(d => <option key={String(d)} value={String(d)}>{String(d)}</option>)}
             </select>
           </div>
           <div className="relative">

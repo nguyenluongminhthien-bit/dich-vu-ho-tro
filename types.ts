@@ -213,6 +213,7 @@ export interface VanBan {
   phamVi?: string;
   hieuLuc?: string;
   linkFile: string;
+  boPhan?: string;
 }
 
 export interface Log {
