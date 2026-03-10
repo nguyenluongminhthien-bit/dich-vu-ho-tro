@@ -289,7 +289,7 @@ const VehicleFormModal: React.FC<VehicleFormModalProps> = ({ isOpen, onClose, on
                 </select>
               </div>
               <div>
-                <label className="block text-[10px] font-bold text-gray-600 mb-1.5 uppercase tracking-wider">Phòng/Nhan chịu chi phí</label>
+                <label className="block text-[10px] font-bold text-gray-600 mb-1.5 uppercase tracking-wider">Pháp nhân chịu chi phí</label>
                 <input name="phanNhanChiuChiPhi" value={formData.phanNhanChiuChiPhi || ''} onChange={handleChange} className={INPUT_CLASS} placeholder="VD: Phòng Hành chính, Showroom A..." />
               </div>
               <div>
