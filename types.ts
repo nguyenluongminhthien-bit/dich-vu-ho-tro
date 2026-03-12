@@ -33,8 +33,19 @@ export interface DonVi {
   hoTenLD: string;
   sdtLD: string;
   mailLD: string;
-  dvhtKd1: string;
-  hoTenDvht1: string;
+  
+  // Kinh doanh xe
+  cdLanhDaoKdx?: string;
+  hoTenLdKdx?: string;
+  sdtLdKdx?: string;
+  mailLdKdx?: string;
+  
+  // Kinh doanh DVPT
+  cdLanhDaoDvpt?: string;
+  hoTenLdDvpt?: string;
+  sdtLdDvpt?: string;
+  mailLdDvpt?: string;
+
   sdtDvht1: string;
   mailDvht1: string;
   dvhtKd2?: string;
@@ -79,8 +90,8 @@ export interface DonVi {
   
   // Chi tiết PVHC
   dinhBienPVHC?: number; 
-  pvhcdv?: string; // Vị trí PVHC Dịch vụ (Kiểu chuỗi để mô tả vị trí)
   chiPhiPvhcDv?: number; // Chi phí PVHC Dịch vụ (Kiểu số)
+  pvhcdv?: string; // Vị trí PVHC Dịch vụ (Kiểu chuỗi để mô tả vị trí)
   
   // Hệ thống An ninh & PCCC (Mới)
   slCamera?: number;

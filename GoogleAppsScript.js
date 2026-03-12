@@ -16,7 +16,7 @@ const CONFIG = {
   // MAPPING: Key = Tên cột trong Sheet sau khi cleanHeader(), Value = Tên biến trong Frontend (types.ts)
   mappings: {
     DonVi: {
-      'idcty': 'id',
+      'id': 'id',
       'mien': 'mien',
       'tendonvi': 'tenDonVi',
       'madonvi': 'maDonVi',
@@ -33,8 +33,14 @@ const CONFIG = {
       'hotenld': 'hoTenLD',
       'sdtld': 'sdtLD',
       'mailld': 'mailLD',
-      'dvhtkd1': 'dvhtKd1',
-      'hotendvht1': 'hoTenDvht1',
+      'cdlanhdaokdxe': 'cdLanhDaoKdx',
+      'hotenldkdxe': 'hoTenLdKdx',
+      'sdtldkdxe': 'sdtLdKdx',
+      'mailldkdxe': 'mailLdKdx',
+      'cdlanhdaodvpt': 'cdLanhDaoDvpt',
+      'hotenlddvpt': 'hoTenLdDvpt',
+      'sdtldvpt': 'sdtLdDvpt',
+      'mailldvpt': 'mailLdDvpt',
       'sdtdvht1': 'sdtDvht1',
       'maildvht1': 'mailDvht1',
       'dvhtkd2': 'dvhtKd2',
@@ -62,18 +68,16 @@ const CONFIG = {
       'ngaytuantra': 'anbvNgayTuanTra',
       'demcodinh': 'anbvDemCoDinh',
       'demtuantra': 'anbvDemTuanTra',
-      'vitribhvdv': 'viTriBvDv',
+      'vitribvdichvu': 'viTriBvDv',
       'chiphibvdv': 'chiPhiBvDv',
       'dinhbienpvhc': 'dinhBienPVHC',
-      'pvhcdv': 'pvhcdv', // Đồng bộ mapping cho cột pvhcdv
+      'pvhcdv': 'pvhcdv', 
       'chiphipvhcdv': 'chiPhiPvhcDv',
-      // Mới thêm cho Hệ thống An ninh & PCCC
       'slcamera': 'slCamera',
       'thoigianluuhinh': 'thoiGianLuuHinh',
       'htbaochaytudong': 'htBaoChayTuDong',
       'vitritubaochay': 'viTriTuBaoChay',
       'hethongbompccc': 'heThongBomPccc',
-      // Mới thêm cho Phòng họp
       'phop1': 'phop1',
       'vitriphop1': 'vitriPhop1',
       'scphop1': 'scPhop1',

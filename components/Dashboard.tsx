@@ -133,6 +133,13 @@ const Dashboard: React.FC<DashboardProps> = ({ units, personnel, vehicles, docum
     return Object.keys(data).map(key => ({ name: key, count: data[key] })).sort((a, b) => b.count - a.count);
   }, [vehicles]);
 
+  const activeShowroomsCount = useMemo(() => {
+    return units.filter(u => 
+      u.loaiHinh === 'Showroom' &&
+      u.trangThai === 'Hoạt động'
+    ).length;
+  }, [units]);
+
   return (
     <div className="space-y-4 sm:space-y-6">
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
@@ -178,7 +185,7 @@ const Dashboard: React.FC<DashboardProps> = ({ units, personnel, vehicles, docum
       </div>
       
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-        <StatCard title="Tổng Đơn vị" value={units.length} icon={Building} color="bg-blue-500" />
+        <StatCard title="Tổng Đơn vị" value={activeShowroomsCount} icon={Building} color="bg-blue-500" />
         <StatCard title="Tổng Nhân sự" value={personnel.length} icon={Users} color="bg-emerald-500" />
         <StatCard title="Tổng Xe" value={vehicles.length} icon={Car} color="bg-orange-500" />
         <StatCard 
