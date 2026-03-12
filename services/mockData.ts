@@ -71,11 +71,24 @@ export const mockDonVi: DonVi[] = [
     hoTenLD: 'Nguyễn Thiện Mỹ',
     sdtLD: '0901123456',
     mailLD: 'nguyenthienmy@thaco.com.vn',
-    dvhtKd1: 'PT DV HTKD',
-    hoTenDvht1: 'Nguyễn Trần Định',
+    
+    cdLanhDaoKdx: 'Giám đốc KD xe',
+    hoTenLdKdx: 'Lê Hoàng Nam',
+    sdtLdKdx: '0901222333',
+    mailLdKdx: 'lehoangnam@thaco.com.vn',
+    
+    cdLanhDaoDvpt: 'Giám đốc DVPT',
+    hoTenLdDvpt: 'Phạm Minh Tuấn',
+    sdtLdDvpt: '0901444555',
+    mailLdDvpt: 'phamminhtuan@thaco.com.vn',
+
     sdtDvht1: '0938809294',
     mailDvht1: 'nguyentrandinh@thaco.com.vn',
-    // Adding missing mandatory properties tongNsAnBv and tongNsPvhc
+    dvhtKd2: 'PT Nhân sự',
+    hoTenDvht2: 'Trần Thị B',
+    sdtDvht2: '0909555666',
+    mailDvht2: 'tranthib@thaco.com.vn',
+    
     tongNsAnBv: 7,
     tongNsPvhc: 7,
     slAnBvNoiBo: 5,
@@ -117,11 +130,8 @@ export const mockDonVi: DonVi[] = [
     hoTenLD: 'Trần Văn A',
     sdtLD: '0909111222',
     mailLD: 'tranvana@thaco.com.vn',
-    dvhtKd1: 'Tổ trưởng PVHC',
-    hoTenDvht1: 'Lê Văn B',
     sdtDvht1: '0909333444',
     mailDvht1: 'levanb@thaco.com.vn',
-    // Adding missing mandatory properties tongNsAnBv and tongNsPvhc
     tongNsAnBv: 5,
     tongNsPvhc: 3,
     slAnBvNoiBo: 2,
@@ -153,11 +163,8 @@ export const mockDonVi: DonVi[] = [
     hoTenLD: 'Phạm Văn C',
     sdtLD: '0988777666',
     mailLD: 'phamvanc@thaco.com.vn',
-    dvhtKd1: 'PT DV HTKD',
-    hoTenDvht1: 'Đỗ Thị D',
     sdtDvht1: '0912345678',
     mailDvht1: 'dothid@thaco.com.vn',
-    // Adding missing mandatory properties tongNsAnBv and tongNsPvhc
     tongNsAnBv: 15,
     tongNsPvhc: 11,
     slAnBvNoiBo: 10,

@@ -64,12 +64,12 @@ const UnitList: React.FC<UnitListProps> = ({ units, onAdd, onEdit, onDelete, isR
   const { groups, childrenMap, flatFilteredUnits } = useMemo(() => {
     const map = new Map<string, DonVi[]>();
     // Set of all unit codes available in the current list
-    const availableCodes = new Set(units.map(u => u.maDonVi));
+    const availableCodes = new Set(units.map(u => u.maDonVi.trim()));
     
     // 1. Map children by parent code (Trim whitespace for safety)
     units.forEach(u => {
-      if (u.maCapTren && u.maCapTren !== 'HO') {
-        const parentCode = u.maCapTren.trim();
+      const parentCode = u.maCapTren?.trim();
+      if (parentCode && availableCodes.has(parentCode)) {
         if (map.has(parentCode)) {
           map.get(parentCode)?.push(u);
         } else {
@@ -79,13 +79,11 @@ const UnitList: React.FC<UnitListProps> = ({ units, onAdd, onEdit, onDelete, isR
     });
 
     // 2. Identify "Root" units for display
-    // A unit is a root if: 
-    // a) It is type 'Văn phòng' (Company level)
-    // b) OR its parent is NOT in the current visible list (Partial view permission)
-    const rootList = units.filter(u => 
-      u.loaiHinh === 'Văn phòng' || 
-      !availableCodes.has(u.maCapTren)
-    );
+    // A unit is a root if its parent is NOT in the current visible list
+    const rootList = units.filter(u => {
+      const parentCode = u.maCapTren?.trim() || '';
+      return !availableCodes.has(parentCode) || parentCode === 'HO';
+    });
 
     // 3. Group roots by Region (Mien)
     const grouped: Record<string, DonVi[]> = {
@@ -191,9 +189,16 @@ const UnitList: React.FC<UnitListProps> = ({ units, onAdd, onEdit, onDelete, isR
                 </button>
              ) : (
                 // Visual spacer for children to align text
-                isRoot ? <span className="w-4 h-4" /> : null
+                <span className="w-4 h-4" />
              )}
           </div>
+
+          {/* Icon based on level/type */}
+          {isRoot ? (
+            <Building2 className={`w-4 h-4 shrink-0 ${isSelected ? 'text-primary' : 'text-gray-400'}`} />
+          ) : (
+            <Store className={`w-3.5 h-3.5 shrink-0 ${isSelected ? 'text-primary' : 'text-gray-400'}`} />
+          )}
 
           <span className={`text-sm md:text-xs truncate leading-tight ${isRoot ? 'font-bold uppercase tracking-tight' : 'font-medium'}`}>
             {unit.tenDonVi}
@@ -202,7 +207,7 @@ const UnitList: React.FC<UnitListProps> = ({ units, onAdd, onEdit, onDelete, isR
 
         {/* Children (Showrooms / Đại lý) */}
         {hasChildren && isExpanded && (
-          <div className="mt-0.5 animate-fadeIn">
+          <div className="mt-0.5 animate-fadeIn border-l border-gray-100 ml-6 md:ml-8">
             {children.map(child => renderTreeItem(child, level + 1))}
           </div>
         )}
@@ -422,11 +427,145 @@ const UnitList: React.FC<UnitListProps> = ({ units, onAdd, onEdit, onDelete, isR
                 </span>
               </div>
 
-            {/* A. Thông tin Đơn vị - REDESIGNED */}
+            {/* A. Thông tin Lãnh đạo */}
             <div>
               <h3 className="text-sm font-bold text-gray-900 uppercase mb-4 flex items-center gap-2">
                  <span className="w-1.5 h-6 bg-primary rounded-r"></span>
-                 A. Thông tin Đơn vị
+                 A. Thông tin Lãnh đạo
+              </h3>
+              <div className="space-y-4">
+                {/* Main Leader */}
+                <div className="bg-gradient-to-br from-blue-50 to-white rounded-xl p-4 md:p-5 border border-blue-100 shadow-sm flex flex-col sm:flex-row items-center sm:items-start gap-4 md:gap-5 text-center sm:text-left">
+                  <div className="w-16 h-16 rounded-full bg-white border-2 border-blue-200 flex items-center justify-center text-blue-600 font-bold text-2xl shadow-sm shrink-0">
+                    {getAvatarChar(selectedUnit.hoTenLD)}
+                  </div>
+                  <div className="flex-1 w-full">
+                    <div className="flex flex-col md:flex-row md:justify-between md:items-start">
+                       <div>
+                          <span className="inline-block px-2 py-0.5 rounded bg-blue-100 text-blue-700 text-[10px] md:text-xs font-bold uppercase mb-1">{selectedUnit.ldDonVi}</span>
+                          <h4 className="text-lg md:text-xl font-bold text-gray-900">{selectedUnit.hoTenLD || 'Chưa cập nhật'}</h4>
+                       </div>
+                    </div>
+                    
+                    <div className="flex flex-wrap justify-center sm:justify-start gap-2 md:gap-3 mt-4">
+                      <a href={`tel:${selectedUnit.sdtLD}`} className="flex items-center gap-2 text-xs md:text-sm text-gray-700 hover:text-primary bg-white px-3 md:px-4 py-2 rounded-lg border border-gray-200 shadow-sm hover:shadow transition-all">
+                        <Phone className="w-3.5 h-3.5 md:w-4 md:h-4 text-green-500" /> 
+                        <span className="font-medium">{selectedUnit.sdtLD}</span>
+                      </a>
+                      <a href={`mailto:${selectedUnit.mailLD}`} className="flex items-center gap-2 text-xs md:text-sm text-gray-700 hover:text-primary bg-white px-3 md:px-4 py-2 rounded-lg border border-gray-200 shadow-sm hover:shadow transition-all">
+                        <Mail className="w-3.5 h-3.5 md:w-4 md:h-4 text-blue-500" /> 
+                        <span className="font-medium truncate max-w-[150px] md:max-w-none">{selectedUnit.mailLD}</span>
+                      </a>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Sub Leaders (KDX & KDDV) */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Kinh doanh xe */}
+                  <div className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="p-1.5 bg-orange-50 text-orange-600 rounded-lg">
+                        <Users className="w-4 h-4" />
+                      </div>
+                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Kinh doanh xe</span>
+                    </div>
+                    <div className="mb-2">
+                       <span className="text-[10px] font-bold text-orange-600 uppercase">{selectedUnit.cdLanhDaoKdx || 'Chức danh'}</span>
+                       <h5 className="text-sm font-bold text-gray-800">{selectedUnit.hoTenLdKdx || 'Chưa cập nhật'}</h5>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-xs text-gray-600">
+                        <Phone className="w-3.5 h-3.5 text-gray-400" />
+                        <span>{selectedUnit.sdtLdKdx || '---'}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-gray-600 truncate">
+                        <Mail className="w-3.5 h-3.5 text-gray-400" />
+                        <span className="truncate">{selectedUnit.mailLdKdx || '---'}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Kinh doanh DVPT */}
+                  <div className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="p-1.5 bg-blue-50 text-blue-600 rounded-lg">
+                        <Users className="w-4 h-4" />
+                      </div>
+                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Kinh doanh DVPT</span>
+                    </div>
+                    <div className="mb-2">
+                       <span className="text-[10px] font-bold text-blue-600 uppercase">{selectedUnit.cdLanhDaoDvpt || 'Chức danh'}</span>
+                       <h5 className="text-sm font-bold text-gray-800">{selectedUnit.hoTenLdDvpt || 'Chưa cập nhật'}</h5>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-xs text-gray-600">
+                        <Phone className="w-3.5 h-3.5 text-gray-400" />
+                        <span>{selectedUnit.sdtLdDvpt || '---'}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-gray-600 truncate">
+                        <Mail className="w-3.5 h-3.5 text-gray-400" />
+                        <span className="truncate">{selectedUnit.mailLdDvpt || '---'}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* B. Phụ trách Dịch vụ Hỗ trợ & PT Nhân sự */}
+            <div>
+              <h3 className="text-sm font-bold text-gray-900 uppercase mb-4 flex items-center gap-2">
+                 <span className="w-1.5 h-6 bg-primary rounded-r"></span>
+                 B. Phụ trách Dịch vụ Hỗ trợ & PT Nhân sự
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
+                {[
+                  { role: 'DVHT KD 1', name: 'Phụ trách 1', phone: selectedUnit.sdtDvht1, mail: selectedUnit.mailDvht1 },
+                  { role: selectedUnit.dvhtKd2 || 'DVHT KD 2', name: selectedUnit.hoTenDvht2, phone: selectedUnit.sdtDvht2, mail: selectedUnit.mailDvht2 },
+                ].map((staff, idx) => (
+                   (staff.phone || staff.name) ? (
+                   <div key={idx} className="bg-white rounded-lg p-3 md:p-4 border border-gray-200 hover:border-gray-300 transition-colors shadow-sm">
+                      <div className="flex items-center gap-3 mb-3 md:mb-4">
+                         <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center text-xs md:text-sm font-bold text-gray-500">{idx + 1}</div>
+                         <div className="min-w-0">
+                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide truncate">{staff?.role || 'Vị trí ' + (idx + 1)}</p>
+                            <p className="text-sm md:text-base font-bold text-gray-900 truncate">{staff?.name}</p>
+                         </div>
+                      </div>
+                      <div className="space-y-2">
+                         <div className="flex items-center gap-2 md:gap-3 text-xs md:text-sm text-gray-600 bg-gray-50 p-2 rounded">
+                            <Phone className="w-3.5 h-3.5 md:w-4 md:h-4 text-gray-400" /> 
+                            {staff?.phone ? (
+                              <a href={`tel:${staff.phone}`} className="hover:text-primary font-medium transition-colors">
+                                {staff.phone}
+                              </a>
+                            ) : (
+                              <span className="text-gray-400">---</span>
+                            )}
+                         </div>
+                         <div className="flex items-center gap-2 md:gap-3 text-xs md:text-sm text-gray-600 bg-gray-50 p-2 rounded">
+                            <Mail className="w-3.5 h-3.5 md:w-4 md:h-4 text-gray-400" /> 
+                            {staff?.mail ? (
+                              <a href={`mailto:${staff.mail}`} className="hover:text-primary font-medium transition-colors truncate">
+                                {staff.mail}
+                              </a>
+                            ) : (
+                              <span className="text-gray-400">---</span>
+                            )}
+                         </div>
+                      </div>
+                   </div>
+                   ) : null
+                ))}
+              </div>
+            </div>
+
+            {/* C. Thông tin đơn vị */}
+            <div>
+              <h3 className="text-sm font-bold text-gray-900 uppercase mb-4 flex items-center gap-2">
+                 <span className="w-1.5 h-6 bg-primary rounded-r"></span>
+                 C. Thông tin đơn vị
               </h3>
               
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5">
@@ -467,15 +606,6 @@ const UnitList: React.FC<UnitListProps> = ({ units, onAdd, onEdit, onDelete, isR
                 />
 
                 <InfoCard 
-                   icon={Presentation} 
-                   label="Số Phòng họp" 
-                   value={`${[selectedUnit.phop1, selectedUnit.phop2, selectedUnit.phop3, selectedUnit.phop4, selectedUnit.phop5].filter(Boolean).length} Phòng`}
-                   bgClass="bg-purple-100" 
-                   colorClass="text-purple-600" 
-                   borderClass="border-purple-100"
-                />
-
-                <InfoCard 
                    icon={UserCheck} 
                    label="Lượt khách TB ra vào" 
                    value={`${selectedUnit.luotKhachTB} / ngày`}
@@ -495,182 +625,133 @@ const UnitList: React.FC<UnitListProps> = ({ units, onAdd, onEdit, onDelete, isR
               </div>
             </div>
 
-            {/* B. Thông tin Lãnh đạo */}
-            <div>
-              <h3 className="text-sm font-bold text-gray-900 uppercase mb-4 flex items-center gap-2">
-                 <span className="w-1.5 h-6 bg-primary rounded-r"></span>
-                 B. Thông tin Lãnh đạo
-              </h3>
-              <div className="bg-gradient-to-br from-blue-50 to-white rounded-xl p-4 md:p-5 border border-blue-100 shadow-sm flex flex-col sm:flex-row items-center sm:items-start gap-4 md:gap-5 text-center sm:text-left">
-                <div className="w-16 h-16 rounded-full bg-white border-2 border-blue-200 flex items-center justify-center text-blue-600 font-bold text-2xl shadow-sm shrink-0">
-                  {getAvatarChar(selectedUnit.hoTenLD)}
-                </div>
-                <div className="flex-1 w-full">
-                  <div className="flex flex-col md:flex-row md:justify-between md:items-start">
-                     <div>
-                        <span className="inline-block px-2 py-0.5 rounded bg-blue-100 text-blue-700 text-[10px] md:text-xs font-bold uppercase mb-1">{selectedUnit.ldDonVi}</span>
-                        <h4 className="text-lg md:text-xl font-bold text-gray-900">{selectedUnit.hoTenLD || 'Chưa cập nhật'}</h4>
-                     </div>
-                  </div>
-                  
-                  <div className="flex flex-wrap justify-center sm:justify-start gap-2 md:gap-3 mt-4">
-                    <a href={`tel:${selectedUnit.sdtLD}`} className="flex items-center gap-2 text-xs md:text-sm text-gray-700 hover:text-primary bg-white px-3 md:px-4 py-2 rounded-lg border border-gray-200 shadow-sm hover:shadow transition-all">
-                      <Phone className="w-3.5 h-3.5 md:w-4 md:h-4 text-green-500" /> 
-                      <span className="font-medium">{selectedUnit.sdtLD}</span>
-                    </a>
-                    <a href={`mailto:${selectedUnit.mailLD}`} className="flex items-center gap-2 text-xs md:text-sm text-gray-700 hover:text-primary bg-white px-3 md:px-4 py-2 rounded-lg border border-gray-200 shadow-sm hover:shadow transition-all">
-                      <Mail className="w-3.5 h-3.5 md:w-4 md:h-4 text-blue-500" /> 
-                      <span className="font-medium truncate max-w-[150px] md:max-w-none">{selectedUnit.mailLD}</span>
-                    </a>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* C. PT DV HTKD */}
-            <div>
-              <h3 className="text-sm font-bold text-gray-900 uppercase mb-4 flex items-center gap-2">
-                 <span className="w-1.5 h-6 bg-primary rounded-r"></span>
-                 C. Phụ trách DV HTKD/NHÂN SỰ
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
-                {[
-                  { role: selectedUnit.dvhtKd1, name: selectedUnit.hoTenDvht1, phone: selectedUnit.sdtDvht1, mail: selectedUnit.mailDvht1 },
-                  selectedUnit.hoTenDvht2 ? { role: selectedUnit.dvhtKd2, name: selectedUnit.hoTenDvht2, phone: selectedUnit.sdtDvht2, mail: selectedUnit.mailDvht2 } : null
-                ].filter(Boolean).map((staff, idx) => (
-                   <div key={idx} className="bg-white rounded-lg p-3 md:p-4 border border-gray-200 hover:border-gray-300 transition-colors shadow-sm">
-                      <div className="flex items-center gap-3 mb-3 md:mb-4">
-                         <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center text-xs md:text-sm font-bold text-gray-500">{idx + 1}</div>
-                         <div className="min-w-0">
-                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide truncate">{staff?.role}</p>
-                            <p className="text-sm md:text-base font-bold text-gray-900 truncate">{staff?.name}</p>
-                         </div>
-                      </div>
-                      <div className="space-y-2">
-                         <div className="flex items-center gap-2 md:gap-3 text-xs md:text-sm text-gray-600 bg-gray-50 p-2 rounded">
-                            <Phone className="w-3.5 h-3.5 md:w-4 md:h-4 text-gray-400" /> 
-                            {staff?.phone ? (
-                              <a href={`tel:${staff.phone}`} className="hover:text-primary font-medium transition-colors">
-                                {staff.phone}
-                              </a>
-                            ) : (
-                              <span className="text-gray-400">---</span>
-                            )}
-                         </div>
-                         <div className="flex items-center gap-2 md:gap-3 text-xs md:text-sm text-gray-600 bg-gray-50 p-2 rounded">
-                            <Mail className="w-3.5 h-3.5 md:w-4 md:h-4 text-gray-400" /> 
-                            {staff?.mail ? (
-                              <a href={`mailto:${staff.mail}`} className="hover:text-primary font-medium transition-colors truncate">
-                                {staff.mail}
-                              </a>
-                            ) : (
-                              <span className="text-gray-400">---</span>
-                            )}
-                         </div>
-                      </div>
-                   </div>
-                ))}
-              </div>
-            </div>
-
-            {/* D. Thống kê nhân sự */}
+            {/* D. An Ninh Bảo vệ, Đón tiếp khách hàng */}
             <div>
                <h3 className="text-sm font-bold text-gray-900 uppercase mb-4 flex items-center gap-2">
                  <span className="w-1.5 h-6 bg-primary rounded-r"></span>
-                 D. Thống kê Nhân sự
+                 D. An Ninh Bảo vệ, Đón tiếp khách hàng
                </h3>
                
-               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Table 1: AN-BV */}
-                  <div className="overflow-hidden rounded-xl border border-gray-200 shadow-sm bg-white">
-                      <div className="bg-blue-50 px-4 py-2 border-b border-blue-100 flex justify-between items-center">
-                          <span className="text-[10px] md:text-xs font-bold text-blue-700 uppercase">AN-BV, ĐTKH</span>
-                          <Users className="w-3.5 h-3.5 md:w-4 md:h-4 text-blue-400"/>
-                      </div>
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-xs md:text-sm">
-                            <tbody className="divide-y divide-gray-100">
-                                <tr>
-                                    <td className="px-3 md:px-4 py-2.5 md:py-3 text-gray-600">Nội bộ</td>
-                                    <td className="px-3 md:px-4 py-2.5 md:py-3 text-right font-mono font-medium">{selectedUnit.slAnBvNoiBo || 0}</td>
-                                </tr>
-                                <tr>
-                                    <td className="px-3 md:px-4 py-2.5 md:py-3 text-gray-600">Dịch vụ</td>
-                                    <td className="px-3 md:px-4 py-2.5 md:py-3 text-right font-mono font-medium">{selectedUnit.slAnBvDichVu || 0}</td>
-                                </tr>
-                            </tbody>
-                            <tfoot className="bg-gray-50 border-t border-gray-100">
-                                <tr>
-                                    <td className="px-3 md:px-4 py-2 font-bold text-gray-800 text-[10px] md:text-xs uppercase">Tổng cộng</td>
-                                    <td className="px-3 md:px-4 py-2 text-right font-bold text-primary font-mono">
-                                        {(selectedUnit.slAnBvNoiBo || 0) + (selectedUnit.slAnBvDichVu || 0)}
-                                    </td>
-                                </tr>
-                            </tfoot>
+               <div className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                     {/* Table 1: AN-BV */}
+                     <div className="overflow-hidden rounded-xl border border-gray-200 shadow-sm bg-white">
+                        <div className="bg-blue-50 px-4 py-2 border-b border-blue-100 flex justify-between items-center">
+                           <span className="text-[10px] md:text-xs font-bold text-blue-700 uppercase">AN-BV, ĐTKH</span>
+                           <Users className="w-3.5 h-3.5 md:w-4 md:h-4 text-blue-400"/>
+                        </div>
+                        <div className="overflow-x-auto">
+                           <table className="w-full text-xs md:text-sm">
+                              <tbody className="divide-y divide-gray-100">
+                                 <tr>
+                                       <td className="px-3 md:px-4 py-2.5 md:py-3 text-gray-600">Nội bộ</td>
+                                       <td className="px-3 md:px-4 py-2.5 md:py-3 text-right font-mono font-medium">{selectedUnit.slAnBvNoiBo || 0}</td>
+                                 </tr>
+                                 <tr>
+                                       <td className="px-3 md:px-4 py-2.5 md:py-3 text-gray-600">Dịch vụ</td>
+                                       <td className="px-3 md:px-4 py-2.5 md:py-3 text-right font-mono font-medium">{selectedUnit.slAnBvDichVu || 0}</td>
+                                 </tr>
+                              </tbody>
+                              <tfoot className="bg-gray-50 border-t border-gray-100">
+                                 <tr>
+                                       <td className="px-3 md:px-4 py-2 font-bold text-gray-800 text-[10px] md:text-xs uppercase">Tổng cộng</td>
+                                       <td className="px-3 md:px-4 py-2 text-right font-bold text-primary font-mono">
+                                          {(selectedUnit.slAnBvNoiBo || 0) + (selectedUnit.slAnBvDichVu || 0)}
+                                       </td>
+                                 </tr>
+                              </tfoot>
+                           </table>
+                        </div>
+                     </div>
+
+                     {/* Table 2: Camera */}
+                     <div className="overflow-hidden rounded-xl border border-gray-200 shadow-sm bg-white">
+                        <div className="bg-blue-50 px-4 py-2 border-b border-blue-100 flex justify-between items-center">
+                           <span className="text-xs font-bold text-blue-700 uppercase">Hệ thống Camera</span>
+                           <Camera className="w-4 h-4 text-blue-400"/>
+                        </div>
+                        <table className="w-full text-sm">
+                           <tbody className="divide-y divide-gray-100">
+                                 <tr>
+                                    <td className="px-4 py-3 text-gray-600">Số lượng Camera</td>
+                                    <td className="px-4 py-3 text-right font-mono font-medium">{selectedUnit.slCamera || 0} mắt</td>
+                                 </tr>
+                                 <tr>
+                                    <td className="px-4 py-3 text-gray-600">Thời gian lưu hình</td>
+                                    <td className="px-4 py-3 text-right font-mono font-medium">{selectedUnit.thoiGianLuuHinh || 0} ngày</td>
+                                 </tr>
+                           </tbody>
                         </table>
-                      </div>
+                     </div>
                   </div>
 
-                  {/* Table 2: PVHC */}
-                  <div className="overflow-hidden rounded-xl border border-gray-200 shadow-sm bg-white">
-                      <div className="bg-orange-50 px-4 py-2 border-b border-orange-100 flex justify-between items-center">
-                          <span className="text-[10px] md:text-xs font-bold text-orange-700 uppercase">Phục vụ Hậu cần</span>
-                          <Coffee className="w-3.5 h-3.5 md:w-4 md:h-4 text-orange-400"/>
-                      </div>
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-xs md:text-sm">
-                            <tbody className="divide-y divide-gray-100">
-                                <tr>
-                                    <td className="px-3 md:px-4 py-2.5 md:py-3 text-gray-600">Phục vụ / Khách</td>
-                                    <td className="px-3 md:px-4 py-2.5 md:py-3 text-right font-mono font-medium">{selectedUnit.slPvhcKhach || 0}</td>
-                                </tr>
-                                <tr>
-                                    <td className="px-3 md:px-4 py-2.5 md:py-3 text-gray-600">Vệ sinh</td>
-                                    <td className="px-3 md:px-4 py-2.5 md:py-3 text-right font-mono font-medium">{selectedUnit.slPvhcVs || 0}</td>
-                                </tr>
-                            </tbody>
-                            <tfoot className="bg-gray-50 border-t border-gray-100">
-                                <tr>
-                                    <td className="px-3 md:px-4 py-2 font-bold text-gray-800 text-[10px] md:text-xs uppercase">Tổng cộng</td>
-                                    <td className="px-3 md:px-4 py-2 text-right font-bold text-orange-600 font-mono">
-                                        {(selectedUnit.slPvhcKhach || 0) + (selectedUnit.slPvhcVs || 0)}
-                                    </td>
-                                </tr>
-                            </tfoot>
-                        </table>
-                      </div>
+                  {/* Geography */}
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+                     <div className="bg-white p-3 rounded-xl border border-gray-100 shadow-sm flex items-center gap-3">
+                        <div className="p-2 bg-slate-50 rounded-lg text-slate-400 shrink-0"><MoveUp className="w-4 h-4"/></div>
+                        <div className="min-w-0">
+                           <p className="text-[10px] font-bold text-gray-400 uppercase truncate">Phía trước</p>
+                           <p className="text-sm font-medium text-gray-800 truncate">{selectedUnit.phiaTruoc || '---'}</p>
+                        </div>
+                     </div>
+                     <div className="bg-white p-3 rounded-xl border border-gray-100 shadow-sm flex items-center gap-3">
+                        <div className="p-2 bg-slate-50 rounded-lg text-slate-400 shrink-0"><MoveDown className="w-4 h-4"/></div>
+                        <div className="min-w-0">
+                           <p className="text-[10px] font-bold text-gray-400 uppercase truncate">Phía sau</p>
+                           <p className="text-sm font-medium text-gray-800 truncate">{selectedUnit.phiaSau || '---'}</p>
+                        </div>
+                     </div>
+                     <div className="bg-white p-3 rounded-xl border border-gray-100 shadow-sm flex items-center gap-3">
+                        <div className="p-2 bg-slate-50 rounded-lg text-slate-400 shrink-0"><MoveLeft className="w-4 h-4"/></div>
+                        <div className="min-w-0">
+                           <p className="text-[10px] font-bold text-gray-400 uppercase truncate">Bên trái</p>
+                           <p className="text-sm font-medium text-gray-800 truncate">{selectedUnit.benTrai || '---'}</p>
+                        </div>
+                     </div>
+                     <div className="bg-white p-3 rounded-xl border border-gray-100 shadow-sm flex items-center gap-3">
+                        <div className="p-2 bg-slate-50 rounded-lg text-slate-400 shrink-0"><MoveRight className="w-4 h-4"/></div>
+                        <div className="min-w-0">
+                           <p className="text-[10px] font-bold text-gray-400 uppercase truncate">Bên phải</p>
+                           <p className="text-sm font-medium text-gray-800 truncate">{selectedUnit.benPhai || '---'}</p>
+                        </div>
+                     </div>
+                  </div>
+
+                  {/* Assessment & Plan */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                     <div className="p-4 bg-yellow-50 rounded-xl border border-yellow-100 shadow-sm">
+                        <h4 className="text-xs font-bold text-yellow-800 uppercase mb-2 flex items-center gap-2">
+                           <Shield className="w-4 h-4" /> Nhận định tình hình ANTT
+                        </h4>
+                        <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">
+                           {selectedUnit.thuctrangANBV || <span className="text-gray-400 italic">Chưa cập nhật thực trạng.</span>}
+                        </p>
+                     </div>
+                     <a 
+                        href={selectedUnit.phuongAnAnBv && selectedUnit.phuongAnAnBv !== '#' ? selectedUnit.phuongAnAnBv : undefined}
+                        target="_blank"
+                        rel="noreferrer"
+                        className={`flex items-center justify-between p-4 rounded-xl border transition-all duration-200 group bg-emerald-50 border-emerald-100 ${selectedUnit.phuongAnAnBv && selectedUnit.phuongAnAnBv !== '#' ? 'hover:shadow-md cursor-pointer hover:-translate-y-0.5' : 'opacity-60 cursor-not-allowed grayscale'}`}
+                     >
+                        <div className="flex items-center gap-3">
+                           <div className="p-2 rounded-lg bg-white shadow-sm text-emerald-600">
+                             <Shield className="w-5 h-5" />
+                           </div>
+                           <span className="font-semibold text-gray-800">Phương án ANBV</span>
+                        </div>
+                        {selectedUnit.phuongAnAnBv && selectedUnit.phuongAnAnBv !== '#' && <ExternalLink className="w-4 h-4 text-gray-400 group-hover:text-primary" />}
+                     </a>
                   </div>
                </div>
             </div>
 
-            {/* E. Hệ thống An ninh & PCCC */}
+            {/* E. Phòng cháy chữa cháy */}
             <div>
                <h3 className="text-sm font-bold text-gray-900 uppercase mb-4 flex items-center gap-2">
-                 <span className="w-1.5 h-6 bg-primary rounded-r"></span>
-                 E. Hệ thống An ninh & PCCC
+                 <span className="w-1.5 h-6 bg-red-500 rounded-r"></span>
+                 E. Phòng cháy chữa cháy
                </h3>
                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Table 1: Camera (Blue Theme matching AN-BV) */}
-                  <div className="overflow-hidden rounded-xl border border-gray-200 shadow-sm bg-white">
-                      <div className="bg-blue-50 px-4 py-2 border-b border-blue-100 flex justify-between items-center">
-                          <span className="text-xs font-bold text-blue-700 uppercase">Hệ thống Camera</span>
-                          <Camera className="w-4 h-4 text-blue-400"/>
-                      </div>
-                      <table className="w-full text-sm">
-                          <tbody className="divide-y divide-gray-100">
-                              <tr>
-                                  <td className="px-4 py-3 text-gray-600">Số lượng Camera</td>
-                                  <td className="px-4 py-3 text-right font-mono font-medium">{selectedUnit.slCamera || 0} mắt</td>
-                              </tr>
-                              <tr>
-                                  <td className="px-4 py-3 text-gray-600">Thời gian lưu hình</td>
-                                  <td className="px-4 py-3 text-right font-mono font-medium">{selectedUnit.thoiGianLuuHinh || 0} ngày</td>
-                              </tr>
-                          </tbody>
-                      </table>
-                  </div>
-
-                  {/* Table 2: PCCC (Red Theme matching PVHC style but with red) */}
                   <div className="overflow-hidden rounded-xl border border-gray-200 shadow-sm bg-white">
                       <div className="bg-red-50 px-4 py-2 border-b border-red-100 flex justify-between items-center">
                           <span className="text-xs font-bold text-red-700 uppercase">Hệ thống PCCC</span>
@@ -707,94 +788,136 @@ const UnitList: React.FC<UnitListProps> = ({ units, onAdd, onEdit, onDelete, isR
                           </tbody>
                       </table>
                   </div>
-               </div>
-            </div>
-
-            {/* F. Các Phương án */}
-            <div>
-               <h3 className="text-sm font-bold text-gray-900 uppercase mb-4 flex items-center gap-2">
-                 <span className="w-1.5 h-6 bg-primary rounded-r"></span>
-                 F. Các Phương Án
-               </h3>
-               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {[
-                     { name: 'P.Án PCTT', link: selectedUnit.phuonganpctt, icon: CloudRain, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-100' },
-                     { name: 'P.Án PCCN', link: selectedUnit.phuonganpccn, icon: Flame, color: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-100' },
-                     { name: 'P.Án ANBV', link: selectedUnit.phuongAnAnBv, icon: Shield, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100' },
-                  ].map((item, idx) => (
+                  <div className="flex flex-col gap-4">
                      <a 
-                        key={idx}
-                        href={item.link && item.link !== '#' ? item.link : undefined}
+                        href={selectedUnit.phuonganpccn && selectedUnit.phuonganpccn !== '#' ? selectedUnit.phuonganpccn : undefined}
                         target="_blank"
                         rel="noreferrer"
-                        className={`flex items-center justify-between p-4 rounded-xl border transition-all duration-200 group ${item.bg} ${item.border} ${item.link && item.link !== '#' ? 'hover:shadow-md cursor-pointer hover:-translate-y-0.5' : 'opacity-60 cursor-not-allowed grayscale'}`}
+                        className={`flex items-center justify-between p-4 rounded-xl border transition-all duration-200 group bg-orange-50 border-orange-100 ${selectedUnit.phuonganpccn && selectedUnit.phuonganpccn !== '#' ? 'hover:shadow-md cursor-pointer hover:-translate-y-0.5' : 'opacity-60 cursor-not-allowed grayscale'}`}
                      >
                         <div className="flex items-center gap-3">
-                           <div className={`p-2 rounded-lg bg-white shadow-sm ${item.color}`}>
-                             <item.icon className="w-5 h-5" />
+                           <div className="p-2 rounded-lg bg-white shadow-sm text-orange-600">
+                             <Flame className="w-5 h-5" />
                            </div>
-                           <span className="font-semibold text-gray-800">{item.name}</span>
+                           <span className="font-semibold text-gray-800">Phương án PCCN</span>
                         </div>
-                        {item.link && item.link !== '#' && <ExternalLink className="w-4 h-4 text-gray-400 group-hover:text-primary" />}
+                        {selectedUnit.phuonganpccn && selectedUnit.phuonganpccn !== '#' && <ExternalLink className="w-4 h-4 text-gray-400 group-hover:text-primary" />}
                      </a>
-                  ))}
-               </div>
-            </div>
-
-            {/* G. Tiếp giáp địa lý */}
-            <div>
-               <h3 className="text-sm font-bold text-gray-900 uppercase mb-4 flex items-center gap-2">
-                 <span className="w-1.5 h-6 bg-emerald-500 rounded-r"></span>
-                 G. Tiếp giáp Địa lý
-               </h3>
-               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
-                  <div className="bg-white p-3 rounded-xl border border-gray-100 shadow-sm flex items-center gap-3">
-                      <div className="p-2 bg-slate-50 rounded-lg text-slate-400 shrink-0"><MoveUp className="w-4 h-4"/></div>
-                      <div className="min-w-0">
-                        <p className="text-[10px] font-bold text-gray-400 uppercase truncate">Phía trước</p>
-                        <p className="text-sm font-medium text-gray-800 truncate">{selectedUnit.phiaTruoc || '---'}</p>
-                      </div>
-                  </div>
-                  <div className="bg-white p-3 rounded-xl border border-gray-100 shadow-sm flex items-center gap-3">
-                      <div className="p-2 bg-slate-50 rounded-lg text-slate-400 shrink-0"><MoveRight className="w-4 h-4"/></div>
-                      <div className="min-w-0">
-                        <p className="text-[10px] font-bold text-gray-400 uppercase truncate">Bên phải</p>
-                        <p className="text-sm font-medium text-gray-800 truncate">{selectedUnit.benPhai || '---'}</p>
-                      </div>
-                  </div>
-                  <div className="bg-white p-3 rounded-xl border border-gray-100 shadow-sm flex items-center gap-3">
-                      <div className="p-2 bg-slate-50 rounded-lg text-slate-400 shrink-0"><MoveLeft className="w-4 h-4"/></div>
-                      <div className="min-w-0">
-                        <p className="text-[10px] font-bold text-gray-400 uppercase truncate">Bên trái</p>
-                        <p className="text-sm font-medium text-gray-800 truncate">{selectedUnit.benTrai || '---'}</p>
-                      </div>
-                  </div>
-                  <div className="bg-white p-3 rounded-xl border border-gray-100 shadow-sm flex items-center gap-3">
-                      <div className="p-2 bg-slate-50 rounded-lg text-slate-400 shrink-0"><MoveDown className="w-4 h-4"/></div>
-                      <div className="min-w-0">
-                        <p className="text-[10px] font-bold text-gray-400 uppercase truncate">Phía sau</p>
-                        <p className="text-sm font-medium text-gray-800 truncate">{selectedUnit.phiaSau || '---'}</p>
-                      </div>
                   </div>
                </div>
             </div>
-         
 
-            {/* H. Thực trạng AN-BV */}
+            {/* F. An toàn Vệ sinh lao động */}
             <div>
                <h3 className="text-sm font-bold text-gray-900 uppercase mb-4 flex items-center gap-2">
-                 <span className="w-1.5 h-6 bg-primary rounded-r"></span>
-                 H. Thực trạng AN-BV
+                 <span className="w-1.5 h-6 bg-yellow-500 rounded-r"></span>
+                 F. An toàn Vệ sinh lao động
                </h3>
-               <div className="p-5 bg-yellow-50 rounded-xl border border-yellow-100 text-sm text-gray-800 leading-relaxed whitespace-pre-wrap shadow-sm">
-                  {selectedUnit.thuctrangANBV ? (
-                    <div className="flex gap-3">
-                       <Shield className="w-5 h-5 text-yellow-600 shrink-0 mt-0.5" />
-                       <p>{selectedUnit.thuctrangANBV}</p>
-                    </div>
-                  ) : (
-                    <span className="text-gray-400 italic">Chưa cập nhật thực trạng.</span>
-                  )}
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="overflow-hidden rounded-xl border border-gray-200 shadow-sm bg-white">
+                      <div className="bg-yellow-50 px-4 py-2 border-b border-yellow-100 flex justify-between items-center">
+                          <span className="text-xs font-bold text-yellow-700 uppercase">Thống kê ATVSLD</span>
+                          <UserCheck className="w-4 h-4 text-yellow-400"/>
+                      </div>
+                      <table className="w-full text-sm">
+                          <tbody className="divide-y divide-gray-100">
+                              <tr>
+                                  <td className="px-4 py-3 text-gray-600">Nội bộ</td>
+                                  <td className="px-4 py-3 text-right font-mono font-medium">{selectedUnit.slAtvsldNoiBo || 0}</td>
+                              </tr>
+                              <tr>
+                                  <td className="px-4 py-3 text-gray-600">Dịch vụ</td>
+                                  <td className="px-4 py-3 text-right font-mono font-medium">{selectedUnit.slAtvsldDichVu || 0}</td>
+                              </tr>
+                          </tbody>
+                          <tfoot className="bg-gray-50 border-t border-gray-100">
+                              <tr>
+                                  <td className="px-4 py-2 font-bold text-gray-800 text-xs uppercase">Tổng cộng</td>
+                                  <td className="px-4 py-2 text-right font-bold text-yellow-600 font-mono">
+                                      {(selectedUnit.slAtvsldNoiBo || 0) + (selectedUnit.slAtvsldDichVu || 0)}
+                                  </td>
+                              </tr>
+                          </tfoot>
+                      </table>
+                  </div>
+                  <div className="flex flex-col gap-4">
+                     <a 
+                        href={selectedUnit.phuonganAtvsld && selectedUnit.phuonganAtvsld !== '#' ? selectedUnit.phuonganAtvsld : undefined}
+                        target="_blank"
+                        rel="noreferrer"
+                        className={`flex items-center justify-between p-4 rounded-xl border transition-all duration-200 group bg-yellow-50 border-yellow-100 ${selectedUnit.phuonganAtvsld && selectedUnit.phuonganAtvsld !== '#' ? 'hover:shadow-md cursor-pointer hover:-translate-y-0.5' : 'opacity-60 cursor-not-allowed grayscale'}`}
+                     >
+                        <div className="flex items-center gap-3">
+                           <div className="p-2 rounded-lg bg-white shadow-sm text-yellow-600">
+                             <CheckCircle2 className="w-5 h-5" />
+                           </div>
+                           <span className="font-semibold text-gray-800">Phương án ATVSLD</span>
+                        </div>
+                        {selectedUnit.phuonganAtvsld && selectedUnit.phuonganAtvsld !== '#' && <ExternalLink className="w-4 h-4 text-gray-400 group-hover:text-primary" />}
+                     </a>
+                  </div>
+               </div>
+            </div>
+
+            {/* G. Phòng chống thiên tai */}
+            <div>
+               <h3 className="text-sm font-bold text-gray-900 uppercase mb-4 flex items-center gap-2">
+                 <span className="w-1.5 h-6 bg-blue-400 rounded-r"></span>
+                 G. Phòng chống thiên tai
+               </h3>
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <a 
+                     href={selectedUnit.phuonganpctt && selectedUnit.phuonganpctt !== '#' ? selectedUnit.phuonganpctt : undefined}
+                     target="_blank"
+                     rel="noreferrer"
+                     className={`flex items-center justify-between p-4 rounded-xl border transition-all duration-200 group bg-blue-50 border-blue-100 ${selectedUnit.phuonganpctt && selectedUnit.phuonganpctt !== '#' ? 'hover:shadow-md cursor-pointer hover:-translate-y-0.5' : 'opacity-60 cursor-not-allowed grayscale'}`}
+                  >
+                     <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-lg bg-white shadow-sm text-blue-600">
+                          <CloudRain className="w-5 h-5" />
+                        </div>
+                        <span className="font-semibold text-gray-800">Phương án PCTT</span>
+                     </div>
+                     {selectedUnit.phuonganpctt && selectedUnit.phuonganpctt !== '#' && <ExternalLink className="w-4 h-4 text-gray-400 group-hover:text-primary" />}
+                  </a>
+               </div>
+            </div>
+
+            {/* H. Phục vụ hậu cần */}
+            <div>
+               <h3 className="text-sm font-bold text-gray-900 uppercase mb-4 flex items-center gap-2">
+                 <span className="w-1.5 h-6 bg-orange-400 rounded-r"></span>
+                 H. Phục vụ hậu cần
+               </h3>
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="overflow-hidden rounded-xl border border-gray-200 shadow-sm bg-white">
+                      <div className="bg-orange-50 px-4 py-2 border-b border-orange-100 flex justify-between items-center">
+                          <span className="text-[10px] md:text-xs font-bold text-orange-700 uppercase">Thống kê Phục vụ Hậu cần</span>
+                          <Coffee className="w-3.5 h-3.5 md:w-4 md:h-4 text-orange-400"/>
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-xs md:text-sm">
+                            <tbody className="divide-y divide-gray-100">
+                                <tr>
+                                    <td className="px-3 md:px-4 py-2.5 md:py-3 text-gray-600">Phục vụ / Khách</td>
+                                    <td className="px-3 md:px-4 py-2.5 md:py-3 text-right font-mono font-medium">{selectedUnit.slPvhcKhach || 0}</td>
+                                </tr>
+                                <tr>
+                                    <td className="px-3 md:px-4 py-2.5 md:py-3 text-gray-600">Vệ sinh</td>
+                                    <td className="px-3 md:px-4 py-2.5 md:py-3 text-right font-mono font-medium">{selectedUnit.slPvhcVs || 0}</td>
+                                </tr>
+                            </tbody>
+                            <tfoot className="bg-gray-50 border-t border-gray-100">
+                                <tr>
+                                    <td className="px-3 md:px-4 py-2 font-bold text-gray-800 text-[10px] md:text-xs uppercase">Tổng cộng</td>
+                                    <td className="px-3 md:px-4 py-2 text-right font-bold text-orange-600 font-mono">
+                                        {(selectedUnit.slPvhcKhach || 0) + (selectedUnit.slPvhcVs || 0)}
+                                    </td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                      </div>
+                  </div>
                </div>
             </div>
 
@@ -841,7 +964,7 @@ const UnitList: React.FC<UnitListProps> = ({ units, onAdd, onEdit, onDelete, isR
                              </tr>
                            );
                         })}
-                        {![1, 2, 3].some(i => selectedUnit[`phop${i}` as keyof DonVi]) && (
+                        {![1, 2, 3, 4, 5].some(i => selectedUnit[`phop${i}` as keyof DonVi]) && (
                           <tr>
                             <td colSpan={6} className="px-4 py-8 text-center text-gray-400 italic">
                               Chưa có thông tin phòng họp.

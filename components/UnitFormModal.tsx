@@ -13,22 +13,24 @@ interface UnitFormModalProps {
 const MIEN_OPTIONS = ['VPĐH', 'CTy TT Phía Nam', 'CTy TT Phía Bắc'];
 const LOAI_HINH_OPTIONS = ['Văn phòng', 'Showroom', 'Đại lý'];
 const LD_OPTIONS = ['PCT TT', 'Tổng Giám đốc', 'P. Tổng Giám đốc', 'Giám đốc SR', 'P. Giám đốc SR', 'Trưởng phòng', 'Phó phòng'];
-const DVHT_OPTIONS = ['PT DV HTKD', 'CV DV HTKD', 'Tổ trưởng AN-BV, ĐTKH', 'Tổ trưởng PVHC', 'Tổ trưởng AN-BV, ĐTKH & PVHC', 'AN-BV, ĐTKH', 'PVHC', 'Đầu mối HR'];
+const DVHT_OPTIONS = ['PT DV HTKD', 'CV DV HTKD', 'PT Nhân sự', 'Tổ trưởng AN-BV, ĐTKH', 'Tổ trưởng PVHC', 'Tổ trưởng AN-BV, ĐTKH & PVHC', 'AN-BV, ĐTKH', 'PVHC', 'Đầu mối HR'];
 const TRANG_THAI_OPTIONS = ['Hoạt động', 'Đại lý', 'Đầu tư mới'];
 
 const emptyUnit: DonVi = {
   id: '', mien: '', tenDonVi: '', maDonVi: '', maCapTren: '', diaChi: '', loaiHinh: '',
   soCong: 0, dienTich: 0, ham: 0, tang: 0, phongCho: 0, luotKhachTB: 0, 
   ldDonVi: '', hoTenLD: '', sdtLD: '', mailLD: '', 
-  dvhtKd1: '', hoTenDvht1: '', sdtDvht1: '', mailDvht1: '', 
+  cdLanhDaoKdx: '', hoTenLdKdx: '', sdtLdKdx: '', mailLdKdx: '',
+  cdLanhDaoDvpt: '', hoTenLdDvpt: '', sdtLdDvpt: '', mailLdDvpt: '',
+  sdtDvht1: '', mailDvht1: '', 
   dvhtKd2: '', hoTenDvht2: '', sdtDvht2: '', mailDvht2: '',
-  tongNsAnBv: 0, tongNsPvhc: 0, slAnBvNoiBo: 0, slAnBvDichVu: 0, 
-  slPvhcKhach: 0, slPvhcVs: 0, soCbNv: 0, trangThai: 'Hoạt động',
+  tongNsAnBv: 0, tongNsPvhc: 0, 
+  slAnBvNoiBo: 0, slAnBvDichVu: 0, slPvhcKhach: 0, slPvhcVs: 0, 
+  soCbNv: 0, trangThai: 'Hoạt động',
   phuonganpctt: '', phuonganpccn: '', phuongAnAnBv: '', thuctrangANBV: '',
   phiaTruoc: '', benPhai: '', benTrai: '', phiaSau: '',
   dinhBienAN: 0, anbvNgayCoDinh: 0, anbvNgayTuanTra: 0, anbvDemCoDinh: 0, anbvDemTuanTra: 0,
   viTriBvDv: '', chiPhiBvDv: 0, dinhBienPVHC: 0, pvhcdv: '', chiPhiPvhcDv: 0,
-  // New fields init
   slCamera: 0, thoiGianLuuHinh: 0, htBaoChayTuDong: false, viTriTuBaoChay: '', heThongBomPccc: false
 };
 
@@ -201,6 +203,28 @@ const UnitFormModal: React.FC<UnitFormModalProps> = ({ isOpen, onClose, onSave, 
                        <input name="mailLD" value={formData.mailLD || ''} onChange={handleChange} className={`${INPUT_CLASS} pl-8`} placeholder="Email" />
                     </div>
                   </div>
+
+                  {/* Kinh doanh xe & Kinh doanh DVPT */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 border-t border-orange-200 pt-4 relative z-10">
+                    <div className="space-y-3 bg-white/50 p-3 rounded-lg border border-orange-100">
+                      <p className="text-[10px] font-bold text-orange-700 uppercase">Kinh doanh xe</p>
+                      <input name="cdLanhDaoKdx" value={formData.cdLanhDaoKdx || ''} onChange={handleChange} className={INPUT_CLASS} placeholder="Chức danh KDX" />
+                      <input name="hoTenLdKdx" value={formData.hoTenLdKdx || ''} onChange={handleChange} className={INPUT_CLASS} placeholder="Họ tên KDX" />
+                      <div className="grid grid-cols-2 gap-2">
+                        <input name="sdtLdKdx" value={formData.sdtLdKdx || ''} onChange={handleChange} className={INPUT_CLASS} placeholder="SĐT KDX" />
+                        <input name="mailLdKdx" value={formData.mailLdKdx || ''} onChange={handleChange} className={INPUT_CLASS} placeholder="Email KDX" />
+                      </div>
+                    </div>
+                    <div className="space-y-3 bg-white/50 p-3 rounded-lg border border-orange-100">
+                      <p className="text-[10px] font-bold text-orange-700 uppercase">Kinh doanh DVPT</p>
+                      <input name="cdLanhDaoDvpt" value={formData.cdLanhDaoDvpt || ''} onChange={handleChange} className={INPUT_CLASS} placeholder="Chức danh DVPT" />
+                      <input name="hoTenLdDvpt" value={formData.hoTenLdDvpt || ''} onChange={handleChange} className={INPUT_CLASS} placeholder="Họ tên DVPT" />
+                      <div className="grid grid-cols-2 gap-2">
+                        <input name="sdtLdDvpt" value={formData.sdtLdDvpt || ''} onChange={handleChange} className={INPUT_CLASS} placeholder="SĐT DVPT" />
+                        <input name="mailLdDvpt" value={formData.mailLdDvpt || ''} onChange={handleChange} className={INPUT_CLASS} placeholder="Email DVPT" />
+                      </div>
+                    </div>
+                  </div>
                </div>
             </div>
           </div>
@@ -213,17 +237,6 @@ const UnitFormModal: React.FC<UnitFormModalProps> = ({ isOpen, onClose, onSave, 
                   <div className="flex items-center gap-2 mb-2">
                      <span className="w-8 h-8 rounded-full bg-gray-100 text-gray-600 flex items-center justify-center text-xs font-bold border border-gray-200">01</span>
                      <span className="text-sm font-bold text-gray-800 uppercase">Phụ trách DV HTKD 1</span>
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Vị trí / Chức danh</label>
-                    <select name="dvhtKd1" value={formData.dvhtKd1 || ''} onChange={handleChange} className={INPUT_CLASS}>
-                      <option value="">-- Chọn Vị trí --</option>
-                      {DVHT_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Họ và Tên</label>
-                    <input name="hoTenDvht1" value={formData.hoTenDvht1 || ''} onChange={handleChange} className={INPUT_CLASS} />
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     <div className="relative">
@@ -240,7 +253,7 @@ const UnitFormModal: React.FC<UnitFormModalProps> = ({ isOpen, onClose, onSave, 
                <div className="space-y-3 p-4 rounded-xl border border-gray-200 bg-white">
                   <div className="flex items-center gap-2 mb-2">
                      <span className="w-8 h-8 rounded-full bg-gray-100 text-gray-600 flex items-center justify-center text-xs font-bold border border-gray-200">02</span>
-                     <span className="text-sm font-bold text-gray-800 uppercase">Phụ trách DV HTKD 2 (Nếu có)</span>
+                     <span className="text-sm font-bold text-gray-800 uppercase">Phụ trách DV HTKD 2</span>
                   </div>
                   <div>
                     <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Vị trí / Chức danh</label>
@@ -365,13 +378,33 @@ const UnitFormModal: React.FC<UnitFormModalProps> = ({ isOpen, onClose, onSave, 
                   </div>
                 )}
               </div>
+
+              <div className="mt-6">
+                <h4 className="text-[11px] font-bold text-yellow-700 mb-2 uppercase border-l-2 border-yellow-500 pl-2">
+                  AN TOÀN VỆ SINH LAO ĐỘNG
+                </h4>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-600 mb-1">SL ATVSLD Nội bộ</label>
+                    <input type="number" name="slAtvsldNoiBo" value={formData.slAtvsldNoiBo || 0} onChange={handleChange} className={INPUT_CLASS} />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-600 mb-1">SL ATVSLD Dịch vụ</label>
+                    <input type="number" name="slAtvsldDichVu" value={formData.slAtvsldDichVu || 0} onChange={handleChange} className={INPUT_CLASS} />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-yellow-700 mb-1">Tổng ATVSLD</label>
+                    <input type="number" readOnly value={(Number(formData.slAtvsldNoiBo) || 0) + (Number(formData.slAtvsldDichVu) || 0)} className={`${INPUT_CLASS} bg-gray-100 font-bold text-yellow-700`} />
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
           {/* 5. HỒ SƠ & PHƯƠNG ÁN */}
           <div>
              <h3 className={SECTION_TITLE}><FileText className="w-4 h-4 text-purple-500"/> 5. Hồ sơ & Phương án (Link)</h3>
-             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
                <div>
                   <label className="block text-[10px] font-bold text-gray-700 mb-1 uppercase flex items-center gap-1"><LinkIcon className="w-3 h-3"/> P.Án PCTT</label>
                   <input name="phuonganpctt" value={formData.phuonganpctt || ''} onChange={handleChange} className={INPUT_CLASS} placeholder="https://..." />
