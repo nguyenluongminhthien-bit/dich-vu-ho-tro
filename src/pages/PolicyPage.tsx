@@ -1,0 +1,449 @@
+import React, { useState, useEffect, useMemo } from 'react';
+import { 
+  Search, Plus, Edit, Trash2, X, AlertCircle, Loader2, Save, 
+  BookOpen, Link as LinkIcon, Calendar, Eye, Bookmark, Briefcase, Filter, Info
+} from 'lucide-react';
+import { apiService } from '../services/api';
+import { QuyDinhQuyTrinh, VanBan } from '../types';
+import { useAuth } from '../contexts/AuthContext';
+
+// Mở rộng interface để thêm cờ đánh dấu tài liệu mượn từ bảng Văn bản
+interface PolicyItem extends QuyDinhQuyTrinh {
+  isFromVB?: boolean;
+}
+
+export default function PolicyPage() {
+  const { user } = useAuth();
+  const [qdData, setQdData] = useState<PolicyItem[]>([]);
+  
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Layout & Filters
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isListCollapsed, setIsListCollapsed] = useState(false);
+  const [selectedNghiepvu, setSelectedNghiepvu] = useState<string | null>(null);
+
+  // Modals
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalMode, setModalMode] = useState<'create' | 'update'>('create');
+  const [formData, setFormData] = useState<Partial<PolicyItem>>({});
+  
+  // View Modal
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const [viewData, setViewData] = useState<PolicyItem | null>(null);
+
+  // Delete Modal
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState<string | null>(null);
+
+  const loadData = async () => {
+    setLoading(true); setError(null);
+    try {
+      // Fetch đồng thời cả Quy định (QD_QT) và Văn bản (VB_TB)
+      const [qdResult, vbResult] = await Promise.all([
+        apiService.getQuyDinh().catch(() => [] as QuyDinhQuyTrinh[]),
+        apiService.getVanBan().catch(() => [] as VanBan[])
+      ]);
+
+      // 1. Dữ liệu gốc của Quy định
+      const mappedQd: PolicyItem[] = (qdResult || []).map(item => ({
+        ...item,
+        isFromVB: false
+      }));
+
+      // 2. Lọc & Chuyển đổi dữ liệu từ Văn bản (Chỉ lấy VB có điền Nghiệp vụ)
+      const mappedVb: PolicyItem[] = (vbResult || [])
+        .filter((item: VanBan) => item.Nghiepvu && item.Nghiepvu.trim() !== '')
+        .map((item: VanBan) => ({
+          ID_QDQT: item.ID_VanBan,
+          Phanloai: item.Phanloai,
+          Sohieu: item.Sohieu,
+          ngayBanHanh: item.NgayBanHanh,
+          TieuDe: item.TieuDe,
+          Noidung: item.Noidung,
+          Nghiepvu: item.Nghiepvu,
+          linkFile: item.Link_FileDinhKem,
+          isFromVB: true // Đánh dấu là mượn từ VB
+        }));
+
+      // 3. Gộp 2 mảng lại
+      const combinedData = [...mappedQd, ...mappedVb];
+      
+      // Có thể sort theo ngày ban hành mới nhất
+      combinedData.sort((a, b) => new Date(b.ngayBanHanh).getTime() - new Date(a.ngayBanHanh).getTime());
+
+      setQdData(combinedData);
+    } catch (err: any) { 
+      setError(err.message || 'Lỗi tải dữ liệu Hệ thống.'); 
+    } finally { 
+      setLoading(false); 
+    }
+  };
+
+  useEffect(() => { loadData(); }, []);
+
+  // TỰ ĐỘNG LẤY DANH SÁCH NGHIỆP VỤ ĐỂ LÀM MENU BÊN TRÁI
+  const uniqueNghiepvu = useMemo(() => {
+    const list = qdData.map(item => item.Nghiepvu).filter(Boolean);
+    return Array.from(new Set(list)).sort();
+  }, [qdData]);
+
+  // GỢI Ý CHO PHÂN LOẠI (AUTOCOMPLETE)
+  const uniquePhanloai = useMemo(() => {
+    const list = qdData.map(item => item.Phanloai).filter(Boolean);
+    return Array.from(new Set(list)).sort();
+  }, [qdData]);
+
+  // LỌC DỮ LIỆU BẢNG
+  const filteredDocs = useMemo(() => {
+    let result = qdData;
+    
+    if (selectedNghiepvu) {
+      result = result.filter(item => item.Nghiepvu === selectedNghiepvu);
+    }
+    
+    if (searchTerm) {
+      const lower = searchTerm.toLowerCase();
+      result = result.filter(item => 
+        (item.Sohieu?.toLowerCase().includes(lower)) || 
+        (item.TieuDe?.toLowerCase().includes(lower)) ||
+        (item.Nghiepvu?.toLowerCase().includes(lower)) ||
+        (item.Phanloai?.toLowerCase().includes(lower))
+      );
+    }
+    return result;
+  }, [qdData, searchTerm, selectedNghiepvu]);
+
+  const openModal = (mode: 'create' | 'update', item?: PolicyItem) => {
+    setModalMode(mode);
+    if (item) { 
+      setFormData({ ...item, ngayBanHanh: item.ngayBanHanh ? item.ngayBanHanh.split('T')[0] : '' }); 
+    } else {
+      setFormData({
+        ID_QDQT: '', Phanloai: 'Quy trình', Sohieu: '', 
+        ngayBanHanh: new Date().toISOString().split('T')[0], 
+        TieuDe: '', Noidung: '', Nghiepvu: selectedNghiepvu || '', linkFile: ''
+      });
+    }
+    setIsModalOpen(true); setError(null);
+  };
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.Nghiepvu) return alert("Vui lòng nhập/chọn Nghiệp vụ!");
+    
+    setSubmitting(true); setError(null);
+    try {
+      const response = await apiService.save(formData, modalMode, "QD_QT");
+      if (modalMode === 'create') {
+        const newItem = { ...formData, ID_QDQT: response.newId, isFromVB: false } as PolicyItem;
+        setQdData(prev => [newItem, ...prev]); 
+      } else {
+        setQdData(prev => prev.map(item => item.ID_QDQT === formData.ID_QDQT ? { ...formData, isFromVB: false } as PolicyItem : item));
+      }
+      setIsModalOpen(false); 
+    } catch (err: any) { 
+      setError(err.message || 'Lỗi lưu dữ liệu.'); 
+    } finally { 
+      setSubmitting(false); 
+    }
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const confirmDelete = async () => {
+    if (!itemToDelete) return; 
+    setSubmitting(true);
+    try {
+      await apiService.delete(itemToDelete, "QD_QT");
+      setQdData(prev => prev.filter(item => item.ID_QDQT !== itemToDelete));
+      setIsConfirmOpen(false); setItemToDelete(null); 
+    } catch (err: any) { 
+      setError(err.message || 'Lỗi xóa dữ liệu.'); 
+    } finally { 
+      setSubmitting(false); 
+    }
+  };
+
+  // Hàm xử lý cảnh báo khi click Sửa/Xóa vào tài liệu từ Văn Bản
+  const handleBlockedAction = (action: 'Sửa' | 'Xóa') => {
+    alert(`Đây là tài liệu được đồng bộ từ mục "Văn bản - Thông báo".\n\nVui lòng sang mục Văn bản để ${action} tài liệu này!`);
+  };
+
+  return (
+    <div className="flex h-full bg-[#f4f7f9] overflow-hidden relative">
+      {/* NÚT MỞ RỘNG CỘT TRÁI NẾU BỊ ẨN */}
+      {isListCollapsed && (
+        <button onClick={() => setIsListCollapsed(false)} className="absolute top-6 left-6 z-20 bg-white p-2.5 rounded-lg shadow-md border border-gray-200 text-[#05469B] hover:bg-blue-50 transition-all">
+          <Filter size={20} />
+        </button>
+      )}
+
+      {/* CỘT TRÁI: NHÓM THEO NGHIỆP VỤ */}
+      <div className={`${isListCollapsed ? 'w-0 opacity-0' : 'w-72 opacity-100'} transition-all duration-300 ease-in-out bg-white border-r border-gray-200 flex flex-col h-full shadow-sm z-10 shrink-0 overflow-hidden`}>
+        <div className="p-4 border-b border-gray-100">
+          <div className="flex justify-between items-center mb-2">
+            <h2 className="text-lg font-bold text-[#05469B] flex items-center gap-2 whitespace-nowrap"><Bookmark size={20} /> Nhóm Nghiệp Vụ</h2>
+            <button onClick={() => setIsListCollapsed(true)} className="p-1.5 text-gray-400 hover:text-[#05469B] hover:bg-blue-50 rounded-md transition-colors"><X size={18} /></button>
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-3 min-w-[287px] custom-scrollbar">
+          <button onClick={() => setSelectedNghiepvu(null)} className={`w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-bold mb-4 transition-colors ${selectedNghiepvu === null ? 'bg-blue-50 text-[#05469B] border border-blue-100' : 'text-gray-700 hover:bg-gray-50'}`}>
+            <BookOpen size={18} className={selectedNghiepvu === null ? 'text-[#05469B]' : 'text-gray-400'} /> Tất cả Dữ liệu
+          </button>
+          <hr className="border-gray-100 mb-4 mx-2"/>
+
+          {loading ? (
+            <div className="flex justify-center p-8"><Loader2 className="animate-spin text-[#05469B]" /></div>
+          ) : uniqueNghiepvu.length === 0 ? (
+            <div className="text-center p-4 text-sm text-gray-500">Chưa có nghiệp vụ nào.</div>
+          ) : (
+            <div className="space-y-1">
+              <p className="px-3 text-[10px] font-black text-gray-400 uppercase tracking-wider mb-2">Danh sách Nghiệp vụ</p>
+              {uniqueNghiepvu.map(nv => (
+                <button key={nv} onClick={() => setSelectedNghiepvu(nv)} className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm transition-colors ${selectedNghiepvu === nv ? 'bg-blue-50 text-[#05469B] font-bold border border-blue-100' : 'text-gray-600 hover:bg-gray-50 font-medium'}`}>
+                  <div className="flex items-center gap-2 truncate">
+                    <Briefcase size={16} className={`shrink-0 ${selectedNghiepvu === nv ? 'text-[#05469B]' : 'text-gray-400'}`} />
+                    <span className="truncate">{nv}</span>
+                  </div>
+                  {/* Hiển thị số lượng bên cạnh */}
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${selectedNghiepvu === nv ? 'bg-[#05469B] text-white' : 'bg-gray-100 text-gray-500'}`}>
+                    {qdData.filter(d => d.Nghiepvu === nv).length}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* CỘT PHẢI: BẢNG DỮ LIỆU */}
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6 relative transition-all duration-300">
+        <div className={`flex flex-col sm:flex-row justify-between items-center mb-6 gap-4 transition-all duration-300 ${isListCollapsed ? 'pl-10' : ''}`}>
+          <div>
+            <h2 className="text-2xl font-bold text-[#05469B] flex items-center gap-2"><BookOpen size={28} /> Quy định & Quy trình</h2>
+            <p className="text-sm font-medium text-gray-500 mt-1">Lọc theo: <span className="text-emerald-600 font-bold">{selectedNghiepvu || 'Tất cả nghiệp vụ'}</span> ({filteredDocs.length} tài liệu)</p>
+          </div>
+          <div className="flex w-full sm:w-auto gap-3">
+            <div className="relative w-full sm:w-80">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+              <input type="text" placeholder="Tìm số hiệu, tiêu đề, loại..." className="w-full pl-9 pr-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#05469B] outline-none shadow-sm text-sm" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+            </div>
+            <button onClick={() => openModal('create')} className="w-full sm:w-auto flex items-center justify-center gap-2 bg-[#05469B] hover:bg-[#04367a] text-white px-5 py-2.5 rounded-lg font-bold shadow-sm transition-all whitespace-nowrap"><Plus className="w-5 h-5" /> Ban hành mới</button>
+          </div>
+        </div>
+
+        {error && <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-500 text-red-700 flex items-start gap-3 rounded-r-lg shadow-sm"><AlertCircle className="w-5 h-5 shrink-0 mt-0.5" /><p>{error}</p></div>}
+
+        <div className={`bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden transition-all duration-300 ${isListCollapsed ? 'ml-10' : ''}`}>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse min-w-[1000px]">
+              <thead>
+                <tr className="bg-[#f8fafc] border-b border-gray-200 text-xs font-bold text-gray-600 uppercase tracking-wider">
+                  <th className="p-4 w-40">Số hiệu / Phân loại</th>
+                  <th className="p-4 w-32">Ngày BH</th>
+                  <th className="p-4">Tiêu đề & Trích yếu</th>
+                  <th className="p-4 w-40">Nghiệp vụ</th>
+                  <th className="p-4 text-center w-36">Thao tác</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {loading ? (
+                  <tr><td colSpan={5} className="p-12 text-center text-gray-500"><Loader2 className="w-8 h-8 animate-spin mx-auto mb-3 text-[#05469B]" />Đang tải dữ liệu...</td></tr>
+                ) : filteredDocs.length === 0 ? (
+                  <tr><td colSpan={5} className="p-16 text-center text-gray-500"><BookOpen size={48} className="mx-auto text-gray-300 mb-4" /><p className="text-lg font-medium">Không tìm thấy tài liệu phù hợp.</p></td></tr>
+                ) : (
+                  filteredDocs.map((item) => (
+                    <tr key={item.ID_QDQT} className="hover:bg-blue-50/50 transition-colors group">
+                      <td className="p-4">
+                        <span className="font-black text-[#05469B] bg-blue-50 px-2 py-1 rounded text-sm whitespace-nowrap border border-blue-100">{item.Sohieu}</span>
+                        <div className="mt-2 flex flex-col items-start gap-1">
+                          <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded uppercase border border-emerald-100">{item.Phanloai}</span>
+                          {/* HIỂN THỊ LABEL NẾU ĐỒNG BỘ TỪ VĂN BẢN */}
+                          {item.isFromVB && (
+                            <span className="text-[9px] font-bold text-orange-600 flex items-center gap-1 mt-0.5"><LinkIcon size={10}/> Từ Văn bản</span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="p-4 text-sm font-medium text-gray-700 flex items-center gap-1.5 mt-3"><Calendar size={14} className="text-gray-400"/> {item.ngayBanHanh ? new Date(item.ngayBanHanh).toLocaleDateString('vi-VN') : '-'}</td>
+                      <td className="p-4">
+                        <p className="font-bold text-gray-800 text-base mb-1">{item.TieuDe}</p>
+                        <p className="text-xs text-gray-500 line-clamp-2 mb-2">{item.Noidung}</p>
+                        {item.linkFile && (
+                          <a href={item.linkFile} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-bold text-blue-600 hover:underline hover:text-blue-800 bg-blue-50 px-2 py-1 rounded border border-blue-100">
+                            <LinkIcon size={12}/> Mở tài liệu
+                          </a>
+                        )}
+                      </td>
+                      <td className="p-4">
+                        <span className="px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-md text-xs font-bold border border-indigo-100">{item.Nghiepvu}</span>
+                      </td>
+                      <td className="p-4">
+                        {/* UPDATE UI NÚT THAO TÁC THEO YÊU CẦU */}
+                        <div className="flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity w-full max-w-[100px] mx-auto">
+                          <button onClick={() => { setViewData(item); setIsViewModalOpen(true); }} className="w-full py-1.5 bg-white border border-emerald-200 text-emerald-600 hover:bg-emerald-50 rounded text-xs font-bold transition-colors flex items-center justify-center gap-1.5 shadow-sm">
+                            <Eye size={14} /> Xem
+                          </button>
+                          
+                          <button 
+                            onClick={() => item.isFromVB ? handleBlockedAction('Sửa') : openModal('update', item)} 
+                            className={`w-full py-1.5 bg-white border border-blue-200 text-blue-600 rounded text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm transition-colors ${item.isFromVB ? 'opacity-50 hover:bg-white cursor-not-allowed' : 'hover:bg-blue-50'}`}
+                          >
+                            <Edit size={14} /> Sửa
+                          </button>
+
+                          <button 
+                            onClick={() => item.isFromVB ? handleBlockedAction('Xóa') : (() => { setItemToDelete(item.ID_QDQT); setIsConfirmOpen(true); })()} 
+                            className={`w-full py-1.5 bg-white border border-red-200 text-red-600 rounded text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm transition-colors ${item.isFromVB ? 'opacity-50 hover:bg-white cursor-not-allowed' : 'hover:bg-red-50'}`}
+                          >
+                            <Trash2 size={14} /> Xóa
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      {/* --- DATALISTS (GỢI Ý TỰ ĐỘNG) --- */}
+      <datalist id="suggest-nghiepvu">{uniqueNghiepvu.map(v => <option key={v} value={v} />)}</datalist>
+      <datalist id="suggest-phanloai">{uniquePhanloai.map(v => <option key={v} value={v} />)}</datalist>
+
+      {/* MODAL THÊM / SỬA */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl flex flex-col max-h-[90vh] animate-in fade-in zoom-in duration-200">
+            <div className="flex justify-between p-5 border-b border-gray-100 bg-gray-50 rounded-t-2xl">
+              <h3 className="text-xl font-bold text-[#05469B] flex items-center gap-2"><BookOpen size={24}/> {modalMode === 'create' ? 'Ban hành Quy định / Quy trình mới' : 'Cập nhật Tài liệu'}</h3>
+              <button onClick={() => setIsModalOpen(false)} disabled={submitting} className="text-gray-400 hover:text-red-500 rounded-full p-1.5 bg-white shadow-sm transition-colors"><X className="w-6 h-6" /></button>
+            </div>
+            
+            <form onSubmit={handleSave} className="p-6 overflow-y-auto space-y-6">
+              
+              {/* KHỐI 1: THÔNG TIN HÀNH CHÍNH */}
+              <div className="bg-blue-50/40 p-5 rounded-xl border border-blue-100">
+                <h4 className="font-bold text-[#05469B] mb-4 flex items-center gap-2"><div className="w-2 h-6 bg-[#05469B] rounded-full"></div> Phân loại & Hệ thống</h4>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
+                  <div className="md:col-span-2">
+                    <label className="block text-xs font-bold text-gray-700 mb-1">Nghiệp vụ áp dụng *</label>
+                    <input list="suggest-nghiepvu" type="text" required name="Nghiepvu" value={formData.Nghiepvu || ''} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-bold text-indigo-700" placeholder="Kinh doanh, Kế toán, Nhân sự..." />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">Phân loại tài liệu *</label>
+                    <input list="suggest-phanloai" type="text" required name="Phanloai" value={formData.Phanloai || ''} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" placeholder="Quy định, Quy trình..." />
+                  </div>
+                  <div><label className="block text-xs font-bold text-gray-700 mb-1">Ngày ban hành *</label><input type="date" required name="ngayBanHanh" value={formData.ngayBanHanh || ''} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-bold" /></div>
+                </div>
+              </div>
+
+              {/* KHỐI 2: NỘI DUNG */}
+              <div className="bg-gray-50 p-5 rounded-xl border border-gray-200">
+                <h4 className="font-bold text-gray-800 mb-4 flex items-center gap-2"><div className="w-2 h-6 bg-gray-400 rounded-full"></div> Nội dung Tài liệu</h4>
+                <div className="space-y-4">
+                  <div className="flex flex-col md:flex-row gap-4">
+                    <div className="w-full md:w-1/3">
+                      <label className="block text-xs font-bold text-gray-700 mb-1">Số hiệu *</label>
+                      <input type="text" required name="Sohieu" value={formData.Sohieu || ''} onChange={handleInputChange} className="w-full p-3 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-black text-[#05469B] tracking-wider" placeholder="VD: 01/QĐ-THACO..." />
+                    </div>
+                    <div className="w-full md:w-2/3">
+                      <label className="block text-xs font-bold text-gray-700 mb-1">Tiêu đề *</label>
+                      <input type="text" required name="TieuDe" value={formData.TieuDe || ''} onChange={handleInputChange} className="w-full p-3 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-bold text-lg text-gray-800" placeholder="Nhập tên quy định/quy trình..." />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">Trích yếu nội dung (Mục đích)</label>
+                    <textarea name="Noidung" value={formData.Noidung || ''} onChange={handleInputChange} rows={3} className="w-full p-3 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] resize-none" placeholder="Quy định này ban hành nhằm mục đích..."></textarea>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">Link File đính kèm (PDF / Drive) *</label>
+                    <div className="relative">
+                      <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                      <input type="url" required name="linkFile" value={formData.linkFile || ''} onChange={handleInputChange} className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] text-blue-600 font-medium" placeholder="Dán link văn bản gốc vào đây..." />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-5 border-t border-gray-100 flex justify-end gap-3 mt-8">
+                <button type="button" onClick={() => setIsModalOpen(false)} className="px-8 py-3 bg-gray-100 text-gray-700 hover:bg-gray-200 rounded-xl font-bold transition-colors shadow-sm">Hủy</button>
+                <button type="submit" disabled={submitting} className="px-8 py-3 text-white bg-[#05469B] hover:bg-[#04367a] rounded-xl font-bold flex items-center gap-2 shadow-lg transition-colors">{submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />} Lưu Tài Liệu</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL XEM CHI TIẾT (VIEW ONLY) */}
+      {isViewModalOpen && viewData && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl flex flex-col max-h-[90vh] animate-in fade-in zoom-in duration-200">
+            <div className="flex justify-between p-5 border-b border-gray-100 bg-[#05469B] text-white rounded-t-2xl">
+              <h3 className="text-xl font-bold flex items-center gap-2"><BookOpen size={24}/> Chi tiết Tài liệu</h3>
+              <button onClick={() => setIsViewModalOpen(false)} className="text-blue-200 hover:text-white rounded-full p-1 transition-colors"><X className="w-6 h-6" /></button>
+            </div>
+            <div className="p-6 overflow-y-auto">
+              {/* LABEL BÁO TÀI LIỆU ĐỒNG BỘ */}
+              {viewData.isFromVB && (
+                <div className="mb-4 bg-orange-50 border border-orange-200 p-3 rounded-lg flex items-start gap-2">
+                  <Info size={16} className="text-orange-500 mt-0.5 shrink-0" />
+                  <p className="text-xs text-orange-800 font-medium">Đây là tài liệu được đồng bộ trực tiếp từ mục <strong>Văn bản - Thông báo</strong>. Bạn chỉ có thể xem nội dung tại đây.</p>
+                </div>
+              )}
+
+              <div className="mb-6">
+                <div className="flex items-center gap-3 mb-2">
+                  <span className="bg-blue-100 text-[#05469B] font-black px-3 py-1 rounded text-lg border border-blue-200">{viewData.Sohieu}</span>
+                  <span className="bg-emerald-100 text-emerald-700 font-bold px-2 py-1 rounded text-xs uppercase border border-emerald-200">{viewData.Phanloai}</span>
+                  <span className="bg-indigo-100 text-indigo-700 font-bold px-2 py-1 rounded text-xs uppercase border border-indigo-200 flex items-center gap-1"><Briefcase size={12}/> {viewData.Nghiepvu}</span>
+                </div>
+                <h2 className="text-2xl font-black text-gray-800 leading-tight mt-3">{viewData.TieuDe}</h2>
+                <p className="text-sm text-gray-500 mt-2 flex items-center gap-2"><Calendar size={14}/> Ban hành: <span className="font-bold text-gray-700">{viewData.ngayBanHanh ? new Date(viewData.ngayBanHanh).toLocaleDateString('vi-VN') : '-'}</span></p>
+              </div>
+
+              <div className="bg-gray-50 p-5 rounded-xl border border-gray-100 mb-6 text-sm text-gray-700 whitespace-pre-wrap leading-relaxed shadow-inner">
+                {viewData.Noidung || <span className="italic text-gray-400">Không có trích yếu nội dung.</span>}
+              </div>
+
+              <div className="flex flex-col gap-3">
+                {viewData.linkFile ? (
+                  <a href={viewData.linkFile} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-2 py-3 bg-[#05469B] hover:bg-[#04367a] text-white rounded-xl font-bold transition-colors shadow-md">
+                    <LinkIcon size={18}/> Đọc Tài Liệu Gốc
+                  </a>
+                ) : (
+                  <button disabled className="flex items-center justify-center gap-2 py-3 bg-gray-200 text-gray-500 rounded-xl font-bold cursor-not-allowed">
+                    Không có Link đính kèm
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* XÁC NHẬN XÓA */}
+      {isConfirmOpen && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-sm text-center animate-in zoom-in duration-200">
+            <div className="w-16 h-16 rounded-full bg-red-50 text-red-500 flex items-center justify-center mx-auto mb-4 border-4 border-red-100"><AlertCircle className="w-8 h-8" /></div>
+            <h3 className="text-xl font-bold text-gray-900 mb-2">Xác nhận xóa</h3>
+            <p className="text-gray-500 text-sm mb-6">Hành động này sẽ xóa tài liệu này vĩnh viễn.</p>
+            <div className="flex gap-3">
+              <button onClick={() => setIsConfirmOpen(false)} className="flex-1 py-3 bg-gray-100 text-gray-700 hover:bg-gray-200 rounded-xl font-bold transition-colors">Hủy</button>
+              <button onClick={confirmDelete} disabled={submitting} className="flex-1 py-3 text-white bg-red-600 hover:bg-red-700 rounded-xl font-bold flex items-center justify-center gap-2 shadow-md transition-colors">{submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Trash2 className="w-5 h-5" />} Xóa</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

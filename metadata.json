@@ -1,0 +1,5 @@
+{
+  "name": "Hệ thống Quản lý Dịch vụ",
+  "description": "Hệ thống Quản lý Dịch vụ hỗ trợ với các chức năng quản lý nhân sự, đơn vị và phân quyền người dùng.",
+  "requestFramePermissions": []
+}

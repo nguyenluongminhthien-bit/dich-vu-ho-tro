@@ -1,0 +1,136 @@
+import React, { useState, useEffect, useMemo } from 'react';
+import { ClipboardList, Search, Loader2, Clock, User, Activity, AlertCircle, Calendar } from 'lucide-react';
+import { apiService } from '../services/api';
+import { SysLog } from '../types';
+
+export default function LogPage() {
+  const [logs, setLogs] = useState<SysLog[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+
+  useEffect(() => {
+    const fetchLogs = async () => {
+      try {
+        const rawLogs = await apiService.getLogs();
+        
+        // 🚀 BỘ QUÉT DỮ LIỆU NHẬT KÝ THÔNG MINH
+        const cleanLogs = rawLogs.map((item: any, index: number) => {
+          if (!item) return null;
+          
+          if (Array.isArray(item)) {
+            return {
+              ID_Log: String(item[0] || `LOG_${index}`).trim(),
+              ThoiGian: String(item[1] || '').trim(),
+              ID_User: String(item[2] || '').trim(),
+              HanhDong: String(item[3] || '').trim(),
+              ChiTiet: String(item[4] || '').trim()
+            };
+          }
+          
+          const getValue = (keys: string[]) => {
+            for (let k of Object.keys(item)) {
+              const cleanK = k.toLowerCase().replace(/[^a-z0-9]/g, '');
+              if (keys.includes(cleanK)) return item[k];
+            }
+            return '';
+          };
+
+          return {
+            ID_Log: String(item.ID_Log || getValue(['idlog', 'malog']) || `LOG_${index}`).trim(),
+            ThoiGian: String(item.ThoiGian || getValue(['thoigian', 'time', 'date']) || '').replace(/undefined/gi, '').trim(),
+            ID_User: String(item.ID_User || getValue(['iduser', 'user', 'taikhoan']) || '').replace(/undefined/gi, '').trim() || 'Hệ thống',
+            HanhDong: String(item.HanhDong || getValue(['hanhdong', 'action', 'thaotac']) || '').replace(/undefined/gi, '').trim() || 'KHÔNG RÕ',
+            ChiTiet: String(item.ChiTiet || getValue(['chitiet', 'detail', 'noidung']) || '').replace(/undefined/gi, '').trim()
+          };
+        }).filter((l: any) => l !== null && !l.ID_Log.toLowerCase().includes('id_log') && !l.ThoiGian.toLowerCase().includes('thoigian'));
+
+        const sortedData = cleanLogs.sort((a, b) => new Date(b.ThoiGian).getTime() - new Date(a.ThoiGian).getTime());
+        setLogs(sortedData);
+      } catch (err: any) {
+        setError(err.message || 'Lỗi tải dữ liệu nhật ký.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchLogs();
+  }, []);
+
+  const filteredLogs = useMemo(() => {
+    if (!searchTerm) return logs;
+    const lower = searchTerm.toLowerCase();
+    return logs.filter(log => 
+      log.ID_User?.toLowerCase().includes(lower) || 
+      log.HanhDong?.toLowerCase().includes(lower) ||
+      log.ChiTiet?.toLowerCase().includes(lower)
+    );
+  }, [logs, searchTerm]);
+
+  const getActionColor = (action: string) => {
+    const act = action?.toUpperCase();
+    if (act?.includes('THÊM')) return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+    if (act?.includes('CẬP NHẬT') || act?.includes('SỬA')) return 'bg-blue-50 text-blue-700 border-blue-200';
+    if (act?.includes('XÓA')) return 'bg-red-50 text-red-700 border-red-200';
+    if (act?.includes('ĐĂNG NHẬP')) return 'bg-purple-50 text-purple-700 border-purple-200';
+    if (act?.includes('ĐĂNG XUẤT')) return 'bg-gray-100 text-gray-600 border-gray-300';
+    return 'bg-gray-50 text-gray-700 border-gray-200';
+  };
+
+  return (
+    <div className="p-6 max-w-7xl mx-auto h-full flex flex-col animate-in fade-in">
+      <div className="flex justify-between items-center mb-6">
+        <div>
+          <h2 className="text-2xl font-black text-[#05469B] flex items-center gap-2"><ClipboardList size={28} /> Nhật ký Hệ thống (Audit Logs)</h2>
+          <p className="text-sm font-medium text-gray-500 mt-1">Giám sát toàn bộ thao tác của người dùng trên hệ thống</p>
+        </div>
+        <div className="relative w-80">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+          <input type="text" placeholder="Tìm theo tài khoản, hành động..." className="w-full pl-9 pr-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#05469B] outline-none shadow-sm text-sm" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+        </div>
+      </div>
+
+      {error && <div className="mb-4 p-4 bg-red-50 text-red-700 rounded-lg flex items-center gap-2 border border-red-100"><AlertCircle size={20}/> {error}</div>}
+
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 flex-1 overflow-hidden flex flex-col">
+        <div className="overflow-x-auto flex-1">
+          <table className="w-full text-left">
+            <thead className="bg-[#f8fafc] border-b border-gray-200 sticky top-0 z-10">
+              <tr className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+                <th className="p-4 w-48"><div className="flex items-center gap-1.5"><Clock size={14}/> Thời gian</div></th>
+                <th className="p-4 w-48"><div className="flex items-center gap-1.5"><User size={14}/> Tài khoản</div></th>
+                <th className="p-4 w-36"><div className="flex items-center gap-1.5"><Activity size={14}/> Hành động</div></th>
+                <th className="p-4"><div className="flex items-center gap-1.5"><ClipboardList size={14}/> Chi tiết cập nhật</div></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {loading ? (<tr><td colSpan={4} className="p-12 text-center"><Loader2 className="w-8 h-8 animate-spin mx-auto text-[#05469B] mb-2"/> Đang tải log...</td></tr>) 
+              : filteredLogs.length === 0 ? (<tr><td colSpan={4} className="p-12 text-center text-gray-400"><ClipboardList size={40} className="mx-auto mb-3 opacity-50"/> Không có nhật ký nào.</td></tr>) 
+              : filteredLogs.map((log, idx) => {
+                
+                const timeParts = log.ThoiGian ? log.ThoiGian.split(' ') : [];
+                const timeStr = timeParts.length > 1 ? timeParts[1] : log.ThoiGian;
+                const dateStr = timeParts.length > 1 ? timeParts[0] : '';
+
+                return (
+                  <tr key={log.ID_Log || idx} className="hover:bg-blue-50/30 transition-colors">
+                    <td className="p-4">
+                      <span className="font-bold text-gray-700 text-sm block">{timeStr || '---'}</span>
+                      {dateStr && <span className="text-xs text-gray-400 font-medium flex items-center gap-1 mt-0.5"><Calendar size={10}/> {dateStr}</span>}
+                    </td>
+                    <td className="p-4 font-bold text-[#05469B] text-sm">{log.ID_User}</td>
+                    <td className="p-4">
+                      <span className={`px-2 py-1 border rounded text-[10px] font-black tracking-wider uppercase ${getActionColor(log.HanhDong)}`}>
+                        {log.HanhDong}
+                      </span>
+                    </td>
+                    <td className="p-4 text-sm font-medium text-gray-700 whitespace-pre-wrap leading-relaxed">{log.ChiTiet || '---'}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
