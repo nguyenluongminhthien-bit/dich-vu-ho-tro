@@ -89,7 +89,7 @@ export default function EquipmentPage() {
     return donViList.filter(dv => allAllowed.includes(dv.ID_DonVi)).map(dv => dv.ID_DonVi);
   }, [user, donViList]);
 
-  // Lọc Thiết bị
+  // --- FIX LỖI TÌM KIẾM THIẾT BỊ: BỌC THÉP VỚI String(...) ---
   const filteredTBs = useMemo(() => {
     let result = tbData.filter(item => allowedDonViIds.includes(item.ID_DonVi));
     if (selectedUnitFilter) {
@@ -100,9 +100,9 @@ export default function EquipmentPage() {
     if (searchTerm) {
       const lower = searchTerm.toLowerCase();
       result = result.filter(item => 
-        (item.MaTaiSan?.toLowerCase().includes(lower)) || 
-        (item.TenThietBi?.toLowerCase().includes(lower)) ||
-        (item.NhomThietBi?.toLowerCase().includes(lower))
+        (String(item.MaTaiSan || '').toLowerCase().includes(lower)) || 
+        (String(item.TenThietBi || '').toLowerCase().includes(lower)) ||
+        (String(item.NhomThietBi || '').toLowerCase().includes(lower))
       );
     }
     return result;
@@ -114,32 +114,64 @@ export default function EquipmentPage() {
     return unit ? unit.TenDonVi : 'Đơn vị không xác định';
   }, [selectedUnitFilter, donViList]);
 
-  // Cây đơn vị
+  // --- FIX LỖI TÌM KIẾM CÂY THƯ MỤC CỰC THÔNG MINH (KÉO RỄ - XỔ CÀNH) VÀ BỌC THÉP String(...) ---
   const filteredUnits = useMemo(() => {
-    let filtered = donViList.filter(dv => allowedDonViIds.includes(dv.ID_DonVi));
-    if (unitSearchTerm) {
-      const lower = unitSearchTerm.toLowerCase();
-      filtered = filtered.filter(u => u.TenDonVi?.toLowerCase().includes(lower) || u.ID_DonVi?.toLowerCase().includes(lower));
-    }
-    return filtered;
+    let baseUnits = donViList.filter(dv => allowedDonViIds.includes(dv.ID_DonVi));
+    if (!unitSearchTerm) return baseUnits;
+
+    const lower = unitSearchTerm.toLowerCase();
+    const matchedIds = new Set<string>();
+
+    // 1. Tìm các đơn vị khớp trực tiếp với từ khóa
+    baseUnits.forEach(u => {
+      if (String(u.TenDonVi || '').toLowerCase().includes(lower) || String(u.ID_DonVi || '').toLowerCase().includes(lower)) {
+        matchedIds.add(u.ID_DonVi);
+        
+        // 2. Kéo theo các node Cha, Ông Nội... để giữ vững cấu trúc cây
+        let parentId = u.CapQuanLy;
+        while (parentId && parentId !== 'HO') {
+          matchedIds.add(parentId);
+          const parentUnit = baseUnits.find(p => p.ID_DonVi === parentId);
+          parentId = parentUnit ? parentUnit.CapQuanLy : null;
+        }
+      }
+    });
+
+    // 3. Xổ cành: Nếu Cha khớp từ khóa, hiện tất cả các Showroom con của nó
+    const addChildren = (parentId: string) => {
+      baseUnits.forEach(u => {
+        if (u.CapQuanLy === parentId && !matchedIds.has(u.ID_DonVi)) {
+          matchedIds.add(u.ID_DonVi);
+          addChildren(u.ID_DonVi);
+        }
+      });
+    };
+    
+    const initialMatches = Array.from(matchedIds);
+    initialMatches.forEach(id => addChildren(id));
+
+    return baseUnits.filter(item => matchedIds.has(item.ID_DonVi));
   }, [donViList, unitSearchTerm, allowedDonViIds]);
   
   const parentUnits = useMemo(() => filteredUnits.filter(item => item.CapQuanLy === 'HO' || !item.CapQuanLy), [filteredUnits]);
   const getChildUnits = (parentId: string) => filteredUnits.filter(item => item.CapQuanLy === parentId);
 
+  // --- SỬA LỖI REFERENCE CÚ PHÁP TẠI ĐÂY ---
   const { vpdhUnits, ctttNamUnits, ctttBacUnits, otherUnits } = useMemo(() => {
-    const vpdh = parentUnits.filter(u => u.Phia?.toLowerCase().includes('vpđh') || u.loaiHinh?.toLowerCase().includes('tổng công ty') || u.loaiHinh?.toLowerCase().includes('văn phòng'));
-    const ctttNam = parentUnits.filter(u => !vpdh.includes(u) && u.Phia?.toLowerCase().includes('nam'));
-    const ctttBac = parentUnits.filter(u => !vpdh.includes(u) && !ctttNam.includes(u) && u.Phia?.toLowerCase().includes('bắc'));
+    const vpdh = parentUnits.filter(u => String(u.Phia || '').toLowerCase().includes('vpđh') || String(u.loaiHinh || '').toLowerCase().includes('tổng công ty') || String(u.loaiHinh || '').toLowerCase().includes('văn phòng'));
+    const ctttNam = parentUnits.filter(u => !vpdh.includes(u) && String(u.Phia || '').toLowerCase().includes('nam'));
+    const ctttBac = parentUnits.filter(u => !vpdh.includes(u) && !ctttNam.includes(u) && String(u.Phia || '').toLowerCase().includes('bắc'));
     const others = parentUnits.filter(u => !vpdh.includes(u) && !ctttNam.includes(u) && !ctttBac.includes(u));
+    // Đã thay đổi thành đúng cú pháp gán biến key: value
     return { vpdhUnits: vpdh, ctttNamUnits: ctttNam, ctttBacUnits: ctttBac, otherUnits: others };
   }, [parentUnits]);
 
   const toggleParent = (parentId: string) => setExpandedParents(prev => prev.includes(parentId) ? prev.filter(id => id !== parentId) : [...prev, parentId]);
 
+  // TỰ ĐỘNG BUNG MỞ THƯ MỤC NẾU CÓ SEARCH
   const renderUnitTree = (parent: DonVi, level: number = 1) => {
     const children = getChildUnits(parent.ID_DonVi);
-    const isExpanded = expandedParents.includes(parent.ID_DonVi);
+    const isExpanded = expandedParents.includes(parent.ID_DonVi) || !!unitSearchTerm;
     const isParentDimmed = parent.trangThai === 'Đại lý' || parent.trangThai === 'Đầu tư mới';
 
     return (
@@ -662,6 +694,10 @@ export default function EquipmentPage() {
                   </div>
                 )}
               </div>
+            </div>
+            
+            <div className="p-4 sm:p-5 border-t border-gray-100 bg-gray-50 rounded-b-2xl flex justify-end shrink-0">
+              <button onClick={() => setIsViewModalOpen(false)} className="w-full sm:w-auto px-6 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold rounded-xl transition-colors">Đóng</button>
             </div>
           </div>
         </div>
