@@ -96,16 +96,43 @@ export default function DepartmentPage() {
     return data.filter(dv => allAllowed.includes(dv.ID_DonVi)).map(dv => dv.ID_DonVi);
   }, [user, data]);
 
+  // --- FIX TÌM KIẾM CÂY THƯ MỤC CỰC THÔNG MINH ---
   const filteredData = useMemo(() => {
-    let result = data.filter(item => allowedDonViIds.includes(item.ID_DonVi));
-    if (searchTerm) {
-      const lower = searchTerm.toLowerCase();
-      result = result.filter(item => 
-        String(item.TenDonVi || '').toLowerCase().includes(lower) || 
-        String(item.ID_DonVi || '').toLowerCase().includes(lower)
-      );
-    }
-    return result;
+    let baseUnits = data.filter(item => allowedDonViIds.includes(item.ID_DonVi));
+    if (!searchTerm) return baseUnits;
+
+    const lower = searchTerm.toLowerCase();
+    const matchedIds = new Set<string>();
+
+    // 1. Tìm các đơn vị khớp trực tiếp với từ khóa
+    baseUnits.forEach(u => {
+      if (String(u.TenDonVi || '').toLowerCase().includes(lower) || String(u.ID_DonVi || '').toLowerCase().includes(lower)) {
+        matchedIds.add(u.ID_DonVi);
+        
+        // 2. Kéo theo các node Cha, Ông Nội... để giữ vững cấu trúc cây
+        let parentId = u.CapQuanLy;
+        while (parentId && parentId !== 'HO') {
+          matchedIds.add(parentId);
+          const parentUnit = baseUnits.find(p => p.ID_DonVi === parentId);
+          parentId = parentUnit ? parentUnit.CapQuanLy : null;
+        }
+      }
+    });
+
+    // 3. Xổ cành: Nếu Cha khớp từ khóa, hiện tất cả các Showroom con của nó
+    const addChildren = (parentId: string) => {
+      baseUnits.forEach(u => {
+        if (u.CapQuanLy === parentId && !matchedIds.has(u.ID_DonVi)) {
+          matchedIds.add(u.ID_DonVi);
+          addChildren(u.ID_DonVi);
+        }
+      });
+    };
+    
+    const initialMatches = Array.from(matchedIds);
+    initialMatches.forEach(id => addChildren(id));
+
+    return baseUnits.filter(item => matchedIds.has(item.ID_DonVi));
   }, [data, searchTerm, allowedDonViIds]);
 
   useEffect(() => {
@@ -117,7 +144,6 @@ export default function DepartmentPage() {
   const parentUnits = useMemo(() => filteredData.filter(item => item.CapQuanLy === 'HO' || !item.CapQuanLy), [filteredData]);
   const getChildUnits = (parentId: string) => filteredData.filter(item => item.CapQuanLy === parentId);
 
-  // FIX LỖI REFERENCE: Đã đổi cách return biến cực kỳ chuẩn xác
   const { vpdhUnits, ctttNamUnits, ctttBacUnits, otherUnits } = useMemo(() => {
     const vpdh = parentUnits.filter(u => String(u.Phia || '').toLowerCase().includes('vpđh') || String(u.loaiHinh || '').toLowerCase().includes('tổng công ty') || String(u.loaiHinh || '').toLowerCase().includes('văn phòng'));
     const ctttNam = parentUnits.filter(u => !vpdh.includes(u) && String(u.Phia || '').toLowerCase().includes('nam'));
@@ -398,9 +424,10 @@ export default function DepartmentPage() {
     finally { setSubmitting(false); }
   };
 
+  // --- TỰ ĐỘNG XỔ CÂY KHI TÌM KIẾM ---
   const renderUnitTree = (parent: DonVi, level: number = 1) => {
     const children = getChildUnits(parent.ID_DonVi);
-    const isExpanded = expandedParents.includes(parent.ID_DonVi);
+    const isExpanded = expandedParents.includes(parent.ID_DonVi) || !!searchTerm;
     const isParentDimmed = parent.trangThai === 'Đại lý' || parent.trangThai === 'Đầu tư mới';
 
     return (
@@ -1066,6 +1093,7 @@ export default function DepartmentPage() {
                 <div className="md:col-span-2"><label className="block text-xs font-bold text-gray-600 mb-1">Tên Công ty (Pháp nhân) *</label><input type="text" required name="TenCongty" value={pnFormData.TenCongty || ''} onChange={(e) => handleInputChange(e, 'pn')} placeholder="VD: Công ty TNHH MTV Phân phối Ô tô..." className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-orange-500 font-bold text-gray-800" /></div>
                 <div><label className="block text-xs font-bold text-gray-600 mb-1">Mã số thuế (MST) *</label><input type="text" required name="MST" value={pnFormData.MST || ''} onChange={(e) => handleInputChange(e, 'pn')} placeholder="Nhập MST..." className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-orange-500 font-bold text-orange-700 tracking-widest" /></div>
                 
+                {/* TRƯỜNG CHỌN ĐƠN VỊ ÁP DỤNG MỚI BỔ SUNG */}
                 <div className="md:col-span-3">
                   <label className="block text-xs font-bold text-gray-600 mb-1">Đơn vị trực thuộc *</label>
                   <select required name="ID_DonVi" value={pnFormData.ID_DonVi || ''} onChange={(e) => handleInputChange(e, 'pn')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-orange-500 font-bold text-[#05469B]">
@@ -1130,14 +1158,14 @@ export default function DepartmentPage() {
 
       {/* XÁC NHẬN XÓA */}
       {isConfirmOpen && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-sm text-center animate-in zoom-in duration-200">
-            <div className="w-16 h-16 rounded-full bg-red-50 text-red-500 flex items-center justify-center mx-auto mb-4 border-4 border-red-100"><AlertCircle className="w-8 h-8" /></div>
-            <h3 className="text-xl font-bold text-gray-900 mb-2">Xác nhận xóa</h3>
-            <p className="text-gray-500 text-sm mb-6">Hành động này sẽ xóa nhân sự này vĩnh viễn.</p>
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white p-8 rounded-2xl text-center shadow-2xl max-w-sm w-full animate-in zoom-in duration-200">
+            <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-red-100"><AlertCircle size={32} /></div>
+            <h3 className="text-xl font-bold mb-2 text-gray-800">Xác nhận xóa?</h3>
+            <p className="text-gray-500 text-sm mb-6">Hành động này sẽ xóa dữ liệu vĩnh viễn.</p>
             <div className="flex gap-3">
-              <button onClick={() => setIsConfirmOpen(false)} className="flex-1 py-3 bg-gray-100 text-gray-700 hover:bg-gray-200 rounded-xl font-bold transition-colors">Hủy</button>
-              <button onClick={confirmDelete} disabled={submitting} className="flex-1 py-3 text-white bg-red-600 hover:bg-red-700 rounded-xl font-bold flex items-center justify-center gap-2 shadow-md transition-colors">{submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Trash2 className="w-5 h-5" />} Xóa</button>
+              <button onClick={() => setIsConfirmOpen(false)} className="flex-1 py-3 bg-gray-100 text-gray-700 hover:bg-gray-200 font-bold rounded-xl transition-colors">Hủy</button>
+              <button onClick={confirmDelete} disabled={submitting} className="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl flex items-center justify-center transition-colors shadow-md">{submitting ? <Loader2 className="animate-spin" /> : 'Xóa'}</button>
             </div>
           </div>
         </div>
