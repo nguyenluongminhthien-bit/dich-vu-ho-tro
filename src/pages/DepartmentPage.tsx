@@ -13,7 +13,6 @@ import { apiService } from '../services/api';
 import { DonVi, Personnel, AnNinh, PhapNhan, PhongHop } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 
-// --- HÀM TỰ ĐỘNG DÒ TÌM ID TRÁNH LỖI TẠO DÒNG MỚI ---
 const getSecId = (sec: any) => sec.ID_AnNinh || sec.iD_AnNinh || sec.Id_AnNinh || sec.id || '';
 
 const initialFormState: Partial<DonVi> = {
@@ -38,7 +37,7 @@ export default function DepartmentPage() {
   const { user } = useAuth();
   const [data, setData] = useState<DonVi[]>([]);
   const [personnelData, setPersonnelData] = useState<Personnel[]>([]);
-  const [anNinhData, setAnNinhData] = useState<any[]>([]); // Dùng any để linh hoạt ID
+  const [anNinhData, setAnNinhData] = useState<any[]>([]); 
   const [phapNhanData, setPhapNhanData] = useState<PhapNhan[]>([]); 
   const [phongHopData, setPhongHopData] = useState<PhongHop[]>([]); 
   
@@ -101,7 +100,10 @@ export default function DepartmentPage() {
     let result = data.filter(item => allowedDonViIds.includes(item.ID_DonVi));
     if (searchTerm) {
       const lower = searchTerm.toLowerCase();
-      result = result.filter(item => (item.TenDonVi?.toLowerCase().includes(lower)) || (item.ID_DonVi?.toLowerCase().includes(lower)));
+      result = result.filter(item => 
+        String(item.TenDonVi || '').toLowerCase().includes(lower) || 
+        String(item.ID_DonVi || '').toLowerCase().includes(lower)
+      );
     }
     return result;
   }, [data, searchTerm, allowedDonViIds]);
@@ -115,10 +117,11 @@ export default function DepartmentPage() {
   const parentUnits = useMemo(() => filteredData.filter(item => item.CapQuanLy === 'HO' || !item.CapQuanLy), [filteredData]);
   const getChildUnits = (parentId: string) => filteredData.filter(item => item.CapQuanLy === parentId);
 
+  // FIX LỖI REFERENCE: Đã đổi cách return biến cực kỳ chuẩn xác
   const { vpdhUnits, ctttNamUnits, ctttBacUnits, otherUnits } = useMemo(() => {
-    const vpdh = parentUnits.filter(u => u.Phia?.toLowerCase().includes('vpđh') || u.loaiHinh?.toLowerCase().includes('tổng công ty') || u.loaiHinh?.toLowerCase().includes('văn phòng'));
-    const ctttNam = parentUnits.filter(u => !vpdh.includes(u) && u.Phia?.toLowerCase().includes('nam'));
-    const ctttBac = parentUnits.filter(u => !vpdh.includes(u) && !ctttNam.includes(u) && u.Phia?.toLowerCase().includes('bắc'));
+    const vpdh = parentUnits.filter(u => String(u.Phia || '').toLowerCase().includes('vpđh') || String(u.loaiHinh || '').toLowerCase().includes('tổng công ty') || String(u.loaiHinh || '').toLowerCase().includes('văn phòng'));
+    const ctttNam = parentUnits.filter(u => !vpdh.includes(u) && String(u.Phia || '').toLowerCase().includes('nam'));
+    const ctttBac = parentUnits.filter(u => !vpdh.includes(u) && !ctttNam.includes(u) && String(u.Phia || '').toLowerCase().includes('bắc'));
     const others = parentUnits.filter(u => !vpdh.includes(u) && !ctttNam.includes(u) && !ctttBac.includes(u));
     return { vpdhUnits: vpdh, ctttNamUnits: ctttNam, ctttBacUnits: ctttBac, otherUnits: others };
   }, [parentUnits]);
@@ -151,11 +154,11 @@ export default function DepartmentPage() {
   const unitStaff = useMemo(() => personnelData.filter(p => p.ID_DonVi === selectedUnitId), [personnelData, selectedUnitId]);
 
   const leader = useMemo(() => unitStaff.find(p => p.ID_NhanSu === selectedUnit?.ID_GiamDoc) || unitStaff.find(p => p.PhanLoai === 'Lãnh đạo'), [unitStaff, selectedUnit]);
-  const kdXe = useMemo(() => unitStaff.find(p => p.ID_NhanSu === selectedUnit?.ID_PTKDXe) || unitStaff.find(p => p.ChucVu?.toLowerCase().includes('kinh doanh xe') || p.ChucVu?.toLowerCase().includes('kd xe')), [unitStaff, selectedUnit]);
-  const kdDvpt = useMemo(() => unitStaff.find(p => p.ID_NhanSu === selectedUnit?.ID_PTKDDVPT) || unitStaff.find(p => p.ChucVu?.toLowerCase().includes('dvpt') || p.ChucVu?.toLowerCase().includes('dịch vụ phụ tùng') || p.ChucVu?.toLowerCase().includes('phó tổng giám đốc')), [unitStaff, selectedUnit]);
-  const dvht1 = useMemo(() => unitStaff.find(p => p.ID_NhanSu === selectedUnit?.ID_DVHT1) || unitStaff.find(p => p.ChucVu?.toLowerCase().includes('dvht 1') || p.ChucVu?.toLowerCase().includes('hỗ trợ 1') || p.ChucVu?.toLowerCase().includes('dvht kd 1')), [unitStaff, selectedUnit]);
-  const dvht2 = useMemo(() => unitStaff.find(p => p.ID_NhanSu === selectedUnit?.ID_DVHT2) || unitStaff.find(p => p.ChucVu?.toLowerCase().includes('dvht 2') || p.ChucVu?.toLowerCase().includes('hỗ trợ 2') || p.ChucVu?.toLowerCase().includes('dvht kd 2')), [unitStaff, selectedUnit]);
-  const ptNhanSu = useMemo(() => unitStaff.find(p => p.ID_NhanSu === selectedUnit?.ID_HCNS) || unitStaff.find(p => p.ChucVu?.toLowerCase().includes('nhân sự') || p.ChucVu?.toLowerCase().includes('hành chính')), [unitStaff, selectedUnit]);
+  const kdXe = useMemo(() => unitStaff.find(p => p.ID_NhanSu === selectedUnit?.ID_PTKDXe) || unitStaff.find(p => String(p.ChucVu || '').toLowerCase().includes('kinh doanh xe') || String(p.ChucVu || '').toLowerCase().includes('kd xe')), [unitStaff, selectedUnit]);
+  const kdDvpt = useMemo(() => unitStaff.find(p => p.ID_NhanSu === selectedUnit?.ID_PTKDDVPT) || unitStaff.find(p => String(p.ChucVu || '').toLowerCase().includes('dvpt') || String(p.ChucVu || '').toLowerCase().includes('dịch vụ phụ tùng') || String(p.ChucVu || '').toLowerCase().includes('phó tổng giám đốc')), [unitStaff, selectedUnit]);
+  const dvht1 = useMemo(() => unitStaff.find(p => p.ID_NhanSu === selectedUnit?.ID_DVHT1) || unitStaff.find(p => String(p.ChucVu || '').toLowerCase().includes('dvht 1') || String(p.ChucVu || '').toLowerCase().includes('hỗ trợ 1') || String(p.ChucVu || '').toLowerCase().includes('dvht kd 1')), [unitStaff, selectedUnit]);
+  const dvht2 = useMemo(() => unitStaff.find(p => p.ID_NhanSu === selectedUnit?.ID_DVHT2) || unitStaff.find(p => String(p.ChucVu || '').toLowerCase().includes('dvht 2') || String(p.ChucVu || '').toLowerCase().includes('hỗ trợ 2') || String(p.ChucVu || '').toLowerCase().includes('dvht kd 2')), [unitStaff, selectedUnit]);
+  const ptNhanSu = useMemo(() => unitStaff.find(p => p.ID_NhanSu === selectedUnit?.ID_HCNS) || unitStaff.find(p => String(p.ChucVu || '').toLowerCase().includes('nhân sự') || String(p.ChucVu || '').toLowerCase().includes('hành chính')), [unitStaff, selectedUnit]);
 
   const isSelectedUnitDimmed = selectedUnit?.trangThai === 'Đại lý' || selectedUnit?.trangThai === 'Đầu tư mới';
 
@@ -364,7 +367,6 @@ export default function DepartmentPage() {
     setIsSecurityModalOpen(true);
   };
 
-  // FIX LỖI TẠO DÒNG MỚI KHI CẬP NHẬT AN NINH BẰNG CÁCH DÒ TÌM ID
   const handleSecuritySave = async (e: React.FormEvent) => {
     e.preventDefault(); setSubmitting(true); setError(null);
     const soNB = Number(securityFormData.SoBaoVeNoiBo) || 0;
@@ -622,7 +624,7 @@ export default function DepartmentPage() {
                              <div className="mt-4">
                                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 sm:gap-3 bg-gradient-to-r from-amber-50 to-indigo-50 px-4 py-3 rounded-lg border border-gray-200 shadow-sm">
                                    <div className="flex items-center gap-1.5 shrink-0"><Clock size={14} className="text-[#05469B]"/><span className="text-[#05469B] font-bold text-xs whitespace-nowrap">Bố trí nghỉ ca / Đổi ca:</span></div>
-                                   <span className="font-black text-gray-800 text-xs flex-1 text-left sm:text-right whitespace-pre-wrap break-words">{currentAnNinh.BoTriNghiCa ? `${currentAnNinh.BoTriNghiCa} người` : '---'}</span>
+                                   <span className="font-black text-[#05469B] text-xs flex-1 text-left sm:text-right whitespace-pre-wrap break-words">{currentAnNinh.BoTriNghiCa ? `${currentAnNinh.BoTriNghiCa} người` : '---'}</span>
                                 </div>
                              </div>
                           </div>
@@ -1064,7 +1066,6 @@ export default function DepartmentPage() {
                 <div className="md:col-span-2"><label className="block text-xs font-bold text-gray-600 mb-1">Tên Công ty (Pháp nhân) *</label><input type="text" required name="TenCongty" value={pnFormData.TenCongty || ''} onChange={(e) => handleInputChange(e, 'pn')} placeholder="VD: Công ty TNHH MTV Phân phối Ô tô..." className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-orange-500 font-bold text-gray-800" /></div>
                 <div><label className="block text-xs font-bold text-gray-600 mb-1">Mã số thuế (MST) *</label><input type="text" required name="MST" value={pnFormData.MST || ''} onChange={(e) => handleInputChange(e, 'pn')} placeholder="Nhập MST..." className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-orange-500 font-bold text-orange-700 tracking-widest" /></div>
                 
-                {/* TRƯỜNG CHỌN ĐƠN VỊ ÁP DỤNG MỚI BỔ SUNG */}
                 <div className="md:col-span-3">
                   <label className="block text-xs font-bold text-gray-600 mb-1">Đơn vị trực thuộc *</label>
                   <select required name="ID_DonVi" value={pnFormData.ID_DonVi || ''} onChange={(e) => handleInputChange(e, 'pn')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-orange-500 font-bold text-[#05469B]">
@@ -1129,14 +1130,14 @@ export default function DepartmentPage() {
 
       {/* XÁC NHẬN XÓA */}
       {isConfirmOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-white p-8 rounded-2xl text-center shadow-2xl max-w-sm w-full animate-in zoom-in duration-200">
-            <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-red-100"><AlertCircle size={32} /></div>
-            <h3 className="text-xl font-bold mb-2 text-gray-800">Xác nhận xóa?</h3>
-            <p className="text-gray-500 text-sm mb-6">Hành động này sẽ xóa dữ liệu vĩnh viễn.</p>
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-sm text-center animate-in zoom-in duration-200">
+            <div className="w-16 h-16 rounded-full bg-red-50 text-red-500 flex items-center justify-center mx-auto mb-4 border-4 border-red-100"><AlertCircle className="w-8 h-8" /></div>
+            <h3 className="text-xl font-bold text-gray-900 mb-2">Xác nhận xóa</h3>
+            <p className="text-gray-500 text-sm mb-6">Hành động này sẽ xóa nhân sự này vĩnh viễn.</p>
             <div className="flex gap-3">
-              <button onClick={() => setIsConfirmOpen(false)} className="flex-1 py-3 bg-gray-100 text-gray-700 hover:bg-gray-200 font-bold rounded-xl transition-colors">Hủy</button>
-              <button onClick={confirmDelete} disabled={submitting} className="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl flex items-center justify-center transition-colors shadow-md">{submitting ? <Loader2 className="animate-spin" /> : 'Xóa'}</button>
+              <button onClick={() => setIsConfirmOpen(false)} className="flex-1 py-3 bg-gray-100 text-gray-700 hover:bg-gray-200 rounded-xl font-bold transition-colors">Hủy</button>
+              <button onClick={confirmDelete} disabled={submitting} className="flex-1 py-3 text-white bg-red-600 hover:bg-red-700 rounded-xl font-bold flex items-center justify-center gap-2 shadow-md transition-colors">{submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Trash2 className="w-5 h-5" />} Xóa</button>
             </div>
           </div>
         </div>
