@@ -112,22 +112,51 @@ export default function DocumentPage() {
     return donViList.filter(dv => allAllowed.includes(dv.ID_DonVi)).map(dv => dv.ID_DonVi);
   }, [user, donViList]);
 
+  // --- FIX TÌM KIẾM CÂY THƯ MỤC CỰC THÔNG MINH VÀ CHỐNG TRẮNG TRANG ---
   const filteredUnits = useMemo(() => {
-    let filtered = donViList.filter(dv => allowedDonViIds.includes(dv.ID_DonVi));
-    if (unitSearchTerm) {
-      const lower = unitSearchTerm.toLowerCase();
-      filtered = filtered.filter(u => u.TenDonVi?.toLowerCase().includes(lower) || u.ID_DonVi?.toLowerCase().includes(lower));
-    }
-    return filtered;
+    let baseUnits = donViList.filter(dv => allowedDonViIds.includes(dv.ID_DonVi));
+    if (!unitSearchTerm) return baseUnits;
+
+    const lower = unitSearchTerm.toLowerCase();
+    const matchedIds = new Set<string>();
+
+    baseUnits.forEach(u => {
+      // Ép String để không bị lỗi với ID số
+      if (String(u.TenDonVi || '').toLowerCase().includes(lower) || String(u.ID_DonVi || '').toLowerCase().includes(lower)) {
+        matchedIds.add(u.ID_DonVi);
+        
+        let parentId = u.CapQuanLy;
+        while (parentId && parentId !== 'HO') {
+          matchedIds.add(parentId);
+          const parentUnit = baseUnits.find(p => p.ID_DonVi === parentId);
+          parentId = parentUnit ? parentUnit.CapQuanLy : null;
+        }
+      }
+    });
+
+    const addChildren = (parentId: string) => {
+      baseUnits.forEach(u => {
+        if (u.CapQuanLy === parentId && !matchedIds.has(u.ID_DonVi)) {
+          matchedIds.add(u.ID_DonVi);
+          addChildren(u.ID_DonVi);
+        }
+      });
+    };
+    
+    const initialMatches = Array.from(matchedIds);
+    initialMatches.forEach(id => addChildren(id));
+
+    return baseUnits.filter(item => matchedIds.has(item.ID_DonVi));
   }, [donViList, unitSearchTerm, allowedDonViIds]);
 
   const parentUnits = useMemo(() => filteredUnits.filter(item => item.CapQuanLy === 'HO' || !item.CapQuanLy), [filteredUnits]);
   const getChildUnits = (parentId: string) => filteredUnits.filter(item => item.CapQuanLy === parentId);
 
+  // --- FIX LỖI ÉP STRING KHI PHÂN LOẠI NHÓM ĐƠN VỊ ---
   const { vpdhUnits, ctttNamUnits, ctttBacUnits, otherUnits } = useMemo(() => {
-    const vpdh = parentUnits.filter(u => u.Phia?.toLowerCase().includes('vpđh') || u.loaiHinh?.toLowerCase().includes('tổng công ty') || u.loaiHinh?.toLowerCase().includes('văn phòng'));
-    const ctttNam = parentUnits.filter(u => !vpdh.includes(u) && u.Phia?.toLowerCase().includes('nam'));
-    const ctttBac = parentUnits.filter(u => !vpdh.includes(u) && !ctttNam.includes(u) && u.Phia?.toLowerCase().includes('bắc'));
+    const vpdh = parentUnits.filter(u => String(u.Phia || '').toLowerCase().includes('vpđh') || String(u.loaiHinh || '').toLowerCase().includes('tổng công ty') || String(u.loaiHinh || '').toLowerCase().includes('văn phòng'));
+    const ctttNam = parentUnits.filter(u => !vpdh.includes(u) && String(u.Phia || '').toLowerCase().includes('nam'));
+    const ctttBac = parentUnits.filter(u => !vpdh.includes(u) && !ctttNam.includes(u) && String(u.Phia || '').toLowerCase().includes('bắc'));
     const others = parentUnits.filter(u => !vpdh.includes(u) && !ctttNam.includes(u) && !ctttBac.includes(u));
     return { vpdhUnits: vpdh, ctttNamUnits: ctttNam, ctttBacUnits: ctttBac, otherUnits: others };
   }, [parentUnits]);
@@ -146,7 +175,7 @@ export default function DocumentPage() {
     return Array.from(years).sort((a, b) => Number(b) - Number(a));
   }, [visibleDocuments]);
 
-  // LỌC VÀ SẮP XẾP VĂN BẢN HIỂN THỊ TRÊN BẢNG
+  // --- FIX LỖI TÌM KIẾM VĂN BẢN TRÊN BẢNG ---
   const filteredDocs = useMemo(() => {
     let result = [...visibleDocuments];
     
@@ -158,9 +187,9 @@ export default function DocumentPage() {
     if (searchTerm) {
       const lower = searchTerm.toLowerCase();
       result = result.filter(item => 
-        (item.Sohieu?.toLowerCase().includes(lower)) || 
-        (item.TieuDe?.toLowerCase().includes(lower)) ||
-        (item.Nghiepvu?.toLowerCase().includes(lower))
+        String(item.Sohieu || '').toLowerCase().includes(lower) || 
+        String(item.TieuDe || '').toLowerCase().includes(lower) ||
+        String(item.Nghiepvu || '').toLowerCase().includes(lower)
       );
     }
 
@@ -239,10 +268,10 @@ export default function DocumentPage() {
     }
   };
 
-  // HÀM VẼ CÂY THƯ MỤC 3 CẤP (Dành riêng cho trang Văn bản)
+  // TỰ ĐỘNG MỞ MENU CÂY KHI TÌM KIẾM
   const renderUnitTree = (parent: DonVi, level: number = 1) => {
     const children = getChildUnits(parent.ID_DonVi);
-    const isExpanded = expandedParents.includes(parent.ID_DonVi);
+    const isExpanded = expandedParents.includes(parent.ID_DonVi) || !!unitSearchTerm;
     const isParentDimmed = parent.trangThai === 'Đại lý' || parent.trangThai === 'Đầu tư mới';
 
     return (
@@ -259,7 +288,6 @@ export default function DocumentPage() {
           <span className="truncate text-left">{parent.TenDonVi}</span>
         </button>
         
-        {/* Đệ quy: Tự động vẽ Cấp con và Cấp cháu */}
         {isExpanded && children.length > 0 && (
           <div className={`ml-${level === 1 ? '6' : '4'} mt-1 border-l-2 border-gray-100 pl-2 space-y-1`}>
             {children.map(child => renderUnitTree(child, level + 1))}
@@ -271,6 +299,7 @@ export default function DocumentPage() {
 
   return (
     <div className="flex h-full bg-[#f4f7f9] overflow-hidden relative">
+      {/* NÚT MỞ RỘNG CỘT TRÁI NẾU BỊ ẨN */}
       {isListCollapsed && (
         <button onClick={() => setIsListCollapsed(false)} className="absolute top-6 left-6 z-20 bg-white p-2.5 rounded-lg shadow-md border border-gray-200 text-[#05469B] hover:bg-blue-50 transition-all">
           <PanelLeftOpen size={20} />
@@ -354,7 +383,7 @@ export default function DocumentPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse min-w-[1200px]">
               <thead>
-                <tr className="bg-gray-50 border-b border-gray-200 text-xs font-bold text-gray-600 uppercase tracking-wider">
+                <tr className="bg-[#f8fafc] border-b border-gray-200 text-xs font-bold text-gray-600 uppercase tracking-wider">
                   <th className="p-4 w-36">Số hiệu</th>
                   <th className="p-4 w-32">Ngày BH</th>
                   <th className="p-4">Tiêu đề & Nội dung</th>
