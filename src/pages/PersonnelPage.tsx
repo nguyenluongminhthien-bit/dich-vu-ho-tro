@@ -3,12 +3,13 @@ import {
   Search, Plus, Edit, Trash2, X, AlertCircle, Loader2, Save, 
   Users, ShieldCheck, Flame, LifeBuoy, Heart, Activity, 
   Dumbbell, Car, Utensils, Coffee, Languages, Monitor, Copy, Eye, User as UserIcon, 
-  Building2, Phone, Mail, Info, MapPin, ChevronDown, ChevronRight, PanelLeftClose, PanelLeftOpen, CheckCheck
+  Building2, Phone, Mail, Info, MapPin, ChevronDown, ChevronRight, PanelLeftClose, PanelLeftOpen, CheckCheck, Briefcase
 } from 'lucide-react';
 import { apiService } from '../services/api';
 import { Personnel, DonVi } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 
+// HÀM FORMAT SỐ ĐIỆN THOẠI 4-3-3
 const formatPhoneNumber = (val: string | number | undefined | null) => {
   if (!val) return '';
   const cleaned = val.toString().replace(/\D/g, ''); 
@@ -100,13 +101,15 @@ export default function PersonnelPage() {
 
   const allowedDonViIds = useMemo(() => {
     if (!user) return [];
-    if (user.idDonVi === 'ALL') return data.map(dv => dv.ID_DonVi);
+    if (user.idDonVi === 'ALL') return donViList.map(dv => dv.ID_DonVi);
+    
     const level1 = [user.idDonVi];
-    const level2 = data.filter(dv => level1.includes(dv.CapQuanLy)).map(dv => dv.ID_DonVi);
-    const level3 = data.filter(dv => level2.includes(dv.CapQuanLy)).map(dv => dv.ID_DonVi);
+    const level2 = donViList.filter(dv => level1.includes(dv.CapQuanLy)).map(dv => dv.ID_DonVi);
+    const level3 = donViList.filter(dv => level2.includes(dv.CapQuanLy)).map(dv => dv.ID_DonVi);
     const allAllowed = [...level1, ...level2, ...level3];
-    return data.filter(dv => allAllowed.includes(dv.ID_DonVi)).map(dv => dv.ID_DonVi);
-  }, [user, data]);
+    
+    return donViList.filter(dv => allAllowed.includes(dv.ID_DonVi)).map(dv => dv.ID_DonVi);
+  }, [user, donViList]);
 
   const calculateSeniority = (startDate: string) => {
     if (!startDate) return 'Chưa có';
@@ -120,11 +123,15 @@ export default function PersonnelPage() {
     return `${years} năm ${months} tháng`;
   };
 
+  // --- FIX LỖI TÌM KIẾM CỘT TRÁI: BỌC THÉP VỚI String(...) ---
   const filteredUnits = useMemo(() => {
     let filtered = donViList.filter(dv => allowedDonViIds.includes(dv.ID_DonVi));
     if (unitSearchTerm) {
       const lower = unitSearchTerm.toLowerCase();
-      filtered = filtered.filter(u => u.TenDonVi?.toLowerCase().includes(lower) || u.ID_DonVi?.toLowerCase().includes(lower));
+      filtered = filtered.filter(u => 
+        String(u.TenDonVi || '').toLowerCase().includes(lower) || 
+        String(u.ID_DonVi || '').toLowerCase().includes(lower)
+      );
     }
     return filtered;
   }, [donViList, unitSearchTerm, allowedDonViIds]);
@@ -132,11 +139,13 @@ export default function PersonnelPage() {
   const parentUnits = useMemo(() => filteredUnits.filter(item => item.CapQuanLy === 'HO' || !item.CapQuanLy), [filteredUnits]);
   const getChildUnits = (parentId: string) => filteredUnits.filter(item => item.CapQuanLy === parentId);
 
+  // --- FIX LỖI REFERENCE: Trả về { vpdhUnits: vpdh } cực kỳ chuẩn xác ---
   const { vpdhUnits, ctttNamUnits, ctttBacUnits, otherUnits } = useMemo(() => {
-    const vpdh = parentUnits.filter(u => u.Phia?.toLowerCase().includes('vpđh') || u.loaiHinh?.toLowerCase().includes('tổng công ty') || u.loaiHinh?.toLowerCase().includes('văn phòng'));
-    const ctttNam = parentUnits.filter(u => !vpdh.includes(u) && u.Phia?.toLowerCase().includes('nam'));
-    const ctttBac = parentUnits.filter(u => !vpdh.includes(u) && !ctttNam.includes(u) && u.Phia?.toLowerCase().includes('bắc'));
+    const vpdh = parentUnits.filter(u => String(u.Phia || '').toLowerCase().includes('vpđh') || String(u.loaiHinh || '').toLowerCase().includes('tổng công ty') || String(u.loaiHinh || '').toLowerCase().includes('văn phòng'));
+    const ctttNam = parentUnits.filter(u => !vpdh.includes(u) && String(u.Phia || '').toLowerCase().includes('nam'));
+    const ctttBac = parentUnits.filter(u => !vpdh.includes(u) && !ctttNam.includes(u) && String(u.Phia || '').toLowerCase().includes('bắc'));
     const others = parentUnits.filter(u => !vpdh.includes(u) && !ctttNam.includes(u) && !ctttBac.includes(u));
+    // Đã thay đổi thành đúng cú pháp key: value để tránh Uncaught ReferenceError
     return { vpdhUnits: vpdh, ctttNamUnits: ctttNam, ctttBacUnits: ctttBac, otherUnits: others };
   }, [parentUnits]);
 
@@ -144,6 +153,7 @@ export default function PersonnelPage() {
     setExpandedParents(prev => prev.includes(parentId) ? prev.filter(id => id !== parentId) : [...prev, parentId]);
   };
 
+  // --- FIX LỖI TÌM KIẾM NHÂN SỰ: BỌC THÉP VỚI String(...) ---
   const filteredPersonnel = useMemo(() => {
     let result = data.filter(item => allowedDonViIds.includes(item.ID_DonVi));
     if (selectedUnitFilter) {
@@ -152,9 +162,10 @@ export default function PersonnelPage() {
     if (personnelSearchTerm) {
       const lower = personnelSearchTerm.toLowerCase();
       result = result.filter(item => 
-        (item.MaNV?.toLowerCase().includes(lower)) || 
-        (item.HoTen?.toLowerCase().includes(lower)) || 
-        (donViMap[item.ID_DonVi || '']?.toLowerCase().includes(lower))
+        String(item.MaNV || '').toLowerCase().includes(lower) || 
+        String(item.HoTen || '').toLowerCase().includes(lower) || 
+        String(donViMap[item.ID_DonVi || ''] || '').toLowerCase().includes(lower) ||
+        String(item.ChucVu || '').toLowerCase().includes(lower) 
       );
     }
     return result;
@@ -170,19 +181,14 @@ export default function PersonnelPage() {
     let emails: string[] = [];
     filteredPersonnel.forEach(p => {
       if (!p.Email) return;
-      const chucVu = p.ChucVu?.toLowerCase() || '';
-      if (roleType === 'LD' && chucVu.includes('tổng giám đốc')) {
-        emails.push(p.Email);
-      } else if (roleType === 'DVHT' && (chucVu.includes('dvht') || chucVu.includes('dịch vụ hỗ trợ'))) {
-        emails.push(p.Email);
-      } else if (roleType === 'NS' && chucVu.includes('nhân sự')) {
-        emails.push(p.Email);
-      }
+      const chucVu = String(p.ChucVu || '').toLowerCase();
+      if (roleType === 'LD' && chucVu.includes('tổng giám đốc')) { emails.push(p.Email); } 
+      else if (roleType === 'DVHT' && (chucVu.includes('dvht') || chucVu.includes('dịch vụ hỗ trợ'))) { emails.push(p.Email); } 
+      else if (roleType === 'NS' && chucVu.includes('nhân sự')) { emails.push(p.Email); }
     });
 
     if (emails.length === 0) {
-      alert('Không tìm thấy email nào phù hợp với chức vụ này trong danh sách hiện tại!');
-      return;
+      alert('Không tìm thấy email nào phù hợp với chức vụ này trong danh sách hiện tại!'); return;
     }
     const uniqueEmails = Array.from(new Set(emails)).join('; ');
     navigator.clipboard.writeText(uniqueEmails).then(() => {
@@ -271,11 +277,16 @@ export default function PersonnelPage() {
           className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold transition-colors ${selectedUnitFilter === parent.ID_DonVi ? 'bg-blue-50 text-[#05469B]' : 'text-gray-700 hover:bg-gray-50'} ${isParentDimmed ? 'opacity-50' : ''}`}
         >
           {children.length > 0 ? (isExpanded ? <ChevronDown size={16} className="text-gray-400 shrink-0" /> : <ChevronRight size={16} className="text-gray-400 shrink-0" />) : <div className="w-4 shrink-0" />}
-          {level === 1 ? <Building2 size={16} className={`shrink-0 ${selectedUnitFilter === parent.ID_DonVi ? 'text-[#05469B]' : 'text-gray-400'}`} /> : <MapPin size={14} className={`shrink-0 ${selectedUnitFilter === parent.ID_DonVi ? 'text-[#05469B]' : 'text-gray-400'}`} /> }
+          
+          {level === 1 ? <Building2 size={16} className={`shrink-0 ${selectedUnitFilter === parent.ID_DonVi ? 'text-[#05469B]' : 'text-gray-400'}`} /> : 
+           level === 2 ? <Briefcase size={15} className={`shrink-0 ${selectedUnitFilter === parent.ID_DonVi ? 'text-[#05469B]' : 'text-gray-400'}`} /> : 
+           <MapPin size={14} className={`shrink-0 ${selectedUnitFilter === parent.ID_DonVi ? 'text-[#05469B]' : 'text-gray-400'}`} /> }
+          
           <span className="truncate text-left">{parent.TenDonVi}</span>
         </button>
+        
         {isExpanded && children.length > 0 && (
-          <div className={`ml-${level === 1 ? '6' : '4'} mt-1 border-l-2 border-gray-100 pl-2 space-y-1`}>
+          <div className={`mt-1 border-l-2 border-gray-100 pl-2 space-y-1 ${level === 1 ? 'ml-6' : 'ml-4'}`}>
             {children.map(child => renderUnitTree(child, level + 1))}
           </div>
         )}
@@ -317,37 +328,36 @@ export default function PersonnelPage() {
             <div className="text-center p-4 text-sm text-gray-500">Không tìm thấy đơn vị.</div>
           ) : (
             <>
-              {vpdhUnits.length > 0 && (<div className="mb-6"><p className="px-3 text-[10px] font-black text-[#05469B] uppercase tracking-wider mb-2">VPĐH</p>{vpdhUnits.map(renderUnitTree)}</div>)}
-              {ctttNamUnits.length > 0 && (<div className="mb-6"><p className="px-3 text-[10px] font-black text-[#05469B] uppercase tracking-wider mb-2">CTTT Phía Nam</p>{ctttNamUnits.map(renderUnitTree)}</div>)}
-              {ctttBacUnits.length > 0 && (<div className="mb-6"><p className="px-3 text-[10px] font-black text-[#05469B] uppercase tracking-wider mb-2">CTTT Phía Bắc</p>{ctttBacUnits.map(renderUnitTree)}</div>)}
-              {otherUnits.length > 0 && (<div className="mb-6"><p className="px-3 text-[10px] font-black text-gray-400 uppercase tracking-wider mb-2">Đơn vị khác</p>{otherUnits.map(renderUnitTree)}</div>)}
+              {vpdhUnits.length > 0 && (<div className="mb-6"><p className="px-3 text-[10px] font-black text-[#05469B] uppercase tracking-wider mb-2">VPĐH</p>{vpdhUnits.map(dv => renderUnitTree(dv, 1))}</div>)}
+              {ctttNamUnits.length > 0 && (<div className="mb-6"><p className="px-3 text-[10px] font-black text-[#05469B] uppercase tracking-wider mb-2">CTTT Phía Nam</p>{ctttNamUnits.map(dv => renderUnitTree(dv, 1))}</div>)}
+              {ctttBacUnits.length > 0 && (<div className="mb-6"><p className="px-3 text-[10px] font-black text-[#05469B] uppercase tracking-wider mb-2">CTTT Phía Bắc</p>{ctttBacUnits.map(dv => renderUnitTree(dv, 1))}</div>)}
+              {otherUnits.length > 0 && (<div className="mb-6"><p className="px-3 text-[10px] font-black text-gray-400 uppercase tracking-wider mb-2">Đơn vị khác</p>{otherUnits.map(dv => renderUnitTree(dv, 1))}</div>)}
             </>
           )}
         </div>
       </div>
 
-      {/* --- CỘT PHẢI CHI TIẾT --- */}
-      <div className="flex-1 overflow-y-auto p-4 sm:p-6 relative transition-all duration-300 w-full">
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6 relative transition-all duration-300">
         
-        {/* HEADER RESPONSIVE: Xếp dọc trên điện thoại, nằm ngang trên PC */}
-        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 gap-4 transition-all duration-300 w-full pl-10 lg:pl-0">
-          <div className="w-full lg:w-auto">
+        {/* HEADER CÓ CHỨA 3 NÚT COPY MAIL */}
+        <div className={`flex flex-col xl:flex-row justify-between items-start xl:items-center mb-6 gap-4 transition-all duration-300 ${isListCollapsed ? 'pl-10 lg:pl-12' : ''}`}>
+          <div>
             <h2 className="text-2xl font-bold text-[#05469B] flex items-center gap-2"><Users size={28} /> Quản lý Nhân sự</h2>
             <p className="text-sm font-medium text-gray-500 mt-1">Đang xem: <span className="text-emerald-600 font-bold">{selectedUnitName}</span> ({filteredPersonnel.length} nhân sự)</p>
           </div>
           
-          <div className="flex flex-col items-end gap-3 w-full lg:w-auto">
+          <div className="flex flex-col items-end gap-3 w-full xl:w-auto">
             {/* Thanh Tìm kiếm & Thêm Mới */}
             <div className="flex flex-col sm:flex-row w-full sm:w-auto gap-3">
               <div className="relative w-full sm:w-72">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-                <input type="text" placeholder="Tìm Mã NV, Họ Tên..." className="w-full pl-9 pr-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#05469B] outline-none shadow-sm text-sm" value={personnelSearchTerm} onChange={(e) => setPersonnelSearchTerm(e.target.value)} />
+                <input type="text" placeholder="Tìm Mã NV, Họ Tên, Chức vụ..." className="w-full pl-9 pr-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#05469B] outline-none shadow-sm text-sm" value={personnelSearchTerm} onChange={(e) => setPersonnelSearchTerm(e.target.value)} />
               </div>
               <button onClick={() => openModal('create')} className="w-full sm:w-auto flex items-center justify-center gap-2 bg-[#05469B] hover:bg-[#04367a] text-white px-5 py-2.5 rounded-lg font-bold shadow-sm transition-all whitespace-nowrap"><Plus className="w-5 h-5" /> Thêm Mới</button>
             </div>
             
-            {/* 3 NÚT COPY MAIL: Đã đổi flex-wrap và căn lề linh hoạt */}
-            <div className="flex flex-wrap justify-start sm:justify-end gap-2 w-full sm:w-auto">
+            {/* 3 NÚT COPY MAIL TỰ XUỐNG DÒNG TRÊN MOBILE */}
+            <div className="flex flex-wrap justify-end gap-2 w-full sm:w-auto">
               <button onClick={() => handleCopyMail('LD')} className="text-[11px] font-bold px-3 py-1.5 border border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100 rounded flex items-center gap-1.5 transition-colors shadow-sm whitespace-nowrap" title="Copy Mail Tổng Giám đốc">
                 {copiedRole === 'LD' ? <CheckCheck size={14} className="text-green-600"/> : <Copy size={14} />} Copy Mail LĐ
               </button>
@@ -363,8 +373,7 @@ export default function PersonnelPage() {
 
         {error && <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-500 text-red-700 flex items-start gap-3 rounded-lg shadow-sm"><AlertCircle className="w-5 h-5 shrink-0 mt-0.5" /><p>{error}</p></div>}
 
-        {/* WRAPPER OVERFLOW-X-AUTO CỨU CÁNH BẢNG DỮ LIỆU */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden transition-all duration-300 w-full">
+        <div className={`bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden transition-all duration-300 ${isListCollapsed ? 'ml-10 lg:ml-0' : ''}`}>
           <div className="overflow-x-auto w-full">
             <table className="w-full text-left border-collapse min-w-[1050px]">
               <thead>
@@ -408,7 +417,6 @@ export default function PersonnelPage() {
         </div>
       </div>
 
-      {/* --- CÁC MODAL ĐÃ ĐƯỢC RESPONSIVE THUỘC TÍNH RỘNG MAX --- */}
       {isViewModalOpen && viewData && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl flex flex-col max-h-[90vh] animate-in fade-in zoom-in duration-200">
@@ -550,7 +558,7 @@ export default function PersonnelPage() {
                     <select name="PhanLoai" value={formData.PhanLoai || 'Lãnh đạo'} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]">
                       <option value="Lãnh đạo">Lãnh đạo</option>
                       <option value="PT DVHT KD">PT DVHT KD</option>
-                      <option value="PT DVHC">PT PVHC</option>
+                      <option value="PT DVHC">PT DVHC</option>
                       <option value="PT NS">PT NS</option>
                       <option value="BV, ĐTKH">BV, ĐTKH</option>
                     </select>
@@ -619,7 +627,7 @@ export default function PersonnelPage() {
               </div>
 
               <div className="bg-orange-50/40 p-4 sm:p-5 rounded-xl border border-orange-100">
-                <h4 className="font-bold text-orange-800 mb-4 flex items-center gap-2"><div className="w-2 h-6 bg-orange-500 rounded-full"></div> Thông tin Bổ sung</h4>
+                <h4 className="font-bold text-orange-800 mb-4 flex items-center gap-2"><div className="w-2 h-6 bg-orange-500 rounded-full"></div> Thông tự Bổ sung</h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-bold text-gray-700 mb-1">Mô tả ngoại hình</label>
