@@ -13,6 +13,9 @@ import { apiService } from '../services/api';
 import { DonVi, Personnel, AnNinh, PhapNhan, PhongHop } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 
+// --- HÀM TỰ ĐỘNG DÒ TÌM ID TRÁNH LỖI TẠO DÒNG MỚI ---
+const getSecId = (sec: any) => sec.ID_AnNinh || sec.iD_AnNinh || sec.Id_AnNinh || sec.id || '';
+
 const initialFormState: Partial<DonVi> = {
   ID_DonVi: '', TenDonVi: '', CapQuanLy: '', DiaChi: '', DienTich: '', SoTang: '', SoHam: '',
   SoPhongCho: '', SoCong: '', LuotKhachBQ: '', TongNhanSu: '', loaiHinh: 'Showroom', trangThai: 'Hoạt động', Phia: 'CTTT Phía Nam'
@@ -35,7 +38,7 @@ export default function DepartmentPage() {
   const { user } = useAuth();
   const [data, setData] = useState<DonVi[]>([]);
   const [personnelData, setPersonnelData] = useState<Personnel[]>([]);
-  const [anNinhData, setAnNinhData] = useState<AnNinh[]>([]);
+  const [anNinhData, setAnNinhData] = useState<any[]>([]); // Dùng any để linh hoạt ID
   const [phapNhanData, setPhapNhanData] = useState<PhapNhan[]>([]); 
   const [phongHopData, setPhongHopData] = useState<PhongHop[]>([]); 
   
@@ -53,7 +56,7 @@ export default function DepartmentPage() {
   const [formData, setFormData] = useState<Partial<DonVi>>(initialFormState);
   
   const [isSecurityModalOpen, setIsSecurityModalOpen] = useState(false);
-  const [securityFormData, setSecurityFormData] = useState<Partial<AnNinh>>({});
+  const [securityFormData, setSecurityFormData] = useState<any>({});
 
   const [isPnModalOpen, setIsPnModalOpen] = useState(false);
   const [pnModalMode, setPnModalMode] = useState<'create' | 'update'>('create');
@@ -85,10 +88,12 @@ export default function DepartmentPage() {
   const allowedDonViIds = useMemo(() => {
     if (!user) return [];
     if (user.idDonVi === 'ALL') return data.map(dv => dv.ID_DonVi);
+    
     const level1 = [user.idDonVi];
     const level2 = data.filter(dv => level1.includes(dv.CapQuanLy)).map(dv => dv.ID_DonVi);
     const level3 = data.filter(dv => level2.includes(dv.CapQuanLy)).map(dv => dv.ID_DonVi);
     const allAllowed = [...level1, ...level2, ...level3];
+    
     return data.filter(dv => allAllowed.includes(dv.ID_DonVi)).map(dv => dv.ID_DonVi);
   }, [user, data]);
 
@@ -343,8 +348,9 @@ export default function DepartmentPage() {
   };
 
   const openSecurityModal = () => {
-    if (currentAnNinh) { setSecurityFormData({ ...currentAnNinh }); } 
-    else {
+    if (currentAnNinh) { 
+      setSecurityFormData({ ...currentAnNinh, ID_AnNinh: getSecId(currentAnNinh) }); 
+    } else {
       setSecurityFormData({
         ID_AnNinh: '', ID_DonVi: selectedUnitId || '', 
         SoBaoVeNoiBo: '', SoBaoVeDichvu: '', VitrBVDV: '', NCC_DichVu: '', ChiPhiThue: '',
@@ -358,20 +364,32 @@ export default function DepartmentPage() {
     setIsSecurityModalOpen(true);
   };
 
+  // FIX LỖI TẠO DÒNG MỚI KHI CẬP NHẬT AN NINH BẰNG CÁCH DÒ TÌM ID
   const handleSecuritySave = async (e: React.FormEvent) => {
     e.preventDefault(); setSubmitting(true); setError(null);
     const soNB = Number(securityFormData.SoBaoVeNoiBo) || 0;
     const soDV = Number(securityFormData.SoBaoVeDichvu) || 0;
-    let finalData = { ...securityFormData, TongANBV: soNB + soDV };
+    let finalData: any = { ...securityFormData, TongANBV: soNB + soDV };
     if (soDV < 1) { finalData.VitrBVDV = ''; finalData.NCC_DichVu = ''; finalData.ChiPhiThue = ''; }
 
+    const currentId = getSecId(finalData);
+    if (currentId) {
+      finalData.ID_AnNinh = currentId;
+      finalData.iD_AnNinh = currentId;
+      finalData.Id_AnNinh = currentId;
+    }
+
     try {
-      const mode = finalData.ID_AnNinh ? 'update' : 'create';
+      const mode = currentId ? 'update' : 'create';
       const res = await apiService.save(finalData, mode, "HS_AnNinh");
+      
+      const savedId = res?.newId || res?.id || currentId || `AN-${Date.now()}`;
+      finalData.ID_AnNinh = savedId;
+
       if (mode === 'create') {
-        finalData.ID_AnNinh = res.newId; setAnNinhData(prev => [...prev, finalData as AnNinh]);
+        setAnNinhData(prev => [...prev, finalData as AnNinh]);
       } else {
-        setAnNinhData(prev => prev.map(item => item.ID_AnNinh === finalData.ID_AnNinh ? finalData as AnNinh : item));
+        setAnNinhData(prev => prev.map(item => getSecId(item) === currentId ? (finalData as AnNinh) : item));
       }
       setIsSecurityModalOpen(false);
     } catch (err: any) { setError(err.message || 'Lỗi lưu dữ liệu An Ninh.'); } 
@@ -404,11 +422,11 @@ export default function DepartmentPage() {
   return (
     <div className="flex h-full bg-[#f4f7f9] overflow-hidden relative">
       {isListCollapsed && (
-        <button onClick={() => setIsListCollapsed(false)} className="absolute top-6 left-6 z-20 bg-white p-2.5 rounded-lg shadow-md border border-gray-200 text-[#05469B] hover:bg-blue-50 transition-all" title="Mở danh sách đơn vị"><PanelLeftOpen size={20} /></button>
+        <button onClick={() => setIsListCollapsed(false)} className="absolute top-6 left-6 z-20 bg-white p-2.5 rounded-lg shadow-md border border-gray-200 text-[#05469B] hover:bg-blue-50 transition-all lg:hidden" title="Mở danh sách đơn vị"><PanelLeftOpen size={20} /></button>
       )}
 
       {/* CỘT TRÁI */}
-      <div className={`${isListCollapsed ? 'w-0 opacity-0' : 'w-80 opacity-100'} transition-all duration-300 ease-in-out bg-white border-r border-gray-200 flex flex-col h-full shadow-sm z-10 shrink-0 overflow-hidden`}>
+      <div className={`${isListCollapsed ? 'w-0 opacity-0 -ml-80 lg:ml-0' : 'w-80 opacity-100 absolute lg:relative inset-y-0 left-0'} transition-all duration-300 ease-in-out bg-white border-r border-gray-200 flex flex-col h-full shadow-2xl lg:shadow-sm z-50 lg:z-10 shrink-0 overflow-hidden`}>
         <div className="p-4 border-b border-gray-100">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-lg font-bold text-[#05469B] flex items-center gap-2 whitespace-nowrap"><Building2 size={20} /> Công ty & Showroom</h2>
@@ -441,8 +459,8 @@ export default function DepartmentPage() {
       </div>
 
       {/* CỘT PHẢI CHI TIẾT */}
-      <div className="flex-1 overflow-y-auto p-6 relative transition-all duration-300">
-        <div className={`max-w-6xl mx-auto space-y-8 pb-12 transition-all duration-300 ${isListCollapsed ? 'pl-12' : ''}`}>
+      <div className="flex-1 overflow-y-auto p-6 relative transition-all duration-300 w-full">
+        <div className={`max-w-6xl mx-auto space-y-8 pb-12 transition-all duration-300 ${isListCollapsed ? 'pl-10 lg:pl-12' : ''}`}>
           {error && <div className="mb-4 p-4 bg-red-50 text-red-700 flex gap-3 rounded-lg"><AlertCircle size={20} /> <p>{error}</p></div>}
           {!selectedUnit ? (
             <div className="h-[80vh] flex items-center justify-center text-gray-400 flex-col"><Building2 size={64} className="mb-4 opacity-20" /><p className="text-lg">Vui lòng chọn một Đơn vị ở danh sách bên trái</p></div>
@@ -450,14 +468,14 @@ export default function DepartmentPage() {
             <div className="animate-in fade-in duration-300 space-y-8">
               
               {/* Header Đơn vị */}
-              <div className="flex justify-between items-start bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
+              <div className="flex flex-col md:flex-row justify-between items-start bg-white p-6 rounded-2xl shadow-sm border border-gray-200 gap-4">
                 <div>
                   <h1 className="text-3xl font-black text-[#05469B] mb-3">{selectedUnit.TenDonVi}</h1>
                   <div className="flex flex-wrap items-center gap-3 text-sm text-gray-500 font-medium">
                     <span className="flex items-center gap-1.5 group">
-                      <MapPin size={16} className="text-red-500" /> 
+                      <MapPin size={16} className="text-red-500 shrink-0" /> 
                       {selectedUnit.DiaChi ? (
-                        <a href={`http://maps.google.com/?q=${encodeURIComponent(selectedUnit.DiaChi)}`} target="_blank" rel="noreferrer" className="group-hover:text-blue-600 group-hover:underline transition-colors" title="Xem trên Google Maps">{selectedUnit.DiaChi}</a>
+                        <a href={`http://maps.google.com/?q=${encodeURIComponent(selectedUnit.DiaChi)}`} target="_blank" rel="noreferrer" className="group-hover:text-blue-600 group-hover:underline transition-colors break-words" title="Xem trên Google Maps">{selectedUnit.DiaChi}</a>
                       ) : 'Chưa cập nhật địa chỉ'}
                     </span>
                     <span className="px-2.5 py-1 bg-gray-100 rounded-md text-xs border border-gray-200">ID: {selectedUnit.ID_DonVi}</span>
@@ -466,7 +484,7 @@ export default function DepartmentPage() {
                     {selectedUnit.Phia && <span className="px-2.5 py-1 bg-gray-50 text-gray-600 rounded-md text-xs border border-gray-200">{selectedUnit.Phia}</span>}
                   </div>
                 </div>
-                <div className="flex gap-2 shrink-0">
+                <div className="flex gap-2 shrink-0 w-full md:w-auto justify-end">
                   <button onClick={() => openModal('update', selectedUnit)} className="px-4 py-2.5 text-sm font-bold text-[#05469B] bg-white border border-[#05469B] hover:bg-blue-50 rounded-lg flex items-center gap-2 shadow-sm"><Edit size={16} /> Cập nhật</button>
                   <button onClick={() => { setItemToDelete({id: selectedUnit.ID_DonVi, type: 'donvi'}); setIsConfirmOpen(true); }} className="p-2.5 text-red-600 bg-white border border-red-200 hover:bg-red-50 rounded-lg shadow-sm"><Trash2 size={20} /></button>
                 </div>
@@ -568,7 +586,6 @@ export default function DepartmentPage() {
                   {currentAnNinh ? (
                     <div className="space-y-5 animate-in fade-in duration-300">
                       
-                      {/* Dòng 1: Cột Lực Lượng (kèm Ca trực) & Cột Giám sát */}
                       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
                         
                         {/* Cột Trái: Lực lượng & Ca trực */}
@@ -580,8 +597,8 @@ export default function DepartmentPage() {
                              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-0"><span className="text-gray-500 font-medium whitespace-nowrap shrink-0">Bảo vệ Dịch vụ:</span><span className="font-bold text-gray-800 sm:text-right">{currentAnNinh.SoBaoVeDichvu || 0} người</span></div>
                              {Number(currentAnNinh.SoBaoVeDichvu) >= 1 && (
                                 <div className="pt-2 border-t border-gray-100 space-y-2">
-                                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-0"><span className="text-gray-500 font-medium whitespace-nowrap shrink-0">Vị trí BV Dịch vụ:</span><span className="font-bold text-gray-800 sm:text-right">{currentAnNinh.VitrBVDV || '---'}</span></div>
-                                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-0"><span className="text-gray-500 font-medium whitespace-nowrap shrink-0">Nhà cung cấp:</span><span className="font-bold text-gray-800 sm:text-right uppercase">{currentAnNinh.NCC_DichVu || '---'}</span></div>
+                                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-0"><span className="text-gray-500 font-medium whitespace-nowrap shrink-0">Vị trí BV Dịch vụ:</span><span className="font-bold text-gray-800 sm:text-right break-words">{currentAnNinh.VitrBVDV || '---'}</span></div>
+                                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-0"><span className="text-gray-500 font-medium whitespace-nowrap shrink-0">Nhà cung cấp:</span><span className="font-bold text-gray-800 sm:text-right uppercase break-words">{currentAnNinh.NCC_DichVu || '---'}</span></div>
                                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-0"><span className="text-gray-500 font-medium whitespace-nowrap shrink-0">Chi phí thuê ngoài:</span><span className="font-black text-red-600 sm:text-right">{formatCurrency(currentAnNinh.ChiPhiThue) || '0'} VNĐ/tháng</span></div>
                                 </div>
                              )}
@@ -602,11 +619,10 @@ export default function DepartmentPage() {
                                 </div>
                              </div>
                              
-                             {/* Bố trí nghỉ ca - Đã chỉnh sửa Mobile-First */}
                              <div className="mt-4">
-                                <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 bg-gradient-to-r from-amber-50 to-indigo-50 px-4 py-3 rounded-lg border border-gray-200 shadow-sm">
+                                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 sm:gap-3 bg-gradient-to-r from-amber-50 to-indigo-50 px-4 py-3 rounded-lg border border-gray-200 shadow-sm">
                                    <div className="flex items-center gap-1.5 shrink-0"><Clock size={14} className="text-[#05469B]"/><span className="text-[#05469B] font-bold text-xs whitespace-nowrap">Bố trí nghỉ ca / Đổi ca:</span></div>
-                                   <span className="font-black text-gray-800 text-xs sm:flex-1 text-left sm:text-right whitespace-pre-wrap break-words">{currentAnNinh.BoTriNghiCa ? `${currentAnNinh.BoTriNghiCa} người` : '---'}</span>
+                                   <span className="font-black text-gray-800 text-xs flex-1 text-left sm:text-right whitespace-pre-wrap break-words">{currentAnNinh.BoTriNghiCa ? `${currentAnNinh.BoTriNghiCa} người` : '---'}</span>
                                 </div>
                              </div>
                           </div>
@@ -618,7 +634,7 @@ export default function DepartmentPage() {
                           <div className="space-y-3 text-sm">
                              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-0"><span className="text-gray-500 font-medium whitespace-nowrap shrink-0">Số lượng Camera:</span><span className="font-black text-gray-800 sm:ml-2">{currentAnNinh.SLCAM || 0} Mắt</span></div>
                              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-0"><span className="text-gray-500 font-medium whitespace-nowrap shrink-0">Thời gian lưu hình:</span><span className="font-bold text-gray-800 sm:ml-2">{currentAnNinh.ThoiGianLuu || '---'} Ngày</span></div>
-                             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-0"><span className="text-gray-500 font-medium whitespace-nowrap shrink-0">Vị trí đặt hệ thống (Đầu ghi):</span><span className="font-bold text-gray-800 text-left sm:text-right sm:ml-2">{currentAnNinh.ViTriDatHeThong || '---'}</span></div>
+                             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-0"><span className="text-gray-500 font-medium whitespace-nowrap shrink-0">Vị trí đặt hệ thống (Đầu ghi):</span><span className="font-bold text-gray-800 text-left sm:text-right sm:ml-2 break-words">{currentAnNinh.ViTriDatHeThong || '---'}</span></div>
                              
                              <div className="flex flex-col sm:flex-row justify-between items-start pt-2 border-t border-gray-50 mt-1 gap-1 sm:gap-0">
                                <span className="text-gray-500 font-medium whitespace-nowrap shrink-0 sm:mr-3">Vị trí giám sát chính:</span>
@@ -919,39 +935,25 @@ export default function DepartmentPage() {
               {/* KHỐI 2: PHÂN BỔ CA TRỰC */}
               <div className="bg-amber-50/50 p-5 rounded-xl border border-amber-100">
                 <h4 className="font-bold text-amber-800 mb-4 flex items-center gap-2 border-b border-amber-200 pb-2"><Clock size={18}/> Phân bổ Ca trực</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  <div>
-                    <p className="text-xs font-bold text-amber-700 mb-3 flex items-center gap-1.5"><Sun size={14}/> CA NGÀY</p>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div><label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Cố định (Chốt)</label><input type="number" name="Ngaycd" value={securityFormData.Ngaycd || ''} onChange={(e) => handleInputChange(e, 'sec')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-amber-500" /></div>
-                      <div><label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Tuần tra (Người)</label><input type="number" name="Ngaytuantra" value={securityFormData.Ngaytuantra || ''} onChange={(e) => handleInputChange(e, 'sec')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-amber-500" /></div>
-                    </div>
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold text-indigo-700 mb-3 flex items-center gap-1.5"><Moon size={14}/> CA ĐÊM</p>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div><label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Cố định (Chốt)</label><input type="number" name="Demcd" value={securityFormData.Demcd || ''} onChange={(e) => handleInputChange(e, 'sec')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-indigo-500" /></div>
-                      <div><label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Tuần tra (Người)</label><input type="number" name="Demtruantra" value={securityFormData.Demtruantra || ''} onChange={(e) => handleInputChange(e, 'sec')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-indigo-500" /></div>
-                    </div>
-                  </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                  <div><label className="block text-[10px] font-bold text-amber-700 mb-1 uppercase flex items-center gap-1"><Sun size={12}/> Ngày (Cố định)</label><input type="number" name="Ngaycd" value={securityFormData.Ngaycd || ''} onChange={(e) => handleInputChange(e, 'sec')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-amber-500" /></div>
+                  <div><label className="block text-[10px] font-bold text-amber-700 mb-1 uppercase flex items-center gap-1"><Sun size={12}/> Ngày (Tuần tra)</label><input type="number" name="Ngaytuantra" value={securityFormData.Ngaytuantra || ''} onChange={(e) => handleInputChange(e, 'sec')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-amber-500" /></div>
+                  <div><label className="block text-[10px] font-bold text-indigo-700 mb-1 uppercase flex items-center gap-1"><Moon size={12}/> Đêm (Cố định)</label><input type="number" name="Demcd" value={securityFormData.Demcd || ''} onChange={(e) => handleInputChange(e, 'sec')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-indigo-500" /></div>
+                  <div><label className="block text-[10px] font-bold text-indigo-700 mb-1 uppercase flex items-center gap-1"><Moon size={12}/> Đêm (Tuần tra)</label><input type="number" name="Demtruantra" value={securityFormData.Demtruantra || ''} onChange={(e) => handleInputChange(e, 'sec')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-indigo-500" /></div>
                 </div>
-                
                 {/* TRƯỜNG DỮ LIỆU MỚI: Bố trí nghỉ ca */}
-                <div className="mt-4 pt-4 border-t border-amber-100/50">
-                  <label className="block text-xs font-bold text-gray-700 mb-1">Bố trí nghỉ ca / Đổi ca</label>
-                  <textarea name="BoTriNghiCa" value={securityFormData.BoTriNghiCa || ''} onChange={(e) => handleInputChange(e, 'sec')} rows={2} placeholder="Mô tả cách thức bố trí người nghỉ ca, đổi ca..." className="w-full p-2.5 border border-gray-200 rounded-lg bg-white resize-none outline-none focus:ring-2 focus:ring-amber-500"></textarea>
-                </div>
+                <div><label className="block text-xs font-bold text-gray-700 mb-1">Bố trí nghỉ ca / Đổi ca</label><textarea name="BoTriNghiCa" value={securityFormData.BoTriNghiCa || ''} onChange={(e) => handleInputChange(e, 'sec')} rows={2} placeholder="Mô tả cách thức bố trí người nghỉ ca, đổi ca..." className="w-full p-2.5 border border-gray-200 rounded-lg bg-white resize-none outline-none focus:ring-2 focus:ring-amber-500"></textarea></div>
               </div>
 
               {/* KHỐI 3: HỆ THỐNG GIÁM SÁT */}
               <div className="bg-gray-50 p-5 rounded-xl border border-gray-200">
                 <h4 className="font-bold text-gray-800 mb-4 flex items-center gap-2 border-b border-gray-200 pb-2"><Camera size={18}/> Hệ thống Giám sát</h4>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-4">
-                  <div><label className="block text-xs font-bold text-gray-700 mb-1">Số lượng Camera (Mắt)</label><input type="number" name="SLCAM" value={securityFormData.SLCAM || ''} onChange={(e) => handleInputChange(e, 'sec')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-indigo-500" /></div>
-                  <div><label className="block text-xs font-bold text-gray-700 mb-1">Thời gian lưu hình (Ngày)</label><input type="number" name="ThoiGianLuu" value={securityFormData.ThoiGianLuu || ''} onChange={(e) => handleInputChange(e, 'sec')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-indigo-500" /></div>
-                  <div><label className="block text-xs font-bold text-gray-700 mb-1">Vị trí đặt hệ thống (Đầu ghi)</label><input type="text" name="ViTriDatHeThong" value={securityFormData.ViTriDatHeThong || ''} onChange={(e) => handleInputChange(e, 'sec')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Phòng IT, Phòng GĐ..." /></div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                  <div><label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase">SL Camera (Mắt)</label><input type="number" name="SLCAM" value={securityFormData.SLCAM || ''} onChange={(e) => handleInputChange(e, 'sec')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-indigo-500" /></div>
+                  <div><label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Lưu hình (Ngày)</label><input type="number" name="ThoiGianLuu" value={securityFormData.ThoiGianLuu || ''} onChange={(e) => handleInputChange(e, 'sec')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-indigo-500" /></div>
+                  <div className="col-span-2"><label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Vị trí đặt hệ thống (Đầu ghi)</label><input type="text" name="ViTriDatHeThong" value={securityFormData.ViTriDatHeThong || ''} onChange={(e) => handleInputChange(e, 'sec')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-indigo-500" placeholder="VD: Phòng IT, Phòng Giám đốc..." /></div>
                 </div>
-                <div><label className="block text-xs font-bold text-gray-700 mb-1">Vị trí giám sát chính</label><textarea name="ViTriGiamSat" value={securityFormData.ViTriGiamSat || ''} onChange={(e) => handleInputChange(e, 'sec')} rows={2} placeholder="Mô tả các góc giám sát quan trọng..." className="w-full p-2.5 border border-gray-200 rounded-lg bg-white resize-none outline-none focus:ring-2 focus:ring-indigo-500"></textarea></div>
+                <div><label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Vị trí giám sát chính</label><textarea name="ViTriGiamSat" value={securityFormData.ViTriGiamSat || ''} onChange={(e) => handleInputChange(e, 'sec')} rows={2} placeholder="Mô tả các góc giám sát quan trọng..." className="w-full p-2.5 border border-gray-200 rounded-lg bg-white resize-none outline-none focus:ring-2 focus:ring-indigo-500"></textarea></div>
               </div>
 
               {/* KHỐI 4: ĐẶC ĐIỂM ĐỊA BÀN */}
