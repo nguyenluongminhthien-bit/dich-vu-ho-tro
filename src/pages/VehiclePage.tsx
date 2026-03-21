@@ -89,28 +89,60 @@ export default function VehiclePage() {
     return donViList.filter(dv => allAllowed.includes(dv.ID_DonVi)).map(dv => dv.ID_DonVi);
   }, [user, donViList]);
 
+  // --- FIX TÌM KIẾM CÂY THƯ MỤC CỰC THÔNG MINH (KÉO RỄ - XỔ CÀNH) VÀ CHỐNG TRẮNG TRANG ---
   const filteredUnits = useMemo(() => {
-    let filtered = donViList.filter(dv => allowedDonViIds.includes(dv.ID_DonVi));
-    if (unitSearchTerm) {
-      const lower = unitSearchTerm.toLowerCase();
-      filtered = filtered.filter(u => u.TenDonVi?.toLowerCase().includes(lower) || u.ID_DonVi?.toLowerCase().includes(lower));
-    }
-    return filtered;
+    let baseUnits = donViList.filter(item => allowedDonViIds.includes(item.ID_DonVi));
+    if (!unitSearchTerm) return baseUnits;
+
+    const lower = unitSearchTerm.toLowerCase();
+    const matchedIds = new Set<string>();
+
+    // 1. Tìm các đơn vị khớp trực tiếp với từ khóa
+    baseUnits.forEach(u => {
+      if (String(u.TenDonVi || '').toLowerCase().includes(lower) || String(u.ID_DonVi || '').toLowerCase().includes(lower)) {
+        matchedIds.add(u.ID_DonVi);
+        
+        // 2. Kéo theo các node Cha, Ông Nội... để giữ vững cấu trúc cây
+        let parentId = u.CapQuanLy;
+        while (parentId && parentId !== 'HO') {
+          matchedIds.add(parentId);
+          const parentUnit = baseUnits.find(p => p.ID_DonVi === parentId);
+          parentId = parentUnit ? parentUnit.CapQuanLy : null;
+        }
+      }
+    });
+
+    // 3. Xổ cành: Nếu Cha khớp từ khóa, hiện tất cả các Showroom con của nó
+    const addChildren = (parentId: string) => {
+      baseUnits.forEach(u => {
+        if (u.CapQuanLy === parentId && !matchedIds.has(u.ID_DonVi)) {
+          matchedIds.add(u.ID_DonVi);
+          addChildren(u.ID_DonVi);
+        }
+      });
+    };
+    
+    const initialMatches = Array.from(matchedIds);
+    initialMatches.forEach(id => addChildren(id));
+
+    return baseUnits.filter(item => matchedIds.has(item.ID_DonVi));
   }, [donViList, unitSearchTerm, allowedDonViIds]);
 
   const parentUnits = useMemo(() => filteredUnits.filter(item => item.CapQuanLy === 'HO' || !item.CapQuanLy), [filteredUnits]);
   const getChildUnits = (parentId: string) => filteredUnits.filter(item => item.CapQuanLy === parentId);
 
+  // --- FIX LỖI TÌM KIẾM THEO PHÂN LOẠI CỘT TRÁI (CHỐNG TRẮNG TRANG) ---
   const { vpdhUnits, ctttNamUnits, ctttBacUnits, otherUnits } = useMemo(() => {
-    const vpdh = parentUnits.filter(u => u.Phia?.toLowerCase().includes('vpđh') || u.loaiHinh?.toLowerCase().includes('tổng công ty') || u.loaiHinh?.toLowerCase().includes('văn phòng'));
-    const ctttNam = parentUnits.filter(u => !vpdh.includes(u) && u.Phia?.toLowerCase().includes('nam'));
-    const ctttBac = parentUnits.filter(u => !vpdh.includes(u) && !ctttNam.includes(u) && u.Phia?.toLowerCase().includes('bắc'));
+    const vpdh = parentUnits.filter(u => String(u.Phia || '').toLowerCase().includes('vpđh') || String(u.loaiHinh || '').toLowerCase().includes('tổng công ty') || String(u.loaiHinh || '').toLowerCase().includes('văn phòng'));
+    const ctttNam = parentUnits.filter(u => !vpdh.includes(u) && String(u.Phia || '').toLowerCase().includes('nam'));
+    const ctttBac = parentUnits.filter(u => !vpdh.includes(u) && !ctttNam.includes(u) && String(u.Phia || '').toLowerCase().includes('bắc'));
     const others = parentUnits.filter(u => !vpdh.includes(u) && !ctttNam.includes(u) && !ctttBac.includes(u));
     return { vpdhUnits: vpdh, ctttNamUnits: ctttNam, ctttBacUnits: ctttBac, otherUnits: others };
   }, [parentUnits]);
 
   const toggleParent = (parentId: string) => setExpandedParents(prev => prev.includes(parentId) ? prev.filter(id => id !== parentId) : [...prev, parentId]);
 
+  // --- FIX LỖI TÌM KIẾM DANH SÁCH XE (CHỐNG TRẮNG TRANG) ---
   const filteredCars = useMemo(() => {
     let result = xeData.filter(item => allowedDonViIds.includes(item.ID_DonVi));
     if (selectedUnitFilter) {
@@ -120,7 +152,11 @@ export default function VehiclePage() {
     }
     if (carSearchTerm) {
       const lower = carSearchTerm.toLowerCase();
-      result = result.filter(item => (item.BienSo?.toLowerCase().includes(lower)) || (item.HieuXe?.toLowerCase().includes(lower)) || (item.LoaiXe?.toLowerCase().includes(lower)));
+      result = result.filter(item => 
+        String(item.BienSo || '').toLowerCase().includes(lower) || 
+        String(item.HieuXe || '').toLowerCase().includes(lower) || 
+        String(item.LoaiXe || '').toLowerCase().includes(lower)
+      );
     }
     return result;
   }, [xeData, carSearchTerm, selectedUnitFilter, allowedDonViIds, donViList]);
@@ -290,9 +326,10 @@ export default function VehiclePage() {
     return unit.TenDonVi;
   };
 
+  // TỰ ĐỘNG BUNG MỞ THƯ MỤC NẾU CÓ SEARCH
   const renderUnitTree = (parent: DonVi, level: number = 1) => {
     const children = getChildUnits(parent.ID_DonVi);
-    const isExpanded = expandedParents.includes(parent.ID_DonVi);
+    const isExpanded = expandedParents.includes(parent.ID_DonVi) || !!unitSearchTerm;
     const isParentDimmed = parent.trangThai === 'Đại lý' || parent.trangThai === 'Đầu tư mới';
 
     return (
