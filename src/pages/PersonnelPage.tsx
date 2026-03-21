@@ -123,29 +123,53 @@ export default function PersonnelPage() {
     return `${years} năm ${months} tháng`;
   };
 
-  // --- FIX LỖI TÌM KIẾM CỘT TRÁI: BỌC THÉP VỚI String(...) ---
+  // --- FIX TÌM KIẾM CÂY THƯ MỤC CỰC THÔNG MINH (KÉO RỄ - XỔ CÀNH) ---
   const filteredUnits = useMemo(() => {
-    let filtered = donViList.filter(dv => allowedDonViIds.includes(dv.ID_DonVi));
-    if (unitSearchTerm) {
-      const lower = unitSearchTerm.toLowerCase();
-      filtered = filtered.filter(u => 
-        String(u.TenDonVi || '').toLowerCase().includes(lower) || 
-        String(u.ID_DonVi || '').toLowerCase().includes(lower)
-      );
-    }
-    return filtered;
+    let baseUnits = donViList.filter(dv => allowedDonViIds.includes(dv.ID_DonVi));
+    if (!unitSearchTerm) return baseUnits;
+
+    const lower = unitSearchTerm.toLowerCase();
+    const matchedIds = new Set<string>();
+
+    // 1. Tìm các đơn vị khớp trực tiếp với từ khóa
+    baseUnits.forEach(u => {
+      if (String(u.TenDonVi || '').toLowerCase().includes(lower) || String(u.ID_DonVi || '').toLowerCase().includes(lower)) {
+        matchedIds.add(u.ID_DonVi);
+        
+        // 2. Kéo theo các node Cha, Ông Nội... để giữ vững cấu trúc cây
+        let parentId = u.CapQuanLy;
+        while (parentId && parentId !== 'HO') {
+          matchedIds.add(parentId);
+          const parentUnit = baseUnits.find(p => p.ID_DonVi === parentId);
+          parentId = parentUnit ? parentUnit.CapQuanLy : null;
+        }
+      }
+    });
+
+    // 3. Xổ cành: Nếu Cha khớp từ khóa, hiện tất cả các Showroom con của nó
+    const addChildren = (parentId: string) => {
+      baseUnits.forEach(u => {
+        if (u.CapQuanLy === parentId && !matchedIds.has(u.ID_DonVi)) {
+          matchedIds.add(u.ID_DonVi);
+          addChildren(u.ID_DonVi);
+        }
+      });
+    };
+    
+    const initialMatches = Array.from(matchedIds);
+    initialMatches.forEach(id => addChildren(id));
+
+    return baseUnits.filter(item => matchedIds.has(item.ID_DonVi));
   }, [donViList, unitSearchTerm, allowedDonViIds]);
 
   const parentUnits = useMemo(() => filteredUnits.filter(item => item.CapQuanLy === 'HO' || !item.CapQuanLy), [filteredUnits]);
   const getChildUnits = (parentId: string) => filteredUnits.filter(item => item.CapQuanLy === parentId);
 
-  // --- FIX LỖI REFERENCE: Trả về { vpdhUnits: vpdh } cực kỳ chuẩn xác ---
   const { vpdhUnits, ctttNamUnits, ctttBacUnits, otherUnits } = useMemo(() => {
     const vpdh = parentUnits.filter(u => String(u.Phia || '').toLowerCase().includes('vpđh') || String(u.loaiHinh || '').toLowerCase().includes('tổng công ty') || String(u.loaiHinh || '').toLowerCase().includes('văn phòng'));
     const ctttNam = parentUnits.filter(u => !vpdh.includes(u) && String(u.Phia || '').toLowerCase().includes('nam'));
     const ctttBac = parentUnits.filter(u => !vpdh.includes(u) && !ctttNam.includes(u) && String(u.Phia || '').toLowerCase().includes('bắc'));
     const others = parentUnits.filter(u => !vpdh.includes(u) && !ctttNam.includes(u) && !ctttBac.includes(u));
-    // Đã thay đổi thành đúng cú pháp key: value để tránh Uncaught ReferenceError
     return { vpdhUnits: vpdh, ctttNamUnits: ctttNam, ctttBacUnits: ctttBac, otherUnits: others };
   }, [parentUnits]);
 
@@ -153,7 +177,6 @@ export default function PersonnelPage() {
     setExpandedParents(prev => prev.includes(parentId) ? prev.filter(id => id !== parentId) : [...prev, parentId]);
   };
 
-  // --- FIX LỖI TÌM KIẾM NHÂN SỰ: BỌC THÉP VỚI String(...) ---
   const filteredPersonnel = useMemo(() => {
     let result = data.filter(item => allowedDonViIds.includes(item.ID_DonVi));
     if (selectedUnitFilter) {
@@ -267,7 +290,8 @@ export default function PersonnelPage() {
 
   const renderUnitTree = (parent: DonVi, level: number = 1) => {
     const children = getChildUnits(parent.ID_DonVi);
-    const isExpanded = expandedParents.includes(parent.ID_DonVi);
+    // FIX: Tự động mở thư mục khi đang tìm kiếm
+    const isExpanded = expandedParents.includes(parent.ID_DonVi) || !!unitSearchTerm;
     const isParentDimmed = parent.trangThai === 'Đại lý' || parent.trangThai === 'Đầu tư mới';
 
     return (
@@ -356,15 +380,15 @@ export default function PersonnelPage() {
               <button onClick={() => openModal('create')} className="w-full sm:w-auto flex items-center justify-center gap-2 bg-[#05469B] hover:bg-[#04367a] text-white px-5 py-2.5 rounded-lg font-bold shadow-sm transition-all whitespace-nowrap"><Plus className="w-5 h-5" /> Thêm Mới</button>
             </div>
             
-            {/* 3 NÚT COPY MAIL TỰ XUỐNG DÒNG TRÊN MOBILE */}
+            {/* 3 NÚT COPY MAIL */}
             <div className="flex flex-wrap justify-end gap-2 w-full sm:w-auto">
-              <button onClick={() => handleCopyMail('LD')} className="text-[11px] font-bold px-3 py-1.5 border border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100 rounded flex items-center gap-1.5 transition-colors shadow-sm whitespace-nowrap" title="Copy Mail Tổng Giám đốc">
+              <button onClick={() => handleCopyMail('LD')} className="text-[11px] font-bold px-3 py-1.5 border border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100 rounded flex items-center gap-1.5 transition-colors shadow-sm" title="Copy Mail Tổng Giám đốc">
                 {copiedRole === 'LD' ? <CheckCheck size={14} className="text-green-600"/> : <Copy size={14} />} Copy Mail LĐ
               </button>
-              <button onClick={() => handleCopyMail('DVHT')} className="text-[11px] font-bold px-3 py-1.5 border border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded flex items-center gap-1.5 transition-colors shadow-sm whitespace-nowrap" title="Copy Mail PT DVHT">
+              <button onClick={() => handleCopyMail('DVHT')} className="text-[11px] font-bold px-3 py-1.5 border border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded flex items-center gap-1.5 transition-colors shadow-sm" title="Copy Mail PT DVHT">
                 {copiedRole === 'DVHT' ? <CheckCheck size={14} className="text-green-600"/> : <Copy size={14} />} Copy Mail PT DVHT
               </button>
-              <button onClick={() => handleCopyMail('NS')} className="text-[11px] font-bold px-3 py-1.5 border border-orange-200 text-orange-700 bg-orange-50 hover:bg-orange-100 rounded flex items-center gap-1.5 transition-colors shadow-sm whitespace-nowrap" title="Copy Mail PT Nhân sự">
+              <button onClick={() => handleCopyMail('NS')} className="text-[11px] font-bold px-3 py-1.5 border border-orange-200 text-orange-700 bg-orange-50 hover:bg-orange-100 rounded flex items-center gap-1.5 transition-colors shadow-sm" title="Copy Mail PT Nhân sự">
                 {copiedRole === 'NS' ? <CheckCheck size={14} className="text-green-600"/> : <Copy size={14} />} Copy Mail PT NS
               </button>
             </div>
@@ -401,7 +425,7 @@ export default function PersonnelPage() {
                       
                       <td className="p-4 text-sm font-medium text-emerald-600"><span className="bg-emerald-50/50 rounded-md inline-block px-2 py-1 border border-emerald-100">{calculateSeniority(item.NgayNhanViec)}</span></td>
                       <td className="p-4">
-                        <div className="flex items-center justify-center gap-1 lg:opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button onClick={() => handleView(item)} className="p-2 text-indigo-600 hover:bg-indigo-100 rounded-md transition-colors" title="Xem chi tiết"><Eye className="w-4 h-4" /></button>
                           <button onClick={() => handleDuplicate(item)} className="p-2 text-emerald-600 hover:bg-emerald-100 rounded-md transition-colors" title="Nhân bản (Tạo hồ sơ kiêm nhiệm)"><Copy className="w-4 h-4" /></button>
                           <button onClick={() => openModal('update', item)} className="p-2 text-blue-600 hover:bg-blue-100 rounded-md transition-colors" title="Sửa"><Edit className="w-4 h-4" /></button>
@@ -571,10 +595,10 @@ export default function PersonnelPage() {
                       <option value="Tiểu học">Tiểu học</option>
                       <option value="Trung học cơ sở">Trung học cơ sở</option>
                       <option value="Trung học phổ thông">Trung học phổ thông</option>
-                      <option value="Sơ cấp: Chứng chỉ nghề 3 tháng">Sơ cấp: 3 tháng</option>
-                      <option value="Sơ cấp: Chứng chỉ nghề 6 tháng">Sơ cấp: 6 tháng</option>
+                      <option value="Sơ cấp: Chứng chỉ nghề 3 tháng">Sơ cấp: Chứng chỉ nghề 3 tháng</option>
+                      <option value="Sơ cấp: Chứng chỉ nghề 6 tháng">Sơ cấp: Chứng chỉ nghề 6 tháng</option>
                       <option value="Trung cấp nghề">Trung cấp nghề</option>
-                      <option value="Trung cấp chuyên nghiệp">Trung cấp CN</option>
+                      <option value="Trung cấp chuyên nghiệp">Trung cấp chuyên nghiệp</option>
                       <option value="Cao đẳng">Cao đẳng</option>
                       <option value="Đại học">Đại học</option>
                       <option value="Thạc sĩ/Tiến sĩ">Thạc sĩ/Tiến sĩ</option>
@@ -598,8 +622,15 @@ export default function PersonnelPage() {
                             const isChecked = currentGPLXList.includes(opt.value);
                             return (
                               <label key={optIdx} className="flex items-start gap-2 cursor-pointer group/cb">
-                                <input type="checkbox" checked={isChecked} onChange={(e) => handleGPLXChange(opt.value, e.target.checked)} className="mt-0.5 w-4 h-4 rounded border-gray-300 text-[#05469B] focus:ring-[#05469B] cursor-pointer"/>
-                                <span className={`text-sm transition-colors ${isChecked ? 'font-bold text-[#05469B]' : 'font-medium text-gray-600 group-hover/cb:text-[#05469B]'}`}>{opt.label}</span>
+                                <input 
+                                  type="checkbox" 
+                                  checked={isChecked}
+                                  onChange={(e) => handleGPLXChange(opt.value, e.target.checked)}
+                                  className="mt-0.5 w-4 h-4 rounded border-gray-300 text-[#05469B] focus:ring-[#05469B] cursor-pointer"
+                                />
+                                <span className={`text-sm transition-colors ${isChecked ? 'font-bold text-[#05469B]' : 'font-medium text-gray-600 group-hover/cb:text-[#05469B]'}`}>
+                                  {opt.label}
+                                </span>
                               </label>
                             );
                           })}
@@ -627,7 +658,7 @@ export default function PersonnelPage() {
               </div>
 
               <div className="bg-orange-50/40 p-4 sm:p-5 rounded-xl border border-orange-100">
-                <h4 className="font-bold text-orange-800 mb-4 flex items-center gap-2"><div className="w-2 h-6 bg-orange-500 rounded-full"></div> Thông tự Bổ sung</h4>
+                <h4 className="font-bold text-orange-800 mb-4 flex items-center gap-2"><div className="w-2 h-6 bg-orange-500 rounded-full"></div> Thông tin Bổ sung</h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-bold text-gray-700 mb-1">Mô tả ngoại hình</label>
