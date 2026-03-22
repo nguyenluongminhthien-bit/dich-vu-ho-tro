@@ -28,11 +28,34 @@ const formatMonthYear = (dateStr: string) => {
   }
 };
 
+// --- HÀM HỖ TRỢ TÍNH TOÁN INLINE (INLINE MATH) ---
+const safeEvalMath = (val: any) => {
+  if (!val) return '';
+  try {
+    let expr = String(val).replace(/[^\d+\-*/.()]/g, '');
+    if (/[+\-*/]/.test(expr)) {
+      // eslint-disable-next-line no-new-func
+      const result = new Function(`return ${expr}`)();
+      if (!isNaN(result) && isFinite(result)) return Math.round(result).toString();
+    }
+    return String(val).replace(/\D/g, '');
+  } catch {
+    return String(val).replace(/\D/g, '');
+  }
+};
+
+const formatMathInput = (val: string | number | undefined | null) => {
+  if (!val) return '';
+  const str = String(val);
+  if (/[+\-*/()]/.test(str)) return str; // Đang có phép tính -> Giữ nguyên để gõ
+  return formatCurrency(str); // Không có phép tính -> Format tiền tệ
+};
+
 export default function VehiclePage() {
   const { user } = useAuth();
   const [donViList, setDonViList] = useState<DonVi[]>([]);
   const [xeData, setXeData] = useState<TS_Xe[]>([]);
-  const [chiPhiData, setChiPhiData] = useState<any[]>([]); // Dùng any để catch mọi trường hợp của ID
+  const [chiPhiData, setChiPhiData] = useState<any[]>([]); 
   
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -127,7 +150,7 @@ export default function VehiclePage() {
   const parentUnits = useMemo(() => filteredUnits.filter(item => item.CapQuanLy === 'HO' || !item.CapQuanLy), [filteredUnits]);
   const getChildUnits = (parentId: string) => filteredUnits.filter(item => item.CapQuanLy === parentId);
 
-  // --- FIX LỖI TÌM KIẾM THEO PHÂN LOẠI CỘT TRÁI ---
+  // --- FIX LỖI TÌM KIẾM THEO PHÂN LOẠI CỘT TRÁI (CHỐNG TRẮNG TRANG) ---
   const { vpdhUnits, ctttNamUnits, ctttBacUnits, otherUnits } = useMemo(() => {
     const vpdh = parentUnits.filter(u => String(u.Phia || '').toLowerCase().includes('vpđh') || String(u.loaiHinh || '').toLowerCase().includes('tổng công ty') || String(u.loaiHinh || '').toLowerCase().includes('văn phòng'));
     const ctttNam = parentUnits.filter(u => !vpdh.includes(u) && String(u.Phia || '').toLowerCase().includes('nam'));
@@ -138,7 +161,7 @@ export default function VehiclePage() {
 
   const toggleParent = (parentId: string) => setExpandedParents(prev => prev.includes(parentId) ? prev.filter(id => id !== parentId) : [...prev, parentId]);
 
-  // --- FIX LỖI TÌM KIẾM DANH SÁCH XE ---
+  // --- FIX LỖI TÌM KIẾM DANH SÁCH XE (CHỐNG TRẮNG TRANG) ---
   const filteredCars = useMemo(() => {
     let result = xeData.filter(item => allowedDonViIds.includes(item.ID_DonVi));
     if (selectedUnitFilter) {
@@ -191,7 +214,6 @@ export default function VehiclePage() {
       else setXeData(prev => prev.map(item => item.ID_Xe === savedId ? newCar : item));
       
       setIsCarModalOpen(false); 
-
       apiService.getXe().then(res => { if(res) setXeData(res) });
     } catch (err: any) { setError(err.message || 'Lỗi lưu dữ liệu Xe.'); } 
     finally { setSubmitting(false); }
@@ -210,6 +232,7 @@ export default function VehiclePage() {
     setCarFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  // --- XỬ LÝ CHI PHÍ VÀ MÁY TÍNH INLINE ---
   const carCosts = useMemo(() => {
     if (!selectedCarForCost) return [];
     return chiPhiData.filter(cp => getCostCarId(cp) === selectedCarForCost.ID_Xe).sort((a, b) => b.ThangNam.localeCompare(a.ThangNam));
@@ -234,11 +257,46 @@ export default function VehiclePage() {
     setCostFormData({ ...cost, ID_ChiPhiXe: getCostId(cost), ID_Xe: getCostCarId(cost), ID_DonVi: cost.ID_DonVi || selectedCarForCost?.ID_DonVi || '' });
   };
 
+  // HÀM BẮT SỰ KIỆN TÍNH TOÁN KHI GÕ (INLINE MATH)
+  const handleInputCostChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    let finalValue = value;
+    
+    if (name === 'KmHienTai') { 
+      finalValue = value.replace(/\D/g, ''); 
+    } else if (['ChiPhiNhienLieu', 'Phicauduong_benbai', 'Phiruaxe', 'ChiPhiBaoDuong_SuaChua', 'ChiPhiThue_KhauHao'].includes(name)) {
+      // Cho phép gõ số, khoảng trắng và các phép tính (Inline Math)
+      finalValue = value.replace(/[^0-9+\-*/().\s]/g, '');
+    }
+    
+    setCostFormData(prev => ({ ...prev, [name]: finalValue }));
+  };
+
+  // KÍCH HOẠT TÍNH TOÁN KHI MẤT FOCUS (ONBLUR)
+  const handleCostMathBlur = (name: string, value: string) => {
+    setCostFormData(prev => ({ ...prev, [name]: safeEvalMath(value) }));
+  };
+
+  // KÍCH HOẠT TÍNH TOÁN KHI NHẤN ENTER
+  const handleCostMathKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, name: string) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleCostMathBlur(name, e.currentTarget.value);
+    }
+  };
+
   const handleCostSave = async (e: React.FormEvent) => {
     e.preventDefault(); setSubmitting(true); setError(null);
     try {
       let finalData = { ...costFormData };
       
+      // Chạy tính toán chốt sổ một lần nữa đề phòng người dùng chưa Blur mà đã bấm Lưu
+      finalData.ChiPhiNhienLieu = safeEvalMath(finalData.ChiPhiNhienLieu);
+      finalData.Phicauduong_benbai = safeEvalMath(finalData.Phicauduong_benbai);
+      finalData.Phiruaxe = safeEvalMath(finalData.Phiruaxe);
+      finalData.ChiPhiBaoDuong_SuaChua = safeEvalMath(finalData.ChiPhiBaoDuong_SuaChua);
+      finalData.ChiPhiThue_KhauHao = safeEvalMath(finalData.ChiPhiThue_KhauHao);
+
       const currentId = getCostId(finalData);
       if (currentId) {
         finalData.ID_ChiPhiXe = currentId;
@@ -267,13 +325,6 @@ export default function VehiclePage() {
       apiService.getChiPhiXe().then(res => { if(res) setChiPhiData(res) });
     } catch (err: any) { setError(err.message || 'Lỗi lưu dữ liệu Chi phí.'); } 
     finally { setSubmitting(false); }
-  };
-
-  const handleInputCostChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    let finalValue = value;
-    if (['KmHienTai', 'ChiPhiNhienLieu', 'Phicauduong_benbai', 'Phiruaxe', 'ChiPhiBaoDuong_SuaChua', 'ChiPhiThue_KhauHao'].includes(name)) { finalValue = value.replace(/\D/g, ''); }
-    setCostFormData(prev => ({ ...prev, [name]: finalValue }));
   };
 
   const chartScale = useMemo(() => {
@@ -345,7 +396,7 @@ export default function VehiclePage() {
   return (
     <div className="flex h-full bg-[#f4f7f9] overflow-hidden relative">
       {isListCollapsed && (
-        <button onClick={() => setIsListCollapsed(false)} className="absolute top-6 left-6 z-20 bg-white p-2.5 rounded-lg shadow-md border border-gray-200 text-[#05469B] hover:bg-blue-50 transition-all" title="Mở danh sách đơn vị"><PanelLeftOpen size={20} /></button>
+        <button onClick={() => setIsListCollapsed(false)} className="absolute top-6 left-6 z-20 bg-white p-2.5 rounded-lg shadow-md border border-gray-200 text-[#05469B] hover:bg-blue-50 transition-all lg:hidden" title="M mở danh sách đơn vị"><PanelLeftOpen size={20} /></button>
       )}
 
       {/* --- CỘT TRÁI (BỘ LỌC ĐƠN VỊ) --- */}
@@ -383,8 +434,8 @@ export default function VehiclePage() {
       </div>
 
       {/* --- CỘT PHẢI (DANH SÁCH XE) --- */}
-      <div className="flex-1 overflow-y-auto p-4 sm:p-6 relative transition-all duration-300">
-        <div className={`flex flex-col sm:flex-row justify-between items-center mb-6 gap-4 transition-all duration-300 ${isListCollapsed ? 'pl-10' : ''}`}>
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6 relative transition-all duration-300 w-full">
+        <div className={`flex flex-col sm:flex-row justify-between items-center mb-6 gap-4 transition-all duration-300 ${isListCollapsed ? 'pl-10 lg:pl-12' : ''}`}>
           <div>
             <h2 className="text-2xl font-bold text-[#05469B] flex items-center gap-2"><Car size={28} /> Quản lý Đội xe</h2>
             <p className="text-sm font-medium text-gray-500 mt-1">Đang xem: <span className="text-emerald-600 font-bold">{selectedUnitName}</span> ({filteredCars.length} xe)</p>
@@ -400,8 +451,8 @@ export default function VehiclePage() {
 
         {error && <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-500 text-red-700 flex items-start gap-3 rounded-r-lg shadow-sm"><AlertCircle className="w-5 h-5 shrink-0 mt-0.5" /><p>{error}</p></div>}
 
-        {/* BẢNG DỮ LIỆU MẶC ĐỊNH */}
-        <div className={`bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden transition-all duration-300 ${isListCollapsed ? 'ml-10' : ''}`}>
+        {/* BẢNG DỮ LIỆU */}
+        <div className={`bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden transition-all duration-300 ${isListCollapsed ? 'ml-10 lg:ml-0' : ''}`}>
           <div className="overflow-x-auto w-full">
             <table className="w-full text-left border-collapse min-w-[1250px]">
               <thead>
@@ -755,12 +806,12 @@ export default function VehiclePage() {
                   <table className="w-full text-left text-sm border-collapse">
                     <thead className="sticky top-0 z-10 bg-gray-50 shadow-sm border-b border-gray-200">
                       <tr className="text-xs text-gray-600 uppercase tracking-wider">
-                        <th className="p-3 w-28">Tháng</th>
-                        <th className="p-3">Số Km</th>
-                        <th className="p-3 text-right">Nhiên liệu</th>
-                        <th className="p-3 text-right">Cầu đường</th>
-                        <th className="p-3 text-right">Bảo dưỡng</th>
-                        <th className="p-3 text-right font-bold text-red-600">Tổng CP</th>
+                        <th className="p-3 w-28 bg-gray-50">Tháng</th>
+                        <th className="p-3 bg-gray-50">Số Km</th>
+                        <th className="p-3 text-right bg-gray-50">Nhiên liệu</th>
+                        <th className="p-3 text-right bg-gray-50">Cầu đường</th>
+                        <th className="p-3 text-right bg-gray-50">Bảo dưỡng</th>
+                        <th className="p-3 text-right font-bold text-red-600 bg-gray-50">Tổng CP</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
@@ -832,13 +883,70 @@ export default function VehiclePage() {
                     <div><label className="block text-xs font-bold text-gray-600 mb-1">Km hiện tại (Đồng hồ)</label><input type="text" name="KmHienTai" value={formatCurrency(costFormData.KmHienTai)} onChange={handleInputCostChange} className="w-full p-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-[#FFFFF0]" /></div>
                     
                     <div><label className="block text-xs font-bold text-gray-600 mb-1">Số Lít nhiên liệu tiêu thụ</label><input type="number" name="SoLitNhienLieu" value={costFormData.SoLitNhienLieu || ''} onChange={handleInputCostChange} className="w-full p-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-[#FFFFF0]" /></div>
-                    <div><label className="block text-xs font-bold text-gray-600 mb-1">Chi phí Nhiên liệu (VNĐ)</label><input type="text" name="ChiPhiNhienLieu" value={formatCurrency(costFormData.ChiPhiNhienLieu)} onChange={handleInputCostChange} className="w-full p-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-[#FFFFF0]" /></div>
                     
-                    <div><label className="block text-xs font-bold text-gray-600 mb-1">Phí cầu đường bến bãi (VNĐ)</label><input type="text" name="Phicauduong_benbai" value={formatCurrency(costFormData.Phicauduong_benbai)} onChange={handleInputCostChange} className="w-full p-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-[#FFFFF0]" /></div>
-                    <div><label className="block text-xs font-bold text-gray-600 mb-1">Phí rửa xe (VNĐ)</label><input type="text" name="Phiruaxe" value={formatCurrency(costFormData.Phiruaxe)} onChange={handleInputCostChange} className="w-full p-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-[#FFFFF0]" /></div>
+                    {/* INLINE MATH: HỖ TRỢ TÍNH TOÁN NGAY TRONG Ô */}
+                    <div>
+                      <label className="block text-xs font-bold text-gray-600 mb-1">Chi phí Nhiên liệu (VNĐ) <span className="text-[9px] font-normal text-indigo-500">(Hỗ trợ +, -, *, /)</span></label>
+                      <input 
+                        type="text" 
+                        name="ChiPhiNhienLieu" 
+                        value={formatMathInput(costFormData.ChiPhiNhienLieu)} 
+                        onChange={handleInputCostChange} 
+                        onBlur={(e) => handleCostMathBlur('ChiPhiNhienLieu', e.target.value)}
+                        onKeyDown={(e) => handleCostMathKeyDown(e, 'ChiPhiNhienLieu')}
+                        className="w-full p-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-[#FFFFF0]" 
+                      />
+                    </div>
                     
-                    <div><label className="block text-xs font-bold text-gray-600 mb-1">CP Bảo dưỡng/Sửa chữa</label><input type="text" name="ChiPhiBaoDuong_SuaChua" value={formatCurrency(costFormData.ChiPhiBaoDuong_SuaChua)} onChange={handleInputCostChange} className="w-full p-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-[#FFFFF0]" /></div>
-                    <div><label className="block text-xs font-bold text-gray-600 mb-1">CP Thuê ngoài/Khấu hao</label><input type="text" name="ChiPhiThue_KhauHao" value={formatCurrency(costFormData.ChiPhiThue_KhauHao)} onChange={handleInputCostChange} className="w-full p-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-[#FFFFF0]" /></div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-600 mb-1">Phí cầu đường bến bãi (VNĐ) <span className="text-[9px] font-normal text-indigo-500">(Hỗ trợ +, -, *, /)</span></label>
+                      <input 
+                        type="text" 
+                        name="Phicauduong_benbai" 
+                        value={formatMathInput(costFormData.Phicauduong_benbai)} 
+                        onChange={handleInputCostChange} 
+                        onBlur={(e) => handleCostMathBlur('Phicauduong_benbai', e.target.value)}
+                        onKeyDown={(e) => handleCostMathKeyDown(e, 'Phicauduong_benbai')}
+                        className="w-full p-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-[#FFFFF0]" 
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-600 mb-1">Phí rửa xe (VNĐ) <span className="text-[9px] font-normal text-indigo-500">(Hỗ trợ +, -, *, /)</span></label>
+                      <input 
+                        type="text" 
+                        name="Phiruaxe" 
+                        value={formatMathInput(costFormData.Phiruaxe)} 
+                        onChange={handleInputCostChange} 
+                        onBlur={(e) => handleCostMathBlur('Phiruaxe', e.target.value)}
+                        onKeyDown={(e) => handleCostMathKeyDown(e, 'Phiruaxe')}
+                        className="w-full p-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-[#FFFFF0]" 
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-xs font-bold text-gray-600 mb-1">CP Bảo dưỡng/Sửa chữa <span className="text-[9px] font-normal text-indigo-500">(Hỗ trợ +, -, *, /)</span></label>
+                      <input 
+                        type="text" 
+                        name="ChiPhiBaoDuong_SuaChua" 
+                        value={formatMathInput(costFormData.ChiPhiBaoDuong_SuaChua)} 
+                        onChange={handleInputCostChange} 
+                        onBlur={(e) => handleCostMathBlur('ChiPhiBaoDuong_SuaChua', e.target.value)}
+                        onKeyDown={(e) => handleCostMathKeyDown(e, 'ChiPhiBaoDuong_SuaChua')}
+                        className="w-full p-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-[#FFFFF0]" 
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-600 mb-1">CP Thuê ngoài/Khấu hao <span className="text-[9px] font-normal text-indigo-500">(Hỗ trợ +, -, *, /)</span></label>
+                      <input 
+                        type="text" 
+                        name="ChiPhiThue_KhauHao" 
+                        value={formatMathInput(costFormData.ChiPhiThue_KhauHao)} 
+                        onChange={handleInputCostChange} 
+                        onBlur={(e) => handleCostMathBlur('ChiPhiThue_KhauHao', e.target.value)}
+                        onKeyDown={(e) => handleCostMathKeyDown(e, 'ChiPhiThue_KhauHao')}
+                        className="w-full p-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-[#FFFFF0]" 
+                      />
+                    </div>
                     
                     <div className="col-span-2"><label className="block text-xs font-bold text-gray-600 mb-1">Ghi chú (Nơi sửa chữa, lý do...)</label><textarea name="GhiChu" value={costFormData.GhiChu || ''} onChange={handleInputCostChange} rows={2} className="w-full p-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-[#FFFFF0] resize-none"></textarea></div>
                   </div>
