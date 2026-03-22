@@ -386,7 +386,7 @@ export default function DepartmentPage() {
         TongANBV: '', DinhbienANBV: '', 
         Ngaycd: '', Ngaytuantra: '', Demcd: '', Demtruantra: '',
         BoTriNghiCa: '',
-        SLCAM: '', ThoiGianLuu: '', ViTriDatHeThong: '', ViTriGiamSat: '', Link_PhuongAnAN: '',
+        SLCAM: '', CAMHD: '', CAMHuHong: '', LyDoHuCam: '', ThoiGianLuu: '', ViTriDatHeThong: '', ViTriGiamSat: '', Link_PhuongAnAN: '',
         TinhHinhKhuVuc: '', TiepGiapTruoc: '', TiepGiapSau: '', TiepGiapTrai: '', TiepGiapPhai: ''
       });
     }
@@ -424,7 +424,6 @@ export default function DepartmentPage() {
     finally { setSubmitting(false); }
   };
 
-  // --- TỰ ĐỘNG XỔ CÂY KHI TÌM KIẾM ---
   const renderUnitTree = (parent: DonVi, level: number = 1) => {
     const children = getChildUnits(parent.ID_DonVi);
     const isExpanded = expandedParents.includes(parent.ID_DonVi) || !!searchTerm;
@@ -661,10 +660,21 @@ export default function DepartmentPage() {
                         <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex flex-col">
                           <h4 className="font-bold text-[#05469B] mb-4 flex items-center gap-2 border-b border-gray-100 pb-2"><Camera size={18} /> Hệ thống Giám sát</h4>
                           <div className="space-y-3 text-sm">
-                             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-0"><span className="text-gray-500 font-medium whitespace-nowrap shrink-0">Số lượng Camera:</span><span className="font-black text-gray-800 sm:ml-2">{currentAnNinh.SLCAM || 0} Mắt</span></div>
-                             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-0"><span className="text-gray-500 font-medium whitespace-nowrap shrink-0">Thời gian lưu hình:</span><span className="font-bold text-gray-800 sm:ml-2">{currentAnNinh.ThoiGianLuu || '---'} Ngày</span></div>
-                             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-0"><span className="text-gray-500 font-medium whitespace-nowrap shrink-0">Vị trí đặt hệ thống (Đầu ghi):</span><span className="font-bold text-gray-800 text-left sm:text-right sm:ml-2 break-words">{currentAnNinh.ViTriDatHeThong || '---'}</span></div>
+                             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-0"><span className="text-gray-500 font-medium whitespace-nowrap shrink-0">Tổng số Camera:</span><span className="font-black text-gray-800 sm:ml-2">{currentAnNinh.SLCAM || 0} Mắt</span></div>
+                             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-0"><span className="text-gray-500 font-medium whitespace-nowrap shrink-0">Camera hoạt động:</span><span className="font-bold text-emerald-600 sm:ml-2">{currentAnNinh.CAMHD || 0} Mắt</span></div>
+                             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-0"><span className="text-gray-500 font-medium whitespace-nowrap shrink-0">Camera hư/hỏng:</span><span className="font-bold text-red-600 sm:ml-2">{currentAnNinh.CAMHuHong || 0} Mắt</span></div>
                              
+                             {Number(currentAnNinh.CAMHuHong) > 0 && (
+                                <div className="flex flex-col sm:flex-row justify-between items-start pt-1 pb-1 gap-1 sm:gap-0">
+                                  <span className="text-gray-500 font-medium whitespace-nowrap shrink-0 sm:mr-3">Lý do hư hỏng:</span>
+                                  <span className="font-bold text-red-600 text-left sm:text-right sm:flex-1 whitespace-pre-wrap break-words">{currentAnNinh.LyDoHuCam || '---'}</span>
+                                </div>
+                             )}
+
+                             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-0 border-t border-gray-50 pt-2 mt-1"><span className="text-gray-500 font-medium whitespace-nowrap shrink-0">Thời gian lưu hình:</span><span className="font-bold text-gray-800 sm:ml-2">{currentAnNinh.ThoiGianLuu || '---'} Ngày</span></div>
+                             
+                             {/* ĐÃ CẬP NHẬT: 2 CỘT NÀY SẼ NẰM TRÊN CÙNG 1 HÀNG TRONG PHẦN CHỈNH SỬA, NHƯNG Ở ĐÂY LÀ PHẦN XEM (BẢN GỐC HIỂN THỊ DỌC CHUẨN) */}
+                             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-0"><span className="text-gray-500 font-medium whitespace-nowrap shrink-0">Vị trí đặt hệ thống (Đầu ghi):</span><span className="font-bold text-gray-800 text-left sm:text-right sm:ml-2 break-words">{currentAnNinh.ViTriDatHeThong || '---'}</span></div>
                              <div className="flex flex-col sm:flex-row justify-between items-start pt-2 border-t border-gray-50 mt-1 gap-1 sm:gap-0">
                                <span className="text-gray-500 font-medium whitespace-nowrap shrink-0 sm:mr-3">Vị trí giám sát chính:</span>
                                <span className="font-bold text-gray-800 text-left sm:text-right sm:flex-1 whitespace-pre-wrap break-words">{currentAnNinh.ViTriGiamSat || '---'}</span>
@@ -974,15 +984,58 @@ export default function DepartmentPage() {
                 <div><label className="block text-xs font-bold text-gray-700 mb-1">Bố trí nghỉ ca / Đổi ca</label><textarea name="BoTriNghiCa" value={securityFormData.BoTriNghiCa || ''} onChange={(e) => handleInputChange(e, 'sec')} rows={2} placeholder="Mô tả cách thức bố trí người nghỉ ca, đổi ca..." className="w-full p-2.5 border border-gray-200 rounded-lg bg-white resize-none outline-none focus:ring-2 focus:ring-amber-500"></textarea></div>
               </div>
 
-              {/* KHỐI 3: HỆ THỐNG GIÁM SÁT */}
+              {/* KHỐI 3: HỆ THỐNG GIÁM SÁT ĐÃ CẬP NHẬT CAM HĐ VÀ HƯ HỎNG */}
               <div className="bg-gray-50 p-5 rounded-xl border border-gray-200">
                 <h4 className="font-bold text-gray-800 mb-4 flex items-center gap-2 border-b border-gray-200 pb-2"><Camera size={18}/> Hệ thống Giám sát</h4>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                  <div><label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase">SL Camera (Mắt)</label><input type="number" name="SLCAM" value={securityFormData.SLCAM || ''} onChange={(e) => handleInputChange(e, 'sec')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-indigo-500" /></div>
+                  <div><label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Tổng SL (Mắt)</label><input type="number" name="SLCAM" value={securityFormData.SLCAM || ''} onChange={(e) => handleInputChange(e, 'sec')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-indigo-500" /></div>
+                  <div><label className="block text-[10px] font-bold text-emerald-600 mb-1 uppercase">Hoạt động</label><input type="number" name="CAMHD" value={securityFormData.CAMHD || ''} onChange={(e) => handleInputChange(e, 'sec')} className="w-full p-2.5 border border-emerald-200 rounded-lg bg-emerald-50 outline-none focus:ring-2 focus:ring-emerald-500 font-bold text-emerald-700" /></div>
+                  <div><label className="block text-[10px] font-bold text-red-600 mb-1 uppercase">Hư hỏng</label><input type="number" name="CAMHuHong" value={securityFormData.CAMHuHong || ''} onChange={(e) => handleInputChange(e, 'sec')} className="w-full p-2.5 border border-red-200 rounded-lg bg-red-50 outline-none focus:ring-2 focus:ring-red-500 font-bold text-red-700" /></div>
                   <div><label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Lưu hình (Ngày)</label><input type="number" name="ThoiGianLuu" value={securityFormData.ThoiGianLuu || ''} onChange={(e) => handleInputChange(e, 'sec')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-indigo-500" /></div>
-                  <div className="col-span-2"><label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Vị trí đặt hệ thống (Đầu ghi)</label><input type="text" name="ViTriDatHeThong" value={securityFormData.ViTriDatHeThong || ''} onChange={(e) => handleInputChange(e, 'sec')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-indigo-500" placeholder="VD: Phòng IT, Phòng Giám đốc..." /></div>
                 </div>
-                <div><label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Vị trí giám sát chính</label><textarea name="ViTriGiamSat" value={securityFormData.ViTriGiamSat || ''} onChange={(e) => handleInputChange(e, 'sec')} rows={2} placeholder="Mô tả các góc giám sát quan trọng..." className="w-full p-2.5 border border-gray-200 rounded-lg bg-white resize-none outline-none focus:ring-2 focus:ring-indigo-500"></textarea></div>
+
+                {Number(securityFormData.CAMHuHong) > 0 && (
+                   <div className="mb-4 p-4 bg-red-50/50 rounded-lg border border-red-100 animate-in fade-in zoom-in duration-200">
+                     <label className="block text-xs font-bold text-red-700 mb-2">Lý do Camera hư/hỏng</label>
+                     <select 
+                       value={securityFormData.LyDoHuCam && !['Sự cố nguồn điện', 'Dây tín hiệu và Jack kết nối', 'Lỗi phần cứng Camera', 'Lỗi đầu ghi (DVR/NVR) và Lưu trữ', 'Vấn đề phần mềm & Mạng'].includes(securityFormData.LyDoHuCam) ? 'Khác' : (securityFormData.LyDoHuCam || '')} 
+                       onChange={(e) => {
+                          const val = e.target.value;
+                          setSecurityFormData({...securityFormData, LyDoHuCam: val === 'Khác' ? 'Khác' : val});
+                       }}
+                       className="w-full p-2.5 border border-red-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-red-500 text-sm font-medium text-red-800 mb-2"
+                     >
+                       <option value="">-- Chọn lý do --</option>
+                       <option value="Sự cố nguồn điện">Sự cố nguồn điện</option>
+                       <option value="Dây tín hiệu và Jack kết nối">Dây tín hiệu và Jack kết nối</option>
+                       <option value="Lỗi phần cứng Camera">Lỗi phần cứng Camera</option>
+                       <option value="Lỗi đầu ghi (DVR/NVR) và Lưu trữ">Lỗi đầu ghi (DVR/NVR) và Lưu trữ</option>
+                       <option value="Vấn đề phần mềm & Mạng">Vấn đề phần mềm & Mạng</option>
+                       <option value="Khác">Khác (Nhập lý do cụ thể...)</option>
+                     </select>
+
+                     {(securityFormData.LyDoHuCam && !['Sự cố nguồn điện', 'Dây tín hiệu và Jack kết nối', 'Lỗi phần cứng Camera', 'Lỗi đầu ghi (DVR/NVR) và Lưu trữ', 'Vấn đề phần mềm & Mạng', ''].includes(securityFormData.LyDoHuCam)) && (
+                       <input type="text" 
+                          value={securityFormData.LyDoHuCam === 'Khác' ? '' : securityFormData.LyDoHuCam}
+                          onChange={(e) => setSecurityFormData({...securityFormData, LyDoHuCam: e.target.value || 'Khác'})}
+                          placeholder="Gõ lý do hư hỏng cụ thể..."
+                          className="w-full p-2.5 border border-red-300 rounded-lg bg-white outline-none focus:ring-2 focus:ring-red-500 text-sm"
+                       />
+                     )}
+                   </div>
+                )}
+
+                {/* ĐÃ CẬP NHẬT: THỂ HIỆN 2 TRƯỜNG DỮ LIỆU TRÊN CÙNG 1 HÀNG (DÙNG GRID-COLS-2) */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Vị trí đặt hệ thống (Đầu ghi)</label>
+                    <input type="text" name="ViTriDatHeThong" value={securityFormData.ViTriDatHeThong || ''} onChange={(e) => handleInputChange(e, 'sec')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-indigo-500" placeholder="VD: Phòng IT, Phòng Giám đốc..." />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Vị trí giám sát chính</label>
+                    <textarea name="ViTriGiamSat" value={securityFormData.ViTriGiamSat || ''} onChange={(e) => handleInputChange(e, 'sec')} rows={1} placeholder="Mô tả các góc giám sát quan trọng..." className="w-full p-2.5 border border-gray-200 rounded-lg bg-white resize-none outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
+                  </div>
+                </div>
               </div>
 
               {/* KHỐI 4: ĐẶC ĐIỂM ĐỊA BÀN */}
