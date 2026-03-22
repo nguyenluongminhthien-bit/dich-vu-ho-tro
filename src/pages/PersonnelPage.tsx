@@ -322,7 +322,7 @@ export default function PersonnelPage() {
     <div className="flex h-full bg-[#f4f7f9] overflow-hidden relative">
       {/* MOBILE MENU TOGGLE */}
       {isListCollapsed && (
-        <button onClick={() => setIsListCollapsed(false)} className="absolute top-6 left-6 z-20 bg-white p-2.5 rounded-lg shadow-md border border-gray-200 text-[#05469B] hover:bg-blue-50 transition-all lg:hidden" title="Mở bộ lọc đơn vị">
+        <button onClick={() => setIsListCollapsed(false)} className="absolute top-6 left-6 z-20 bg-white p-2.5 rounded-lg shadow-md border border-gray-200 text-[#05469B] hover:bg-blue-50 transition-all" title="Mở bộ lọc đơn vị">
           <PanelLeftOpen size={20} />
         </button>
       )}
