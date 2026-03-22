@@ -45,7 +45,26 @@ export default function LogPage() {
           };
         }).filter((l: any) => l !== null && !l.ID_Log.toLowerCase().includes('id_log') && !l.ThoiGian.toLowerCase().includes('thoigian'));
 
-        const sortedData = cleanLogs.sort((a, b) => new Date(b.ThoiGian).getTime() - new Date(a.ThoiGian).getTime());
+        // Hàm parse Date an toàn (Hỗ trợ định dạng ngày Việt Nam DD/MM/YYYY)
+        const parseSafeDate = (dateStr: string) => {
+          if (!dateStr) return 0;
+          const d = new Date(dateStr).getTime();
+          if (!isNaN(d)) return d;
+          
+          const parts = dateStr.trim().split(/[\sT]+/);
+          const datePart = parts[0];
+          const timePart = parts[1] || '00:00:00';
+          
+          if (datePart && datePart.includes('/')) {
+            const [day, month, year] = datePart.split('/');
+            const [hr, min, sec] = timePart.split(':');
+            return new Date(Number(year), Number(month) - 1, Number(day), Number(hr || 0), Number(min || 0), Number(sec || 0)).getTime();
+          }
+          return 0;
+        };
+
+        // Sắp xếp: Thời gian mới nhất lên đầu. Reverse trước để những log thêm sau cùng (ở cuối sheet) sẽ lên đầu
+        const sortedData = cleanLogs.reverse().sort((a, b) => parseSafeDate(b.ThoiGian) - parseSafeDate(a.ThoiGian));
         setLogs(sortedData);
       } catch (err: any) {
         setError(err.message || 'Lỗi tải dữ liệu nhật ký.');
