@@ -97,12 +97,9 @@ export default function VehiclePage() {
     const lower = unitSearchTerm.toLowerCase();
     const matchedIds = new Set<string>();
 
-    // 1. Tìm các đơn vị khớp trực tiếp với từ khóa
     baseUnits.forEach(u => {
       if (String(u.TenDonVi || '').toLowerCase().includes(lower) || String(u.ID_DonVi || '').toLowerCase().includes(lower)) {
         matchedIds.add(u.ID_DonVi);
-        
-        // 2. Kéo theo các node Cha, Ông Nội... để giữ vững cấu trúc cây
         let parentId = u.CapQuanLy;
         while (parentId && parentId !== 'HO') {
           matchedIds.add(parentId);
@@ -112,7 +109,6 @@ export default function VehiclePage() {
       }
     });
 
-    // 3. Xổ cành: Nếu Cha khớp từ khóa, hiện tất cả các Showroom con của nó
     const addChildren = (parentId: string) => {
       baseUnits.forEach(u => {
         if (u.CapQuanLy === parentId && !matchedIds.has(u.ID_DonVi)) {
@@ -131,7 +127,7 @@ export default function VehiclePage() {
   const parentUnits = useMemo(() => filteredUnits.filter(item => item.CapQuanLy === 'HO' || !item.CapQuanLy), [filteredUnits]);
   const getChildUnits = (parentId: string) => filteredUnits.filter(item => item.CapQuanLy === parentId);
 
-  // --- FIX LỖI TÌM KIẾM THEO PHÂN LOẠI CỘT TRÁI (CHỐNG TRẮNG TRANG) ---
+  // --- FIX LỖI TÌM KIẾM THEO PHÂN LOẠI CỘT TRÁI ---
   const { vpdhUnits, ctttNamUnits, ctttBacUnits, otherUnits } = useMemo(() => {
     const vpdh = parentUnits.filter(u => String(u.Phia || '').toLowerCase().includes('vpđh') || String(u.loaiHinh || '').toLowerCase().includes('tổng công ty') || String(u.loaiHinh || '').toLowerCase().includes('văn phòng'));
     const ctttNam = parentUnits.filter(u => !vpdh.includes(u) && String(u.Phia || '').toLowerCase().includes('nam'));
@@ -142,7 +138,7 @@ export default function VehiclePage() {
 
   const toggleParent = (parentId: string) => setExpandedParents(prev => prev.includes(parentId) ? prev.filter(id => id !== parentId) : [...prev, parentId]);
 
-  // --- FIX LỖI TÌM KIẾM DANH SÁCH XE (CHỐNG TRẮNG TRANG) ---
+  // --- FIX LỖI TÌM KIẾM DANH SÁCH XE ---
   const filteredCars = useMemo(() => {
     let result = xeData.filter(item => allowedDonViIds.includes(item.ID_DonVi));
     if (selectedUnitFilter) {
@@ -180,7 +176,6 @@ export default function VehiclePage() {
     setIsCarModalOpen(true); setError(null);
   };
 
-  // FIX LỖI 1: TỰ ĐỘNG CẬP NHẬT GIAO DIỆN & BACKGROUND SYNC CHO XE
   const handleCarSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!carFormData.ID_DonVi) return alert("Vui lòng chọn Đơn vị quản lý!");
@@ -197,7 +192,6 @@ export default function VehiclePage() {
       
       setIsCarModalOpen(false); 
 
-      // Background Sync
       apiService.getXe().then(res => { if(res) setXeData(res) });
     } catch (err: any) { setError(err.message || 'Lỗi lưu dữ liệu Xe.'); } 
     finally { setSubmitting(false); }
@@ -216,7 +210,6 @@ export default function VehiclePage() {
     setCarFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  // --- XỬ LÝ CHI PHÍ ---
   const carCosts = useMemo(() => {
     if (!selectedCarForCost) return [];
     return chiPhiData.filter(cp => getCostCarId(cp) === selectedCarForCost.ID_Xe).sort((a, b) => b.ThangNam.localeCompare(a.ThangNam));
@@ -241,7 +234,6 @@ export default function VehiclePage() {
     setCostFormData({ ...cost, ID_ChiPhiXe: getCostId(cost), ID_Xe: getCostCarId(cost), ID_DonVi: cost.ID_DonVi || selectedCarForCost?.ID_DonVi || '' });
   };
 
-  // FIX LỖI 2: XỬ LÝ ID ĐỂ GOOGLE SHEETS NHẬN DIỆN VÀ ĐỒNG BỘ NGẦM (BACKGROUND SYNC)
   const handleCostSave = async (e: React.FormEvent) => {
     e.preventDefault(); setSubmitting(true); setError(null);
     try {
@@ -272,7 +264,6 @@ export default function VehiclePage() {
         KmHienTai: '', SoLitNhienLieu: '', ChiPhiNhienLieu: '', Phicauduong_benbai: '', Phiruaxe: '', ChiPhiBaoDuong_SuaChua: '', ChiPhiThue_KhauHao: '', GhiChu: ''
       });
 
-      // Background Sync
       apiService.getChiPhiXe().then(res => { if(res) setChiPhiData(res) });
     } catch (err: any) { setError(err.message || 'Lỗi lưu dữ liệu Chi phí.'); } 
     finally { setSubmitting(false); }
@@ -292,7 +283,6 @@ export default function VehiclePage() {
     return { maxCP: Math.max(...costs, 1), maxKm: Math.max(...kms, 1) };
   }, [viewHistoryCosts]);
 
-  // FIX LỖI 3: DÙNG VÒNG LẶP FOR...OF ĐỂ XÓA TUẦN TỰ TỪNG DÒNG CHI PHÍ THAY VÌ PROMISE.ALL
   const confirmDelete = async () => {
     if (!itemToDelete) return; setSubmitting(true); setError(null);
     try {
@@ -326,7 +316,6 @@ export default function VehiclePage() {
     return unit.TenDonVi;
   };
 
-  // TỰ ĐỘNG BUNG MỞ THƯ MỤC NẾU CÓ SEARCH
   const renderUnitTree = (parent: DonVi, level: number = 1) => {
     const children = getChildUnits(parent.ID_DonVi);
     const isExpanded = expandedParents.includes(parent.ID_DonVi) || !!unitSearchTerm;
@@ -356,11 +345,11 @@ export default function VehiclePage() {
   return (
     <div className="flex h-full bg-[#f4f7f9] overflow-hidden relative">
       {isListCollapsed && (
-        <button onClick={() => setIsListCollapsed(false)} className="absolute top-6 left-6 z-20 bg-white p-2.5 rounded-lg shadow-md border border-gray-200 text-[#05469B] hover:bg-blue-50 transition-all" title="Mở bộ lọc đơn vị"><PanelLeftOpen size={20} /></button>
+        <button onClick={() => setIsListCollapsed(false)} className="absolute top-6 left-6 z-20 bg-white p-2.5 rounded-lg shadow-md border border-gray-200 text-[#05469B] hover:bg-blue-50 transition-all" title="Mở danh sách đơn vị"><PanelLeftOpen size={20} /></button>
       )}
 
       {/* --- CỘT TRÁI (BỘ LỌC ĐƠN VỊ) --- */}
-      <div className={`${isListCollapsed ? 'w-0 opacity-0' : 'w-80 opacity-100'} transition-all duration-300 ease-in-out bg-white border-r border-gray-200 flex flex-col h-full shadow-sm z-10 shrink-0 overflow-hidden`}>
+      <div className={`${isListCollapsed ? 'w-0 opacity-0 -ml-80 lg:ml-0' : 'w-80 opacity-100 absolute lg:relative inset-y-0 left-0'} transition-all duration-300 ease-in-out bg-white border-r border-gray-200 flex flex-col h-full shadow-2xl lg:shadow-sm z-50 lg:z-10 shrink-0 overflow-hidden`}>
         <div className="p-4 border-b border-gray-100">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-lg font-bold text-[#05469B] flex items-center gap-2 whitespace-nowrap"><MapPin size={20} /> Bộ lọc Đơn vị</h2>
@@ -411,9 +400,9 @@ export default function VehiclePage() {
 
         {error && <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-500 text-red-700 flex items-start gap-3 rounded-r-lg shadow-sm"><AlertCircle className="w-5 h-5 shrink-0 mt-0.5" /><p>{error}</p></div>}
 
-        {/* BẢNG DỮ LIỆU */}
+        {/* BẢNG DỮ LIỆU MẶC ĐỊNH */}
         <div className={`bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden transition-all duration-300 ${isListCollapsed ? 'ml-10' : ''}`}>
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto w-full">
             <table className="w-full text-left border-collapse min-w-[1250px]">
               <thead>
                 <tr className="bg-[#f8fafc] border-b border-gray-200 text-xs font-bold text-gray-600 uppercase tracking-wider">
@@ -481,12 +470,12 @@ export default function VehiclePage() {
       {isCarModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl flex flex-col max-h-[90vh] animate-in fade-in zoom-in duration-200">
-            <div className="flex justify-between p-5 border-b border-gray-100 bg-gray-50 rounded-t-2xl">
+            <div className="flex justify-between p-5 border-b border-gray-100 bg-gray-50 rounded-t-2xl shrink-0">
               <h3 className="text-xl font-bold text-[#05469B] flex items-center gap-2"><Car size={24}/> {modalMode === 'create' ? 'Thêm Xe Mới' : 'Cập nhật Thông tin Xe'}</h3>
               <button onClick={() => setIsCarModalOpen(false)} disabled={submitting} className="text-gray-400 hover:text-red-500 rounded-full p-1.5 bg-white shadow-sm transition-colors"><X className="w-6 h-6" /></button>
             </div>
             
-            <form onSubmit={handleCarSave} className="p-6 overflow-y-auto space-y-6">
+            <form onSubmit={handleCarSave} className="p-6 overflow-y-auto space-y-6 flex-1 min-h-0">
               
               <div className="bg-blue-50/40 p-5 rounded-xl border border-blue-100">
                 <h4 className="font-bold text-[#05469B] mb-4 flex items-center gap-2"><div className="w-2 h-6 bg-[#05469B] rounded-full"></div> Hồ sơ Đăng ký & Sở hữu</h4>
@@ -585,7 +574,7 @@ export default function VehiclePage() {
                 </div>
               </div>
 
-              <div className="pt-5 border-t border-gray-100 flex justify-end gap-3 mt-8">
+              <div className="pt-5 border-t border-gray-100 flex justify-end gap-3 mt-8 shrink-0">
                 <button type="button" onClick={() => setIsCarModalOpen(false)} className="px-8 py-3 bg-gray-100 text-gray-700 hover:bg-gray-200 rounded-xl font-bold transition-colors">Hủy</button>
                 <button type="submit" disabled={submitting} className="px-8 py-3 text-white bg-[#05469B] hover:bg-[#04367a] rounded-xl font-bold flex items-center gap-2 shadow-lg transition-colors">{submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />} Lưu Hồ Sơ Xe</button>
               </div>
@@ -594,19 +583,20 @@ export default function VehiclePage() {
         </div>
       )}
 
-      {/* --- MODAL XEM CHI TIẾT XE VÀ THỐNG KÊ CHI PHÍ KẾP HỢP (MIXED CHART 2 AXES) --- */}
+      {/* --- MODAL XEM CHI TIẾT XE VÀ THỐNG KÊ CHI PHÍ (CÓ SCROLL BẢNG) --- */}
       {isViewModalOpen && viewData && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl flex flex-col max-h-[90vh] animate-in fade-in zoom-in duration-200">
-            <div className="flex justify-between p-5 border-b border-gray-100 bg-[#05469B] rounded-t-2xl">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl flex flex-col max-h-[90vh] animate-in fade-in zoom-in duration-200 overflow-hidden">
+            <div className="flex justify-between p-5 border-b border-gray-100 bg-[#05469B] rounded-t-2xl shrink-0">
               <h3 className="text-xl font-bold text-white flex items-center gap-2"><Car size={24}/> Chi tiết Thông tin & Hoạt động Xe</h3>
               <button onClick={() => setIsViewModalOpen(false)} className="text-blue-200 hover:text-white rounded-full p-1 transition-colors"><X className="w-6 h-6" /></button>
             </div>
             
-            <div className="p-6 overflow-y-auto flex flex-col gap-6">
+            {/* THÊM flex-1 min-h-0 ĐỂ POPUP LUÔN VỪA KHÍT MÀN HÌNH */}
+            <div className="p-6 overflow-y-auto flex-1 min-h-0 flex flex-col gap-6">
               
               {/* Info Header */}
-              <div className="flex items-center gap-5 border-b border-gray-100 pb-6">
+              <div className="flex items-center gap-5 border-b border-gray-100 pb-6 shrink-0">
                 <div className="w-24 h-24 bg-blue-50 text-[#05469B] rounded-2xl flex items-center justify-center border border-blue-100 shadow-inner">
                   <Car size={48} />
                 </div>
@@ -628,7 +618,7 @@ export default function VehiclePage() {
               </div>
 
               {/* Data Grid */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-gray-50 p-5 rounded-xl border border-gray-200">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-gray-50 p-5 rounded-xl border border-gray-200 shrink-0">
                 <div><p className="text-xs text-gray-500 font-bold mb-1">Chủ sở hữu</p><p className="font-semibold text-gray-800">{viewData.donvichusohuu || '-'}</p></div>
                 <div><p className="text-xs text-gray-500 font-bold mb-1">Số Khung</p><p className="font-semibold text-gray-800">{viewData.SoKhung || '-'}</p></div>
                 <div><p className="text-xs text-gray-500 font-bold mb-1">Số Máy</p><p className="font-semibold text-gray-800">{viewData.SoMay || '-'}</p></div>
@@ -640,8 +630,8 @@ export default function VehiclePage() {
                 <div><p className="text-xs text-gray-500 font-bold mb-1">Nhiên Liệu</p><p className="font-semibold text-gray-800">{viewData.LoaiNhienLieu || '-'}</p></div>
               </div>
 
-              {/* Chart Section - MIXED CHART 2 AXES */}
-              <div className="bg-white border border-gray-200 p-5 rounded-xl shadow-sm">
+              {/* Chart Section */}
+              <div className="bg-white border border-gray-200 p-5 rounded-xl shadow-sm shrink-0">
                 <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-3 mb-6">
                   <h4 className="font-bold text-gray-800 flex items-center gap-2"><BarChart3 size={18} className="text-[#05469B]"/> Thống kê Quãng đường & Chi phí</h4>
                   
@@ -751,45 +741,52 @@ export default function VehiclePage() {
                       {viewHistoryCosts.map((cost, idx) => {
                         const costId = getCostId(cost) || `label-${idx}`;
                         return (
-                        <div key={costId} className="flex-1 text-center text-[9px] font-black text-gray-500">{formatMonthYear(cost.ThangNam)}</div>
-                      )})}
+                          <div key={costId} className="flex-1 text-center text-[9px] font-black text-gray-500">{formatMonthYear(cost.ThangNam)}</div>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
               </div>
 
-              {/* Detailed Table */}
-              <div className="overflow-x-auto border border-gray-200 rounded-xl mt-2">
-                <table className="w-full text-left text-sm">
-                  <thead>
-                    <tr className="bg-gray-50 border-b text-xs text-gray-600 uppercase tracking-wider">
-                      <th className="p-3 w-28">Tháng</th>
-                      <th className="p-3">Số Km</th>
-                      <th className="p-3 text-right">Nhiên liệu</th>
-                      <th className="p-3 text-right">Cầu đường</th>
-                      <th className="p-3 text-right">Bảo dưỡng</th>
-                      <th className="p-3 text-right font-bold text-red-600">Tổng CP</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {viewHistoryCosts.slice().reverse().map((cost, idx) => { 
-                      const total = (Number(cost.ChiPhiNhienLieu) || 0) + (Number(cost.Phicauduong_benbai) || 0) + (Number(cost.Phiruaxe) || 0) + (Number(cost.ChiPhiBaoDuong_SuaChua) || 0) + (Number(cost.ChiPhiThue_KhauHao) || 0);
-                      const costId = getCostId(cost) || `table-${idx}`;
-                      return (
-                        <tr key={costId} className="hover:bg-blue-50/30">
-                          <td className="p-3 font-bold text-[#05469B]">{formatMonthYear(cost.ThangNam)}</td>
-                          <td className="p-3 font-medium text-emerald-600">{formatCurrency(cost.KmHienTai)}</td>
-                          <td className="p-3 text-right">{formatCurrency(cost.ChiPhiNhienLieu)}</td>
-                          <td className="p-3 text-right">{formatCurrency(cost.Phicauduong_benbai)}</td>
-                          <td className="p-3 text-right">{formatCurrency(cost.ChiPhiBaoDuong_SuaChua)}</td>
-                          <td className="p-3 text-right font-black text-red-600">{formatCurrency(total)}</td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
+              {/* Detailed Table - ĐÃ THÊM THANH CUỘN VÀ MAX-HEIGHT, HEADER ĐỨNG YÊN */}
+              <div className="border border-gray-200 rounded-xl mt-2 flex flex-col overflow-hidden shrink-0">
+                <div className="overflow-y-auto max-h-56 w-full custom-scrollbar relative">
+                  <table className="w-full text-left text-sm border-collapse">
+                    <thead className="sticky top-0 z-10 bg-gray-50 shadow-sm border-b border-gray-200">
+                      <tr className="text-xs text-gray-600 uppercase tracking-wider">
+                        <th className="p-3 w-28">Tháng</th>
+                        <th className="p-3">Số Km</th>
+                        <th className="p-3 text-right">Nhiên liệu</th>
+                        <th className="p-3 text-right">Cầu đường</th>
+                        <th className="p-3 text-right">Bảo dưỡng</th>
+                        <th className="p-3 text-right font-bold text-red-600">Tổng CP</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {viewHistoryCosts.slice().reverse().map((cost, idx) => { 
+                        const total = (Number(cost.ChiPhiNhienLieu) || 0) + (Number(cost.Phicauduong_benbai) || 0) + (Number(cost.Phiruaxe) || 0) + (Number(cost.ChiPhiBaoDuong_SuaChua) || 0) + (Number(cost.ChiPhiThue_KhauHao) || 0);
+                        const costId = getCostId(cost) || `table-${idx}`;
+                        return (
+                          <tr key={costId} className="hover:bg-blue-50/30">
+                            <td className="p-3 font-bold text-[#05469B] bg-white">{formatMonthYear(cost.ThangNam)}</td>
+                            <td className="p-3 font-medium text-emerald-600 bg-white">{formatCurrency(cost.KmHienTai)}</td>
+                            <td className="p-3 text-right bg-white">{formatCurrency(cost.ChiPhiNhienLieu)}</td>
+                            <td className="p-3 text-right bg-white">{formatCurrency(cost.Phicauduong_benbai)}</td>
+                            <td className="p-3 text-right bg-white">{formatCurrency(cost.ChiPhiBaoDuong_SuaChua)}</td>
+                            <td className="p-3 text-right font-black text-red-600 bg-white">{formatCurrency(total)}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               </div>
 
+            </div>
+            
+            <div className="p-4 sm:p-5 border-t border-gray-100 bg-gray-50 flex justify-end shrink-0 rounded-b-2xl">
+              <button onClick={() => setIsViewModalOpen(false)} className="px-6 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold rounded-xl transition-colors">Đóng</button>
             </div>
           </div>
         </div>
@@ -820,7 +817,7 @@ export default function VehiclePage() {
               <button onClick={() => setIsCostModalOpen(false)} className="text-indigo-200 hover:text-white bg-indigo-700/50 hover:bg-indigo-700 p-2 rounded-full transition-colors mt-1 shrink-0"><X size={20}/></button>
             </div>
 
-            <div className="flex-1 overflow-y-auto bg-gray-50 flex flex-col">
+            <div className="flex-1 overflow-y-auto bg-gray-50 flex flex-col min-h-0">
               <div className="p-5 bg-white border-b border-gray-200 shadow-sm z-10 shrink-0">
                 <div className="flex justify-between items-center mb-4">
                   <h4 className="font-bold text-gray-800 text-sm uppercase tracking-wider flex items-center gap-1.5"><Calendar size={16} className="text-indigo-600"/> {costModalMode === 'create' ? 'Khai báo tháng mới' : 'Cập nhật tháng'}</h4>
@@ -880,7 +877,7 @@ export default function VehiclePage() {
                             <span className="text-sm font-black text-red-600">{formatCurrency(tongCP)} VNĐ</span>
                           </div>
                         </div>
-                      )
+                      );
                     })
                   )}
                 </div>
