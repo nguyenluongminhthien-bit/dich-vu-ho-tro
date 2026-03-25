@@ -582,7 +582,7 @@ export default function PersonnelPage() {
                     <select name="PhanLoai" value={formData.PhanLoai || 'Lãnh đạo'} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]">
                       <option value="Lãnh đạo">Lãnh đạo</option>
                       <option value="PT DVHT KD">PT DVHT KD</option>
-                      <option value="PT DVHC">PT DVHC</option>
+                      <option value="PT PVHC">PT PVHC</option>
                       <option value="PT NS">PT NS</option>
                       <option value="BV, ĐTKH">BV, ĐTKH</option>
                     </select>
