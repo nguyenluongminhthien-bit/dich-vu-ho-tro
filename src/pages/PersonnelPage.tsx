@@ -290,7 +290,6 @@ export default function PersonnelPage() {
 
   const renderUnitTree = (parent: DonVi, level: number = 1) => {
     const children = getChildUnits(parent.ID_DonVi);
-    // FIX: Tự động mở thư mục khi đang tìm kiếm
     const isExpanded = expandedParents.includes(parent.ID_DonVi) || !!unitSearchTerm;
     const isParentDimmed = parent.trangThai === 'Đại lý' || parent.trangThai === 'Đầu tư mới';
 
@@ -327,7 +326,6 @@ export default function PersonnelPage() {
         </button>
       )}
 
-      {/* CỘT TRÁI (BỘ LỌC ĐƠN VỊ) - TỰ ĐỘNG ẨN TRÊN MOBILE, BẤM NÚT MỚI HIỆN */}
       <div className={`${isListCollapsed ? 'w-0 opacity-0 -ml-80 lg:ml-0' : 'w-80 opacity-100 absolute lg:relative inset-y-0 left-0'} transition-all duration-300 ease-in-out bg-white border-r border-gray-200 flex flex-col h-full shadow-2xl lg:shadow-sm z-50 lg:z-10 shrink-0 overflow-hidden`}>
         <div className="p-4 border-b border-gray-100">
           <div className="flex justify-between items-center mb-4">
@@ -402,7 +400,13 @@ export default function PersonnelPage() {
             <table className="w-full text-left border-collapse min-w-[1050px]">
               <thead>
                 <tr className="bg-[#f8fafc] border-b border-gray-200 text-xs font-bold text-gray-600 uppercase tracking-wider">
-                  <th className="p-4 w-24">Mã NV</th><th className="p-4">Họ Tên</th><th className="p-4 w-48">Đơn Vị</th><th className="p-4 w-36">Chức vụ</th><th className="p-4 w-32">SĐT</th><th className="p-4 w-32">Thâm niên</th><th className="p-4 text-center w-40">Thao tác</th>
+                  <th className="p-4 w-24 whitespace-nowrap">Mã NV</th>
+                  <th className="p-4 whitespace-nowrap">Họ Tên</th>
+                  <th className="p-4 whitespace-nowrap">Đơn Vị</th>
+                  <th className="p-4 whitespace-nowrap">Chức vụ</th>
+                  <th className="p-4 w-32 whitespace-nowrap">SĐT</th>
+                  <th className="p-4 w-32 whitespace-nowrap">Thâm niên</th>
+                  <th className="p-4 text-center w-40 whitespace-nowrap">Thao tác</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
@@ -416,14 +420,25 @@ export default function PersonnelPage() {
                 ) : (
                   filteredPersonnel.map((item) => (
                     <tr key={item.ID_NhanSu} className="hover:bg-blue-50/50 transition-colors group">
-                      <td className="p-4 font-semibold text-gray-800">{item.MaNV}</td>
-                      <td className="p-4 font-bold text-[#05469B]">{item.HoTen}</td>
-                      <td className="p-4 text-sm font-medium text-gray-700">{donViMap[item.ID_DonVi] || item.ID_DonVi || '-'}</td>
-                      <td className="p-4 text-sm text-gray-600">{item.ChucVu}</td>
+                      <td className="p-4 font-semibold text-gray-800 whitespace-nowrap">{item.MaNV}</td>
+                      <td className="p-4 font-bold text-[#05469B] whitespace-nowrap">
+                        <div className="flex items-center gap-2">
+                          <span>{item.HoTen}</span>
+                          <div title={item.GioiTinh === 'Nữ' ? 'Nữ' : 'Nam'} className={`w-5 h-5 flex items-center justify-center rounded-full text-xs font-black border shrink-0 ${item.GioiTinh === 'Nữ' ? 'bg-rose-50 text-rose-500 border-rose-200' : 'bg-blue-50 text-blue-500 border-blue-200'}`}>
+                            {item.GioiTinh === 'Nữ' ? '♀' : '♂'}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="p-4 text-sm font-medium text-gray-700 whitespace-nowrap">{donViMap[item.ID_DonVi] || item.ID_DonVi || '-'}</td>
+                      <td className="p-4 text-sm text-gray-600 whitespace-nowrap">{item.ChucVu}</td>
                       
                       <td className="p-4 text-sm text-gray-600 whitespace-nowrap">{formatPhoneNumber(item.SDT)}</td>
                       
-                      <td className="p-4 text-sm font-medium text-emerald-600"><span className="bg-emerald-50/50 rounded-md inline-block px-2 py-1 border border-emerald-100">{calculateSeniority(item.NgayNhanViec)}</span></td>
+                      <td className="p-4 text-sm font-medium text-emerald-600 whitespace-nowrap">
+                        <span className="bg-emerald-50/50 rounded-md inline-block px-2 py-1 border border-emerald-100">
+                          {calculateSeniority(item.NgayNhanViec)}
+                        </span>
+                      </td>
                       <td className="p-4">
                         <div className="flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button onClick={() => handleView(item)} className="p-2 text-indigo-600 hover:bg-indigo-100 rounded-md transition-colors" title="Xem chi tiết"><Eye className="w-4 h-4" /></button>
