@@ -422,12 +422,7 @@ export default function PersonnelPage() {
                     <tr key={item.ID_NhanSu} className="hover:bg-blue-50/50 transition-colors group">
                       <td className="p-4 font-semibold text-gray-800 whitespace-nowrap">{item.MaNV}</td>
                       <td className="p-4 font-bold text-[#05469B] whitespace-nowrap">
-                        <div className="flex items-center gap-2">
-                          <span>{item.HoTen}</span>
-                          <div title={item.GioiTinh === 'Nữ' ? 'Nữ' : 'Nam'} className={`w-5 h-5 flex items-center justify-center rounded-full text-xs font-black border shrink-0 ${item.GioiTinh === 'Nữ' ? 'bg-rose-50 text-rose-500 border-rose-200' : 'bg-blue-50 text-blue-500 border-blue-200'}`}>
-                            {item.GioiTinh === 'Nữ' ? '♀' : '♂'}
-                          </div>
-                        </div>
+                        {item.HoTen}</span>
                       </td>
                       <td className="p-4 text-sm font-medium text-gray-700 whitespace-nowrap">{donViMap[item.ID_DonVi] || item.ID_DonVi || '-'}</td>
                       <td className="p-4 text-sm text-gray-600 whitespace-nowrap">{item.ChucVu}</td>
