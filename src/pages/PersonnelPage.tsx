@@ -585,6 +585,8 @@ export default function PersonnelPage() {
                       <option value="PT PVHC">PT PVHC</option>
                       <option value="PT NS">PT NS</option>
                       <option value="BV, ĐTKH">BV, ĐTKH</option>
+                      <option value="PVHC">PVHC</option>
+                      <option value="CB-NV">CB-NV</option>
                     </select>
                   </div>
                   <div><label className="block text-xs font-bold text-gray-700 mb-1">Ngày nhận việc</label><input type="date" name="NgayNhanViec" value={formData.NgayNhanViec ? formData.NgayNhanViec.split('T')[0] : ''} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" /></div>
