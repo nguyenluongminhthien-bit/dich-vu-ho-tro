@@ -422,7 +422,7 @@ export default function PersonnelPage() {
                     <tr key={item.ID_NhanSu} className="hover:bg-blue-50/50 transition-colors group">
                       <td className="p-4 font-semibold text-gray-800 whitespace-nowrap">{item.MaNV}</td>
                       <td className="p-4 font-bold text-[#05469B] whitespace-nowrap">
-                        {item.HoTen}</span>
+                        {item.HoTen}
                       </td>
                       <td className="p-4 text-sm font-medium text-gray-700 whitespace-nowrap">{donViMap[item.ID_DonVi] || item.ID_DonVi || '-'}</td>
                       <td className="p-4 text-sm text-gray-600 whitespace-nowrap">{item.ChucVu}</td>
