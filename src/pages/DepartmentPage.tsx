@@ -7,10 +7,11 @@ import {
   Maximize2, Layers, DoorOpen, Coffee, UserCheck, Copy, CheckCheck,
   Flame, HardHat, CloudLightning, Utensils, Monitor,
   Projector, Video, LayoutTemplate, MousePointerClick, 
-  SquarePen, PenTool, Wand2, Compass, Clock, Sun, Moon
+  SquarePen, PenTool, Wand2, Compass, Clock, Sun, Moon,
+  MonitorSmartphone, Tag, Car
 } from 'lucide-react';
 import { apiService } from '../services/api';
-import { DonVi, Personnel, AnNinh, PhapNhan, PhongHop } from '../types';
+import { DonVi, Personnel, AnNinh, PhapNhan, PhongHop, TS_Xe, ThietBi } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 
 const getSecId = (sec: any) => sec.ID_AnNinh || sec.iD_AnNinh || sec.Id_AnNinh || sec.id || '';
@@ -41,6 +42,10 @@ export default function DepartmentPage() {
   const [phapNhanData, setPhapNhanData] = useState<PhapNhan[]>([]); 
   const [phongHopData, setPhongHopData] = useState<PhongHop[]>([]); 
   
+  // --- STATE MỚI CHO THỐNG KÊ TÀI SẢN ---
+  const [xeData, setXeData] = useState<TS_Xe[]>([]);
+  const [thietBiData, setThietBiData] = useState<ThietBi[]>([]);
+
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -72,11 +77,14 @@ export default function DepartmentPage() {
   const loadData = async () => {
     setLoading(true); setError(null);
     try { 
-      const [dvResult, nsResult, anResult, pnResult, phResult] = await Promise.all([
+      const [dvResult, nsResult, anResult, pnResult, phResult, xeResult, tbResult] = await Promise.all([
         apiService.getDonVi(), apiService.getPersonnel(), apiService.getAnNinh(), apiService.getPhapNhan(), 
-        apiService.getPhongHop ? apiService.getPhongHop() : Promise.resolve([]) 
+        apiService.getPhongHop ? apiService.getPhongHop() : Promise.resolve([]),
+        apiService.getXe ? apiService.getXe().catch(() => []) : Promise.resolve([]),
+        apiService.getThietBi ? apiService.getThietBi().catch(() => []) : Promise.resolve([])
       ]);
       setData(dvResult); setPersonnelData(nsResult); setAnNinhData(anResult || []); setPhapNhanData(pnResult || []); setPhongHopData(phResult || []);
+      setXeData(xeResult || []); setThietBiData(tbResult || []);
     } 
     catch (err: any) { setError(err.message || 'Lỗi tải dữ liệu. Vui lòng kiểm tra lại kết nối mạng.'); } 
     finally { setLoading(false); }
@@ -96,7 +104,6 @@ export default function DepartmentPage() {
     return data.filter(dv => allAllowed.includes(dv.ID_DonVi)).map(dv => dv.ID_DonVi);
   }, [user, data]);
 
-  // --- FIX TÌM KIẾM CÂY THƯ MỤC CỰC THÔNG MINH ---
   const filteredData = useMemo(() => {
     let baseUnits = data.filter(item => allowedDonViIds.includes(item.ID_DonVi));
     if (!searchTerm) return baseUnits;
@@ -104,12 +111,10 @@ export default function DepartmentPage() {
     const lower = searchTerm.toLowerCase();
     const matchedIds = new Set<string>();
 
-    // 1. Tìm các đơn vị khớp trực tiếp với từ khóa
     baseUnits.forEach(u => {
       if (String(u.TenDonVi || '').toLowerCase().includes(lower) || String(u.ID_DonVi || '').toLowerCase().includes(lower)) {
         matchedIds.add(u.ID_DonVi);
         
-        // 2. Kéo theo các node Cha, Ông Nội... để giữ vững cấu trúc cây
         let parentId = u.CapQuanLy;
         while (parentId && parentId !== 'HO') {
           matchedIds.add(parentId);
@@ -119,7 +124,6 @@ export default function DepartmentPage() {
       }
     });
 
-    // 3. Xổ cành: Nếu Cha khớp từ khóa, hiện tất cả các Showroom con của nó
     const addChildren = (parentId: string) => {
       baseUnits.forEach(u => {
         if (u.CapQuanLy === parentId && !matchedIds.has(u.ID_DonVi)) {
@@ -178,6 +182,74 @@ export default function DepartmentPage() {
 
   const currentPhongHopList = useMemo(() => phongHopData.filter(item => item.ID_DonVi === selectedUnitId), [phongHopData, selectedUnitId]);
   const unitStaff = useMemo(() => personnelData.filter(p => p.ID_DonVi === selectedUnitId), [personnelData, selectedUnitId]);
+
+  // --- LOGIC TÍNH TOÁN THỐNG KÊ TÀI SẢN (XE & TTB) ---
+  const currentXeList = useMemo(() => {
+    return xeData.filter(item => selectedUnitSubordinates.includes(item.ID_DonVi));
+  }, [xeData, selectedUnitSubordinates]);
+
+  const currentTbList = useMemo(() => {
+    return thietBiData.filter(item => selectedUnitSubordinates.includes(item.ID_DonVi));
+  }, [thietBiData, selectedUnitSubordinates]);
+
+  const xeStats = useMemo(() => {
+    const active = currentXeList.filter(x => x.Hientrang === 'Đang hoạt động').length;
+    const inactive = currentXeList.length - active;
+
+    const grouped: Record<string, { total: number, brands: Record<string, { total: number, models: Record<string, number> }> }> = {};
+
+    currentXeList.forEach(xe => {
+      const purpose = xe.Mucdichsudung || 'Khác';
+      const brand = xe.HieuXe || 'Khác';
+      const model = xe.LoaiXe || 'Không rõ';
+
+      if (!grouped[purpose]) grouped[purpose] = { total: 0, brands: {} };
+      grouped[purpose].total++;
+
+      if (!grouped[purpose].brands[brand]) grouped[purpose].brands[brand] = { total: 0, models: {} };
+      grouped[purpose].brands[brand].total++;
+
+      if (!grouped[purpose].brands[brand].models[model]) grouped[purpose].brands[brand].models[model] = 0;
+      grouped[purpose].brands[brand].models[model]++;
+    });
+
+    return { total: currentXeList.length, active, inactive, grouped };
+  }, [currentXeList]);
+
+  const tbStats = useMemo(() => {
+    const active = currentTbList.filter(t => t.TinhTrang === 'Đang sử dụng').length;
+    const inactive = currentTbList.length - active;
+
+    const grouped: Record<string, number> = {};
+    currentTbList.forEach(tb => {
+      const group = tb.NhomThietBi || 'Khác';
+      grouped[group] = (grouped[group] || 0) + 1;
+    });
+
+    const sortedGroups = Object.entries(grouped).sort((a, b) => b[1] - a[1]);
+
+    return { total: currentTbList.length, active, inactive, groups: sortedGroups };
+  }, [currentTbList]);
+
+  const subordinateStats = useMemo(() => {
+    if (selectedUnitSubordinates.length <= 1) return [];
+    const stats: { id: string, name: string, xe: number, tb: number }[] = [];
+
+    selectedUnitSubordinates.forEach(unitId => {
+      const xeCount = currentXeList.filter(x => x.ID_DonVi === unitId).length;
+      const tbCount = currentTbList.filter(t => t.ID_DonVi === unitId).length;
+      if (xeCount > 0 || tbCount > 0) {
+        stats.push({
+          id: unitId,
+          name: donViMap[unitId] || unitId,
+          xe: xeCount,
+          tb: tbCount
+        });
+      }
+    });
+    return stats;
+  }, [selectedUnitSubordinates, currentXeList, currentTbList, donViMap]);
+
 
   const leader = useMemo(() => unitStaff.find(p => p.ID_NhanSu === selectedUnit?.ID_GiamDoc) || unitStaff.find(p => p.PhanLoai === 'Lãnh đạo'), [unitStaff, selectedUnit]);
   const kdXe = useMemo(() => unitStaff.find(p => p.ID_NhanSu === selectedUnit?.ID_PTKDXe) || unitStaff.find(p => String(p.ChucVu || '').toLowerCase().includes('kinh doanh xe') || String(p.ChucVu || '').toLowerCase().includes('kd xe')), [unitStaff, selectedUnit]);
@@ -673,7 +745,6 @@ export default function DepartmentPage() {
 
                              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-0 border-t border-gray-50 pt-2 mt-1"><span className="text-gray-500 font-medium whitespace-nowrap shrink-0">Thời gian lưu hình:</span><span className="font-bold text-gray-800 sm:ml-2">{currentAnNinh.ThoiGianLuu || '---'} Ngày</span></div>
                              
-                             {/* ĐÃ CẬP NHẬT: 2 CỘT NÀY SẼ NẰM TRÊN CÙNG 1 HÀNG TRONG PHẦN CHỈNH SỬA, NHƯNG Ở ĐÂY LÀ PHẦN XEM (BẢN GỐC HIỂN THỊ DỌC CHUẨN) */}
                              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-0"><span className="text-gray-500 font-medium whitespace-nowrap shrink-0">Vị trí đặt hệ thống (Đầu ghi):</span><span className="font-bold text-gray-800 text-left sm:text-right sm:ml-2 break-words">{currentAnNinh.ViTriDatHeThong || '---'}</span></div>
                              <div className="flex flex-col sm:flex-row justify-between items-start pt-2 border-t border-gray-50 mt-1 gap-1 sm:gap-0">
                                <span className="text-gray-500 font-medium whitespace-nowrap shrink-0 sm:mr-3">Vị trí giám sát chính:</span>
@@ -936,6 +1007,151 @@ export default function DepartmentPage() {
                     )}
                   </div>
                 </section>
+
+                {/* --- L. THỐNG KÊ TÀI SẢN (XE CÔNG & TTB) --- */}
+                <section className="animate-in fade-in duration-500">
+                  <div className="flex justify-between items-center mb-5">
+                    <h3 className="text-lg font-black text-[#05469B] flex items-center gap-2 uppercase tracking-wider">
+                      <div className="w-1.5 h-6 bg-[#05469B] rounded-full"></div> L. THỐNG KÊ TÀI SẢN (XE & TRANG THIẾT BỊ)
+                    </h3>
+                  </div>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
+                     
+                     {/* 1. THỐNG KÊ PHƯƠNG TIỆN */}
+                     <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex flex-col">
+                        <h4 className="font-bold text-[#05469B] mb-4 flex items-center gap-2 border-b border-gray-100 pb-2">
+                           <Car size={18} className="text-[#05469B]" /> 1. Phương tiện (Xe công & Lái thử)
+                        </h4>
+                        
+                        {/* Summary Cards */}
+                        <div className="grid grid-cols-3 gap-4 mb-5">
+                           <div className="bg-gray-50 p-3 rounded-xl border border-gray-100 text-center flex flex-col items-center justify-between">
+                              <p className="text-[10px] font-bold text-gray-500 uppercase mb-1 whitespace-nowrap w-full truncate" title="Tổng số xe">Tổng số xe</p>
+                              <p className="text-xl font-black text-[#05469B] mt-auto">{xeStats.total}</p>
+                           </div>
+                           <div className="bg-emerald-50 p-3 rounded-xl border border-emerald-100 text-center flex flex-col items-center justify-between">
+                              <p className="text-[10px] font-bold text-emerald-600 uppercase mb-1 whitespace-nowrap w-full truncate" title="Đang hoạt động">Đang hoạt động</p>
+                              <p className="text-xl font-black text-emerald-700 mt-auto">{xeStats.active}</p>
+                           </div>
+                           <div className="bg-red-50 p-3 rounded-xl border border-red-100 text-center flex flex-col items-center justify-between">
+                              <p className="text-[10px] font-bold text-red-600 uppercase mb-1 whitespace-nowrap w-full truncate" title="Sửa chữa / Ngừng">Sửa chữa / Ngừng</p>
+                              <p className="text-xl font-black text-red-700 mt-auto">{xeStats.inactive}</p>
+                           </div>
+                        </div>
+
+                        {/* Detail Table */}
+                        {xeStats.total > 0 ? (
+                          <div className="overflow-x-auto border border-gray-200 rounded-xl flex-1">
+                            <table className="w-full text-left text-sm border-collapse">
+                              <thead className="bg-gray-50 border-b border-gray-200">
+                                <tr className="text-xs text-gray-600 uppercase tracking-wider">
+                                  <th className="p-3 border-r border-gray-200 w-1/3">Mục đích Sử dụng</th>
+                                  <th className="p-3 border-r border-gray-200 w-24 text-center">SL</th>
+                                  <th className="p-3">Phân theo Loại xe</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-gray-200">
+                                {Object.entries(xeStats.grouped).map(([purpose, pData]) => (
+                                  <React.Fragment key={purpose}>
+                                    {/* Category Row */}
+                                    <tr className="bg-gray-100/80">
+                                      <td className="p-3 font-bold text-gray-800 border-r border-gray-200 flex items-center gap-2">
+                                        <Tag size={14} className="text-[#05469B]" /> {purpose}
+                                      </td>
+                                      <td className="p-3 font-black text-[#05469B] text-center border-r border-gray-200">{pData.total}</td>
+                                      <td className="p-3 bg-gray-50/50"></td>
+                                    </tr>
+                                    {/* Brands Rows */}
+                                    {Object.entries(pData.brands).map(([brand, bData]) => (
+                                      <tr key={`${purpose}-${brand}`} className="bg-white hover:bg-blue-50/30 transition-colors">
+                                        <td className="p-3 text-gray-600 italic border-r border-gray-200 pl-10 font-medium">
+                                          {brand}
+                                        </td>
+                                        <td className="p-3 text-center font-bold text-gray-700 border-r border-gray-200">
+                                          {bData.total}
+                                        </td>
+                                        <td className="p-3">
+                                          <div className="flex flex-col gap-1.5">
+                                            {Object.entries(bData.models).map(([model, count]) => (
+                                              <div key={model} className="flex items-center gap-2 text-xs font-semibold text-gray-700">
+                                                <Car size={14} className="text-gray-400 shrink-0" /> <span className="truncate">{model}:</span> <span className="text-[#05469B] font-bold whitespace-nowrap">{count} xe</span>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </React.Fragment>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        ) : (
+                          <div className="text-center py-6 text-gray-400 border border-dashed border-gray-200 rounded-xl flex-1 flex items-center justify-center">Không có dữ liệu xe.</div>
+                        )}
+                     </div>
+
+                     {/* 2. THỐNG KÊ TRANG THIẾT BỊ VĂN PHÒNG */}
+                     <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex flex-col">
+                        <h4 className="font-bold text-[#05469B] mb-4 flex items-center gap-2 border-b border-gray-100 pb-2">
+                           <MonitorSmartphone size={18} className="text-[#05469B]" /> 2. Trang thiết bị Văn phòng
+                        </h4>
+                        
+                        {/* Summary Cards */}
+                        <div className="grid grid-cols-3 gap-4 mb-5">
+                           <div className="bg-gray-50 p-3 rounded-xl border border-gray-100 text-center flex flex-col items-center justify-between">
+                              <p className="text-[10px] font-bold text-gray-500 uppercase mb-1 whitespace-nowrap w-full truncate" title="Tổng thiết bị">Tổng thiết bị</p>
+                              <p className="text-xl font-black text-[#05469B] mt-auto">{tbStats.total}</p>
+                           </div>
+                           <div className="bg-emerald-50 p-3 rounded-xl border border-emerald-100 text-center flex flex-col items-center justify-between">
+                              <p className="text-[10px] font-bold text-emerald-600 uppercase mb-1 whitespace-nowrap w-full truncate" title="Đang sử dụng">Đang sử dụng</p>
+                              <p className="text-xl font-black text-emerald-700 mt-auto">{tbStats.active}</p>
+                           </div>
+                           <div className="bg-red-50 p-3 rounded-xl border border-red-100 text-center flex flex-col items-center justify-between">
+                              <p className="text-[10px] font-bold text-red-600 uppercase mb-1 whitespace-nowrap w-full truncate" title="Hỏng / Lưu kho">Hỏng / Lưu kho</p>
+                              <p className="text-xl font-black text-red-700 mt-auto">{tbStats.inactive}</p>
+                           </div>
+                        </div>
+
+                        {/* Group Tags */}
+                        {tbStats.total > 0 ? (
+                          <div className="flex flex-wrap gap-2.5 flex-1 content-start">
+                            {tbStats.groups.map(([group, count]) => (
+                              <div key={group} className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded-lg shadow-sm hover:border-[#05469B] hover:shadow-md transition-all cursor-default group">
+                                <span className="text-xs font-bold text-gray-600 group-hover:text-[#05469B]">{group}</span>
+                                <span className="bg-blue-50 px-2 py-0.5 rounded text-xs font-black text-[#05469B] border border-blue-100 group-hover:bg-[#05469B] group-hover:text-white transition-colors">{count}</span>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="text-center py-6 text-gray-400 border border-dashed border-gray-200 rounded-xl flex-1 flex items-center justify-center">Không có dữ liệu thiết bị.</div>
+                        )}
+                     </div>
+
+                     {/* 3. PHÂN BỔ TÀI SẢN THEO ĐƠN VỊ (NẾU CÓ SUBORDINATES) */}
+                     {subordinateStats.length > 0 && (
+                       <div className="lg:col-span-2 bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex flex-col">
+                          <h4 className="font-bold text-[#05469B] mb-4 flex items-center gap-2 border-b border-gray-100 pb-2">
+                             <Building2 size={18} className="text-[#05469B]" /> 3. Phân bổ Tài sản theo Đơn vị trực thuộc
+                          </h4>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                            {subordinateStats.map(stat => (
+                              <div key={stat.id} className="bg-white p-3 rounded-xl border border-gray-200 hover:border-[#05469B] shadow-sm flex flex-col gap-2 transition-colors">
+                                <p className="text-sm font-bold text-gray-800 truncate" title={stat.name}>{stat.name}</p>
+                                <div className="flex items-center gap-3">
+                                  <span className="flex items-center gap-1.5 text-xs font-semibold text-gray-600 bg-gray-50 px-2 py-1 rounded border border-gray-100"><Car size={12} className="text-[#05469B]"/> {stat.xe} Xe</span>
+                                  <span className="flex items-center gap-1.5 text-xs font-semibold text-gray-600 bg-gray-50 px-2 py-1 rounded border border-gray-100"><MonitorSmartphone size={12} className="text-[#05469B]"/> {stat.tb} TTB</span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                       </div>
+                     )}
+
+                  </div>
+                </section>
+
               </div> {/* Kết thúc wrapper làm mờ */}
             </div>
           )}
@@ -1185,7 +1401,7 @@ export default function DepartmentPage() {
                 <div><label className="block text-xs font-bold mb-1 text-gray-600">Cấp Quản Lý (Mẹ) *</label><select required name="CapQuanLy" value={formData.CapQuanLy || ''} onChange={(e) => setFormData({...formData, CapQuanLy: e.target.value})} className="w-full p-2.5 border rounded-lg bg-[#FFFFF0] font-bold text-[#05469B] outline-none focus:ring-2 focus:ring-blue-500"><option value="">-- Chọn Cấp QL --</option><option value="HO" className="text-red-600">Tổng Công Ty (HO)</option>{data.filter(d => d.ID_DonVi !== formData.ID_DonVi).map(dv => (<option key={dv.ID_DonVi} value={dv.ID_DonVi} className="font-normal text-gray-700">{dv.TenDonVi}</option>))}</select></div>
                 <div><label className="block text-xs font-bold mb-1 text-gray-600">Khu vực (Phía)</label><select name="Phia" value={formData.Phia || 'VPĐH'} onChange={(e) => setFormData({...formData, Phia: e.target.value})} className="w-full p-2.5 border rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-blue-500"><option value="VPĐH">VPĐH</option><option value="CTTT Phía Nam">CTTT Phía Nam</option><option value="CTTT Phía Bắc">CTTT Phía Bắc</option></select></div>
                 
-                <div><label className="block text-xs font-bold mb-1 text-gray-600">Loại hình</label><select name="loaiHinh" value={formData.loaiHinh || 'Showroom'} onChange={(e) => setFormData({...formData, loaiHinh: e.target.value})} className="w-full p-2.5 border rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-blue-500"><option value="Tổng Công Ty">Tổng Công Ty</option><option value="Công ty Tỉnh/TP">Công ty Tỉnh/TP</option><option value="Cụm Showroom">Cụm Showroom (Quản lý)</option><option value="Showroom">Showroom (Độc lập)</option><option value="Điểm Kinh Doanh">Điểm Kinh Doanh (Trực thuộc)</option><option value="Kho xe">Kho xe (Trực thuộc)</option></select></div>
+                <div><label className="block text-xs font-bold mb-1 text-gray-600">Loại hình</label><select name="loaiHinh" value={formData.loaiHinh || 'Showroom'} onChange={(e) => setFormData({...formData, loaiHinh: e.target.value})} className="w-full p-2.5 border rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-blue-500"><option value="Tổng Công Ty">Tổng Công Ty</option><option value="Công ty Tỉnh/TP">Công ty Tỉnh/TP</option><option value="Cụm Showroom">Cụm Showroom (Quản lý)</option><option value="Showroom">Showroom (Độc lập)</option><option value="Điểm Kinh Doanh">Điểm Kinh Doanh (Trực thuộc)</option></select></div>
                 
                 <div><label className="block text-xs font-bold mb-1 text-gray-600">Trạng thái</label><select name="trangThai" value={formData.trangThai || 'Hoạt động'} onChange={(e) => setFormData({...formData, trangThai: e.target.value})} className="w-full p-2.5 border rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-blue-500 font-bold text-gray-700"><option value="Hoạt động">Hoạt động</option><option value="Đại lý">Đại lý</option><option value="Đầu tư mới">Đầu tư mới</option><option value="Ngừng hoạt động">Ngừng hoạt động</option></select></div>
                 <div className="md:col-span-2"><label className="block text-xs font-bold mb-1 text-gray-600">Địa chỉ</label><input type="text" name="DiaChi" value={formData.DiaChi || ''} onChange={(e) => setFormData({...formData, DiaChi: e.target.value})} className="w-full p-2.5 border rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-blue-500" /></div>
