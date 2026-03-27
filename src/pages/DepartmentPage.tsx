@@ -183,6 +183,32 @@ export default function DepartmentPage() {
   const currentPhongHopList = useMemo(() => phongHopData.filter(item => item.ID_DonVi === selectedUnitId), [phongHopData, selectedUnitId]);
   const unitStaff = useMemo(() => personnelData.filter(p => p.ID_DonVi === selectedUnitId), [personnelData, selectedUnitId]);
 
+  // --- LOGIC GOM NHÓM ĐỘNG (CÔNG TY MẸ / SHOWROOM) DÀNH CHO PHẦN C ---
+  const isParentUnit = selectedUnitSubordinates.length > 1;
+
+  const aggregatedStats = useMemo(() => {
+    if (!isParentUnit) return null;
+    let totalDienTich = 0;
+    let totalPhongCho = 0;
+    let totalCong = 0;
+    let totalKhach = 0;
+    let totalNhanSu = 0;
+
+    const childCount = selectedUnitSubordinates.length - 1; // Loại trừ bản thân nó ra
+
+    data.forEach(dv => {
+      if (selectedUnitSubordinates.includes(dv.ID_DonVi)) {
+        totalDienTich += Number(dv.DienTich) || 0;
+        totalPhongCho += Number(dv.SoPhongCho) || 0;
+        totalCong += Number(dv.SoCong) || 0;
+        totalKhach += Number(dv.LuotKhachBQ) || 0;
+        totalNhanSu += Number(dv.TongNhanSu) || 0;
+      }
+    });
+
+    return { childCount, totalDienTich, totalPhongCho, totalCong, totalKhach, totalNhanSu };
+  }, [isParentUnit, selectedUnitSubordinates, data]);
+
   // --- LOGIC TÍNH TOÁN THỐNG KÊ TÀI SẢN (XE & TTB) ---
   const currentXeList = useMemo(() => {
     return xeData.filter(item => selectedUnitSubordinates.includes(item.ID_DonVi));
@@ -613,61 +639,115 @@ export default function DepartmentPage() {
                   </div>
                 </section>
                 
-                {/* C. THÔNG TIN CƠ SỞ VẬT CHẤT */}
+                {/* C. THÔNG TIN CƠ SỞ VẬT CHẤT (DYNAMIC VIEW THEO CẤP QUẢN LÝ) */}
                 <section>
                   <h3 className="text-lg font-black text-[#05469B] mb-5 flex items-center gap-2 uppercase tracking-wider">
-                    <div className="w-1.5 h-6 bg-[#05469B] rounded-full"></div> C. THÔNG TIN CƠ SỞ VẬT CHẤT
+                    <div className="w-1.5 h-6 bg-[#05469B] rounded-full"></div> {isParentUnit ? 'C. QUY MÔ CỤM / TỈNH (TỔNG HỢP)' : 'C. THÔNG TIN CƠ SỞ VẬT CHẤT'}
                   </h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                    <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-blue-200 transition-all relative overflow-hidden group flex items-center gap-4">
-                      <Maximize2 className="absolute -right-4 -bottom-4 w-20 h-20 text-blue-500 opacity-5 group-hover:opacity-10 group-hover:scale-110 transition-all duration-500" strokeWidth={1.5} />
-                      <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 z-10"><Maximize2 size={24} strokeWidth={2} /></div>
-                      <div className="relative z-10 flex-1">
-                        <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">Diện tích sàn</p>
-                        <p className="text-2xl font-black text-gray-800">{formatCurrency(selectedUnit.DienTich || 0)} <span className="text-sm font-semibold text-gray-500">m²</span></p>
+                  
+                  {isParentUnit && aggregatedStats ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                      <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-indigo-200 transition-all relative overflow-hidden group flex items-center gap-4">
+                        <Briefcase className="absolute -right-4 -bottom-4 w-20 h-20 text-indigo-500 opacity-5 group-hover:opacity-10 group-hover:scale-110 transition-all duration-500" strokeWidth={1.5} />
+                        <div className="w-12 h-12 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0 z-10"><Building2 size={24} strokeWidth={2} /></div>
+                        <div className="relative z-10 flex-1">
+                          <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">Đơn vị trực thuộc</p>
+                          <p className="text-2xl font-black text-gray-800">{aggregatedStats.childCount} <span className="text-sm font-semibold text-gray-500">Đơn vị</span></p>
+                        </div>
+                      </div>
+                      <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-blue-200 transition-all relative overflow-hidden group flex items-center gap-4">
+                        <Maximize2 className="absolute -right-4 -bottom-4 w-20 h-20 text-blue-500 opacity-5 group-hover:opacity-10 group-hover:scale-110 transition-all duration-500" strokeWidth={1.5} />
+                        <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 z-10"><Maximize2 size={24} strokeWidth={2} /></div>
+                        <div className="relative z-10 flex-1">
+                          <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">Tổng diện tích mặt bằng</p>
+                          <p className="text-2xl font-black text-gray-800">{formatCurrency(aggregatedStats.totalDienTich)} <span className="text-sm font-semibold text-gray-500">m²</span></p>
+                        </div>
+                      </div>
+                      <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-cyan-200 transition-all relative overflow-hidden group flex items-center gap-4">
+                        <DoorOpen className="absolute -right-4 -bottom-4 w-20 h-20 text-cyan-500 opacity-5 group-hover:opacity-10 group-hover:scale-110 transition-all duration-500" strokeWidth={1.5} />
+                        <div className="w-12 h-12 rounded-xl bg-cyan-50 text-cyan-600 flex items-center justify-center shrink-0 z-10"><DoorOpen size={24} strokeWidth={2} /></div>
+                        <div className="relative z-10 flex-1">
+                          <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">Tổng số cổng an ninh</p>
+                          <p className="text-2xl font-black text-gray-800">{formatCurrency(aggregatedStats.totalCong)} <span className="text-sm font-semibold text-gray-500">Cổng</span></p>
+                        </div>
+                      </div>
+                      <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-orange-200 transition-all relative overflow-hidden group flex items-center gap-4">
+                        <Coffee className="absolute -right-4 -bottom-4 w-20 h-20 text-orange-500 opacity-5 group-hover:opacity-10 group-hover:scale-110 transition-all duration-500" strokeWidth={1.5} />
+                        <div className="w-12 h-12 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center shrink-0 z-10"><Coffee size={24} strokeWidth={2} /></div>
+                        <div className="relative z-10 flex-1">
+                          <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">Tổng số phòng chờ</p>
+                          <p className="text-2xl font-black text-gray-800">{formatCurrency(aggregatedStats.totalPhongCho)} <span className="text-sm font-semibold text-gray-500">Phòng</span></p>
+                        </div>
+                      </div>
+                      <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-emerald-200 transition-all relative overflow-hidden group flex items-center gap-4">
+                        <UserCheck className="absolute -right-4 -bottom-4 w-20 h-20 text-emerald-500 opacity-5 group-hover:opacity-10 group-hover:scale-110 transition-all duration-500" strokeWidth={1.5} />
+                        <div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 z-10"><UserCheck size={24} strokeWidth={2} /></div>
+                        <div className="relative z-10 flex-1">
+                          <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">Tổng lượt khách trung bình</p>
+                          <p className="text-2xl font-black text-gray-800">{formatCurrency(aggregatedStats.totalKhach)} <span className="text-sm font-semibold text-gray-500">/ ngày</span></p>
+                        </div>
+                      </div>
+                      <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-rose-200 transition-all relative overflow-hidden group flex items-center gap-4">
+                        <Users className="absolute -right-4 -bottom-4 w-20 h-20 text-rose-500 opacity-5 group-hover:opacity-10 group-hover:scale-110 transition-all duration-500" strokeWidth={1.5} />
+                        <div className="w-12 h-12 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0 z-10"><Users size={24} strokeWidth={2} /></div>
+                        <div className="relative z-10 flex-1">
+                          <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">Tổng nhân sự hệ thống</p>
+                          <p className="text-2xl font-black text-gray-800">{formatCurrency(aggregatedStats.totalNhanSu)} <span className="text-sm font-semibold text-gray-500">Người</span></p>
+                        </div>
                       </div>
                     </div>
-                    <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-purple-200 transition-all relative overflow-hidden group flex items-center gap-4">
-                      <Layers className="absolute -right-4 -bottom-4 w-20 h-20 text-purple-500 opacity-5 group-hover:opacity-10 group-hover:scale-110 transition-all duration-500" strokeWidth={1.5} />
-                      <div className="w-12 h-12 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0 z-10"><Layers size={24} strokeWidth={2} /></div>
-                      <div className="relative z-10 flex-1">
-                        <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">Quy mô</p>
-                        <p className="text-2xl font-black text-gray-800">{selectedUnit.SoHam || 0} <span className="text-sm font-semibold text-gray-500">Hầm</span> / {selectedUnit.SoTang || 0} <span className="text-sm font-semibold text-gray-500">Tầng</span></p>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                      <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-blue-200 transition-all relative overflow-hidden group flex items-center gap-4">
+                        <Maximize2 className="absolute -right-4 -bottom-4 w-20 h-20 text-blue-500 opacity-5 group-hover:opacity-10 group-hover:scale-110 transition-all duration-500" strokeWidth={1.5} />
+                        <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 z-10"><Maximize2 size={24} strokeWidth={2} /></div>
+                        <div className="relative z-10 flex-1">
+                          <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">Diện tích sàn</p>
+                          <p className="text-2xl font-black text-gray-800">{formatCurrency(selectedUnit.DienTich || 0)} <span className="text-sm font-semibold text-gray-500">m²</span></p>
+                        </div>
+                      </div>
+                      <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-purple-200 transition-all relative overflow-hidden group flex items-center gap-4">
+                        <Layers className="absolute -right-4 -bottom-4 w-20 h-20 text-purple-500 opacity-5 group-hover:opacity-10 group-hover:scale-110 transition-all duration-500" strokeWidth={1.5} />
+                        <div className="w-12 h-12 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0 z-10"><Layers size={24} strokeWidth={2} /></div>
+                        <div className="relative z-10 flex-1">
+                          <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">Quy mô</p>
+                          <p className="text-2xl font-black text-gray-800">{selectedUnit.SoHam || 0} <span className="text-sm font-semibold text-gray-500">Hầm</span> / {selectedUnit.SoTang || 0} <span className="text-sm font-semibold text-gray-500">Tầng</span></p>
+                        </div>
+                      </div>
+                      <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-cyan-200 transition-all relative overflow-hidden group flex items-center gap-4">
+                        <DoorOpen className="absolute -right-4 -bottom-4 w-20 h-20 text-cyan-500 opacity-5 group-hover:opacity-10 group-hover:scale-110 transition-all duration-500" strokeWidth={1.5} />
+                        <div className="w-12 h-12 rounded-xl bg-cyan-50 text-cyan-600 flex items-center justify-center shrink-0 z-10"><DoorOpen size={24} strokeWidth={2} /></div>
+                        <div className="relative z-10 flex-1">
+                          <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">Số cổng</p>
+                          <p className="text-2xl font-black text-gray-800">{selectedUnit.SoCong || 0} <span className="text-sm font-semibold text-gray-500">Cổng</span></p>
+                        </div>
+                      </div>
+                      <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-orange-200 transition-all relative overflow-hidden group flex items-center gap-4">
+                        <Coffee className="absolute -right-4 -bottom-4 w-20 h-20 text-orange-500 opacity-5 group-hover:opacity-10 group-hover:scale-110 transition-all duration-500" strokeWidth={1.5} />
+                        <div className="w-12 h-12 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center shrink-0 z-10"><Coffee size={24} strokeWidth={2} /></div>
+                        <div className="relative z-10 flex-1">
+                          <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">Số phòng chờ</p>
+                          <p className="text-2xl font-black text-gray-800">{selectedUnit.SoPhongCho || 0} <span className="text-sm font-semibold text-gray-500">Phòng</span></p>
+                        </div>
+                      </div>
+                      <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-emerald-200 transition-all relative overflow-hidden group flex items-center gap-4">
+                        <UserCheck className="absolute -right-4 -bottom-4 w-20 h-20 text-emerald-500 opacity-5 group-hover:opacity-10 group-hover:scale-110 transition-all duration-500" strokeWidth={1.5} />
+                        <div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 z-10"><UserCheck size={24} strokeWidth={2} /></div>
+                        <div className="relative z-10 flex-1">
+                          <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">Khách TB ra vào</p>
+                          <p className="text-2xl font-black text-gray-800">{formatCurrency(selectedUnit.LuotKhachBQ || 0)} <span className="text-sm font-semibold text-gray-500">/ ngày</span></p>
+                        </div>
+                      </div>
+                      <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-rose-200 transition-all relative overflow-hidden group flex items-center gap-4">
+                        <Users className="absolute -right-4 -bottom-4 w-20 h-20 text-rose-500 opacity-5 group-hover:opacity-10 group-hover:scale-110 transition-all duration-500" strokeWidth={1.5} />
+                        <div className="w-12 h-12 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0 z-10"><Users size={24} strokeWidth={2} /></div>
+                        <div className="relative z-10 flex-1">
+                          <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">Nhân sự Đơn vị</p>
+                          <p className="text-2xl font-black text-gray-800">{formatCurrency(selectedUnit.TongNhanSu || 0)} <span className="text-sm font-semibold text-gray-500">Người</span></p>
+                        </div>
                       </div>
                     </div>
-                    <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-cyan-200 transition-all relative overflow-hidden group flex items-center gap-4">
-                      <DoorOpen className="absolute -right-4 -bottom-4 w-20 h-20 text-cyan-500 opacity-5 group-hover:opacity-10 group-hover:scale-110 transition-all duration-500" strokeWidth={1.5} />
-                      <div className="w-12 h-12 rounded-xl bg-cyan-50 text-cyan-600 flex items-center justify-center shrink-0 z-10"><DoorOpen size={24} strokeWidth={2} /></div>
-                      <div className="relative z-10 flex-1">
-                        <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">Số cổng</p>
-                        <p className="text-2xl font-black text-gray-800">{selectedUnit.SoCong || 0} <span className="text-sm font-semibold text-gray-500">Cổng</span></p>
-                      </div>
-                    </div>
-                    <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-orange-200 transition-all relative overflow-hidden group flex items-center gap-4">
-                      <Coffee className="absolute -right-4 -bottom-4 w-20 h-20 text-orange-500 opacity-5 group-hover:opacity-10 group-hover:scale-110 transition-all duration-500" strokeWidth={1.5} />
-                      <div className="w-12 h-12 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center shrink-0 z-10"><Coffee size={24} strokeWidth={2} /></div>
-                      <div className="relative z-10 flex-1">
-                        <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">Số phòng chờ</p>
-                        <p className="text-2xl font-black text-gray-800">{selectedUnit.SoPhongCho || 0} <span className="text-sm font-semibold text-gray-500">Phòng</span></p>
-                      </div>
-                    </div>
-                    <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-emerald-200 transition-all relative overflow-hidden group flex items-center gap-4">
-                      <UserCheck className="absolute -right-4 -bottom-4 w-20 h-20 text-emerald-500 opacity-5 group-hover:opacity-10 group-hover:scale-110 transition-all duration-500" strokeWidth={1.5} />
-                      <div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 z-10"><UserCheck size={24} strokeWidth={2} /></div>
-                      <div className="relative z-10 flex-1">
-                        <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">Khách TB ra vào</p>
-                        <p className="text-2xl font-black text-gray-800">{formatCurrency(selectedUnit.LuotKhachBQ || 0)} <span className="text-sm font-semibold text-gray-500">/ ngày</span></p>
-                      </div>
-                    </div>
-                    <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-rose-200 transition-all relative overflow-hidden group flex items-center gap-4">
-                      <Users className="absolute -right-4 -bottom-4 w-20 h-20 text-rose-500 opacity-5 group-hover:opacity-10 group-hover:scale-110 transition-all duration-500" strokeWidth={1.5} />
-                      <div className="w-12 h-12 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0 z-10"><Users size={24} strokeWidth={2} /></div>
-                      <div className="relative z-10 flex-1">
-                        <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">Nhân sự Đơn vị</p>
-                        <p className="text-2xl font-black text-gray-800">{formatCurrency(selectedUnit.TongNhanSu || 0)} <span className="text-sm font-semibold text-gray-500">Người</span></p>
-                      </div>
-                    </div>
-                  </div>
+                  )}
                 </section>
                 
                 {/* D. AN NINH & HỆ THỐNG CAMERA */}
@@ -1019,7 +1099,7 @@ export default function DepartmentPage() {
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
                      
                      {/* 1. THỐNG KÊ PHƯƠNG TIỆN */}
-                     <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex flex-col">
+                     <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex flex-col h-full">
                         <h4 className="font-bold text-[#05469B] mb-4 flex items-center gap-2 border-b border-gray-100 pb-2">
                            <Car size={18} className="text-[#05469B]" /> 1. Phương tiện (Xe công & Lái thử)
                         </h4>
@@ -1028,15 +1108,15 @@ export default function DepartmentPage() {
                         <div className="grid grid-cols-3 gap-4 mb-5">
                            <div className="bg-gray-50 p-3 rounded-xl border border-gray-100 text-center flex flex-col items-center justify-between">
                               <p className="text-[10px] font-bold text-gray-500 uppercase mb-1 whitespace-nowrap w-full truncate" title="Tổng số xe">Tổng số xe</p>
-                              <p className="text-xl font-black text-[#05469B] mt-auto">{xeStats.total}</p>
+                              <p className="text-xl font-black text-[#05469B] mt-auto flex-1 flex items-end">{xeStats.total}</p>
                            </div>
                            <div className="bg-emerald-50 p-3 rounded-xl border border-emerald-100 text-center flex flex-col items-center justify-between">
                               <p className="text-[10px] font-bold text-emerald-600 uppercase mb-1 whitespace-nowrap w-full truncate" title="Đang hoạt động">Đang hoạt động</p>
-                              <p className="text-xl font-black text-emerald-700 mt-auto">{xeStats.active}</p>
+                              <p className="text-xl font-black text-emerald-700 mt-auto flex-1 flex items-end">{xeStats.active}</p>
                            </div>
                            <div className="bg-red-50 p-3 rounded-xl border border-red-100 text-center flex flex-col items-center justify-between">
                               <p className="text-[10px] font-bold text-red-600 uppercase mb-1 whitespace-nowrap w-full truncate" title="Sửa chữa / Ngừng">Sửa chữa / Ngừng</p>
-                              <p className="text-xl font-black text-red-700 mt-auto">{xeStats.inactive}</p>
+                              <p className="text-xl font-black text-red-700 mt-auto flex-1 flex items-end">{xeStats.inactive}</p>
                            </div>
                         </div>
 
@@ -1046,9 +1126,9 @@ export default function DepartmentPage() {
                             <table className="w-full text-left text-sm border-collapse">
                               <thead className="bg-gray-50 border-b border-gray-200">
                                 <tr className="text-xs text-gray-600 uppercase tracking-wider">
-                                  <th className="p-3 border-r border-gray-200 w-1/3">Mục đích Sử dụng</th>
+                                  <th className="p-3 border-r border-gray-200 w-1/3 whitespace-nowrap">Phân loại theo Mục đích</th>
                                   <th className="p-3 border-r border-gray-200 w-24 text-center">SL</th>
-                                  <th className="p-3">Phân theo Loại xe</th>
+                                  <th className="p-3 whitespace-nowrap">Phân loại theo Loại xe</th>
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-gray-200">
@@ -1093,7 +1173,7 @@ export default function DepartmentPage() {
                      </div>
 
                      {/* 2. THỐNG KÊ TRANG THIẾT BỊ VĂN PHÒNG */}
-                     <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex flex-col">
+                     <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex flex-col h-full">
                         <h4 className="font-bold text-[#05469B] mb-4 flex items-center gap-2 border-b border-gray-100 pb-2">
                            <MonitorSmartphone size={18} className="text-[#05469B]" /> 2. Trang thiết bị Văn phòng
                         </h4>
@@ -1102,15 +1182,15 @@ export default function DepartmentPage() {
                         <div className="grid grid-cols-3 gap-4 mb-5">
                            <div className="bg-gray-50 p-3 rounded-xl border border-gray-100 text-center flex flex-col items-center justify-between">
                               <p className="text-[10px] font-bold text-gray-500 uppercase mb-1 whitespace-nowrap w-full truncate" title="Tổng thiết bị">Tổng thiết bị</p>
-                              <p className="text-xl font-black text-[#05469B] mt-auto">{tbStats.total}</p>
+                              <p className="text-xl font-black text-[#05469B] mt-auto flex-1 flex items-end">{tbStats.total}</p>
                            </div>
                            <div className="bg-emerald-50 p-3 rounded-xl border border-emerald-100 text-center flex flex-col items-center justify-between">
                               <p className="text-[10px] font-bold text-emerald-600 uppercase mb-1 whitespace-nowrap w-full truncate" title="Đang sử dụng">Đang sử dụng</p>
-                              <p className="text-xl font-black text-emerald-700 mt-auto">{tbStats.active}</p>
+                              <p className="text-xl font-black text-emerald-700 mt-auto flex-1 flex items-end">{tbStats.active}</p>
                            </div>
                            <div className="bg-red-50 p-3 rounded-xl border border-red-100 text-center flex flex-col items-center justify-between">
                               <p className="text-[10px] font-bold text-red-600 uppercase mb-1 whitespace-nowrap w-full truncate" title="Hỏng / Lưu kho">Hỏng / Lưu kho</p>
-                              <p className="text-xl font-black text-red-700 mt-auto">{tbStats.inactive}</p>
+                              <p className="text-xl font-black text-red-700 mt-auto flex-1 flex items-end">{tbStats.inactive}</p>
                            </div>
                         </div>
 
@@ -1129,22 +1209,24 @@ export default function DepartmentPage() {
                         )}
                      </div>
 
-                     {/* 3. PHÂN BỔ TÀI SẢN THEO ĐƠN VỊ (NẾU CÓ SUBORDINATES) */}
+                     {/* 3. PHÂN BỔ TÀI SẢN THEO ĐƠN VỊ (NẾU CÓ SUBORDINATES) - NẰM FULL DƯỚI */}
                      {subordinateStats.length > 0 && (
-                       <div className="lg:col-span-2 bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex flex-col">
+                       <div className="lg:col-span-2 bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex flex-col h-full">
                           <h4 className="font-bold text-[#05469B] mb-4 flex items-center gap-2 border-b border-gray-100 pb-2">
                              <Building2 size={18} className="text-[#05469B]" /> 3. Phân bổ Tài sản theo Đơn vị trực thuộc
                           </h4>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                            {subordinateStats.map(stat => (
-                              <div key={stat.id} className="bg-white p-3 rounded-xl border border-gray-200 hover:border-[#05469B] shadow-sm flex flex-col gap-2 transition-colors">
-                                <p className="text-sm font-bold text-gray-800 truncate" title={stat.name}>{stat.name}</p>
-                                <div className="flex items-center gap-3">
-                                  <span className="flex items-center gap-1.5 text-xs font-semibold text-gray-600 bg-gray-50 px-2 py-1 rounded border border-gray-100"><Car size={12} className="text-[#05469B]"/> {stat.xe} Xe</span>
-                                  <span className="flex items-center gap-1.5 text-xs font-semibold text-gray-600 bg-gray-50 px-2 py-1 rounded border border-gray-100"><MonitorSmartphone size={12} className="text-[#05469B]"/> {stat.tb} TTB</span>
+                          <div className="flex flex-col gap-4 flex-1 overflow-y-auto pr-2 custom-scrollbar">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                              {subordinateStats.map(stat => (
+                                <div key={stat.id} className="bg-white p-3 rounded-xl border border-gray-200 hover:border-[#05469B] shadow-sm flex flex-col gap-2 transition-colors">
+                                  <p className="text-sm font-bold text-gray-800 truncate" title={stat.name}>{stat.name}</p>
+                                  <div className="flex items-center gap-3">
+                                    <span className="flex items-center gap-1.5 text-xs font-semibold text-gray-600 bg-gray-50 px-2 py-1 rounded border border-gray-100"><Car size={12} className="text-[#05469B]"/> {stat.xe} Xe</span>
+                                    <span className="flex items-center gap-1.5 text-xs font-semibold text-gray-600 bg-gray-50 px-2 py-1 rounded border border-gray-100"><MonitorSmartphone size={12} className="text-[#05469B]"/> {stat.tb} TTB</span>
+                                  </div>
                                 </div>
-                              </div>
-                            ))}
+                              ))}
+                            </div>
                           </div>
                        </div>
                      )}
