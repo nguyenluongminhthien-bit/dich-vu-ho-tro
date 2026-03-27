@@ -82,6 +82,9 @@ export const apiService = {
   getThietBi: async (): Promise<any[]> => fetchWithCache('TS_ThietBi'),
   getNhatKyThietBi: async (): Promise<any[]> => fetchWithCache('NK_ThietBi'),
   
+  // 🟢 [ĐÃ THÊM MỚI: API GỌI DỮ LIỆU PHỤC VỤ HẬU CẦN]
+  getPVHC: async (): Promise<any[]> => fetchWithCache('HS_PVHC'),
+
   // 👉 2 HÀM MỚI ĐÃ ĐƯỢC THÊM LẠI ĐỂ FIX LỖI CHO TRANG TÀI KHOẢN VÀ NHẬT KÝ
   getUsers: async (): Promise<User[]> => fetchWithCache('Config_Users'),
   getLogs: async (): Promise<SysLog[]> => fetchWithCache('Sys_Logs'),
