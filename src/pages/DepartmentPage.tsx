@@ -193,11 +193,16 @@ export default function DepartmentPage() {
     let totalCong = 0;
     let totalKhach = 0;
     let totalNhanSu = 0;
-
-    const childCount = selectedUnitSubordinates.length - 1; // Loại trừ bản thân nó ra
+    let childCount = 0;
 
     data.forEach(dv => {
-      if (selectedUnitSubordinates.includes(dv.ID_DonVi)) {
+      // CHỈ TÍNH CÁC ĐƠN VỊ CÓ TRẠNG THÁI "HOẠT ĐỘNG"
+      if (selectedUnitSubordinates.includes(dv.ID_DonVi) && dv.trangThai === 'Hoạt động') {
+        
+        if (dv.ID_DonVi !== selectedUnitId) {
+          childCount++; // Chỉ đếm các đơn vị con (trực thuộc) đang hoạt động
+        }
+
         totalDienTich += Number(dv.DienTich) || 0;
         totalPhongCho += Number(dv.SoPhongCho) || 0;
         totalCong += Number(dv.SoCong) || 0;
@@ -207,7 +212,7 @@ export default function DepartmentPage() {
     });
 
     return { childCount, totalDienTich, totalPhongCho, totalCong, totalKhach, totalNhanSu };
-  }, [isParentUnit, selectedUnitSubordinates, data]);
+  }, [isParentUnit, selectedUnitSubordinates, data, selectedUnitId]);
 
   // --- LOGIC TÍNH TOÁN THỐNG KÊ TÀI SẢN (XE & TTB) ---
   const currentXeList = useMemo(() => {
@@ -1096,10 +1101,10 @@ export default function DepartmentPage() {
                     </h3>
                   </div>
 
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
+                  <div className={`grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch`}>
                      
                      {/* 1. THỐNG KÊ PHƯƠNG TIỆN */}
-                     <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex flex-col h-full">
+                     <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex flex-col">
                         <h4 className="font-bold text-[#05469B] mb-4 flex items-center gap-2 border-b border-gray-100 pb-2">
                            <Car size={18} className="text-[#05469B]" /> 1. Phương tiện (Xe công & Lái thử)
                         </h4>
@@ -1173,7 +1178,7 @@ export default function DepartmentPage() {
                      </div>
 
                      {/* 2. THỐNG KÊ TRANG THIẾT BỊ VĂN PHÒNG */}
-                     <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex flex-col h-full">
+                     <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex flex-col">
                         <h4 className="font-bold text-[#05469B] mb-4 flex items-center gap-2 border-b border-gray-100 pb-2">
                            <MonitorSmartphone size={18} className="text-[#05469B]" /> 2. Trang thiết bị Văn phòng
                         </h4>
@@ -1209,9 +1214,9 @@ export default function DepartmentPage() {
                         )}
                      </div>
 
-                     {/* 3. PHÂN BỔ TÀI SẢN THEO ĐƠN VỊ (NẾU CÓ SUBORDINATES) - NẰM FULL DƯỚI */}
+                     {/* 3. PHÂN BỔ TÀI SẢN THEO ĐƠN VỊ (NẾU CÓ SUBORDINATES) */}
                      {subordinateStats.length > 0 && (
-                       <div className="lg:col-span-2 bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex flex-col h-full">
+                       <div className="lg:col-span-2 bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex flex-col">
                           <h4 className="font-bold text-[#05469B] mb-4 flex items-center gap-2 border-b border-gray-100 pb-2">
                              <Building2 size={18} className="text-[#05469B]" /> 3. Phân bổ Tài sản theo Đơn vị trực thuộc
                           </h4>
