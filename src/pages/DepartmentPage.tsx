@@ -8,13 +8,27 @@ import {
   Flame, HardHat, CloudLightning, Utensils, Monitor,
   Projector, Video, LayoutTemplate, MousePointerClick, 
   SquarePen, PenTool, Wand2, Compass, Clock, Sun, Moon,
-  MonitorSmartphone, Tag, Car
+  MonitorSmartphone, Tag, Car, Pocket
 } from 'lucide-react';
 import { apiService } from '../services/api';
 import { DonVi, Personnel, AnNinh, PhapNhan, PhongHop, TS_Xe, ThietBi } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 
-const getSecId = (sec: any) => sec.ID_AnNinh || sec.iD_AnNinh || sec.Id_AnNinh || sec.id || '';
+// 🟢 [KHU VỰC: HÀM TIỆN ÍCH CHUNG - BỌC THÉP TÊN CỘT GOOGLE SHEETS]
+// Hàm safeGet giúp bất chấp Google Sheets trả về chữ hoa hay chữ thường đều nhận diện được
+const safeGet = (obj: any, key: string) => {
+  if (!obj) return '';
+  if (obj[key] !== undefined) return obj[key];
+  const lowerKey = key.toLowerCase();
+  for (const k in obj) {
+    if (k.toLowerCase() === lowerKey) return obj[k];
+  }
+  return '';
+};
+
+const getSecId = (sec: any) => safeGet(sec, 'ID_AnNinh') || safeGet(sec, 'id');
+const getPvhcId = (p: any) => safeGet(p, 'ID_PVHC') || safeGet(p, 'id');
+const getUnitIdSafe = (item: any) => safeGet(item, 'ID_DonVi');
 
 const initialFormState: Partial<DonVi> = {
   ID_DonVi: '', TenDonVi: '', CapQuanLy: '', DiaChi: '', DienTich: '', SoTang: '', SoHam: '',
@@ -36,6 +50,8 @@ const formatPhoneNumber = (val: string | number | undefined | null) => {
 
 export default function DepartmentPage() {
   const { user } = useAuth();
+  
+  // 🟢 [KHU VỰC: QUẢN LÝ DỮ LIỆU (STATES)]
   const [data, setData] = useState<DonVi[]>([]);
   const [personnelData, setPersonnelData] = useState<Personnel[]>([]);
   const [anNinhData, setAnNinhData] = useState<any[]>([]); 
@@ -45,6 +61,7 @@ export default function DepartmentPage() {
   // --- STATE MỚI CHO THỐNG KÊ TÀI SẢN ---
   const [xeData, setXeData] = useState<TS_Xe[]>([]);
   const [thietBiData, setThietBiData] = useState<ThietBi[]>([]);
+  const [pvhcData, setPvhcData] = useState<any[]>([]); // Dữ liệu Phục vụ hậu cần
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -70,21 +87,28 @@ export default function DepartmentPage() {
   const [phModalMode, setPhModalMode] = useState<'create' | 'update'>('create');
   const [phFormData, setPhFormData] = useState<Partial<PhongHop>>({});
 
+  // Form State cho Hậu cần (PVHC)
+  const [isPvhcModalOpen, setIsPvhcModalOpen] = useState(false);
+  const [pvhcFormData, setPvhcFormData] = useState<any>({});
+
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<{id: string, type: 'donvi' | 'phapnhan' | 'phonghop'} | null>(null);
 
+  // 🟢 [KHU VỰC: LẤY DỮ LIỆU TỪ GOOGLE SHEETS]
   const loadData = async () => {
     setLoading(true); setError(null);
     try { 
-      const [dvResult, nsResult, anResult, pnResult, phResult, xeResult, tbResult] = await Promise.all([
+      const [dvResult, nsResult, anResult, pnResult, phResult, xeResult, tbResult, pvhcResult] = await Promise.all([
         apiService.getDonVi(), apiService.getPersonnel(), apiService.getAnNinh(), apiService.getPhapNhan(), 
         apiService.getPhongHop ? apiService.getPhongHop() : Promise.resolve([]),
         apiService.getXe ? apiService.getXe().catch(() => []) : Promise.resolve([]),
-        apiService.getThietBi ? apiService.getThietBi().catch(() => []) : Promise.resolve([])
+        apiService.getThietBi ? apiService.getThietBi().catch(() => []) : Promise.resolve([]),
+        // Đảm bảo file api.ts có hàm getPVHC, nếu không sẽ luôn trả về mảng rỗng
+        apiService.getPVHC ? apiService.getPVHC().catch(() => []) : Promise.resolve([])
       ]);
       setData(dvResult); setPersonnelData(nsResult); setAnNinhData(anResult || []); setPhapNhanData(pnResult || []); setPhongHopData(phResult || []);
-      setXeData(xeResult || []); setThietBiData(tbResult || []);
+      setXeData(xeResult || []); setThietBiData(tbResult || []); setPvhcData(pvhcResult || []);
     } 
     catch (err: any) { setError(err.message || 'Lỗi tải dữ liệu. Vui lòng kiểm tra lại kết nối mạng.'); } 
     finally { setLoading(false); }
@@ -92,6 +116,7 @@ export default function DepartmentPage() {
 
   useEffect(() => { loadData(); }, []);
 
+  // 🟢 [KHU VỰC: TÍNH TOÁN QUYỀN VÀ CÂY ĐƠN VỊ]
   const allowedDonViIds = useMemo(() => {
     if (!user) return [];
     if (user.idDonVi === 'ALL') return data.map(dv => dv.ID_DonVi);
@@ -174,35 +199,29 @@ export default function DepartmentPage() {
     return [...level1, ...level2, ...level3];
   }, [selectedUnitId, data]);
 
-  const currentAnNinh = useMemo(() => anNinhData.find(item => item.ID_DonVi === selectedUnitId) || null, [anNinhData, selectedUnitId]);
+  // 🟢 [KHU VỰC: LỌC DỮ LIỆU HIỆN TẠI (CHỈ MỘT ĐƠN VỊ)]
+  // Sử dụng safeGet để chống lỗi bất chấp Google Sheets viết thường hay hoa
+  const currentAnNinh = useMemo(() => anNinhData.find(item => getUnitIdSafe(item) === selectedUnitId) || null, [anNinhData, selectedUnitId]);
+  const currentPvhc = useMemo(() => pvhcData.find(item => getUnitIdSafe(item) === selectedUnitId) || null, [pvhcData, selectedUnitId]);
   
   const currentPhapNhanList = useMemo(() => {
-    return phapNhanData.filter(item => selectedUnitSubordinates.includes(item.ID_DonVi));
+    return phapNhanData.filter(item => selectedUnitSubordinates.includes(getUnitIdSafe(item)));
   }, [phapNhanData, selectedUnitSubordinates]);
 
-  const currentPhongHopList = useMemo(() => phongHopData.filter(item => item.ID_DonVi === selectedUnitId), [phongHopData, selectedUnitId]);
-  const unitStaff = useMemo(() => personnelData.filter(p => p.ID_DonVi === selectedUnitId), [personnelData, selectedUnitId]);
+  const currentPhongHopList = useMemo(() => phongHopData.filter(item => getUnitIdSafe(item) === selectedUnitId), [phongHopData, selectedUnitId]);
+  const unitStaff = useMemo(() => personnelData.filter(p => getUnitIdSafe(p) === selectedUnitId), [personnelData, selectedUnitId]);
 
-  // --- LOGIC GOM NHÓM ĐỘNG (CÔNG TY MẸ / SHOWROOM) DÀNH CHO PHẦN C ---
+  // 🟢 [KHU VỰC: CÁC HÀM THỐNG KÊ (AGGREGATION) CHO CÔNG TY MẸ]
   const isParentUnit = selectedUnitSubordinates.length > 1;
 
+  // Thống kê: Cơ sở vật chất
   const aggregatedStats = useMemo(() => {
     if (!isParentUnit) return null;
-    let totalDienTich = 0;
-    let totalPhongCho = 0;
-    let totalCong = 0;
-    let totalKhach = 0;
-    let totalNhanSu = 0;
-    let childCount = 0;
+    let totalDienTich = 0, totalPhongCho = 0, totalCong = 0, totalKhach = 0, totalNhanSu = 0, childCount = 0;
 
     data.forEach(dv => {
-      // CHỈ TÍNH CÁC ĐƠN VỊ CÓ TRẠNG THÁI "HOẠT ĐỘNG"
       if (selectedUnitSubordinates.includes(dv.ID_DonVi) && dv.trangThai === 'Hoạt động') {
-        
-        if (dv.ID_DonVi !== selectedUnitId) {
-          childCount++; // Chỉ đếm các đơn vị con (trực thuộc) đang hoạt động
-        }
-
+        if (dv.ID_DonVi !== selectedUnitId) { childCount++; }
         totalDienTich += Number(dv.DienTich) || 0;
         totalPhongCho += Number(dv.SoPhongCho) || 0;
         totalCong += Number(dv.SoCong) || 0;
@@ -214,32 +233,73 @@ export default function DepartmentPage() {
     return { childCount, totalDienTich, totalPhongCho, totalCong, totalKhach, totalNhanSu };
   }, [isParentUnit, selectedUnitSubordinates, data, selectedUnitId]);
 
-  // --- LOGIC TÍNH TOÁN THỐNG KÊ TÀI SẢN (XE & TTB) ---
+  // Thống kê: An Ninh Toàn Cụm
+  const aggregatedSecurity = useMemo(() => {
+    if (!isParentUnit) return null;
+    let tongANBV = 0, noiBo = 0, dichVu = 0, chiPhi = 0;
+    let tongCam = 0, camHD = 0, camHu = 0;
+    
+    data.forEach(dv => {
+      if (selectedUnitSubordinates.includes(dv.ID_DonVi) && dv.trangThai === 'Hoạt động') {
+        const sec = anNinhData.find(a => getUnitIdSafe(a) === dv.ID_DonVi);
+        if (sec) {
+          tongANBV += Number(safeGet(sec, 'TongANBV')) || 0;
+          noiBo += Number(safeGet(sec, 'SoBaoVeNoiBo')) || 0;
+          dichVu += Number(safeGet(sec, 'SoBaoVeDichvu')) || 0;
+          chiPhi += Number(safeGet(sec, 'ChiPhiThue')) || 0;
+          tongCam += Number(safeGet(sec, 'SLCAM')) || 0;
+          camHD += Number(safeGet(sec, 'CAMHD')) || 0;
+          camHu += Number(safeGet(sec, 'CAMHuHong')) || 0;
+        }
+      }
+    });
+    return { tongANBV, noiBo, dichVu, chiPhi, tongCam, camHD, camHu };
+  }, [isParentUnit, selectedUnitSubordinates, anNinhData, data]);
+
+  // Thống kê: Hậu Cần Toàn Cụm
+  const aggregatedPvhc = useMemo(() => {
+    if (!isParentUnit) return null;
+    let dinhBien = 0, hienHuu = 0, khachCho = 0, veSinh = 0, dichVu = 0, chiPhi = 0;
+    
+    data.forEach(dv => {
+      if (selectedUnitSubordinates.includes(dv.ID_DonVi) && dv.trangThai === 'Hoạt động') {
+        const pvhc = pvhcData.find(p => getUnitIdSafe(p) === dv.ID_DonVi);
+        if (pvhc) {
+          dinhBien += Number(safeGet(pvhc, 'DinhBien')) || 0;
+          hienHuu += Number(safeGet(pvhc, 'Hienhuu')) || 0;
+          khachCho += Number(safeGet(pvhc, 'PVHC_KhachCho')) || 0;
+          veSinh += Number(safeGet(pvhc, 'PVHC_Vesinh')) || 0;
+          dichVu += Number(safeGet(pvhc, 'PVHC_DichVu')) || 0;
+          chiPhi += Number(safeGet(pvhc, 'ChiPhiThue')) || 0;
+        }
+      }
+    });
+    return { dinhBien, hienHuu, khachCho, veSinh, dichVu, chiPhi };
+  }, [isParentUnit, selectedUnitSubordinates, pvhcData, data]);
+
+  // Thống kê: Tài sản Xe và TTB
   const currentXeList = useMemo(() => {
-    return xeData.filter(item => selectedUnitSubordinates.includes(item.ID_DonVi));
+    return xeData.filter(item => selectedUnitSubordinates.includes(getUnitIdSafe(item)));
   }, [xeData, selectedUnitSubordinates]);
 
   const currentTbList = useMemo(() => {
-    return thietBiData.filter(item => selectedUnitSubordinates.includes(item.ID_DonVi));
+    return thietBiData.filter(item => selectedUnitSubordinates.includes(getUnitIdSafe(item)));
   }, [thietBiData, selectedUnitSubordinates]);
 
   const xeStats = useMemo(() => {
-    const active = currentXeList.filter(x => x.Hientrang === 'Đang hoạt động').length;
+    const active = currentXeList.filter(x => safeGet(x, 'Hientrang') === 'Đang hoạt động').length;
     const inactive = currentXeList.length - active;
-
     const grouped: Record<string, { total: number, brands: Record<string, { total: number, models: Record<string, number> }> }> = {};
 
     currentXeList.forEach(xe => {
-      const purpose = xe.Mucdichsudung || 'Khác';
-      const brand = xe.HieuXe || 'Khác';
-      const model = xe.LoaiXe || 'Không rõ';
+      const purpose = safeGet(xe, 'Mucdichsudung') || 'Khác';
+      const brand = safeGet(xe, 'HieuXe') || 'Khác';
+      const model = safeGet(xe, 'LoaiXe') || 'Không rõ';
 
       if (!grouped[purpose]) grouped[purpose] = { total: 0, brands: {} };
       grouped[purpose].total++;
-
       if (!grouped[purpose].brands[brand]) grouped[purpose].brands[brand] = { total: 0, models: {} };
       grouped[purpose].brands[brand].total++;
-
       if (!grouped[purpose].brands[brand].models[model]) grouped[purpose].brands[brand].models[model] = 0;
       grouped[purpose].brands[brand].models[model]++;
     });
@@ -248,17 +308,15 @@ export default function DepartmentPage() {
   }, [currentXeList]);
 
   const tbStats = useMemo(() => {
-    const active = currentTbList.filter(t => t.TinhTrang === 'Đang sử dụng').length;
+    const active = currentTbList.filter(t => safeGet(t, 'TinhTrang') === 'Đang sử dụng').length;
     const inactive = currentTbList.length - active;
-
     const grouped: Record<string, number> = {};
     currentTbList.forEach(tb => {
-      const group = tb.NhomThietBi || 'Khác';
+      const group = safeGet(tb, 'NhomThietBi') || 'Khác';
       grouped[group] = (grouped[group] || 0) + 1;
     });
 
     const sortedGroups = Object.entries(grouped).sort((a, b) => b[1] - a[1]);
-
     return { total: currentTbList.length, active, inactive, groups: sortedGroups };
   }, [currentTbList]);
 
@@ -267,15 +325,10 @@ export default function DepartmentPage() {
     const stats: { id: string, name: string, xe: number, tb: number }[] = [];
 
     selectedUnitSubordinates.forEach(unitId => {
-      const xeCount = currentXeList.filter(x => x.ID_DonVi === unitId).length;
-      const tbCount = currentTbList.filter(t => t.ID_DonVi === unitId).length;
+      const xeCount = currentXeList.filter(x => getUnitIdSafe(x) === unitId).length;
+      const tbCount = currentTbList.filter(t => getUnitIdSafe(t) === unitId).length;
       if (xeCount > 0 || tbCount > 0) {
-        stats.push({
-          id: unitId,
-          name: donViMap[unitId] || unitId,
-          xe: xeCount,
-          tb: tbCount
-        });
+        stats.push({ id: unitId, name: donViMap[unitId] || unitId, xe: xeCount, tb: tbCount });
       }
     });
     return stats;
@@ -291,6 +344,7 @@ export default function DepartmentPage() {
 
   const isSelectedUnitDimmed = selectedUnit?.trangThai === 'Đại lý' || selectedUnit?.trangThai === 'Đầu tư mới';
 
+  // 🟢 [KHU VỰC: HÀM CẬP NHẬT, THAY ĐỔI FORM]
   const handleButVietChange = (color: string, isChecked: boolean) => {
     let currentColors = phFormData.Butviet ? phFormData.Butviet.split(',').map((s: string) => s.trim()).filter(Boolean) : [];
     if (isChecked) {
@@ -445,7 +499,8 @@ export default function DepartmentPage() {
     finally { setSubmitting(false); }
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>, formType: 'pn' | 'ph' | 'sec' = 'pn') => {
+  // 🟢 [KHU VỰC: LƯU LẠI GIÁ TRỊ TỪ FORM CỦA CÁC MODAL BẢNG KHÁC NHAU]
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>, formType: 'pn' | 'ph' | 'sec' | 'pvhc' = 'pn') => {
     const { name, value, type } = e.target;
     let finalValue: string | boolean = type === 'checkbox' ? (e.target as HTMLInputElement).checked : value;
 
@@ -454,6 +509,10 @@ export default function DepartmentPage() {
     else if (formType === 'sec') {
       if (name === 'ChiPhiThue') finalValue = value.replace(/\D/g, '');
       setSecurityFormData(prev => ({ ...prev, [name]: finalValue }));
+    }
+    else if (formType === 'pvhc') {
+      if (name === 'ChiPhiThue') finalValue = value.replace(/\D/g, '');
+      setPvhcFormData((prev: any) => ({ ...prev, [name]: finalValue }));
     }
   };
 
@@ -527,6 +586,71 @@ export default function DepartmentPage() {
     finally { setSubmitting(false); }
   };
 
+  // 🟢 [KHU VỰC: XỬ LÝ LOGIC HẬU CẦN (PVHC) - ÁP DỤNG SAFEGET ĐỂ CHỐNG LỖI TÊN CỘT]
+  const openPvhcModal = () => {
+    if (currentPvhc) { 
+      setPvhcFormData({ 
+        ...currentPvhc, 
+        ID_PVHC: getPvhcId(currentPvhc),
+        DinhBien: safeGet(currentPvhc, 'DinhBien'),
+        PVHC_KhachCho: safeGet(currentPvhc, 'PVHC_KhachCho'),
+        PVHC_Vesinh: safeGet(currentPvhc, 'PVHC_Vesinh'),
+        Hienhuu: safeGet(currentPvhc, 'Hienhuu'),
+        PVHC_DichVu: safeGet(currentPvhc, 'PVHC_DichVu'),
+        Vitri: safeGet(currentPvhc, 'Vitri'), // Đã thêm trường Vitri
+        NCC_DichVu: safeGet(currentPvhc, 'NCC_DichVu'),
+        ChiPhiThue: safeGet(currentPvhc, 'ChiPhiThue')
+      }); 
+    } else {
+      setPvhcFormData({
+        ID_PVHC: '', ID_DonVi: selectedUnitId || '', 
+        DinhBien: '', PVHC_KhachCho: '', PVHC_Vesinh: '', Hienhuu: '',
+        PVHC_DichVu: '', Vitri: '', NCC_DichVu: '', ChiPhiThue: '' // Đã thêm trường Vitri
+      });
+    }
+    setIsPvhcModalOpen(true);
+  };
+
+  const handlePvhcSave = async (e: React.FormEvent) => {
+    e.preventDefault(); setSubmitting(true); setError(null);
+    const khachCho = Number(pvhcFormData.PVHC_KhachCho) || 0;
+    const veSinh = Number(pvhcFormData.PVHC_Vesinh) || 0;
+    const dichVu = Number(pvhcFormData.PVHC_DichVu) || 0;
+    
+    // Tự động tính Hiện hữu (Khách chờ + Vệ sinh)
+    let finalData: any = { ...pvhcFormData, Hienhuu: khachCho + veSinh };
+    
+    if (dichVu < 1) { 
+      finalData.Vitri = ''; // Reset Vitri nếu không có người
+      finalData.NCC_DichVu = ''; 
+      finalData.ChiPhiThue = ''; 
+    }
+
+    const currentId = getPvhcId(finalData);
+    if (currentId) {
+      finalData.ID_PVHC = currentId;
+      finalData.iD_PVHC = currentId;
+      finalData.Id_PVHC = currentId;
+    }
+
+    try {
+      const mode = currentId ? 'update' : 'create';
+      const res = await apiService.save(finalData, mode, "HS_PVHC");
+      
+      const savedId = res?.newId || res?.id || currentId || `PVHC-${Date.now()}`;
+      finalData.ID_PVHC = savedId;
+
+      if (mode === 'create') {
+        setPvhcData(prev => [...prev, finalData]);
+      } else {
+        setPvhcData(prev => prev.map(item => getPvhcId(item) === currentId ? finalData : item));
+      }
+      setIsPvhcModalOpen(false);
+    } catch (err: any) { setError(err.message || 'Lỗi lưu dữ liệu Hậu cần.'); } 
+    finally { setSubmitting(false); }
+  };
+
+  // 🟢 [KHU VỰC: RENDER GIAO DIỆN (UI)]
   const renderUnitTree = (parent: DonVi, level: number = 1) => {
     const children = getChildUnits(parent.ID_DonVi);
     const isExpanded = expandedParents.includes(parent.ID_DonVi) || !!searchTerm;
@@ -644,7 +768,7 @@ export default function DepartmentPage() {
                   </div>
                 </section>
                 
-                {/* C. THÔNG TIN CƠ SỞ VẬT CHẤT (DYNAMIC VIEW THEO CẤP QUẢN LÝ) */}
+                {/* 🟢 [KHU VỰC: HIỂN THỊ PHẦN C - CƠ SỞ VẬT CHẤT (DYNAMIC)] */}
                 <section>
                   <h3 className="text-lg font-black text-[#05469B] mb-5 flex items-center gap-2 uppercase tracking-wider">
                     <div className="w-1.5 h-6 bg-[#05469B] rounded-full"></div> {isParentUnit ? 'C. QUY MÔ CỤM / TỈNH (TỔNG HỢP)' : 'C. THÔNG TIN CƠ SỞ VẬT CHẤT'}
@@ -755,20 +879,65 @@ export default function DepartmentPage() {
                   )}
                 </section>
                 
-                {/* D. AN NINH & HỆ THỐNG CAMERA */}
+                {/* 🟢 [KHU VỰC: HIỂN THỊ PHẦN D - AN NINH (GIAO DIỆN GỐC)] */}
                 <section className="animate-in fade-in duration-500">
                   <div className="flex justify-between items-center mb-5">
                     <h3 className="text-lg font-black text-[#05469B] flex items-center gap-2 uppercase tracking-wider">
-                      <div className="w-1.5 h-6 bg-[#05469B] rounded-full"></div> D. AN NINH & HỆ THỐNG CAMERA
+                      <div className="w-1.5 h-6 bg-[#05469B] rounded-full"></div> {isParentUnit ? 'D. TỔNG HỢP AN NINH & CAMERA TOÀN CỤM' : 'D. AN NINH & HỆ THỐNG CAMERA'}
                     </h3>
-                    {currentAnNinh && (
+                    {!isParentUnit && currentAnNinh && (
                       <button onClick={openSecurityModal} className="px-4 py-2 text-sm font-bold text-[#05469B] bg-blue-50 hover:bg-blue-100 rounded-lg flex items-center gap-2 transition-colors border border-blue-100 shadow-sm">
                         <Edit size={16} /> Cập nhật
                       </button>
                     )}
                   </div>
 
-                  {currentAnNinh ? (
+                  {isParentUnit && aggregatedSecurity ? (
+                    <div className="space-y-6">
+                      {/* Bảng tổng hợp An Ninh Công ty Mẹ */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm">
+                          <h4 className="font-bold text-[#05469B] mb-4 flex items-center gap-2 border-b border-gray-100 pb-2"><Shield size={18} /> Tổng lực lượng Bảo vệ</h4>
+                          <div className="grid grid-cols-2 gap-3 mb-3">
+                            <div className="bg-blue-50 p-3 rounded-xl border border-blue-100 text-center">
+                              <p className="text-[10px] font-bold text-blue-600 uppercase mb-1">Tổng ANBV</p>
+                              <p className="text-xl font-black text-[#05469B]">{aggregatedSecurity.tongANBV}</p>
+                            </div>
+                            <div className="bg-emerald-50 p-3 rounded-xl border border-emerald-100 text-center">
+                              <p className="text-[10px] font-bold text-emerald-600 uppercase mb-1">Nội bộ</p>
+                              <p className="text-xl font-black text-emerald-700">{aggregatedSecurity.noiBo}</p>
+                            </div>
+                            <div className="bg-orange-50 p-3 rounded-xl border border-orange-100 text-center">
+                              <p className="text-[10px] font-bold text-orange-600 uppercase mb-1">Dịch vụ ngoài</p>
+                              <p className="text-xl font-black text-orange-700">{aggregatedSecurity.dichVu}</p>
+                            </div>
+                            <div className="bg-red-50 p-3 rounded-xl border border-red-100 text-center">
+                              <p className="text-[10px] font-bold text-red-600 uppercase mb-1">Tổng chi phí / Tháng</p>
+                              <p className="text-sm font-black text-red-700 mt-1">{formatCurrency(aggregatedSecurity.chiPhi)} đ</p>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm">
+                          <h4 className="font-bold text-[#05469B] mb-4 flex items-center gap-2 border-b border-gray-100 pb-2"><Camera size={18} /> Tổng hệ thống Giám sát</h4>
+                          <div className="grid grid-cols-3 gap-3">
+                            <div className="bg-blue-50 p-3 rounded-xl border border-blue-100 text-center">
+                              <p className="text-[10px] font-bold text-blue-600 uppercase mb-1">Tổng Camera</p>
+                              <p className="text-xl font-black text-[#05469B]">{aggregatedSecurity.tongCam}</p>
+                            </div>
+                            <div className="bg-emerald-50 p-3 rounded-xl border border-emerald-100 text-center">
+                              <p className="text-[10px] font-bold text-emerald-600 uppercase mb-1">Hoạt động</p>
+                              <p className="text-xl font-black text-emerald-700">{aggregatedSecurity.camHD}</p>
+                            </div>
+                            <div className="bg-red-50 p-3 rounded-xl border border-red-100 text-center">
+                              <p className="text-[10px] font-bold text-red-600 uppercase mb-1">Đang hư hỏng</p>
+                              <p className="text-xl font-black text-red-700">{aggregatedSecurity.camHu}</p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : currentAnNinh ? (
                     <div className="space-y-5 animate-in fade-in duration-300">
                       
                       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
@@ -937,18 +1106,109 @@ export default function DepartmentPage() {
                   </div>
                 </section>
 
-                {/* I. PHỤC VỤ HẬU CẦN (Placeholder) */}
+                {/* 🟢 [KHU VỰC: HIỂN THỊ PHẦN I - PHỤC VỤ HẬU CẦN (DYNAMIC)] */}
                 <section>
                   <div className="flex justify-between items-center mb-5">
                     <h3 className="text-lg font-black text-[#05469B] flex items-center gap-2 uppercase tracking-wider">
-                      <div className="w-1.5 h-6 bg-[#05469B] rounded-full"></div> I. PHỤC VỤ HẬU CẦN
+                      <div className="w-1.5 h-6 bg-[#05469B] rounded-full"></div> {isParentUnit ? 'I. TỔNG HỢP HẬU CẦN TOÀN CỤM' : 'I. PHỤC VỤ HẬU CẦN'}
                     </h3>
+                    {!isParentUnit && currentPvhc && (
+                      <button onClick={openPvhcModal} className="px-4 py-2 text-sm font-bold text-[#05469B] bg-blue-50 hover:bg-blue-100 rounded-lg flex items-center gap-2 transition-colors border border-blue-100 shadow-sm">
+                        <Edit size={16} /> Cập nhật
+                      </button>
+                    )}
                   </div>
-                  <div className="bg-gray-50 hover:bg-amber-50/50 cursor-not-allowed p-8 rounded-xl border-2 border-dashed border-gray-200 text-center transition-all group shadow-sm">
-                    <Utensils size={40} className="mx-auto text-gray-300 group-hover:text-amber-400 mb-3 transition-colors" />
-                    <h4 className="text-base font-bold text-gray-600 group-hover:text-amber-700 mb-1">Dữ liệu Hậu cần chưa cập nhật</h4>
-                    <p className="text-xs text-gray-400 group-hover:text-amber-500">Module này sẽ được mở khóa sau khi cấu hình Sheet dữ liệu hoàn tất.</p>
-                  </div>
+
+                  {isParentUnit && aggregatedPvhc ? (
+                    <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm animate-in fade-in duration-300">
+                      <h4 className="font-bold text-[#05469B] mb-4 flex items-center gap-2 border-b border-gray-100 pb-2"><Utensils size={18} /> Tổng Nhân sự PVHC (Khách chờ & Vệ sinh)</h4>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 flex flex-col justify-between">
+                          <p className="text-[11px] font-bold text-blue-600 uppercase mb-2">Tổng Hiện hữu / Định biên</p>
+                          <p className="text-2xl font-black text-[#05469B]">{aggregatedPvhc.hienHuu} / {aggregatedPvhc.dinhBien}</p>
+                        </div>
+                        <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-100 flex flex-col justify-between">
+                          <p className="text-[11px] font-bold text-emerald-600 uppercase mb-2">Hậu cần Nội bộ</p>
+                          <p className="text-2xl font-black text-emerald-700">{aggregatedPvhc.khachCho + aggregatedPvhc.veSinh} <span className="text-sm font-semibold">Người</span></p>
+                          <p className="text-xs text-emerald-600 mt-2 font-medium">Khách chờ: {aggregatedPvhc.khachCho} | Vệ sinh: {aggregatedPvhc.veSinh}</p>
+                        </div>
+                        <div className="bg-orange-50 p-4 rounded-xl border border-orange-100 flex flex-col justify-between">
+                          <p className="text-[11px] font-bold text-orange-600 uppercase mb-2">Dịch vụ Thuê ngoài</p>
+                          <p className="text-2xl font-black text-orange-700">{aggregatedPvhc.dichVu} <span className="text-sm font-semibold">Người</span></p>
+                        </div>
+                        <div className="bg-red-50 p-4 rounded-xl border border-red-100 flex flex-col justify-between">
+                          <p className="text-[11px] font-bold text-red-600 uppercase mb-2">Tổng Chi phí thuê ngoài</p>
+                          <p className="text-lg font-black text-red-700">{formatCurrency(aggregatedPvhc.chiPhi)} đ</p>
+                          <p className="text-xs text-red-500 mt-1 font-medium">/ Tháng</p>
+                        </div>
+                      </div>
+                    </div>
+                  ) : currentPvhc ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5 animate-in fade-in duration-300">
+                      <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex flex-col">
+                        <div className="flex justify-between items-center border-b border-gray-100 pb-3 mb-4">
+                          <h4 className="font-bold text-emerald-700 flex items-center gap-2"><Pocket size={18} />Nội bộ</h4>
+                          <span className="text-sm font-black text-[#05469B] bg-blue-50 px-3 py-1 rounded-md border border-blue-100">Hiện hữu: {currentPvhc.Hienhuu || 0} / Định biên: {currentPvhc.DinhBien || 0}</span>
+                        </div>
+                        <div className="space-y-4 flex-1">
+                          <div className="flex justify-between items-center p-3 bg-emerald-50 rounded-lg border border-emerald-100">
+                            <span className="text-emerald-800 font-semibold text-sm flex items-center gap-2"><Coffee size={16}/> Phục vụ Khách chờ</span>
+                            <span className="text-emerald-700 font-black">{currentPvhc.PVHC_KhachCho || 0} Người</span>
+                          </div>
+                          <div className="flex justify-between items-center p-3 bg-emerald-50 rounded-lg border border-emerald-100">
+                            <span className="text-emerald-800 font-semibold text-sm flex items-center gap-2"><Utensils size={16}/> Nhân viên Vệ sinh</span>
+                            <span className="text-emerald-700 font-black">{currentPvhc.PVHC_Vesinh || 0} Người</span>
+                          </div>
+                          
+                          {/* Progress bar */}
+                          <div className="mt-4 pt-2">
+                            <div className="flex justify-between text-xs mb-1 font-bold text-gray-500">
+                              <span>Tỷ lệ lấp đầy định biên</span>
+                              <span>{currentPvhc.DinhBien ? Math.round(((Number(currentPvhc.Hienhuu) || 0) / (Number(currentPvhc.DinhBien) || 1)) * 100) : 0}%</span>
+                            </div>
+                            <div className="w-full bg-gray-100 rounded-full h-2">
+                              <div className="bg-emerald-500 h-2 rounded-full" style={{ width: `${Math.min(currentPvhc.DinhBien ? ((Number(currentPvhc.Hienhuu) || 0) / (Number(currentPvhc.DinhBien) || 1)) * 100 : 0, 100)}%` }}></div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {Number(currentPvhc.PVHC_DichVu) > 0 ? (
+                        <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex flex-col">
+                          <h4 className="font-bold text-orange-700 flex items-center gap-2 border-b border-gray-100 pb-3 mb-4"><Briefcase size={18} /> Dịch vụ Thuê ngoài</h4>
+                          <div className="space-y-4 flex-1">
+                            <div className="flex justify-between items-center p-3 bg-orange-50 rounded-lg border border-orange-100">
+                              <span className="text-orange-800 font-semibold text-sm">Nhân sự dịch vụ</span>
+                              <span className="text-orange-700 font-black">{currentPvhc.PVHC_DichVu || 0} Người</span>
+                            </div>
+                            <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg border border-gray-100">
+                              <span className="text-gray-600 font-semibold text-sm">Vị trí đảm nhận</span>
+                              <span className="text-gray-800 font-bold text-right break-words">{currentPvhc.Vitri || '---'}</span>
+                            </div>
+                            <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg border border-gray-100">
+                              <span className="text-gray-600 font-semibold text-sm">Nhà cung cấp</span>
+                              <span className="text-gray-800 font-black uppercase text-right break-words">{currentPvhc.NCC_DichVu || '---'}</span>
+                            </div>
+                            <div className="flex justify-between items-center p-3 bg-red-50 rounded-lg border border-red-100">
+                              <span className="text-red-800 font-semibold text-sm">Chi phí thuê / tháng</span>
+                              <span className="text-red-600 font-black">{formatCurrency(currentPvhc.ChiPhiThue) || 0} VNĐ</span>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="bg-gray-50 p-5 rounded-2xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center text-gray-400">
+                          <Shield size={32} className="mb-2 opacity-30"/>
+                          <p className="text-sm font-medium">Không có thuê ngoài dịch vụ</p>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div onClick={openPvhcModal} className="bg-white hover:bg-indigo-50/50 cursor-pointer p-10 rounded-2xl border-2 border-dashed border-gray-300 hover:border-indigo-300 text-center transition-all group shadow-sm">
+                      <Utensils size={48} className="mx-auto text-gray-300 group-hover:text-indigo-400 mb-4 transition-colors" />
+                      <h4 className="text-lg font-bold text-gray-700 group-hover:text-indigo-700 mb-1">Cập nhật Hồ sơ Phục vụ Hậu cần</h4>
+                      <p className="text-sm text-gray-400">Click vào đây để khai báo nhân sự nội bộ, tạp vụ và thuê ngoài.</p>
+                    </div>
+                  )}
                 </section>
 
                 {/* J. THÔNG TIN PHÒNG HỌP */}
@@ -1093,7 +1353,7 @@ export default function DepartmentPage() {
                   </div>
                 </section>
 
-                {/* --- L. THỐNG KÊ TÀI SẢN (XE CÔNG & TTB) --- */}
+                {/* 🟢 [KHU VỰC: HIỂN THỊ PHẦN L - THỐNG KÊ TÀI SẢN (DYNAMIC)] */}
                 <section className="animate-in fade-in duration-500">
                   <div className="flex justify-between items-center mb-5">
                     <h3 className="text-lg font-black text-[#05469B] flex items-center gap-2 uppercase tracking-wider">
@@ -1104,7 +1364,7 @@ export default function DepartmentPage() {
                   <div className={`grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch`}>
                      
                      {/* 1. THỐNG KÊ PHƯƠNG TIỆN */}
-                     <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex flex-col">
+                     <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex flex-col h-full">
                         <h4 className="font-bold text-[#05469B] mb-4 flex items-center gap-2 border-b border-gray-100 pb-2">
                            <Car size={18} className="text-[#05469B]" /> 1. Phương tiện (Xe công & Lái thử)
                         </h4>
@@ -1178,7 +1438,7 @@ export default function DepartmentPage() {
                      </div>
 
                      {/* 2. THỐNG KÊ TRANG THIẾT BỊ VĂN PHÒNG */}
-                     <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex flex-col">
+                     <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex flex-col h-full">
                         <h4 className="font-bold text-[#05469B] mb-4 flex items-center gap-2 border-b border-gray-100 pb-2">
                            <MonitorSmartphone size={18} className="text-[#05469B]" /> 2. Trang thiết bị Văn phòng
                         </h4>
@@ -1214,9 +1474,9 @@ export default function DepartmentPage() {
                         )}
                      </div>
 
-                     {/* 3. PHÂN BỔ TÀI SẢN THEO ĐƠN VỊ (NẾU CÓ SUBORDINATES) */}
+                     {/* 3. PHÂN BỔ TÀI SẢN THEO ĐƠN VỊ (NẾU CÓ SUBORDINATES) - NẰM FULL DƯỚI */}
                      {subordinateStats.length > 0 && (
-                       <div className="lg:col-span-2 bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex flex-col">
+                       <div className="lg:col-span-2 bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex flex-col h-full">
                           <h4 className="font-bold text-[#05469B] mb-4 flex items-center gap-2 border-b border-gray-100 pb-2">
                              <Building2 size={18} className="text-[#05469B]" /> 3. Phân bổ Tài sản theo Đơn vị trực thuộc
                           </h4>
@@ -1245,7 +1505,7 @@ export default function DepartmentPage() {
         </div>
       </div>
 
-      {/* --- FORM CẬP NHẬT AN NINH & CAMERA --- */}
+      {/* 🟢 [KHU VỰC: MODAL CẬP NHẬT AN NINH & CAMERA] */}
       {isSecurityModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl flex flex-col max-h-[90vh] animate-in fade-in zoom-in duration-200">
@@ -1287,7 +1547,7 @@ export default function DepartmentPage() {
                 <div><label className="block text-xs font-bold text-gray-700 mb-1">Bố trí nghỉ ca / Đổi ca</label><textarea name="BoTriNghiCa" value={securityFormData.BoTriNghiCa || ''} onChange={(e) => handleInputChange(e, 'sec')} rows={2} placeholder="Mô tả cách thức bố trí người nghỉ ca, đổi ca..." className="w-full p-2.5 border border-gray-200 rounded-lg bg-white resize-none outline-none focus:ring-2 focus:ring-amber-500"></textarea></div>
               </div>
 
-              {/* KHỐI 3: HỆ THỐNG GIÁM SÁT ĐÃ CẬP NHẬT CAM HĐ VÀ HƯ HỎNG */}
+              {/* KHỐI 3: HỆ THỐNG GIÁM SÁT */}
               <div className="bg-gray-50 p-5 rounded-xl border border-gray-200">
                 <h4 className="font-bold text-gray-800 mb-4 flex items-center gap-2 border-b border-gray-200 pb-2"><Camera size={18}/> Hệ thống Giám sát</h4>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
@@ -1328,7 +1588,6 @@ export default function DepartmentPage() {
                    </div>
                 )}
 
-                {/* ĐÃ CẬP NHẬT: THỂ HIỆN 2 TRƯỜNG DỮ LIỆU TRÊN CÙNG 1 HÀNG (DÙNG GRID-COLS-2) */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Vị trí đặt hệ thống (Đầu ghi)</label>
@@ -1372,6 +1631,78 @@ export default function DepartmentPage() {
 
               <div className="pt-4 flex justify-end gap-3 mt-6 border-t border-gray-100">
                 <button type="button" onClick={() => setIsSecurityModalOpen(false)} className="px-8 py-3 bg-gray-100 text-gray-700 rounded-xl font-bold hover:bg-gray-200 transition-colors shadow-sm">Hủy</button>
+                <button type="submit" disabled={submitting} className="px-8 py-3 bg-[#05469B] text-white rounded-xl font-bold flex items-center gap-2 hover:bg-[#04367a] shadow-md transition-colors">{submitting ? <Loader2 className="animate-spin"/> : <Save/>} Lưu Cập Nhật</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 🟢 [KHU VỰC: MODAL PHỤC VỤ HẬU CẦN (PVHC)] */}
+      {isPvhcModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[90vh] animate-in fade-in zoom-in duration-200">
+            <div className="flex justify-between items-center p-5 border-b border-emerald-100 bg-emerald-50 rounded-t-2xl text-emerald-900">
+              <h3 className="text-xl font-bold flex items-center gap-2"><Utensils size={24}/> Cập nhật Phục vụ Hậu cần</h3>
+              <button onClick={() => setIsPvhcModalOpen(false)} disabled={submitting} className="text-emerald-400 hover:text-red-500 rounded-full p-1.5 bg-white shadow-sm"><X className="w-6 h-6" /></button>
+            </div>
+            
+            <form onSubmit={handlePvhcSave} className="p-6 overflow-y-auto space-y-6">
+              
+              <div className="bg-emerald-50/50 p-5 rounded-xl border border-emerald-100">
+                <h4 className="font-bold text-emerald-800 mb-4 flex items-center gap-2 border-b border-emerald-200 pb-2"><Pocket size={18}/> 1. Lực lượng Nội bộ</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">Định biên (Người) *</label>
+                    <input type="number" required name="DinhBien" value={pvhcFormData.DinhBien || ''} onChange={(e) => handleInputChange(e, 'pvhc')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-emerald-500" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">NV Khách chờ (Trà nước)</label>
+                    <input type="number" name="PVHC_KhachCho" value={pvhcFormData.PVHC_KhachCho || ''} onChange={(e) => handleInputChange(e, 'pvhc')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-emerald-500" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">NV Vệ sinh (Tạp vụ)</label>
+                    <input type="number" name="PVHC_Vesinh" value={pvhcFormData.PVHC_Vesinh || ''} onChange={(e) => handleInputChange(e, 'pvhc')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-emerald-500" />
+                  </div>
+                </div>
+                <p className="text-[10px] text-gray-500 mt-3 italic">* Hệ thống sẽ tự động tính <strong>Hiện hữu</strong> = Khách chờ + Vệ sinh</p>
+              </div>
+
+              <div className="bg-orange-50/50 p-5 rounded-xl border border-orange-100">
+                <h4 className="font-bold text-orange-800 mb-4 flex items-center gap-2 border-b border-orange-200 pb-2"><Briefcase size={18}/> 2. Dịch vụ Thuê ngoài</h4>
+                
+                {/* Dòng 1: Số lượng và Vị trí */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-5">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">Số lượng Thuê ngoài (Người)</label>
+                    <input type="number" name="PVHC_DichVu" value={pvhcFormData.PVHC_DichVu || ''} onChange={(e) => handleInputChange(e, 'pvhc')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-orange-500" />
+                  </div>
+                  
+                  {Number(pvhcFormData.PVHC_DichVu) > 0 && (
+                    <div className="animate-in fade-in">
+                      <label className="block text-xs font-bold text-gray-700 mb-1">Vị trí đảm nhận *</label>
+                      <input type="text" required name="Vitri" value={pvhcFormData.Vitri || ''} onChange={(e) => handleInputChange(e, 'pvhc')} placeholder="VD: Khách chờ, Vệ sinh..." className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-orange-500" />
+                    </div>
+                  )}
+                </div>
+                
+                {/* Dòng 2: Nhà cung cấp và Chi phí */}
+                {Number(pvhcFormData.PVHC_DichVu) > 0 && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 pt-4 border-t border-orange-100 animate-in fade-in">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 mb-1">Nhà cung cấp *</label>
+                      <input type="text" required name="NCC_DichVu" value={pvhcFormData.NCC_DichVu || ''} onChange={(e) => handleInputChange(e, 'pvhc')} placeholder="Tên công ty thuê ngoài..." className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-orange-500" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-red-600 mb-1">Chi phí thuê / tháng (VNĐ) *</label>
+                      <input type="text" required name="ChiPhiThue" value={formatCurrency(pvhcFormData.ChiPhiThue)} onChange={(e) => handleInputChange(e, 'pvhc')} placeholder="Nhập số tiền..." className="w-full p-2.5 border border-red-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-red-500 font-bold text-red-600" />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="pt-4 flex justify-end gap-3 mt-6 border-t border-gray-100">
+                <button type="button" onClick={() => setIsPvhcModalOpen(false)} className="px-8 py-3 bg-gray-100 text-gray-700 rounded-xl font-bold hover:bg-gray-200 transition-colors shadow-sm">Hủy</button>
                 <button type="submit" disabled={submitting} className="px-8 py-3 bg-[#05469B] text-white rounded-xl font-bold flex items-center gap-2 hover:bg-[#04367a] shadow-md transition-colors">{submitting ? <Loader2 className="animate-spin"/> : <Save/>} Lưu Cập Nhật</button>
               </div>
             </form>
@@ -1453,7 +1784,7 @@ export default function DepartmentPage() {
                 <div className="md:col-span-3">
                   <label className="block text-xs font-bold text-gray-600 mb-1">Đơn vị trực thuộc *</label>
                   <select required name="ID_DonVi" value={pnFormData.ID_DonVi || ''} onChange={(e) => handleInputChange(e, 'pn')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-orange-500 font-bold text-[#05469B]">
-                    {data.filter(dv => selectedUnitSubordinates.includes(dv.ID_DonVi)).map(dv => (
+                    {data.filter(dv => selectedUnitSubordinates.includes(getUnitIdSafe(dv))).map(dv => (
                       <option key={dv.ID_DonVi} value={dv.ID_DonVi}>{dv.TenDonVi}</option>
                     ))}
                   </select>
@@ -1485,7 +1816,7 @@ export default function DepartmentPage() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                 <div><label className="block text-xs font-bold mb-1 text-gray-600">Mã Đơn Vị (ID) *</label><input type="text" required name="ID_DonVi" value={formData.ID_DonVi || ''} onChange={(e) => setFormData({...formData, ID_DonVi: e.target.value})} disabled={modalMode === 'update'} className="w-full p-2.5 border rounded-lg bg-[#FFFFF0] disabled:bg-gray-100 outline-none focus:ring-2 focus:ring-blue-500" /></div>
                 <div className="md:col-span-2"><label className="block text-xs font-bold mb-1 text-gray-600">Tên Đơn Vị *</label><input type="text" required name="TenDonVi" value={formData.TenDonVi || ''} onChange={(e) => setFormData({...formData, TenDonVi: e.target.value})} className="w-full p-2.5 border rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-blue-500" /></div>
-                <div><label className="block text-xs font-bold mb-1 text-gray-600">Cấp Quản Lý (Mẹ) *</label><select required name="CapQuanLy" value={formData.CapQuanLy || ''} onChange={(e) => setFormData({...formData, CapQuanLy: e.target.value})} className="w-full p-2.5 border rounded-lg bg-[#FFFFF0] font-bold text-[#05469B] outline-none focus:ring-2 focus:ring-blue-500"><option value="">-- Chọn Cấp QL --</option><option value="HO" className="text-red-600">Tổng Công Ty (HO)</option>{data.filter(d => d.ID_DonVi !== formData.ID_DonVi).map(dv => (<option key={dv.ID_DonVi} value={dv.ID_DonVi} className="font-normal text-gray-700">{dv.TenDonVi}</option>))}</select></div>
+                <div><label className="block text-xs font-bold mb-1 text-gray-600">Cấp Quản Lý (Mẹ) *</label><select required name="CapQuanLy" value={formData.CapQuanLy || ''} onChange={(e) => setFormData({...formData, CapQuanLy: e.target.value})} className="w-full p-2.5 border rounded-lg bg-[#FFFFF0] font-bold text-[#05469B] outline-none focus:ring-2 focus:ring-blue-500"><option value="">-- Chọn Cấp QL --</option><option value="HO" className="text-red-600">Tổng Công Ty (HO)</option>{data.filter(d => getUnitIdSafe(d) !== formData.ID_DonVi).map(dv => (<option key={dv.ID_DonVi} value={dv.ID_DonVi} className="font-normal text-gray-700">{dv.TenDonVi}</option>))}</select></div>
                 <div><label className="block text-xs font-bold mb-1 text-gray-600">Khu vực (Phía)</label><select name="Phia" value={formData.Phia || 'VPĐH'} onChange={(e) => setFormData({...formData, Phia: e.target.value})} className="w-full p-2.5 border rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-blue-500"><option value="VPĐH">VPĐH</option><option value="CTTT Phía Nam">CTTT Phía Nam</option><option value="CTTT Phía Bắc">CTTT Phía Bắc</option></select></div>
                 
                 <div><label className="block text-xs font-bold mb-1 text-gray-600">Loại hình</label><select name="loaiHinh" value={formData.loaiHinh || 'Showroom'} onChange={(e) => setFormData({...formData, loaiHinh: e.target.value})} className="w-full p-2.5 border rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-blue-500"><option value="Tổng Công Ty">Tổng Công Ty</option><option value="Công ty Tỉnh/TP">Công ty Tỉnh/TP</option><option value="Cụm Showroom">Cụm Showroom (Quản lý)</option><option value="Showroom">Showroom (Độc lập)</option><option value="Điểm Kinh Doanh">Điểm Kinh Doanh (Trực thuộc)</option></select></div>
@@ -1512,7 +1843,7 @@ export default function DepartmentPage() {
         </div>
       )}
 
-      {/* XÁC NHẬN XÓA */}
+      {/* 🟢 [KHU VỰC: CẢNH BÁO XÁC NHẬN XÓA] */}
       {isConfirmOpen && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="bg-white p-8 rounded-2xl text-center shadow-2xl max-w-sm w-full animate-in zoom-in duration-200">
