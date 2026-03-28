@@ -8,14 +8,14 @@ import {
   Flame, HardHat, CloudLightning, Utensils, Monitor,
   Projector, Video, LayoutTemplate, MousePointerClick, 
   SquarePen, PenTool, Wand2, Compass, Clock, Sun, Moon,
-  MonitorSmartphone, Tag, Car, Pocket
+  MonitorSmartphone, Tag, Car, Pocket, Store, Warehouse
 } from 'lucide-react';
 import { apiService } from '../services/api';
 import { DonVi, Personnel, AnNinh, PhapNhan, PhongHop, TS_Xe, ThietBi } from '../types';
 import { useAuth } from '../contexts/AuthContext';
+import { buildHierarchicalOptions, getUnitEmoji } from '../utils/hierarchy'; // IMPORT TÍNH NĂNG VẼ CÂY
 
 // 🟢 [KHU VỰC: HÀM TIỆN ÍCH CHUNG - BỌC THÉP TÊN CỘT GOOGLE SHEETS]
-// Hàm safeGet giúp bất chấp Google Sheets trả về chữ hoa hay chữ thường đều nhận diện được
 const safeGet = (obj: any, key: string) => {
   if (!obj) return '';
   if (obj[key] !== undefined) return obj[key];
@@ -30,9 +30,10 @@ const getSecId = (sec: any) => safeGet(sec, 'ID_AnNinh') || safeGet(sec, 'id');
 const getPvhcId = (p: any) => safeGet(p, 'ID_PVHC') || safeGet(p, 'id');
 const getUnitIdSafe = (item: any) => safeGet(item, 'ID_DonVi');
 
+// 👉 Cập nhật giá trị mặc định chuẩn theo list mới
 const initialFormState: Partial<DonVi> = {
   ID_DonVi: '', TenDonVi: '', CapQuanLy: '', DiaChi: '', DienTich: '', SoTang: '', SoHam: '',
-  SoPhongCho: '', SoCong: '', LuotKhachBQ: '', TongNhanSu: '', loaiHinh: 'Showroom', trangThai: 'Hoạt động', Phia: 'CTTT Phía Nam'
+  SoPhongCho: '', SoCong: '', LuotKhachBQ: '', TongNhanSu: '', loaiHinh: 'Showroom Quản trị', trangThai: 'Hoạt động', Phia: 'CTTT Phía Nam'
 };
 
 const formatCurrency = (val: string | number | undefined | null) => {
@@ -57,11 +58,9 @@ export default function DepartmentPage() {
   const [anNinhData, setAnNinhData] = useState<any[]>([]); 
   const [phapNhanData, setPhapNhanData] = useState<PhapNhan[]>([]); 
   const [phongHopData, setPhongHopData] = useState<PhongHop[]>([]); 
-  
-  // --- STATE MỚI CHO THỐNG KÊ TÀI SẢN ---
   const [xeData, setXeData] = useState<TS_Xe[]>([]);
   const [thietBiData, setThietBiData] = useState<ThietBi[]>([]);
-  const [pvhcData, setPvhcData] = useState<any[]>([]); // Dữ liệu Phục vụ hậu cần
+  const [pvhcData, setPvhcData] = useState<any[]>([]); 
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -87,7 +86,6 @@ export default function DepartmentPage() {
   const [phModalMode, setPhModalMode] = useState<'create' | 'update'>('create');
   const [phFormData, setPhFormData] = useState<Partial<PhongHop>>({});
 
-  // Form State cho Hậu cần (PVHC)
   const [isPvhcModalOpen, setIsPvhcModalOpen] = useState(false);
   const [pvhcFormData, setPvhcFormData] = useState<any>({});
 
@@ -104,7 +102,6 @@ export default function DepartmentPage() {
         apiService.getPhongHop ? apiService.getPhongHop() : Promise.resolve([]),
         apiService.getXe ? apiService.getXe().catch(() => []) : Promise.resolve([]),
         apiService.getThietBi ? apiService.getThietBi().catch(() => []) : Promise.resolve([]),
-        // Đảm bảo file api.ts có hàm getPVHC, nếu không sẽ luôn trả về mảng rỗng
         apiService.getPVHC ? apiService.getPVHC().catch(() => []) : Promise.resolve([])
       ]);
       setData(dvResult); setPersonnelData(nsResult); setAnNinhData(anResult || []); setPhapNhanData(pnResult || []); setPhongHopData(phResult || []);
@@ -116,15 +113,22 @@ export default function DepartmentPage() {
 
   useEffect(() => { loadData(); }, []);
 
-  // 🟢 [KHU VỰC: TÍNH TOÁN QUYỀN VÀ CÂY ĐƠN VỊ]
+  // 🟢 [KHU VỰC TỐI QUAN TRỌNG: THUẬT TOÁN ĐỆ QUY TÌM ĐƠN VỊ CON CHÁU]
+  const getAllSubordinateIds = (unitId: string, allUnits: DonVi[]): string[] => {
+    const subordinates = allUnits.filter(u => u.CapQuanLy === unitId);
+    let ids = subordinates.map(u => u.ID_DonVi);
+    subordinates.forEach(sub => {
+      ids = [...ids, ...getAllSubordinateIds(sub.ID_DonVi, allUnits)]; 
+    });
+    return ids;
+  };
+
   const allowedDonViIds = useMemo(() => {
     if (!user) return [];
     if (user.idDonVi === 'ALL') return data.map(dv => dv.ID_DonVi);
     
-    const level1 = [user.idDonVi];
-    const level2 = data.filter(dv => level1.includes(dv.CapQuanLy)).map(dv => dv.ID_DonVi);
-    const level3 = data.filter(dv => level2.includes(dv.CapQuanLy)).map(dv => dv.ID_DonVi);
-    const allAllowed = [...level1, ...level2, ...level3];
+    const subIds = getAllSubordinateIds(user.idDonVi, data);
+    const allAllowed = [user.idDonVi, ...subIds];
     
     return data.filter(dv => allAllowed.includes(dv.ID_DonVi)).map(dv => dv.ID_DonVi);
   }, [user, data]);
@@ -193,17 +197,28 @@ export default function DepartmentPage() {
 
   const selectedUnitSubordinates = useMemo(() => {
     if (!selectedUnitId) return [];
-    const level1 = [selectedUnitId];
-    const level2 = data.filter(dv => level1.includes(dv.CapQuanLy)).map(dv => dv.ID_DonVi);
-    const level3 = data.filter(dv => level2.includes(dv.CapQuanLy)).map(dv => dv.ID_DonVi);
-    return [...level1, ...level2, ...level3];
+    const subIds = getAllSubordinateIds(selectedUnitId, data);
+    return [selectedUnitId, ...subIds];
   }, [selectedUnitId, data]);
 
   // 🟢 [KHU VỰC: LỌC DỮ LIỆU HIỆN TẠI (CHỈ MỘT ĐƠN VỊ)]
-  // Sử dụng safeGet để chống lỗi bất chấp Google Sheets viết thường hay hoa
   const currentAnNinh = useMemo(() => anNinhData.find(item => getUnitIdSafe(item) === selectedUnitId) || null, [anNinhData, selectedUnitId]);
   const currentPvhc = useMemo(() => pvhcData.find(item => getUnitIdSafe(item) === selectedUnitId) || null, [pvhcData, selectedUnitId]);
   
+  const currentPvhcSafe = useMemo(() => {
+    if (!currentPvhc) return null;
+    return {
+      Hienhuu: safeGet(currentPvhc, 'Hienhuu'),
+      DinhBien: safeGet(currentPvhc, 'DinhBien'),
+      PVHC_KhachCho: safeGet(currentPvhc, 'PVHC_KhachCho'),
+      PVHC_Vesinh: safeGet(currentPvhc, 'PVHC_Vesinh'),
+      PVHC_DichVu: safeGet(currentPvhc, 'PVHC_DichVu'),
+      Vitri: safeGet(currentPvhc, 'Vitri'),
+      NCC_DichVu: safeGet(currentPvhc, 'NCC_DichVu'),
+      ChiPhiThue: safeGet(currentPvhc, 'ChiPhiThue')
+    };
+  }, [currentPvhc]);
+
   const currentPhapNhanList = useMemo(() => {
     return phapNhanData.filter(item => selectedUnitSubordinates.includes(getUnitIdSafe(item)));
   }, [phapNhanData, selectedUnitSubordinates]);
@@ -214,7 +229,6 @@ export default function DepartmentPage() {
   // 🟢 [KHU VỰC: CÁC HÀM THỐNG KÊ (AGGREGATION) CHO CÔNG TY MẸ]
   const isParentUnit = selectedUnitSubordinates.length > 1;
 
-  // Thống kê: Cơ sở vật chất
   const aggregatedStats = useMemo(() => {
     if (!isParentUnit) return null;
     let totalDienTich = 0, totalPhongCho = 0, totalCong = 0, totalKhach = 0, totalNhanSu = 0, childCount = 0;
@@ -233,7 +247,6 @@ export default function DepartmentPage() {
     return { childCount, totalDienTich, totalPhongCho, totalCong, totalKhach, totalNhanSu };
   }, [isParentUnit, selectedUnitSubordinates, data, selectedUnitId]);
 
-  // Thống kê: An Ninh Toàn Cụm
   const aggregatedSecurity = useMemo(() => {
     if (!isParentUnit) return null;
     let tongANBV = 0, noiBo = 0, dichVu = 0, chiPhi = 0;
@@ -256,7 +269,6 @@ export default function DepartmentPage() {
     return { tongANBV, noiBo, dichVu, chiPhi, tongCam, camHD, camHu };
   }, [isParentUnit, selectedUnitSubordinates, anNinhData, data]);
 
-  // Thống kê: Hậu Cần Toàn Cụm
   const aggregatedPvhc = useMemo(() => {
     if (!isParentUnit) return null;
     let dinhBien = 0, hienHuu = 0, khachCho = 0, veSinh = 0, dichVu = 0, chiPhi = 0;
@@ -277,7 +289,6 @@ export default function DepartmentPage() {
     return { dinhBien, hienHuu, khachCho, veSinh, dichVu, chiPhi };
   }, [isParentUnit, selectedUnitSubordinates, pvhcData, data]);
 
-  // Thống kê: Tài sản Xe và TTB
   const currentXeList = useMemo(() => {
     return xeData.filter(item => selectedUnitSubordinates.includes(getUnitIdSafe(item)));
   }, [xeData, selectedUnitSubordinates]);
@@ -333,7 +344,6 @@ export default function DepartmentPage() {
     });
     return stats;
   }, [selectedUnitSubordinates, currentXeList, currentTbList, donViMap]);
-
 
   const leader = useMemo(() => unitStaff.find(p => p.ID_NhanSu === selectedUnit?.ID_GiamDoc) || unitStaff.find(p => p.PhanLoai === 'Lãnh đạo'), [unitStaff, selectedUnit]);
   const kdXe = useMemo(() => unitStaff.find(p => p.ID_NhanSu === selectedUnit?.ID_PTKDXe) || unitStaff.find(p => String(p.ChucVu || '').toLowerCase().includes('kinh doanh xe') || String(p.ChucVu || '').toLowerCase().includes('kd xe')), [unitStaff, selectedUnit]);
@@ -650,19 +660,31 @@ export default function DepartmentPage() {
     finally { setSubmitting(false); }
   };
 
-  // 🟢 [KHU VỰC: RENDER GIAO DIỆN (UI)]
+  // 🟢 [KHU VỰC: RENDER CÂY THƯ MỤC VỚI ICON ĐỘNG ĐƯỢC CHUẨN HÓA]
   const renderUnitTree = (parent: DonVi, level: number = 1) => {
     const children = getChildUnits(parent.ID_DonVi);
     const isExpanded = expandedParents.includes(parent.ID_DonVi) || !!searchTerm;
     const isParentDimmed = parent.trangThai === 'Đại lý' || parent.trangThai === 'Đầu tư mới';
 
+    // Xác định Icon dựa trên loaiHinh của đơn vị với .trim() để tránh lỗi khoảng trắng
+    let UnitIcon = Building2;
+    const loaiHinhStr = String(parent.loaiHinh || '').toLowerCase().trim();
+    
+    if (loaiHinhStr.includes('tổng công ty')) UnitIcon = Building2; // 🏢
+    else if (loaiHinhStr.includes('công ty tỉnh')) UnitIcon = Store; // 🏪
+    else if (loaiHinhStr.includes('quản trị')) UnitIcon = Store; // 🏪
+    else if (loaiHinhStr === 'showroom') UnitIcon = Store; // 🏬 (hoặc Briefcase/Store tùy bạn)
+    else if (loaiHinhStr.includes('điểm kinh doanh')) UnitIcon = MapPin; // 📍
+    else if (loaiHinhStr.includes('kho')) UnitIcon = Warehouse; // 🏭
+    else UnitIcon = Briefcase; // Default
+
     return (
       <div key={parent.ID_DonVi} className={level === 1 ? "mb-1" : "mt-1"}>
         <button onClick={() => { setSelectedUnitId(parent.ID_DonVi); if (children.length > 0) toggleParent(parent.ID_DonVi); }} className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold transition-colors ${selectedUnitId === parent.ID_DonVi ? 'bg-blue-50 text-[#05469B]' : 'text-gray-700 hover:bg-gray-50'} ${isParentDimmed ? 'opacity-50' : ''}`}>
           {children.length > 0 ? (isExpanded ? <ChevronDown size={16} className="text-gray-400 shrink-0" /> : <ChevronRight size={16} className="text-gray-400 shrink-0" />) : <div className="w-4 shrink-0" />}
-          {level === 1 ? <Building2 size={16} className={`shrink-0 ${selectedUnitId === parent.ID_DonVi ? 'text-[#05469B]' : 'text-gray-400'}`} /> : 
-           level === 2 ? <Briefcase size={15} className={`shrink-0 ${selectedUnitId === parent.ID_DonVi ? 'text-[#05469B]' : 'text-gray-400'}`} /> :
-           <MapPin size={14} className={`shrink-0 ${selectedUnitId === parent.ID_DonVi ? 'text-[#05469B]' : 'text-gray-400'}`} /> }
+          
+          <UnitIcon size={level === 1 ? 16 : level === 2 ? 15 : 14} className={`shrink-0 ${selectedUnitId === parent.ID_DonVi ? 'text-[#05469B]' : 'text-gray-400'}`} />
+          
           <span className="truncate text-left">{parent.TenDonVi}</span>
         </button>
         {isExpanded && children.length > 0 && (
@@ -768,7 +790,7 @@ export default function DepartmentPage() {
                   </div>
                 </section>
                 
-                {/* 🟢 [KHU VỰC: HIỂN THỊ PHẦN C - CƠ SỞ VẬT CHẤT (DYNAMIC)] */}
+                {/* C. THÔNG TIN CƠ SỞ VẬT CHẤT (DYNAMIC VIEW THEO CẤP QUẢN LÝ) */}
                 <section>
                   <h3 className="text-lg font-black text-[#05469B] mb-5 flex items-center gap-2 uppercase tracking-wider">
                     <div className="w-1.5 h-6 bg-[#05469B] rounded-full"></div> {isParentUnit ? 'C. QUY MÔ CỤM / TỈNH (TỔNG HỢP)' : 'C. THÔNG TIN CƠ SỞ VẬT CHẤT'}
@@ -883,7 +905,7 @@ export default function DepartmentPage() {
                 <section className="animate-in fade-in duration-500">
                   <div className="flex justify-between items-center mb-5">
                     <h3 className="text-lg font-black text-[#05469B] flex items-center gap-2 uppercase tracking-wider">
-                      <div className="w-1.5 h-6 bg-[#05469B] rounded-full"></div> {isParentUnit ? 'D. TỔNG HỢP AN NINH & CAMERA TOÀN CỤM' : 'D. AN NINH & HỆ THỐNG CAMERA'}
+                      <div className="w-1.5 h-6 bg-[#05469B] rounded-full"></div> D. AN NINH & HỆ THỐNG CAMERA
                     </h3>
                     {!isParentUnit && currentAnNinh && (
                       <button onClick={openSecurityModal} className="px-4 py-2 text-sm font-bold text-[#05469B] bg-blue-50 hover:bg-blue-100 rounded-lg flex items-center gap-2 transition-colors border border-blue-100 shadow-sm">
@@ -1112,7 +1134,7 @@ export default function DepartmentPage() {
                     <h3 className="text-lg font-black text-[#05469B] flex items-center gap-2 uppercase tracking-wider">
                       <div className="w-1.5 h-6 bg-[#05469B] rounded-full"></div> {isParentUnit ? 'I. TỔNG HỢP HẬU CẦN TOÀN CỤM' : 'I. PHỤC VỤ HẬU CẦN'}
                     </h3>
-                    {!isParentUnit && currentPvhc && (
+                    {!isParentUnit && currentPvhcSafe && (
                       <button onClick={openPvhcModal} className="px-4 py-2 text-sm font-bold text-[#05469B] bg-blue-50 hover:bg-blue-100 rounded-lg flex items-center gap-2 transition-colors border border-blue-100 shadow-sm">
                         <Edit size={16} /> Cập nhật
                       </button>
@@ -1143,55 +1165,55 @@ export default function DepartmentPage() {
                         </div>
                       </div>
                     </div>
-                  ) : currentPvhc ? (
+                  ) : currentPvhcSafe ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5 animate-in fade-in duration-300">
                       <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex flex-col">
                         <div className="flex justify-between items-center border-b border-gray-100 pb-3 mb-4">
                           <h4 className="font-bold text-emerald-700 flex items-center gap-2"><Pocket size={18} />Nội bộ</h4>
-                          <span className="text-sm font-black text-[#05469B] bg-blue-50 px-3 py-1 rounded-md border border-blue-100">Hiện hữu: {currentPvhc.Hienhuu || 0} / Định biên: {currentPvhc.DinhBien || 0}</span>
+                          <span className="text-sm font-black text-[#05469B] bg-blue-50 px-3 py-1 rounded-md border border-blue-100">Hiện hữu: {currentPvhcSafe.Hienhuu || 0} / Định biên: {currentPvhcSafe.DinhBien || 0}</span>
                         </div>
                         <div className="space-y-4 flex-1">
                           <div className="flex justify-between items-center p-3 bg-emerald-50 rounded-lg border border-emerald-100">
                             <span className="text-emerald-800 font-semibold text-sm flex items-center gap-2"><Coffee size={16}/> Phục vụ Khách chờ</span>
-                            <span className="text-emerald-700 font-black">{currentPvhc.PVHC_KhachCho || 0} Người</span>
+                            <span className="text-emerald-700 font-black">{currentPvhcSafe.PVHC_KhachCho || 0} Người</span>
                           </div>
                           <div className="flex justify-between items-center p-3 bg-emerald-50 rounded-lg border border-emerald-100">
                             <span className="text-emerald-800 font-semibold text-sm flex items-center gap-2"><Utensils size={16}/> Nhân viên Vệ sinh</span>
-                            <span className="text-emerald-700 font-black">{currentPvhc.PVHC_Vesinh || 0} Người</span>
+                            <span className="text-emerald-700 font-black">{currentPvhcSafe.PVHC_Vesinh || 0} Người</span>
                           </div>
                           
                           {/* Progress bar */}
                           <div className="mt-4 pt-2">
                             <div className="flex justify-between text-xs mb-1 font-bold text-gray-500">
                               <span>Tỷ lệ lấp đầy định biên</span>
-                              <span>{currentPvhc.DinhBien ? Math.round(((Number(currentPvhc.Hienhuu) || 0) / (Number(currentPvhc.DinhBien) || 1)) * 100) : 0}%</span>
+                              <span>{currentPvhcSafe.DinhBien ? Math.round(((Number(currentPvhcSafe.Hienhuu) || 0) / (Number(currentPvhcSafe.DinhBien) || 1)) * 100) : 0}%</span>
                             </div>
                             <div className="w-full bg-gray-100 rounded-full h-2">
-                              <div className="bg-emerald-500 h-2 rounded-full" style={{ width: `${Math.min(currentPvhc.DinhBien ? ((Number(currentPvhc.Hienhuu) || 0) / (Number(currentPvhc.DinhBien) || 1)) * 100 : 0, 100)}%` }}></div>
+                              <div className="bg-emerald-500 h-2 rounded-full" style={{ width: `${Math.min(currentPvhcSafe.DinhBien ? ((Number(currentPvhcSafe.Hienhuu) || 0) / (Number(currentPvhcSafe.DinhBien) || 1)) * 100 : 0, 100)}%` }}></div>
                             </div>
                           </div>
                         </div>
                       </div>
 
-                      {Number(currentPvhc.PVHC_DichVu) > 0 ? (
+                      {Number(currentPvhcSafe.PVHC_DichVu) > 0 ? (
                         <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex flex-col">
                           <h4 className="font-bold text-orange-700 flex items-center gap-2 border-b border-gray-100 pb-3 mb-4"><Briefcase size={18} /> Dịch vụ Thuê ngoài</h4>
                           <div className="space-y-4 flex-1">
                             <div className="flex justify-between items-center p-3 bg-orange-50 rounded-lg border border-orange-100">
                               <span className="text-orange-800 font-semibold text-sm">Nhân sự dịch vụ</span>
-                              <span className="text-orange-700 font-black">{currentPvhc.PVHC_DichVu || 0} Người</span>
+                              <span className="text-orange-700 font-black">{currentPvhcSafe.PVHC_DichVu || 0} Người</span>
                             </div>
                             <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg border border-gray-100">
                               <span className="text-gray-600 font-semibold text-sm">Vị trí đảm nhận</span>
-                              <span className="text-gray-800 font-bold text-right break-words">{currentPvhc.Vitri || '---'}</span>
+                              <span className="text-gray-800 font-bold text-right break-words">{currentPvhcSafe.Vitri || '---'}</span>
                             </div>
                             <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg border border-gray-100">
                               <span className="text-gray-600 font-semibold text-sm">Nhà cung cấp</span>
-                              <span className="text-gray-800 font-black uppercase text-right break-words">{currentPvhc.NCC_DichVu || '---'}</span>
+                              <span className="text-gray-800 font-black uppercase text-right break-words">{currentPvhcSafe.NCC_DichVu || '---'}</span>
                             </div>
                             <div className="flex justify-between items-center p-3 bg-red-50 rounded-lg border border-red-100">
                               <span className="text-red-800 font-semibold text-sm">Chi phí thuê / tháng</span>
-                              <span className="text-red-600 font-black">{formatCurrency(currentPvhc.ChiPhiThue) || 0} VNĐ</span>
+                              <span className="text-red-600 font-black">{formatCurrency(currentPvhcSafe.ChiPhiThue) || 0} VNĐ</span>
                             </div>
                           </div>
                         </div>
@@ -1783,9 +1805,12 @@ export default function DepartmentPage() {
                 {/* TRƯỜNG CHỌN ĐƠN VỊ ÁP DỤNG MỚI BỔ SUNG */}
                 <div className="md:col-span-3">
                   <label className="block text-xs font-bold text-gray-600 mb-1">Đơn vị trực thuộc *</label>
-                  <select required name="ID_DonVi" value={pnFormData.ID_DonVi || ''} onChange={(e) => handleInputChange(e, 'pn')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-orange-500 font-bold text-[#05469B]">
-                    {data.filter(dv => selectedUnitSubordinates.includes(getUnitIdSafe(dv))).map(dv => (
-                      <option key={dv.ID_DonVi} value={dv.ID_DonVi}>{dv.TenDonVi}</option>
+                  <select required name="ID_DonVi" value={pnFormData.ID_DonVi || ''} onChange={(e) => handleInputChange(e, 'pn')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-orange-500 font-bold text-[#05469B]" style={{ fontFamily: 'monospace, sans-serif' }}>
+                    <option value="">-- Chọn Đơn vị --</option>
+                    {buildHierarchicalOptions(data.filter(dv => selectedUnitSubordinates.includes(getUnitIdSafe(dv)))).map(({ unit, prefix }) => (
+                      <option key={unit.ID_DonVi} value={unit.ID_DonVi} className="font-normal text-gray-700">
+                        {prefix}{getUnitEmoji(unit.loaiHinh)} {unit.TenDonVi}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -1816,10 +1841,32 @@ export default function DepartmentPage() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                 <div><label className="block text-xs font-bold mb-1 text-gray-600">Mã Đơn Vị (ID) *</label><input type="text" required name="ID_DonVi" value={formData.ID_DonVi || ''} onChange={(e) => setFormData({...formData, ID_DonVi: e.target.value})} disabled={modalMode === 'update'} className="w-full p-2.5 border rounded-lg bg-[#FFFFF0] disabled:bg-gray-100 outline-none focus:ring-2 focus:ring-blue-500" /></div>
                 <div className="md:col-span-2"><label className="block text-xs font-bold mb-1 text-gray-600">Tên Đơn Vị *</label><input type="text" required name="TenDonVi" value={formData.TenDonVi || ''} onChange={(e) => setFormData({...formData, TenDonVi: e.target.value})} className="w-full p-2.5 border rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-blue-500" /></div>
-                <div><label className="block text-xs font-bold mb-1 text-gray-600">Cấp Quản Lý (Mẹ) *</label><select required name="CapQuanLy" value={formData.CapQuanLy || ''} onChange={(e) => setFormData({...formData, CapQuanLy: e.target.value})} className="w-full p-2.5 border rounded-lg bg-[#FFFFF0] font-bold text-[#05469B] outline-none focus:ring-2 focus:ring-blue-500"><option value="">-- Chọn Cấp QL --</option><option value="HO" className="text-red-600">Tổng Công Ty (HO)</option>{data.filter(d => getUnitIdSafe(d) !== formData.ID_DonVi).map(dv => (<option key={dv.ID_DonVi} value={dv.ID_DonVi} className="font-normal text-gray-700">{dv.TenDonVi}</option>))}</select></div>
+                <div>
+                  <label className="block text-xs font-bold mb-1 text-gray-600">Cấp Quản Lý (Mẹ) *</label>
+                  <select required name="CapQuanLy" value={formData.CapQuanLy || ''} onChange={(e) => setFormData({...formData, CapQuanLy: e.target.value})} className="w-full p-2.5 border rounded-lg bg-[#FFFFF0] font-bold text-[#05469B] outline-none focus:ring-2 focus:ring-blue-500" style={{ fontFamily: 'monospace, sans-serif' }}>
+                    <option value="">-- Chọn Cấp QL --</option>
+                    <option value="HO" className="text-red-600">🏢 Tổng Công Ty (HO)</option>
+                    {buildHierarchicalOptions(data.filter(d => getUnitIdSafe(d) !== formData.ID_DonVi)).map(({ unit, prefix }) => (
+                      <option key={unit.ID_DonVi} value={unit.ID_DonVi} className="font-normal text-gray-700">
+                        {prefix}{getUnitEmoji(unit.loaiHinh)} {unit.TenDonVi}
+                      </option>
+                    ))}
+                  </select>
+                </div>
                 <div><label className="block text-xs font-bold mb-1 text-gray-600">Khu vực (Phía)</label><select name="Phia" value={formData.Phia || 'VPĐH'} onChange={(e) => setFormData({...formData, Phia: e.target.value})} className="w-full p-2.5 border rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-blue-500"><option value="VPĐH">VPĐH</option><option value="CTTT Phía Nam">CTTT Phía Nam</option><option value="CTTT Phía Bắc">CTTT Phía Bắc</option></select></div>
                 
-                <div><label className="block text-xs font-bold mb-1 text-gray-600">Loại hình</label><select name="loaiHinh" value={formData.loaiHinh || 'Showroom'} onChange={(e) => setFormData({...formData, loaiHinh: e.target.value})} className="w-full p-2.5 border rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-blue-500"><option value="Tổng Công Ty">Tổng Công Ty</option><option value="Công ty Tỉnh/TP">Công ty Tỉnh/TP</option><option value="Cụm Showroom">Cụm Showroom (Quản lý)</option><option value="Showroom">Showroom (Độc lập)</option><option value="Điểm Kinh Doanh">Điểm Kinh Doanh (Trực thuộc)</option></select></div>
+                {/* TRƯỜNG LOẠI HÌNH ĐƯỢC CHUẨN HÓA DANH SÁCH */}
+                <div>
+                  <label className="block text-xs font-bold mb-1 text-gray-600">Loại hình</label>
+                  <select name="loaiHinh" value={formData.loaiHinh || 'Showroom Quản trị'} onChange={(e) => setFormData({...formData, loaiHinh: e.target.value})} className="w-full p-2.5 border rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="Tổng Công ty">Tổng Công ty</option>
+                    <option value="Công ty Tỉnh thành">Công ty Tỉnh thành</option>
+                    <option value="Showroom Quản trị">Showroom Quản trị</option>
+                    <option value="Showroom">Showroom</option>
+                    <option value="Điểm Kinh doanh">Điểm Kinh doanh</option>
+                    <option value="Kho xe">Kho xe</option>
+                  </select>
+                </div>
                 
                 <div><label className="block text-xs font-bold mb-1 text-gray-600">Trạng thái</label><select name="trangThai" value={formData.trangThai || 'Hoạt động'} onChange={(e) => setFormData({...formData, trangThai: e.target.value})} className="w-full p-2.5 border rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-blue-500 font-bold text-gray-700"><option value="Hoạt động">Hoạt động</option><option value="Đại lý">Đại lý</option><option value="Đầu tư mới">Đầu tư mới</option><option value="Ngừng hoạt động">Ngừng hoạt động</option></select></div>
                 <div className="md:col-span-2"><label className="block text-xs font-bold mb-1 text-gray-600">Địa chỉ</label><input type="text" name="DiaChi" value={formData.DiaChi || ''} onChange={(e) => setFormData({...formData, DiaChi: e.target.value})} className="w-full p-2.5 border rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-blue-500" /></div>
