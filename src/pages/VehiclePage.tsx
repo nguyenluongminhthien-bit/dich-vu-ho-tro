@@ -7,6 +7,7 @@ import {
 import { apiService } from '../services/api';
 import { DonVi, TS_Xe, CP_HoatDongXe } from '../types';
 import { useAuth } from '../contexts/AuthContext';
+import { buildHierarchicalOptions, getUnitEmoji } from '../utils/hierarchy'; // IMPORT TÍNH NĂNG VẼ CÂY
 
 // --- HÀM TỰ ĐỘNG DÒ TÌM ID TỪ GOOGLE SHEETS DÙ SAI TÊN CỘT ---
 const getCostId = (cp: any) => cp.ID_ChiPhiXe || cp.iD_ChiPhiXe || cp.Id_ChiPhiXe || cp.ID_ChiPhi || cp.ID_CP || cp.id || '';
@@ -379,9 +380,9 @@ export default function VehiclePage() {
           className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold transition-colors ${selectedUnitFilter === parent.ID_DonVi ? 'bg-blue-50 text-[#05469B]' : 'text-gray-700 hover:bg-gray-50'} ${isParentDimmed ? 'opacity-50' : ''}`}
         >
           {children.length > 0 ? (isExpanded ? <ChevronDown size={16} className="text-gray-400 shrink-0" /> : <ChevronRight size={16} className="text-gray-400 shrink-0" />) : <div className="w-4 shrink-0" />}
-          {level === 1 ? <Building2 size={16} className={`shrink-0 ${selectedUnitFilter === parent.ID_DonVi ? 'text-[#05469B]' : 'text-gray-400'}`} /> : 
-           level === 2 ? <Briefcase size={15} className={`shrink-0 ${selectedUnitFilter === parent.ID_DonVi ? 'text-[#05469B]' : 'text-gray-400'}`} /> : 
-           <MapPin size={14} className={`shrink-0 ${selectedUnitFilter === parent.ID_DonVi ? 'text-[#05469B]' : 'text-gray-400'}`} /> }
+          
+          <span className="shrink-0">{getUnitEmoji(parent.loaiHinh)}</span>
+          
           <span className="truncate text-left">{parent.TenDonVi}</span>
         </button>
         {isExpanded && children.length > 0 && (
@@ -539,9 +540,20 @@ export default function VehiclePage() {
                   
                   <div className="md:col-span-2">
                     <label className="block text-xs font-bold text-gray-700 mb-1">Đơn vị quản lý *</label>
-                    <select required name="ID_DonVi" value={carFormData.ID_DonVi || ''} onChange={handleInputCarChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]">
+                    <select 
+                      required 
+                      name="ID_DonVi" 
+                      value={carFormData.ID_DonVi || ''} 
+                      onChange={handleInputCarChange} 
+                      className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]"
+                      style={{ fontFamily: 'monospace, sans-serif' }}
+                    >
                       <option value="">-- Chọn đơn vị --</option>
-                      {donViList.filter(dv => allowedDonViIds.includes(dv.ID_DonVi)).map(dv => (<option key={dv.ID_DonVi} value={dv.ID_DonVi}>{dv.TenDonVi}</option>))}
+                      {buildHierarchicalOptions(donViList.filter(dv => allowedDonViIds.includes(dv.ID_DonVi))).map(({ unit, prefix }) => (
+                        <option key={unit.ID_DonVi} value={unit.ID_DonVi} className="font-normal text-gray-700">
+                          {prefix}{getUnitEmoji(unit.loaiHinh)} {unit.TenDonVi}
+                        </option>
+                      ))}
                     </select>
                   </div>
                   
@@ -643,7 +655,6 @@ export default function VehiclePage() {
               <button onClick={() => setIsViewModalOpen(false)} className="text-blue-200 hover:text-white rounded-full p-1 transition-colors"><X className="w-6 h-6" /></button>
             </div>
             
-            {/* THÊM flex-1 min-h-0 ĐỂ POPUP LUÔN VỪA KHÍT MÀN HÌNH */}
             <div className="p-6 overflow-y-auto flex-1 min-h-0 flex flex-col gap-6">
               
               {/* Info Header */}
