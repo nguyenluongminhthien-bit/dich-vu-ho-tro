@@ -1,3 +1,4 @@
+import { buildHierarchicalOptions, getUnitEmoji } from '../utils/hierarchy';
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Search, Plus, Edit, Trash2, X, AlertCircle, Loader2, Save, 
@@ -99,7 +100,7 @@ export default function DocumentPage() {
     };
   }, [vbData]);
 
-  // LỌC VÀ TẠO CÂY ĐƠN VỊ BÊN TRÁI (PHÂN QUYỀN 3 CẤP CHUẨN)
+  // LỌC VÀ TẠO CÂY ĐƠN VỊ BÊN TRÁI (PHÂN QUYỀN CHUẨN)
   const allowedDonViIds = useMemo(() => {
     if (!user) return [];
     if (user.idDonVi === 'ALL') return donViList.map(dv => dv.ID_DonVi);
@@ -152,7 +153,6 @@ export default function DocumentPage() {
   const parentUnits = useMemo(() => filteredUnits.filter(item => item.CapQuanLy === 'HO' || !item.CapQuanLy), [filteredUnits]);
   const getChildUnits = (parentId: string) => filteredUnits.filter(item => item.CapQuanLy === parentId);
 
-  // --- FIX LỖI ÉP STRING KHI PHÂN LOẠI NHÓM ĐƠN VỊ ---
   const { vpdhUnits, ctttNamUnits, ctttBacUnits, otherUnits } = useMemo(() => {
     const vpdh = parentUnits.filter(u => String(u.Phia || '').toLowerCase().includes('vpđh') || String(u.loaiHinh || '').toLowerCase().includes('tổng công ty') || String(u.loaiHinh || '').toLowerCase().includes('văn phòng'));
     const ctttNam = parentUnits.filter(u => !vpdh.includes(u) && String(u.Phia || '').toLowerCase().includes('nam'));
@@ -175,7 +175,7 @@ export default function DocumentPage() {
     return Array.from(years).sort((a, b) => Number(b) - Number(a));
   }, [visibleDocuments]);
 
-  // --- FIX LỖI TÌM KIẾM VĂN BẢN TRÊN BẢNG ---
+  // --- LỌC VĂN BẢN TRÊN BẢNG ---
   const filteredDocs = useMemo(() => {
     let result = [...visibleDocuments];
     
@@ -282,8 +282,7 @@ export default function DocumentPage() {
         >
           {children.length > 0 ? (isExpanded ? <ChevronDown size={16} className="text-gray-400 shrink-0" /> : <ChevronRight size={16} className="text-gray-400 shrink-0" />) : <div className="w-4 shrink-0" />}
           
-          {level === 1 ? <Building2 size={16} className={`shrink-0 ${selectedUnitFilter === parent.ID_DonVi ? 'text-[#05469B]' : 'text-gray-400'}`} /> : 
-           <MapPin size={14} className={`shrink-0 ${selectedUnitFilter === parent.ID_DonVi ? 'text-[#05469B]' : 'text-gray-400'}`} /> }
+          <span className="shrink-0">{getUnitEmoji(parent.loaiHinh)}</span>
           
           <span className="truncate text-left">{parent.TenDonVi}</span>
         </button>
@@ -482,9 +481,20 @@ export default function DocumentPage() {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
                   <div className="md:col-span-2">
                     <label className="block text-xs font-bold text-gray-700 mb-1">Đơn vị ban hành (Lưu trữ) *</label>
-                    <select required name="ID_DonVi" value={formData.ID_DonVi || ''} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-bold text-[#05469B]">
+                    <select 
+                      required 
+                      name="ID_DonVi" 
+                      value={formData.ID_DonVi || ''} 
+                      onChange={handleInputChange} 
+                      className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-bold text-[#05469B]"
+                      style={{ fontFamily: 'monospace, sans-serif' }}
+                    >
                       <option value="">-- Chọn đơn vị --</option>
-                      {donViList.filter(dv => allowedDonViIds.includes(dv.ID_DonVi)).map(dv => (<option key={dv.ID_DonVi} value={dv.ID_DonVi}>{dv.TenDonVi}</option>))}
+                      {buildHierarchicalOptions(donViList.filter(dv => allowedDonViIds.includes(dv.ID_DonVi))).map(({ unit, prefix }) => (
+                        <option key={unit.ID_DonVi} value={unit.ID_DonVi} className="font-normal text-gray-700">
+                          {prefix}{getUnitEmoji(unit.loaiHinh)} {unit.TenDonVi}
+                        </option>
+                      ))}
                     </select>
                   </div>
                   <div>
@@ -514,10 +524,21 @@ export default function DocumentPage() {
                   <div><label className="block text-xs font-bold text-gray-700 mb-1">Ngày ban hành *</label><input type="date" required name="NgayBanHanh" value={formData.NgayBanHanh || ''} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-bold" /></div>
                   <div className="md:col-span-2">
                     <label className="block text-xs font-bold text-gray-700 mb-1">Phạm vi áp dụng (Hiển thị cho) *</label>
-                    <select required name="Phamviapdung" value={formData.Phamviapdung || 'Toàn hệ thống'} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-indigo-50 outline-none focus:ring-2 focus:ring-[#05469B] font-bold text-indigo-800">
+                    <select 
+                      required 
+                      name="Phamviapdung" 
+                      value={formData.Phamviapdung || 'Toàn hệ thống'} 
+                      onChange={handleInputChange} 
+                      className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-bold text-[#05469B]"
+                      style={{ fontFamily: 'monospace, sans-serif' }}
+                    >
                       <option value="Toàn hệ thống">🌍 Áp dụng Toàn hệ thống</option>
                       <optgroup label="Hoặc Chỉ định Đơn vị cụ thể:">
-                        {donViList.map(dv => (<option key={dv.ID_DonVi} value={dv.ID_DonVi}>🏢 {dv.TenDonVi}</option>))}
+                        {buildHierarchicalOptions(donViList).map(({ unit, prefix }) => (
+                          <option key={unit.ID_DonVi} value={unit.ID_DonVi} className="font-normal text-gray-700">
+                            {prefix}{getUnitEmoji(unit.loaiHinh)} {unit.TenDonVi}
+                          </option>
+                        ))}
                       </optgroup>
                     </select>
                   </div>
