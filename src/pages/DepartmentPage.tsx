@@ -1151,8 +1151,8 @@ export default function DepartmentPage() {
                         </div>
                         <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-100 flex flex-col justify-between">
                           <p className="text-[11px] font-bold text-emerald-600 uppercase mb-2">Hậu cần Nội bộ</p>
-                          <p className="text-2xl font-black text-emerald-700">{aggregatedPvhc.khachCho + aggregatedPvhc.veSinh} <span className="text-sm font-semibold">Người</span></p>
                           <p className="text-xs text-emerald-600 mt-2 font-medium">Khách chờ: {aggregatedPvhc.khachCho} | Vệ sinh: {aggregatedPvhc.veSinh}</p>
+                          <p className="text-2xl font-black text-emerald-700">{aggregatedPvhc.khachCho + aggregatedPvhc.veSinh} <span className="text-sm font-semibold">Người</span></p>
                         </div>
                         <div className="bg-orange-50 p-4 rounded-xl border border-orange-100 flex flex-col justify-between">
                           <p className="text-[11px] font-bold text-orange-600 uppercase mb-2">Dịch vụ Thuê ngoài</p>
