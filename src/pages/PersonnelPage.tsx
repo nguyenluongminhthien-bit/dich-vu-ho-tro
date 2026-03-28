@@ -8,6 +8,7 @@ import {
 import { apiService } from '../services/api';
 import { Personnel, DonVi } from '../types';
 import { useAuth } from '../contexts/AuthContext';
+import { buildHierarchicalOptions, getUnitEmoji } from '../utils/hierarchy'; // IMPORT TÍNH NĂNG VẼ CÂY
 
 // HÀM FORMAT SỐ ĐIỆN THOẠI 4-3-3
 const formatPhoneNumber = (val: string | number | undefined | null) => {
@@ -301,9 +302,8 @@ export default function PersonnelPage() {
         >
           {children.length > 0 ? (isExpanded ? <ChevronDown size={16} className="text-gray-400 shrink-0" /> : <ChevronRight size={16} className="text-gray-400 shrink-0" />) : <div className="w-4 shrink-0" />}
           
-          {level === 1 ? <Building2 size={16} className={`shrink-0 ${selectedUnitFilter === parent.ID_DonVi ? 'text-[#05469B]' : 'text-gray-400'}`} /> : 
-           level === 2 ? <Briefcase size={15} className={`shrink-0 ${selectedUnitFilter === parent.ID_DonVi ? 'text-[#05469B]' : 'text-gray-400'}`} /> : 
-           <MapPin size={14} className={`shrink-0 ${selectedUnitFilter === parent.ID_DonVi ? 'text-[#05469B]' : 'text-gray-400'}`} /> }
+          {/* Tích hợp Icon Emoji tự động */}
+          <span className="shrink-0">{getUnitEmoji(parent.loaiHinh)}</span>
           
           <span className="truncate text-left">{parent.TenDonVi}</span>
         </button>
@@ -577,12 +577,22 @@ export default function PersonnelPage() {
               <div className="bg-gray-50 p-4 sm:p-5 rounded-xl border border-gray-200">
                 <h4 className="font-bold text-gray-800 mb-4 flex items-center gap-2"><div className="w-2 h-6 bg-gray-400 rounded-full"></div> Công việc</h4>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  {/* TÍCH HỢP CÂY ĐƠN VỊ VÀO SELECT VỚI MÀU VÀNG #FFFFF0 */}
                   <div className="md:col-span-1">
                     <label className="block text-xs font-bold text-gray-700 mb-1">Đơn vị công tác *</label>
-                    <select required name="ID_DonVi" value={formData.ID_DonVi || ''} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] text-sm">
+                    <select 
+                      required 
+                      name="ID_DonVi" 
+                      value={formData.ID_DonVi || ''} 
+                      onChange={handleInputChange} 
+                      className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] text-sm"
+                      style={{ fontFamily: 'monospace, sans-serif' }}
+                    >
                       <option value="">-- Chọn đơn vị --</option>
-                      {donViList.filter(dv => allowedDonViIds.includes(dv.ID_DonVi)).map(dv => (
-                        <option key={dv.ID_DonVi} value={dv.ID_DonVi}>{dv.TenDonVi}</option>
+                      {buildHierarchicalOptions(donViList.filter(dv => allowedDonViIds.includes(dv.ID_DonVi))).map(({ unit, prefix }) => (
+                        <option key={unit.ID_DonVi} value={unit.ID_DonVi} className="font-normal text-gray-700">
+                          {prefix}{getUnitEmoji(unit.loaiHinh)} {unit.TenDonVi}
+                        </option>
                       ))}
                     </select>
                   </div>
@@ -592,11 +602,9 @@ export default function PersonnelPage() {
                     <select name="PhanLoai" value={formData.PhanLoai || 'Lãnh đạo'} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]">
                       <option value="Lãnh đạo">Lãnh đạo</option>
                       <option value="PT DVHT KD">PT DVHT KD</option>
-                      <option value="PT PVHC">PT PVHC</option>
+                      <option value="PT DVHC">PT DVHC</option>
                       <option value="PT NS">PT NS</option>
                       <option value="BV, ĐTKH">BV, ĐTKH</option>
-                      <option value="PVHC">PVHC</option>
-                      <option value="CB-NV">CB-NV</option>
                     </select>
                   </div>
                   <div><label className="block text-xs font-bold text-gray-700 mb-1">Ngày nhận việc</label><input type="date" name="NgayNhanViec" value={formData.NgayNhanViec ? formData.NgayNhanViec.split('T')[0] : ''} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" /></div>
