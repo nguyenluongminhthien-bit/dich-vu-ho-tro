@@ -481,7 +481,6 @@ export default function DepartmentPage() {
     );
   };
 
-  // 👉 CẬP NHẬT: TỰ ĐỘNG SINH MÃ ID ĐƠN VỊ KHI THÊM MỚI
   const openModal = (mode: 'create' | 'update', item?: DonVi) => {
     setModalMode(mode); 
     setCustomKD(''); 
@@ -717,10 +716,10 @@ export default function DepartmentPage() {
         <button onClick={() => { setSelectedUnitId(parent.ID_DonVi); if (children.length > 0) toggleParent(parent.ID_DonVi); }} className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold transition-colors ${selectedUnitId === parent.ID_DonVi ? 'bg-blue-50 text-[#05469B]' : 'text-gray-700 hover:bg-gray-50'} ${isParentDimmed ? 'opacity-50' : ''}`}>
           {children.length > 0 ? (isExpanded ? <ChevronDown size={16} className="text-gray-400 shrink-0" /> : <ChevronRight size={16} className="text-gray-400 shrink-0" />) : <div className="w-4 shrink-0" />}
           
-          {/* KHÔI PHỤC LẠI ICON NHƯ CŨ (THEO LEVEL CỦA BẠN YÊU CẦU) */}
-          {level === 1 ? <Building2 size={16} className={`shrink-0 ${selectedUnitId === parent.ID_DonVi ? 'text-[#05469B]' : 'text-gray-400'}`} /> : 
-           level === 2 ? <Briefcase size={15} className={`shrink-0 ${selectedUnitId === parent.ID_DonVi ? 'text-[#05469B]' : 'text-gray-400'}`} /> :
-           <MapPin size={14} className={`shrink-0 ${selectedUnitId === parent.ID_DonVi ? 'text-[#05469B]' : 'text-gray-400'}`} /> }
+          {/* SỬ DỤNG EMOJI TỰ ĐỘNG THEO LOẠI HÌNH */}
+          <span className={`shrink-0 ${selectedUnitId === parent.ID_DonVi ? 'opacity-100' : 'opacity-70'}`}>
+            {getUnitEmoji(parent.loaiHinh)}
+          </span>
           
           <span className="truncate text-left">{parent.TenDonVi}</span>
         </button>
@@ -1894,7 +1893,7 @@ export default function DepartmentPage() {
                 <div className="md:col-span-2"><label className="block text-xs font-bold text-gray-600 mb-1">Tên Công ty (Pháp nhân) *</label><input type="text" required name="TenCongty" value={pnFormData.TenCongty || ''} onChange={(e) => handleInputChange(e, 'pn')} placeholder="VD: Công ty TNHH MTV Phân phối Ô tô..." className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-orange-500 font-bold text-gray-800" /></div>
                 <div><label className="block text-xs font-bold text-gray-600 mb-1">Mã số thuế (MST) *</label><input type="text" required name="MST" value={pnFormData.MST || ''} onChange={(e) => handleInputChange(e, 'pn')} placeholder="Nhập MST..." className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-orange-500 font-bold text-orange-700 tracking-widest" /></div>
                 
-                {/* TRƯỜNG CHỌN ĐƠN VỊ ÁP DỤNG ĐÃ ĐƯỢC TÍCH HỢP HIERARCHY */}
+                {/* TRƯỜNG CHỌN ĐƠN VỊ ÁP DỤNG MỚI BỔ SUNG */}
                 <div className="md:col-span-3">
                   <label className="block text-xs font-bold text-gray-600 mb-1">Đơn vị trực thuộc *</label>
                   <select required name="ID_DonVi" value={pnFormData.ID_DonVi || ''} onChange={(e) => handleInputChange(e, 'pn')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-orange-500 font-bold text-[#05469B]" style={{ fontFamily: 'monospace, sans-serif' }}>
@@ -1961,7 +1960,7 @@ export default function DepartmentPage() {
                   <label className="block text-xs font-bold mb-1 text-gray-600">Loại hình</label>
                   <select name="loaiHinh" value={formData.loaiHinh || 'Showroom Quản trị'} onChange={(e) => setFormData({...formData, loaiHinh: e.target.value})} className="w-full p-2.5 border rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-blue-500">
                     <option value="Tổng Công ty">Tổng Công ty</option>
-                    <option value="Công ty Tỉnh thành">Công ty Tỉnh thành</option>
+                    <option value="Công ty Tỉnh/TP">Công ty Tỉnh/TP</option>
                     <option value="Showroom Quản trị">Showroom Quản trị</option>
                     <option value="Showroom">Showroom</option>
                     <option value="Điểm Kinh doanh">Điểm Kinh doanh</option>
