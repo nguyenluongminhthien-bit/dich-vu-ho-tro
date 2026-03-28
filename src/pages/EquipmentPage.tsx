@@ -7,6 +7,7 @@ import {
 import { apiService } from '../services/api';
 import { DonVi, ThietBi, NhatKyThietBi, Personnel } from '../types';
 import { useAuth } from '../contexts/AuthContext';
+import { buildHierarchicalOptions, getUnitEmoji } from '../utils/hierarchy'; // IMPORT TÍNH NĂNG VẼ CÂY
 
 const formatCurrency = (val: string | number | undefined | null) => {
   if (!val) return '';
@@ -182,8 +183,7 @@ export default function EquipmentPage() {
         >
           {children.length > 0 ? (isExpanded ? <ChevronDown size={16} className="text-gray-400 shrink-0" /> : <ChevronRight size={16} className="text-gray-400 shrink-0" />) : <div className="w-4 shrink-0" />}
           
-          {level === 1 ? <Building2 size={16} className={`shrink-0 ${selectedUnitFilter === parent.ID_DonVi ? 'text-[#05469B]' : 'text-gray-400'}`} /> : 
-           <MapPin size={14} className={`shrink-0 ${selectedUnitFilter === parent.ID_DonVi ? 'text-[#05469B]' : 'text-gray-400'}`} /> }
+          <span className="shrink-0">{getUnitEmoji(parent.loaiHinh)}</span>
           
           <span className="truncate text-left">{parent.TenDonVi}</span>
         </button>
@@ -477,7 +477,25 @@ export default function EquipmentPage() {
                   <div className="md:col-span-2"><label className="block text-xs font-bold text-gray-700 mb-1">Tên Thiết bị *</label><input type="text" required name="TenThietBi" value={tbFormData.TenThietBi || ''} onChange={handleTbChange} placeholder="Nhập tên..." className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-bold" /></div>
                   <div><label className="block text-xs font-bold text-gray-700 mb-1">Nhóm Thiết bị *</label><input list="suggest-nhom" required name="NhomThietBi" value={tbFormData.NhomThietBi || ''} onChange={handleTbChange} placeholder="VD: Laptop, PC, Bàn ghế..." className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-bold text-indigo-700" /></div>
                   
-                  <div className="md:col-span-2"><label className="block text-xs font-bold text-gray-700 mb-1">Đơn vị quản lý *</label><select required name="ID_DonVi" value={tbFormData.ID_DonVi || ''} onChange={handleTbChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]"><option value="">-- Chọn đơn vị --</option>{donViList.filter(dv => allowedDonViIds.includes(dv.ID_DonVi)).map(dv => (<option key={dv.ID_DonVi} value={dv.ID_DonVi}>{dv.TenDonVi}</option>))}</select></div>
+                  {/* BỘ CHỌN ĐƠN VỊ VỚI GIAO DIỆN CÂY CÓ MÀU VÀNG NHẠT */}
+                  <div className="md:col-span-2">
+                    <label className="block text-xs font-bold text-gray-700 mb-1">Đơn vị quản lý *</label>
+                    <select 
+                      required 
+                      name="ID_DonVi" 
+                      value={tbFormData.ID_DonVi || ''} 
+                      onChange={handleTbChange} 
+                      className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]"
+                      style={{ fontFamily: 'monospace, sans-serif' }}
+                    >
+                      <option value="">-- Chọn đơn vị --</option>
+                      {buildHierarchicalOptions(donViList.filter(dv => allowedDonViIds.includes(dv.ID_DonVi))).map(({ unit, prefix }) => (
+                        <option key={unit.ID_DonVi} value={unit.ID_DonVi}>
+                          {prefix}{getUnitEmoji(unit.loaiHinh)} {unit.TenDonVi}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                   <div><label className="block text-xs font-bold text-gray-700 mb-1">Tình trạng *</label><select required name="TinhTrang" value={tbFormData.TinhTrang || 'Đang sử dụng'} onChange={handleTbChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-bold"><option value="Đang sử dụng">Đang sử dụng</option><option value="Lưu kho">Lưu kho</option><option value="Đang sửa chữa">Đang sửa chữa</option><option value="Đã thanh lý / Hỏng hóc">Đã thanh lý / Hỏng hóc</option></select></div>
                   <div><label className="block text-xs font-bold text-gray-700 mb-1">Hạn bảo hành</label><input type="date" name="HanBaoHanh" value={tbFormData.HanBaoHanh || ''} onChange={handleTbChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" /></div>
                   
