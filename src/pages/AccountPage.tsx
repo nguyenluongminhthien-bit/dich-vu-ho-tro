@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Search, Plus, Edit, Trash2, X, AlertCircle, Loader2, Save, UserCog, Shield, Key, Building2, Mail } from 'lucide-react';
 import { apiService } from '../services/api';
 import { User, DonVi } from '../types';
+import { buildHierarchicalOptions, getUnitEmoji } from '../utils/hierarchy'; // IMPORT TÍNH NĂNG VẼ CÂY
 
 export default function AccountPage() {
   const [data, setData] = useState<User[]>([]);
@@ -181,32 +182,48 @@ export default function AccountPage() {
             </div>
             <form onSubmit={handleSave} className="p-6 space-y-5">
               <div className="grid grid-cols-2 gap-5">
-                <div><label className="block text-xs font-bold text-gray-600 mb-1">Mã User *</label><input type="text" required name="ID_User" value={formData.ID_User || ''} onChange={e=>setFormData({...formData, ID_User: e.target.value})} disabled={modalMode==='update'} className="w-full p-2.5 border rounded-lg bg-gray-50 focus:bg-white outline-none focus:ring-2 focus:ring-[#05469B] disabled:opacity-70" placeholder="VD: U01"/></div>
-                <div><label className="block text-xs font-bold text-gray-600 mb-1">Họ và Tên *</label><input type="text" required name="HoTen" value={formData.HoTen || ''} onChange={e=>setFormData({...formData, HoTen: e.target.value})} className="w-full p-2.5 border rounded-lg bg-gray-50 focus:bg-white outline-none focus:ring-2 focus:ring-[#05469B]"/></div>
+                <div><label className="block text-xs font-bold text-gray-600 mb-1">Mã User *</label><input type="text" required name="ID_User" value={formData.ID_User || ''} onChange={e=>setFormData({...formData, ID_User: e.target.value})} disabled={modalMode==='update'} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] disabled:bg-gray-100 outline-none focus:ring-2 focus:ring-[#05469B] disabled:opacity-70" placeholder="VD: U01"/></div>
+                <div><label className="block text-xs font-bold text-gray-600 mb-1">Họ và Tên *</label><input type="text" required name="HoTen" value={formData.HoTen || ''} onChange={e=>setFormData({...formData, HoTen: e.target.value})} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]"/></div>
                 
                 <div className="col-span-2">
                   <label className="block text-xs font-bold text-gray-600 mb-1">Tên đăng nhập (Email) *</label>
-                  <div className="relative"><Mail className="absolute left-3 top-3 text-gray-400" size={18}/><input type="text" required name="Username" value={formData.Username || ''} onChange={e=>setFormData({...formData, Username: e.target.value})} className="w-full pl-10 pr-4 py-2.5 border rounded-lg bg-gray-50 focus:bg-white outline-none focus:ring-2 focus:ring-[#05469B] font-medium"/></div>
+                  <div className="relative"><Mail className="absolute left-3 top-3 text-gray-400" size={18}/><input type="text" required name="Username" value={formData.Username || ''} onChange={e=>setFormData({...formData, Username: e.target.value})} className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-medium"/></div>
                 </div>
 
                 <div className="col-span-2">
                   <label className="block text-xs font-bold text-gray-600 mb-1">Mật khẩu *</label>
-                  <div className="relative"><Key className="absolute left-3 top-3 text-gray-400" size={18}/><input type="text" required name="Password" value={formData.Password || ''} onChange={e=>setFormData({...formData, Password: e.target.value})} className="w-full pl-10 pr-4 py-2.5 border rounded-lg bg-gray-50 focus:bg-white outline-none focus:ring-2 focus:ring-[#05469B] font-mono tracking-widest text-indigo-700 font-bold"/></div>
+                  <div className="relative"><Key className="absolute left-3 top-3 text-gray-400" size={18}/><input type="text" required name="Password" value={formData.Password || ''} onChange={e=>setFormData({...formData, Password: e.target.value})} className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-mono tracking-widest text-indigo-700 font-bold"/></div>
                 </div>
 
                 <div>
                   <label className="block text-xs font-bold text-gray-600 mb-1">Nhóm Quyền *</label>
-                  <div className="relative"><Shield className="absolute left-3 top-3 text-gray-400" size={18}/><select required name="NhomQuyen" value={formData.NhomQuyen || 'USER'} onChange={e=>setFormData({...formData, NhomQuyen: e.target.value})} className="w-full pl-10 pr-4 py-2.5 border rounded-lg bg-gray-50 focus:bg-white outline-none focus:ring-2 focus:ring-[#05469B] font-bold"><option value="USER">USER (Nhân viên)</option><option value="ADMIN">ADMIN (Quản trị)</option></select></div>
+                  <div className="relative"><Shield className="absolute left-3 top-3 text-gray-400" size={18}/><select required name="NhomQuyen" value={formData.NhomQuyen || 'USER'} onChange={e=>setFormData({...formData, NhomQuyen: e.target.value})} className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-bold"><option value="USER">USER (Nhân viên)</option><option value="ADMIN">ADMIN (Quản trị)</option></select></div>
                 </div>
 
                 <div>
                   <label className="block text-xs font-bold text-gray-600 mb-1">Đơn vị quản lý</label>
-                  <div className="relative"><Building2 className="absolute left-3 top-3 text-gray-400" size={18}/><select name="ID_DonVi" value={formData.ID_DonVi || ''} onChange={e=>setFormData({...formData, ID_DonVi: e.target.value})} className="w-full pl-10 pr-4 py-2.5 border rounded-lg bg-gray-50 focus:bg-white outline-none focus:ring-2 focus:ring-[#05469B]"><option value="">-- Quản trị Toàn quốc (HO) --</option>{donViList.map(dv => <option key={dv.ID_DonVi} value={dv.ID_DonVi}>{dv.TenDonVi}</option>)}</select></div>
+                  <div className="relative">
+                    <Building2 className="absolute left-3 top-3 text-gray-400" size={18}/>
+                    <select 
+                      name="ID_DonVi" 
+                      value={formData.ID_DonVi || ''} 
+                      onChange={e=>setFormData({...formData, ID_DonVi: e.target.value})} 
+                      className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]"
+                      style={{ fontFamily: 'monospace, sans-serif' }}
+                    >
+                      <option value="">-- Quản trị Toàn quốc (HO) --</option>
+                      {buildHierarchicalOptions(donViList).map(({ unit, prefix }) => (
+                        <option key={unit.ID_DonVi} value={unit.ID_DonVi} className="font-normal text-gray-700">
+                          {prefix}{getUnitEmoji(unit.loaiHinh)} {unit.TenDonVi}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
               </div>
 
               <div className="pt-4 flex justify-end gap-3 border-t mt-6">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="px-6 py-2.5 bg-gray-100 font-bold rounded-lg hover:bg-gray-200">Hủy</button>
+                <button type="button" onClick={() => setIsModalOpen(false)} className="px-6 py-2.5 bg-gray-100 font-bold rounded-lg hover:bg-gray-200 border border-gray-200">Hủy</button>
                 <button type="submit" disabled={submitting} className="px-6 py-2.5 bg-[#05469B] text-white font-bold rounded-lg flex items-center gap-2">{submitting ? <Loader2 className="animate-spin" size={18}/> : <Save size={18}/>} Lưu Tài Khoản</button>
               </div>
             </form>
