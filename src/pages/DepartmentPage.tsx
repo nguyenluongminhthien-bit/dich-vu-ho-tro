@@ -63,7 +63,8 @@ export default function DepartmentPage() {
   const [phongHopData, setPhongHopData] = useState<PhongHop[]>([]); 
   const [xeData, setXeData] = useState<TS_Xe[]>([]);
   const [thietBiData, setThietBiData] = useState<ThietBi[]>([]);
-  const [pvhcData, setPvhcData] = useState<any[]>([]); 
+  const [pvhcData, setPvhcData] = useState<any[]>([]);
+  const [pcccData, setPcccData] = useState<any[]>([]); 
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -103,15 +104,17 @@ export default function DepartmentPage() {
   const loadData = async () => {
     setLoading(true); setError(null);
     try { 
-      const [dvResult, nsResult, anResult, pnResult, phResult, xeResult, tbResult, pvhcResult] = await Promise.all([
+      const [dvResult, nsResult, anResult, pnResult, phResult, xeResult, tbResult, pvhcResult, pcResult] = await Promise.all([
         apiService.getDonVi(), apiService.getPersonnel(), apiService.getAnNinh(), apiService.getPhapNhan(), 
         apiService.getPhongHop ? apiService.getPhongHop() : Promise.resolve([]),
         apiService.getXe ? apiService.getXe().catch(() => []) : Promise.resolve([]),
         apiService.getThietBi ? apiService.getThietBi().catch(() => []) : Promise.resolve([]),
-        apiService.getPVHC ? apiService.getPVHC().catch(() => []) : Promise.resolve([])
+        apiService.getPVHC ? apiService.getPVHC().catch(() => []) : Promise.resolve([]),
+        apiService.getPCCC ? apiService.getPCCC().catch(() => []) : Promise.resolve([]) // <-- GỌI API PCCC MỚI
       ]);
       setData(dvResult); setPersonnelData(nsResult); setAnNinhData(anResult || []); setPhapNhanData(pnResult || []); setPhongHopData(phResult || []);
       setXeData(xeResult || []); setThietBiData(tbResult || []); setPvhcData(pvhcResult || []);
+      setPcccData(pcResult || []); // <-- LƯU STATE PCCC
     } 
     catch (err: any) { setError(err.message || 'Lỗi tải dữ liệu. Vui lòng kiểm tra lại kết nối mạng.'); } 
     finally { setLoading(false); }
@@ -1177,18 +1180,74 @@ export default function DepartmentPage() {
                   )}
                 </section>
 
-                {/* F. PHÒNG CHỐNG CHÁY NỔ (Placeholder) */}
+                {/* 🟢 F. PHÒNG CHỐNG CHÁY NỔ (ĐÃ LIÊN KẾT MODULE) */}
                 <section>
                   <div className="flex justify-between items-center mb-5">
                     <h3 className="text-lg font-black text-[#05469B] flex items-center gap-2 uppercase tracking-wider">
-                      <div className="w-1.5 h-6 bg-[#05469B] rounded-full"></div> F. PHÒNG CHỐNG CHÁY NỔ
+                      <div className="w-1.5 h-6 bg-[#05469B] rounded-full"></div> {isParentUnit ? 'F. TỔNG HỢP PCCC TOÀN CỤM' : 'F. PHÒNG CHỐNG CHÁY NỔ'}
                     </h3>
                   </div>
-                  <div className="bg-gray-50 hover:bg-red-50/50 cursor-not-allowed p-8 rounded-xl border-2 border-dashed border-gray-200 text-center transition-all group shadow-sm">
-                    <Flame size={40} className="mx-auto text-gray-300 group-hover:text-red-400 mb-3 transition-colors" />
-                    <h4 className="text-base font-bold text-gray-600 group-hover:text-red-700 mb-1">Dữ liệu PCCC chưa cập nhật</h4>
-                    <p className="text-xs text-gray-400 group-hover:text-red-500">Module này sẽ được mở khóa sau khi cấu hình Sheet dữ liệu hoàn tất.</p>
-                  </div>
+
+                  {isParentUnit ? (() => {
+                    // TÍNH TOÁN CHO CÔNG TY MẸ
+                    const childPCCCs = pcccData.filter(p => selectedUnitSubordinates.includes(p.ID_DonVi));
+                    const totalPCCC = childPCCCs.length;
+                    const hoSoLoi = childPCCCs.filter(p => p.LoiTonTaiChuaKhacPhuc || p.TrangThaiBaoChay === 'Lỗi' || p.TrangThaiBom === 'Lỗi').length;
+                    const hoSoChuan = totalPCCC - hoSoLoi;
+                    return (
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 animate-in fade-in">
+                        <div className="bg-red-50 p-5 rounded-2xl border border-red-100 shadow-sm flex items-center justify-between">
+                          <div><p className="text-xs font-bold text-red-600 uppercase mb-1">Cơ sở đã khai báo</p><p className="text-3xl font-black text-red-700">{totalPCCC}</p></div>
+                          <Flame size={40} className="text-red-200"/>
+                        </div>
+                        <div className="bg-emerald-50 p-5 rounded-2xl border border-emerald-100 shadow-sm flex items-center justify-between">
+                          <div><p className="text-xs font-bold text-emerald-600 uppercase mb-1">Hệ thống Tốt / Nghiệm thu</p><p className="text-3xl font-black text-emerald-700">{hoSoChuan}</p></div>
+                          <Shield size={40} className="text-emerald-200"/>
+                        </div>
+                        <div className="bg-orange-50 p-5 rounded-2xl border border-orange-100 shadow-sm flex items-center justify-between">
+                          <div><p className="text-xs font-bold text-orange-600 uppercase mb-1">Đang bị Lỗi / Có tồn tại</p><p className="text-3xl font-black text-orange-700">{hoSoLoi}</p></div>
+                          <AlertCircle size={40} className="text-orange-200"/>
+                        </div>
+                      </div>
+                    );
+                  })() : (() => {
+                    // TÍNH TOÁN CHO ĐƠN VỊ ĐƠN LẺ
+                    const pccc = pcccData.find(p => p.ID_DonVi === selectedUnitId);
+                    if (!pccc) return (
+                      <div className="bg-gray-50 p-8 rounded-xl border-2 border-dashed border-gray-200 text-center shadow-sm">
+                        <Flame size={40} className="mx-auto text-gray-300 mb-3" />
+                        <h4 className="text-base font-bold text-gray-600 mb-1">Dữ liệu PCCC chưa khai báo</h4>
+                        <p className="text-xs text-gray-400">Hãy sang Module Quản lý PCCC để tạo hồ sơ cho đơn vị này.</p>
+                      </div>
+                    );
+                    
+                    return (
+                      <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm animate-in fade-in">
+                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="space-y-3">
+                              <h4 className="font-bold text-red-700 border-b border-gray-100 pb-2 text-sm flex items-center gap-1.5"><FileText size={16}/> Pháp lý & Hệ thống</h4>
+                              <div className="flex justify-between text-sm"><span className="text-gray-500">Tình trạng Pháp lý:</span><span className="font-bold text-gray-800">{pccc.TinhTrangPhapLy}</span></div>
+                              <div className="flex justify-between text-sm"><span className="text-gray-500">Hệ thống Báo cháy:</span><span className={`font-bold ${pccc.TrangThaiBaoChay === 'Bình thường' ? 'text-emerald-600' : 'text-red-600'}`}>{pccc.TrangThaiBaoChay}</span></div>
+                              <div className="flex justify-between text-sm"><span className="text-gray-500">Hệ thống Bơm:</span><span className={`font-bold ${pccc.TrangThaiBom === 'Sẵn sàng' ? 'text-emerald-600' : 'text-red-600'}`}>{pccc.TrangThaiBom}</span></div>
+                              <div className="flex justify-between text-sm pt-2 border-t border-gray-50"><span className="text-gray-500">Bình chữa cháy:</span><span className="font-bold text-gray-800">{Number(pccc.SoLuongBinhBot||0) + Number(pccc.SoLuongBinhCO2||0)} Bình</span></div>
+                            </div>
+                            
+                            <div className="space-y-3 border-l border-gray-100 pl-6">
+                              <h4 className="font-bold text-orange-600 border-b border-gray-100 pb-2 text-sm flex items-center gap-1.5"><AlertCircle size={16}/> Cảnh báo & Tồn tại</h4>
+                              <div className="flex justify-between text-sm"><span className="text-gray-500">Khu vực rủi ro:</span><span className="font-semibold text-gray-800 text-right">{pccc.KhuVucRuiRoCao || 'Không có'}</span></div>
+                              <div className="mt-2">
+                                <span className="text-gray-500 text-sm block mb-1">Lỗi / Tồn tại chưa khắc phục:</span>
+                                {pccc.LoiTonTaiChuaKhacPhuc ? (
+                                  <div className="bg-red-50 text-red-700 p-2 rounded text-xs font-semibold border border-red-100">{pccc.LoiTonTaiChuaKhacPhuc}</div>
+                                ) : (
+                                  <div className="bg-emerald-50 text-emerald-600 p-2 rounded text-xs font-semibold border border-emerald-100">Đảm bảo an toàn</div>
+                                )}
+                              </div>
+                            </div>
+                         </div>
+                      </div>
+                    );
+                  })()}
                 </section>
 
                 {/* G. AN TOÀN VỆ SINH LAO ĐỘNG (Placeholder) */}
