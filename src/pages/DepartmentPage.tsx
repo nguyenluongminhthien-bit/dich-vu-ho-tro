@@ -90,6 +90,11 @@ export default function DepartmentPage() {
   const [isAtvsldModalOpen, setIsAtvsldModalOpen] = useState(false);
   const [atvsldFormData, setAtvsldFormData] = useState<any>({});
 
+  // 🟢 STATE CHO PCTT
+  const [pcttData, setPcttData] = useState<any[]>([]);
+  const [isPcttModalOpen, setIsPcttModalOpen] = useState(false);
+  const [pcttFormData, setPcttFormData] = useState<any>({});
+
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -121,19 +126,20 @@ export default function DepartmentPage() {
 
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
-  const [itemToDelete, setItemToDelete] = useState<{id: string, type: 'donvi' | 'phapnhan' | 'phonghop' | 'pccc'} | null>(null);
+  const [itemToDelete, setItemToDelete] = useState<{id: string, type: 'donvi' | 'phapnhan' | 'phonghop' | 'pccc' | 'pctt'} | null>(null);
 
   const loadData = async () => {
     setLoading(true); setError(null);
     try { 
-      const [dvResult, nsResult, anResult, pnResult, phResult, xeResult, tbResult, pvhcResult, pcResult, atvsldResult] = await Promise.all([
+      const [dvResult, nsResult, anResult, pnResult, phResult, xeResult, tbResult, pvhcResult, pcResult, atvsldResult, pcttResult] = await Promise.all([
         apiService.getDonVi(), apiService.getPersonnel(), apiService.getAnNinh(), apiService.getPhapNhan(), 
         apiService.getPhongHop ? apiService.getPhongHop() : Promise.resolve([]),
         apiService.getXe ? apiService.getXe().catch(() => []) : Promise.resolve([]),
         apiService.getThietBi ? apiService.getThietBi().catch(() => []) : Promise.resolve([]),
         apiService.getPVHC ? apiService.getPVHC().catch(() => []) : Promise.resolve([]),
         apiService.getPCCC ? apiService.getPCCC().catch(() => []) : Promise.resolve([]),
-        apiService.getATVSLD ? apiService.getATVSLD().catch(() => []) : Promise.resolve([])
+        apiService.getATVSLD ? apiService.getATVSLD().catch(() => []) : Promise.resolve([]),
+        apiService.getPCTT ? apiService.getPCTT().catch(() => []) : Promise.resolve([])
       ]);
       setData(dvResult); setPersonnelData(nsResult); setAnNinhData(anResult || []); setPhapNhanData(pnResult || []); setPhongHopData(phResult || []);
       setXeData(xeResult || []); setThietBiData(tbResult || []); setPvhcData(pvhcResult || []);
@@ -158,6 +164,13 @@ export default function DepartmentPage() {
         NgayTuKiemTraGanNhat: normalizeDateToISO(item.NgayTuKiemTraGanNhat),
       }));
       setAtvsldData(cleanAtvsld);
+
+      const cleanPctt = (pcttResult || []).map((item: any) => ({
+        ...item,
+        NgayKiemTraPCTT: normalizeDateToISO(item.NgayKiemTraPCTT),
+        NgayCapNhatTaiSan: normalizeDateToISO(item.NgayCapNhatTaiSan),
+      }));
+      setPcttData(cleanPctt);
 
     } 
     catch (err: any) { setError(err.message || 'Lỗi tải dữ liệu. Vui lòng kiểm tra lại kết nối mạng.'); } 
@@ -250,6 +263,7 @@ export default function DepartmentPage() {
   const currentPvhc = useMemo(() => pvhcData.find(item => getUnitIdSafe(item) === selectedUnitId) || null, [pvhcData, selectedUnitId]);
   const currentPccc = useMemo(() => pcccData.find(item => getUnitIdSafe(item) === selectedUnitId) || null, [pcccData, selectedUnitId]);
   const currentAtvsld = useMemo(() => atvsldData.find(item => getUnitIdSafe(item) === selectedUnitId) || null, [atvsldData, selectedUnitId]);
+  const currentPctt = useMemo(() => pcttData.find(item => getUnitIdSafe(item) === selectedUnitId) || null, [pcttData, selectedUnitId]);
 
   const currentPhapNhanList = useMemo(() => phapNhanData.filter(item => selectedUnitSubordinates.includes(getUnitIdSafe(item))), [phapNhanData, selectedUnitSubordinates]);
   const currentPhongHopList = useMemo(() => phongHopData.filter(item => getUnitIdSafe(item) === selectedUnitId), [phongHopData, selectedUnitId]);
@@ -528,7 +542,7 @@ export default function DepartmentPage() {
     finally { setSubmitting(false); }
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>, formType: 'pn' | 'ph' | 'sec' | 'pvhc' | 'pccc' | 'atvsld' = 'pn') => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>, formType: 'pn' | 'ph' | 'sec' | 'pvhc' | 'pccc' | 'atvsld' | 'pctt' = 'pn') => {
     const { name, value, type } = e.target;
     let finalValue: string | boolean = type === 'checkbox' ? (e.target as HTMLInputElement).checked : value;
     if (formType === 'pn') { setPnFormData(prev => ({ ...prev, [name]: finalValue })); } 
@@ -543,6 +557,7 @@ export default function DepartmentPage() {
     }
     else if (formType === 'pccc') { setPcccFormData((prev: any) => ({ ...prev, [name]: finalValue })); }
     else if (formType === 'atvsld') { setAtvsldFormData((prev: any) => ({ ...prev, [name]: finalValue })); }
+    else if (formType === 'pctt') { setPcttFormData((prev: any) => ({ ...prev, [name]: finalValue })); }
   };
 
   const openSecurityModal = () => {
@@ -644,6 +659,29 @@ export default function DepartmentPage() {
     finally { setSubmitting(false); }
   };
 
+  const openPcttModal = () => {
+    if (currentPctt) { setPcttFormData({ ...currentPctt, ID_PCTT: safeGet(currentPctt, 'ID_PCTT') || safeGet(currentPctt, 'id') }); } 
+    else { setPcttFormData({ ID_PCTT: '', ID_DonVi: selectedUnitId || '', DoiTruongPCTT: '', SoNhanSuDoi: '', Link_PhuongAnPCTT: '', ViTriDiDoi: '', NgayKiemTraPCTT: '', TinhTrangHaTang: 'Đã hoàn thành', TinhTrangBaoHiem: 'Đầy đủ', NgayCapNhatTaiSan: '', SoVuThienTai: '0', Link_HoSoBoiThuong: '', TinhTrangKhacPhuc: 'Không có sự cố', GhiChu: '' }); }
+    setIsPcttModalOpen(true);
+  };
+
+  const handlePcttSave = async (e: React.FormEvent) => {
+    e.preventDefault(); setSubmitting(true); setError(null);
+    const currentId = safeGet(pcttFormData, 'ID_PCTT') || safeGet(pcttFormData, 'id');
+    let finalData = { ...pcttFormData };
+    if (currentId) finalData.ID_PCTT = currentId;
+    try {
+      const mode = currentId ? 'update' : 'create';
+      const res = await apiService.save(finalData, mode, "HS_PCTT");
+      const savedId = res?.newId || res?.id || currentId || `PCTT-${Date.now()}`;
+      finalData.ID_PCTT = savedId;
+      if (mode === 'create') setPcttData(prev => [finalData, ...prev]);
+      else setPcttData(prev => prev.map(item => (safeGet(item, 'ID_PCTT') || safeGet(item, 'id')) === currentId ? finalData : item));
+      setIsPcttModalOpen(false);
+    } catch (err: any) { setError(err.message || 'Lỗi lưu dữ liệu PCTT.'); } 
+    finally { setSubmitting(false); }
+  };
+
   const confirmDelete = async () => {
     if (!itemToDelete) return; setSubmitting(true); setError(null);
     try {
@@ -660,6 +698,9 @@ export default function DepartmentPage() {
       } else if (itemToDelete.type === 'pccc') {
         await apiService.delete(itemToDelete.id, "HS_PCCC");
         setPcccData(prev => prev.filter(item => getPcccId(item) !== itemToDelete.id));
+      } else if (itemToDelete.type === 'pctt') {
+        await apiService.delete(itemToDelete.id, "HS_PCTT");
+        setPcttData(prev => prev.filter(item => (safeGet(item, 'ID_PCTT') || safeGet(item, 'id')) !== itemToDelete.id));
       }
       setIsConfirmOpen(false); setItemToDelete(null);
     } catch (err: any) { setError(err.message || 'Lỗi xóa dữ liệu.'); } 
@@ -935,10 +976,10 @@ export default function DepartmentPage() {
                 <section className="animate-in fade-in duration-500">
                   <div className="flex justify-between items-center mb-5">
                     <h3 className="text-lg font-black text-[#05469B] flex items-center gap-2 uppercase tracking-wider">
-                      <div className="w-1.5 h-6 bg-[#05469B] rounded-full"></div> {isParentUnit ? 'D. TỔNG HỢP AN NINH TOÀN CỤM' : 'D. AN NINH & HỆ THỐNG CAMERA'}
+                      <div className="w-1.5 h-6 bg-[#05469B] rounded-full"></div> {isParentUnit ? 'D. TỔNG HỢP AN NINH TOÀN CỤM & CƠ SỞ' : 'D. AN NINH & HỆ THỐNG CAMERA'}
                     </h3>
                     <button onClick={openSecurityModal} className="px-4 py-2 text-sm font-bold text-[#05469B] bg-blue-50 hover:bg-blue-100 rounded-lg flex items-center gap-2 transition-colors border border-blue-100 shadow-sm">
-                      {currentAnNinh ? <><Edit size={16} /> Cập nhật</> : <><Plus size={16} />AN-BV & HT Camera</>}
+                      {currentAnNinh ? <><Edit size={16} /> Cập nhật</> : <><Plus size={16} /> Cập nhật AN-BV & Camera Giám sát</>}
                     </button>
                   </div>
 
@@ -1092,7 +1133,7 @@ export default function DepartmentPage() {
                 <section className="animate-in fade-in duration-500">
                   <div className="flex justify-between items-center mb-5">
                     <h3 className="text-lg font-black text-[#05469B] flex items-center gap-2 uppercase tracking-wider">
-                      <div className="w-1.5 h-6 bg-[#05469B] rounded-full"></div> {isParentUnit ? 'F. TỔNG HỢP PCCC TOÀN CỤM' : 'F. PHÒNG CHỐNG CHÁY NỔ'}
+                      <div className="w-1.5 h-6 bg-[#05469B] rounded-full"></div> {isParentUnit ? 'F. TỔNG HỢP PCCC TOÀN CỤM & CƠ SỞ' : 'F. PHÒNG CHỐNG CHÁY NỔ'}
                     </h3>
                     <button onClick={openPcccModal} className="px-4 py-2 text-sm font-bold text-red-600 bg-red-50 hover:bg-red-100 rounded-lg flex items-center gap-2 transition-colors border border-red-100 shadow-sm">
                       {currentPccc ? <><Edit size={16} /> Cập nhật</> : <><Plus size={16} /> Khai báo PCCN</>}
@@ -1166,7 +1207,7 @@ export default function DepartmentPage() {
                 <section className="animate-in fade-in duration-500">
                   <div className="flex justify-between items-center mb-5">
                     <h3 className="text-lg font-black text-[#05469B] flex items-center gap-2 uppercase tracking-wider">
-                      <div className="w-1.5 h-6 bg-[#05469B] rounded-full"></div> {isParentUnit ? 'G. TỔNG HỢP ATVSLĐ TOÀN CỤM' : 'G. AN TOÀN VỆ SINH LAO ĐỘNG'}
+                      <div className="w-1.5 h-6 bg-[#05469B] rounded-full"></div> {isParentUnit ? 'G. TỔNG HỢP ATVSLĐ TOÀN CỤM & CƠ SỞ' : 'G. AN TOÀN VỆ SINH LAO ĐỘNG'}
                     </h3>
                     <button onClick={openAtvsldModal} className="px-4 py-2 text-sm font-bold text-emerald-600 bg-emerald-50 hover:bg-emerald-100 rounded-lg flex items-center gap-2 transition-colors border border-emerald-100 shadow-sm">
                       {currentAtvsld ? <><Edit size={16} /> Cập nhật</> : <><Plus size={16} /> Khai báo ATVSLĐ</>}
@@ -1238,17 +1279,81 @@ export default function DepartmentPage() {
                   )}
                 </section>
 
-                {/* H. PHÒNG CHỐNG THIÊN TAI */}
-                <section>
-                  <div className="flex justify-between items-center mb-5"><h3 className="text-lg font-black text-[#05469B] flex items-center gap-2 uppercase tracking-wider"><div className="w-1.5 h-6 bg-[#05469B] rounded-full"></div> H. PHÒNG CHỐNG THIÊN TAI</h3></div>
-                  <div className="bg-gray-50 hover:bg-blue-50/50 cursor-not-allowed p-8 rounded-xl border-2 border-dashed border-gray-200 text-center transition-all group shadow-sm"><CloudLightning size={40} className="mx-auto text-gray-300 group-hover:text-blue-400 mb-3 transition-colors" /><h4 className="text-base font-bold text-gray-600 group-hover:text-blue-700 mb-1">Dữ liệu PCTT chưa cập nhật</h4><p className="text-xs text-gray-400 group-hover:text-blue-500">Module này sẽ được mở khóa sau khi cấu hình Sheet dữ liệu hoàn tất.</p></div>
+                {/* 🟢 H. PHÒNG CHỐNG THIÊN TAI */}
+                <section className="animate-in fade-in duration-500">
+                  <div className="flex justify-between items-center mb-5">
+                    <h3 className="text-lg font-black text-[#05469B] flex items-center gap-2 uppercase tracking-wider">
+                      <div className="w-1.5 h-6 bg-[#05469B] rounded-full"></div> {isParentUnit ? 'H. TỔNG HỢP PCTT TOÀN CỤM & CƠ SỞ' : 'H. PHÒNG CHỐNG THIÊN TAI'}
+                    </h3>
+                    <button onClick={openPcttModal} className="px-4 py-2 text-sm font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg flex items-center gap-2 transition-colors border border-blue-100 shadow-sm">
+                      {currentPctt ? <><Edit size={16} /> Cập nhật</> : <><Plus size={16} /> Khai báo PCTT</>}
+                    </button>
+                  </div>
+
+                  {isParentUnit && (() => {
+                    const childData = pcttData.filter(p => selectedUnitSubordinates.includes(p.ID_DonVi));
+                    const thieuBaoHiem = childData.filter(item => item.TinhTrangBaoHiem !== 'Đầy đủ').length;
+                    const tongThienTai = childData.reduce((sum, item) => sum + (Number(item.SoVuThienTai) || 0), 0);
+                    return (
+                      <div className="mb-6 p-5 bg-indigo-50/30 rounded-2xl border border-indigo-100 shadow-sm">
+                        <h4 className="font-bold text-indigo-800 mb-4 flex items-center gap-2"><Layers size={18} /> Số liệu Tổng hợp Toàn Cụm</h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 animate-in fade-in">
+                          <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex items-center justify-between">
+                            <div><p className="text-[10px] font-bold text-blue-600 uppercase mb-1">Cơ sở đã khai báo</p><p className="text-2xl font-black text-blue-700">{childData.length}</p></div>
+                            <CloudLightning size={32} className="text-blue-200"/>
+                          </div>
+                          <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex items-center justify-between">
+                            <div><p className={`text-[10px] font-bold uppercase mb-1 ${thieuBaoHiem > 0 ? 'text-red-600' : 'text-emerald-600'}`}>Thiếu Bảo Hiểm TS</p><p className={`text-2xl font-black ${thieuBaoHiem > 0 ? 'text-red-700' : 'text-emerald-700'}`}>{thieuBaoHiem} CS</p></div>
+                            <Briefcase size={32} className={thieuBaoHiem > 0 ? 'text-red-200' : 'text-emerald-200'}/>
+                          </div>
+                          <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex items-center justify-between">
+                            <div><p className={`text-[10px] font-bold uppercase mb-1 ${tongThienTai > 0 ? 'text-orange-600' : 'text-gray-500'}`}>Sự cố / Thiên tai</p><p className={`text-2xl font-black ${tongThienTai > 0 ? 'text-orange-700' : 'text-gray-600'}`}>{tongThienTai}</p></div>
+                            <AlertCircle size={32} className={tongThienTai > 0 ? 'text-orange-200' : 'text-gray-200'}/>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {currentPctt ? (
+                    <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm animate-in fade-in">
+                       <h4 className="font-bold text-[#05469B] mb-4 flex items-center gap-2 border-b border-gray-100 pb-2"><CloudLightning size={18} /> Thông tin PCTT Trụ sở</h4>
+                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div className="space-y-3">
+                            <h4 className="font-bold text-blue-700 border-b border-gray-100 pb-2 text-sm flex items-center gap-1.5"><Users size={16}/> Tổ chức & Phương án</h4>
+                            <div className="flex justify-between text-sm"><span className="text-gray-500">Đội trưởng PCTT:</span><span className="font-bold text-[#05469B] text-right">{currentPctt.DoiTruongPCTT || '---'}</span></div>
+                            <div className="flex justify-between text-sm"><span className="text-gray-500">Lực lượng ứng phó:</span><span className="font-bold text-gray-800">{currentPctt.SoNhanSuDoi || 0} Người</span></div>
+                            <div className="flex flex-col text-sm mt-1 pt-1"><span className="text-gray-500 mb-1">Vị trí di dời xe & tài sản an toàn:</span><span className="font-semibold text-gray-800 bg-gray-50 p-2 rounded border border-gray-100">{currentPctt.ViTriDiDoi || 'Chưa xác định'}</span></div>
+                            <div className="flex justify-between text-sm pt-2 border-t border-gray-50"><span className="text-gray-500">Ngày kiểm tra hạ tầng:</span><span className="font-bold text-gray-800">{formatToVN(currentPctt.NgayKhamTraPCTT) || '---'} ({currentPctt.TinhTrangHaTang})</span></div>
+                          </div>
+                          <div className="space-y-3 border-l border-gray-100 pl-6">
+                            <h4 className="font-bold text-orange-600 border-b border-gray-100 pb-2 text-sm flex items-center gap-1.5"><ShieldAlert size={16}/> Bảo hiểm & Xử lý sự cố</h4>
+                            <div className="flex justify-between text-sm"><span className="text-gray-500">Bảo hiểm rủi ro TS:</span><span className={`font-black ${currentPctt.TinhTrangBaoHiem !== 'Đầy đủ' ? 'text-red-600 animate-pulse' : 'text-emerald-600'}`}>{currentPctt.TinhTrangBaoHiem || '---'}</span></div>
+                            <div className="flex justify-between text-sm"><span className="text-gray-500">Chốt tồn kho / Kế toán:</span><span className="font-semibold text-gray-800 text-right">{formatToVN(currentPctt.NgayCapNhatTaiSan) || '---'}</span></div>
+                            <div className="flex justify-between text-sm pt-2 border-t border-gray-50"><span className="text-gray-500">Thiên tai (Năm nay):</span><span className={`font-bold ${Number(currentPctt.SoVuThienTai) > 0 ? 'text-orange-600' : 'text-gray-800'}`}>{currentPctt.SoVuThienTai || 0} Vụ</span></div>
+                            <div className="flex justify-between text-sm"><span className="text-gray-500">Tình trạng khắc phục:</span><span className="font-semibold text-gray-800 text-right">{currentPctt.TinhTrangKhacPhuc || '---'}</span></div>
+                            {currentPctt.Link_HoSoBoiThuong && (
+                              <div className="mt-2"><a href={currentPctt.Link_HoSoBoiThuong} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-100 hover:bg-blue-100"><LinkIcon size={14}/> Hồ sơ bồi thường</a></div>
+                            )}
+                          </div>
+                       </div>
+                    </div>
+                  ) : (
+                    !isParentUnit && (
+                      <div onClick={openPcttModal} className="bg-white hover:bg-blue-50/50 cursor-pointer p-10 rounded-2xl border-2 border-dashed border-gray-300 hover:border-blue-300 text-center transition-all group shadow-sm">
+                        <CloudLightning size={48} className="mx-auto text-gray-300 group-hover:text-blue-400 mb-4 transition-colors" />
+                        <h4 className="text-lg font-bold text-gray-700 group-hover:text-blue-700 mb-1">Khai báo Hồ sơ PCTT</h4>
+                        <p className="text-sm text-gray-400">Thiết lập phương án ứng phó bão lụt, quản lý bảo hiểm và ghi nhận thiệt hại.</p>
+                      </div>
+                    )
+                  )}
                 </section>
 
                 {/* 🟢 I. PHỤC VỤ HẬU CẦN */}
                 <section className="animate-in fade-in duration-500">
                   <div className="flex justify-between items-center mb-5">
                     <h3 className="text-lg font-black text-[#05469B] flex items-center gap-2 uppercase tracking-wider">
-                      <div className="w-1.5 h-6 bg-[#05469B] rounded-full"></div> {isParentUnit ? 'I. TỔNG HỢP HẬU CẦN TOÀN CỤM' : 'I. PHỤC VỤ HẬU CẦN'}
+                      <div className="w-1.5 h-6 bg-[#05469B] rounded-full"></div> {isParentUnit ? 'I. TỔNG HỢP HẬU CẦN TOÀN CỤM & CƠ SỞ' : 'I. PHỤC VỤ HẬU CẦN'}
                     </h3>
                     <button onClick={openPvhcModal} className="px-4 py-2 text-sm font-bold text-[#05469B] bg-blue-50 hover:bg-blue-100 rounded-lg flex items-center gap-2 transition-colors border border-blue-100 shadow-sm">
                       {currentPvhc ? <><Edit size={16} /> Cập nhật</> : <><Plus size={16} /> Khai báo PVHC</>}
@@ -1909,6 +2014,64 @@ export default function DepartmentPage() {
               <div className="pt-5 border-t border-gray-100 flex justify-end gap-3 mt-8 shrink-0">
                 <button type="button" onClick={() => setIsAtvsldModalOpen(false)} className="px-8 py-3 bg-gray-100 text-gray-700 hover:bg-gray-200 rounded-xl font-bold transition-colors">Hủy</button>
                 <button type="submit" disabled={submitting} className="px-8 py-3 text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl font-bold flex items-center gap-2 shadow-lg transition-colors">{submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />} Lưu ATVSLĐ</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 🟢 MODAL PCTT */}
+      {isPcttModalOpen && (
+        <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm transition-all duration-300 ${!isListCollapsed ? 'lg:pl-80' : ''}`}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl flex flex-col max-h-[90vh] animate-in fade-in zoom-in duration-200">
+            <div className="flex justify-between p-5 border-b border-blue-100 bg-blue-50 rounded-t-2xl shrink-0">
+              <h3 className="text-xl font-bold text-blue-800 flex items-center gap-2"><CloudLightning size={24}/> {pcttFormData.ID_PCTT ? 'Cập nhật Hồ sơ PCTT & Bảo hiểm' : 'Tạo Hồ sơ PCTT'}</h3>
+              <button onClick={() => setIsPcttModalOpen(false)} disabled={submitting} className="text-blue-400 hover:text-red-500 rounded-full p-1.5 bg-white shadow-sm transition-colors"><X className="w-6 h-6" /></button>
+            </div>
+            <form onSubmit={handlePcttSave} className="p-6 overflow-y-auto space-y-6 flex-1 min-h-0 custom-scrollbar">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="space-y-6">
+                  <div className="bg-gray-50 p-5 rounded-xl border border-gray-200 shadow-sm">
+                    <h4 className="font-bold text-gray-800 mb-4 flex items-center gap-2 border-b border-gray-200 pb-2"><Users size={18}/> 1. Tổ chức Đội PCTT & Phương án</h4>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="col-span-2"><label className="block text-xs font-bold text-gray-700 mb-1">Đội trưởng chỉ huy PCTT</label><input type="text" name="DoiTruongPCTT" value={pcttFormData.DoiTruongPCTT || ''} onChange={(e) => handleInputChange(e, 'pctt')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-blue-500" placeholder="VD: GĐ Showroom..." /></div>
+                      <div><label className="block text-xs font-bold text-gray-700 mb-1">Lực lượng ứng phó (Người)</label><input type="number" name="SoNhanSuDoi" value={pcttFormData.SoNhanSuDoi || ''} onChange={(e) => handleInputChange(e, 'pctt')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-blue-500" /></div>
+                      <div className="col-span-2"><label className="block text-xs font-bold text-gray-700 mb-1">Vị trí di dời xe & tài sản an toàn</label><textarea name="ViTriDiDoi" value={pcttFormData.ViTriDiDoi || ''} onChange={(e) => handleInputChange(e, 'pctt')} rows={2} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-blue-500 resize-none" placeholder="Mô tả bãi đỗ xe tránh ngập lụt, cây xanh..."></textarea></div>
+                      <div className="col-span-2"><label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">Link Phương án PCTT (PDF/Drive)</label><input type="url" name="Link_PhuongAnPCTT" value={pcttFormData.Link_PhuongAnPCTT || ''} onChange={(e) => handleInputChange(e, 'pctt')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-blue-500 text-blue-600" /></div>
+                    </div>
+                  </div>
+                  <div className="bg-emerald-50/40 p-5 rounded-xl border border-emerald-100 shadow-sm">
+                    <h4 className="font-bold text-emerald-800 mb-4 flex items-center gap-2 border-b border-emerald-200 pb-2"><Shield size={18}/> 2. Bảo hiểm & Quản trị Tài sản</h4>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div><label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">Bảo hiểm mọi rủi ro TS</label><select name="TinhTrangBaoHiem" value={pcttFormData.TinhTrangBaoHiem || 'Đầy đủ'} onChange={(e) => handleInputChange(e, 'pctt')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-emerald-500 font-bold text-emerald-700"><option value="Đầy đủ">Đầy đủ</option><option value="Đang thiếu">Đang thiếu / Chưa mua</option></select></div>
+                      <div><label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">Ngày chốt TS gửi Kế toán</label><input type="date" name="NgayCapNhatTaiSan" value={pcttFormData.NgayCapNhatTaiSan ? pcttFormData.NgayCapNhatTaiSan.split('T')[0] : ''} onChange={(e) => handleInputChange(e, 'pctt')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-emerald-500" title="Chốt biến động kho xe, phụ tùng định kỳ" /></div>
+                    </div>
+                  </div>
+                </div>
+                <div className="space-y-6">
+                  <div className="bg-orange-50/40 p-5 rounded-xl border border-orange-100 shadow-sm">
+                    <h4 className="font-bold text-orange-800 mb-4 flex items-center gap-2 border-b border-orange-200 pb-2"><HardHat size={18}/> 3. Hạ tầng & Bảo trì</h4>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div><label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">Ngày KT/Bảo trì PCTT</label><input type="date" name="NgayKiemTraPCTT" value={pcttFormData.NgayKiemTraPCTT ? pcttFormData.NgayKiemTraPCTT.split('T')[0] : ''} onChange={(e) => handleInputChange(e, 'pctt')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-orange-500" /></div>
+                      <div><label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">Khơi thông cống / Mái tôn</label><select name="TinhTrangHaTang" value={pcttFormData.TinhTrangHaTang || 'Đã hoàn thành'} onChange={(e) => handleInputChange(e, 'pctt')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-orange-500"><option value="Đã hoàn thành">Đã hoàn thành</option><option value="Chờ xử lý">Chờ xử lý / Tắc nghẽn</option></select></div>
+                    </div>
+                  </div>
+                  <div className="bg-red-50/40 p-5 rounded-xl border border-red-200 shadow-sm">
+                    <h4 className="font-bold text-red-800 mb-4 flex items-center gap-2 border-b border-red-200 pb-2"><AlertCircle size={18}/> 4. Thiệt hại & Khắc phục</h4>
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div><label className="block text-[10px] font-bold text-red-600 mb-1 uppercase">Số đợt bão lụt / thiên tai</label><input type="number" name="SoVuThienTai" value={pcttFormData.SoVuThienTai || '0'} onChange={(e) => handleInputChange(e, 'pctt')} className="w-full p-2.5 border border-red-300 rounded-lg bg-white outline-none focus:ring-2 focus:ring-red-500 font-bold text-red-700" /></div>
+                        <div><label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">Tình trạng khắc phục</label><select name="TinhTrangKhacPhuc" value={pcttFormData.TinhTrangKhacPhuc || 'Không có sự cố'} onChange={(e) => handleInputChange(e, 'pctt')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-red-500"><option value="Không có sự cố">Không có sự cố</option><option value="Đang xử lý">Đang xử lý</option><option value="Đã hoàn thành">Đã hoàn thành</option></select></div>
+                      </div>
+                      <div><label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">Link Hồ sơ bảo hiểm (Hình ảnh, xác nhận)</label><input type="url" name="Link_HoSoBoiThuong" value={pcttFormData.Link_HoSoBoiThuong || ''} onChange={(e) => handleInputChange(e, 'pctt')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-red-500 text-blue-600" /></div>
+                      <div><label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">Ghi chú tổn thất</label><textarea name="GhiChu" value={pcttFormData.GhiChu || ''} onChange={(e) => handleInputChange(e, 'pctt')} rows={2} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-red-500 resize-none"></textarea></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="pt-5 border-t border-gray-100 flex justify-end gap-3 mt-8 shrink-0">
+                <button type="button" onClick={() => setIsPcttModalOpen(false)} className="px-8 py-3 bg-gray-100 text-gray-700 hover:bg-gray-200 rounded-xl font-bold transition-colors">Hủy</button>
+                <button type="submit" disabled={submitting} className="px-8 py-3 text-white bg-blue-600 hover:bg-blue-700 rounded-xl font-bold flex items-center gap-2 shadow-lg transition-colors">{submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />} Lưu PCTT</button>
               </div>
             </form>
           </div>
