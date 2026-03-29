@@ -254,3 +254,57 @@ export interface NhatKyThietBi {
   GhiChu_NhatKySuDung: string;
   [key: string]: any;
 }
+
+export interface ATVSLD {
+  ID_ATVSLD: string;
+  ID_DonVi: string;
+  NguoiPhuTrach: string;
+  SL_MangLuoiATVSV: string | number;
+  Link_HoSoQuyDinh: string;
+  NgayHuanLuyenGanNhat: string;
+  TyLeHoanThanhHL: string;
+  NgayKhamSKGanNhat: string;
+  NgayKhamBenhNgheNghiep: string;
+  SL_ThietBiNghiemNgat: string | number;
+  SL_ThietBiQuaHanKD: string | number;
+  NgayQuanTracMoiTruong: string;
+  TyLeCapPhatBHLD: string;
+  NgayTuKiemTraGanNhat: string;
+  CacLoiHienTruong: string;
+  SoTaiNanTrongNam: string | number;
+  Link_BienBanChecklist: string;
+  GhiChu: string;
+}
+
+export interface PCCC {
+  ID_PCCC: string;
+  ID_DonVi: string;
+  TinhTrangPhapLy: string;
+  HanBaoHiemChayNo: string;
+  HanKiemDinhChongSet: string;
+  NgayTuKiemTraGanNhat: string;
+  NgayBaoCaoCongAnGanNhat: string;
+  SoNhanSuDoiPCCC: string | number;
+  TenDoiTruong: string;
+  ChucDanhDoiTruong: string;
+  SDTDoiTruong: string;
+  NgayDienTapGanNhat: string;
+  Link_HoSoDoiPCCC: string;
+  HeThongBaoChay: string;
+  HeThongBom: string;
+  ViTriTuBaoChay: string;
+  TrangThaiBaoChay: string;
+  TrangThaiBom: string;
+  SoLuongBinhBot: string | number;
+  SoLuongBinhCO2: string | number;
+  SoLuongBinhXeDay: string | number;
+  SoLuongPhuyCat: string | number;
+  SoLuongBinhPinDien: string | number;
+  NgayBomSacGannhat: string;
+  ChiTietBomSac: string;
+  KhuVucRuiRoCao: string;
+  LoiTonTaiChuaKhacPhuc: string;
+  Link_HoSoPCCC: string;
+  Link_PhuongAnPCCC_CNCH: string;
+  GhiChu: string;
+}
