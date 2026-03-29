@@ -90,9 +90,15 @@ export const apiService = {
   // 🟢 [ĐÃ THÊM MỚI: API GỌI DỮ LIỆU PCCC]
   getPCCC: async (): Promise<any[]> => fetchWithCache('HS_PCCC'),
 
+// 🟢 [ĐÃ THÊM MỚI: API GỌI DỮ LIỆU ATVSLĐ]
+  getATVSLD: async (): Promise<any[]> => fetchWithCache('HS_ATVSLD'),
+
+  // 🟢 [ĐÃ THÊM MỚI: API GỌI DỮ LIỆU PCTT]
+  getPCTT: async (): Promise<any[]> => fetchWithCache('HS_PCTT'),
+  
   // 👉 2 HÀM MỚI ĐÃ ĐƯỢC THÊM LẠI ĐỂ FIX LỖI CHO TRANG TÀI KHOẢN VÀ NHẬT KÝ
   getUsers: async (): Promise<User[]> => fetchWithCache('Config_Users'),
-  
+
   // 👉 2 HÀM MỚI ĐÃ ĐƯỢC THÊM LẠI ĐỂ FIX LỖI CHO TRANG TÀI KHOẢN VÀ NHẬT KÝ
   getUsers: async (): Promise<User[]> => fetchWithCache('Config_Users'),
   getLogs: async (): Promise<SysLog[]> => fetchWithCache('Sys_Logs'),
