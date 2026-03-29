@@ -16,6 +16,7 @@ import { DonVi, Personnel, AnNinh, PhapNhan, PhongHop, TS_Xe, ThietBi } from '..
 import { useAuth } from '../contexts/AuthContext';
 import { buildHierarchicalOptions, getUnitEmoji } from '../utils/hierarchy'; 
 
+// 🟢 [HÀM TIỆN ÍCH CHUNG]
 const safeGet = (obj: any, key: string) => {
   if (!obj) return '';
   if (obj[key] !== undefined) return obj[key];
@@ -80,9 +81,11 @@ export default function DepartmentPage() {
   const [xeData, setXeData] = useState<TS_Xe[]>([]);
   const [thietBiData, setThietBiData] = useState<ThietBi[]>([]);
   const [pvhcData, setPvhcData] = useState<any[]>([]);
+  
   const [pcccData, setPcccData] = useState<any[]>([]);
   const [isPcccModalOpen, setIsPcccModalOpen] = useState(false);
-  const [pcccFormData, setPcccFormData] = useState<any>({});
+  const [pcccFormData, setPcccFormData] = useState<any>({}); 
+
   const [atvsldData, setAtvsldData] = useState<any[]>([]);
   const [isAtvsldModalOpen, setIsAtvsldModalOpen] = useState(false);
   const [atvsldFormData, setAtvsldFormData] = useState<any>({});
@@ -155,6 +158,7 @@ export default function DepartmentPage() {
         NgayTuKiemTraGanNhat: normalizeDateToISO(item.NgayTuKiemTraGanNhat),
       }));
       setAtvsldData(cleanAtvsld);
+
     } 
     catch (err: any) { setError(err.message || 'Lỗi tải dữ liệu. Vui lòng kiểm tra lại kết nối mạng.'); } 
     finally { setLoading(false); }
@@ -207,6 +211,7 @@ export default function DepartmentPage() {
     
     const initialMatches = Array.from(matchedIds);
     initialMatches.forEach(id => addChildren(id));
+
     return baseUnits.filter(item => matchedIds.has(item.ID_DonVi));
   }, [data, searchTerm, allowedDonViIds]);
 
@@ -226,7 +231,6 @@ export default function DepartmentPage() {
   }, [parentUnits]);
 
   const toggleParent = (parentId: string) => setExpandedParents(prev => prev.includes(parentId) ? prev.filter(id => id !== parentId) : [...prev, parentId]);
-
   const selectedUnit = useMemo(() => data.find(item => item.ID_DonVi === selectedUnitId) || null, [data, selectedUnitId]);
   
   const donViMap = useMemo(() => {
@@ -241,6 +245,7 @@ export default function DepartmentPage() {
     return [selectedUnitId, ...subIds];
   }, [selectedUnitId, data]);
 
+  // 🟢 LỌC DỮ LIỆU HIỆN TẠI (CHỈ MỘT ĐƠN VỊ)
   const currentAnNinh = useMemo(() => anNinhData.find(item => getUnitIdSafe(item) === selectedUnitId) || null, [anNinhData, selectedUnitId]);
   const currentPvhc = useMemo(() => pvhcData.find(item => getUnitIdSafe(item) === selectedUnitId) || null, [pvhcData, selectedUnitId]);
   const currentPccc = useMemo(() => pcccData.find(item => getUnitIdSafe(item) === selectedUnitId) || null, [pcccData, selectedUnitId]);
@@ -252,15 +257,13 @@ export default function DepartmentPage() {
 
   const isParentUnit = selectedUnitSubordinates.length > 1;
 
+  // 🟢 CÁC HÀM THỐNG KÊ (AGGREGATION)
   const branchStats = useMemo(() => {
     if (!isParentUnit) return null;
     const subordinates = data.filter(u => selectedUnitSubordinates.includes(u.ID_DonVi) && u.ID_DonVi !== selectedUnitId);
     return {
       total: subordinates.length,
-      srQt: subordinates.filter(u => {
-        const type = String(u.loaiHinh).toLowerCase();
-        return type.includes('quản trị') || type.includes('công ty tỉnh');
-      }).length,
+      srQt: subordinates.filter(u => String(u.loaiHinh).toLowerCase().includes('quản trị') || String(u.loaiHinh).toLowerCase().includes('công ty tỉnh')).length,
       sr: subordinates.filter(u => String(u.loaiHinh).toLowerCase().trim() === 'showroom').length,
       dkd: subordinates.filter(u => String(u.loaiHinh).toLowerCase().includes('điểm kinh doanh')).length,
       kho: subordinates.filter(u => String(u.loaiHinh).toLowerCase().includes('kho')).length,
@@ -329,7 +332,6 @@ export default function DepartmentPage() {
     const active = currentXeList.filter(x => safeGet(x, 'Hientrang') === 'Đang hoạt động').length;
     const inactive = currentXeList.length - active;
     const grouped: Record<string, { total: number, brands: Record<string, { total: number, models: Record<string, number> }> }> = {};
-
     currentXeList.forEach(xe => {
       const purpose = safeGet(xe, 'Mucdichsudung') || 'Khác';
       const brand = safeGet(xe, 'HieuXe') || 'Khác';
@@ -376,6 +378,7 @@ export default function DepartmentPage() {
 
   const isSelectedUnitDimmed = selectedUnit?.trangThai === 'Đại lý' || selectedUnit?.trangThai === 'Đầu tư mới';
 
+  // 🟢 [KHU VỰC: HÀM CẬP NHẬT FORM]
   const handleButVietChange = (color: string, isChecked: boolean) => {
     let currentColors = phFormData.Butviet ? phFormData.Butviet.split(',').map((s: string) => s.trim()).filter(Boolean) : [];
     if (isChecked) { if (!currentColors.includes(color)) currentColors.push(color); } 
@@ -472,7 +475,8 @@ export default function DepartmentPage() {
   };
 
   const openModal = (mode: 'create' | 'update', item?: DonVi) => {
-    setModalMode(mode); setCustomKD(''); 
+    setModalMode(mode); 
+    setCustomKD(''); 
     setFormData(item ? { ...item } : { ...initialFormState, ID_DonVi: `DV${Date.now()}` }); 
     setIsModalOpen(true); setError(null);
   };
@@ -539,28 +543,6 @@ export default function DepartmentPage() {
     }
     else if (formType === 'pccc') { setPcccFormData((prev: any) => ({ ...prev, [name]: finalValue })); }
     else if (formType === 'atvsld') { setAtvsldFormData((prev: any) => ({ ...prev, [name]: finalValue })); }
-  };
-
-  const confirmDelete = async () => {
-    if (!itemToDelete) return; setSubmitting(true); setError(null);
-    try {
-      if (itemToDelete.type === 'donvi') {
-        await apiService.delete(itemToDelete.id, "DM_Donvi");
-        setData(prev => prev.filter(item => item.ID_DonVi !== itemToDelete.id));
-        if (selectedUnitId === itemToDelete.id) setSelectedUnitId(null);
-      } else if (itemToDelete.type === 'phapnhan') {
-        await apiService.delete(itemToDelete.id, "PhapNhan");
-        setPhapNhanData(prev => prev.filter(item => item.Id_Phapnhan !== itemToDelete.id));
-      } else if (itemToDelete.type === 'phonghop') {
-        await apiService.delete(itemToDelete.id, "PhongHop");
-        setPhongHopData(prev => prev.filter(item => (item.ID_Phonghop || item.iD_Phonghop || item.ID_PhongHop) !== itemToDelete.id));
-      } else if (itemToDelete.type === 'pccc') {
-        await apiService.delete(itemToDelete.id, "HS_PCCC");
-        setPcccData(prev => prev.filter(item => getPcccId(item) !== itemToDelete.id));
-      }
-      setIsConfirmOpen(false); setItemToDelete(null);
-    } catch (err: any) { setError(err.message || 'Lỗi xóa dữ liệu.'); } 
-    finally { setSubmitting(false); }
   };
 
   const openSecurityModal = () => {
@@ -662,6 +644,28 @@ export default function DepartmentPage() {
     finally { setSubmitting(false); }
   };
 
+  const confirmDelete = async () => {
+    if (!itemToDelete) return; setSubmitting(true); setError(null);
+    try {
+      if (itemToDelete.type === 'donvi') {
+        await apiService.delete(itemToDelete.id, "DM_Donvi");
+        setData(prev => prev.filter(item => item.ID_DonVi !== itemToDelete.id));
+        if (selectedUnitId === itemToDelete.id) setSelectedUnitId(null);
+      } else if (itemToDelete.type === 'phapnhan') {
+        await apiService.delete(itemToDelete.id, "PhapNhan");
+        setPhapNhanData(prev => prev.filter(item => item.Id_Phapnhan !== itemToDelete.id));
+      } else if (itemToDelete.type === 'phonghop') {
+        await apiService.delete(itemToDelete.id, "PhongHop");
+        setPhongHopData(prev => prev.filter(item => (item.ID_Phonghop || item.iD_Phonghop || item.ID_PhongHop) !== itemToDelete.id));
+      } else if (itemToDelete.type === 'pccc') {
+        await apiService.delete(itemToDelete.id, "HS_PCCC");
+        setPcccData(prev => prev.filter(item => getPcccId(item) !== itemToDelete.id));
+      }
+      setIsConfirmOpen(false); setItemToDelete(null);
+    } catch (err: any) { setError(err.message || 'Lỗi xóa dữ liệu.'); } 
+    finally { setSubmitting(false); }
+  };
+
   const renderUnitTree = (parent: DonVi, level: number = 1) => {
     const children = getChildUnits(parent.ID_DonVi);
     const isExpanded = expandedParents.includes(parent.ID_DonVi) || !!searchTerm;
@@ -682,7 +686,7 @@ export default function DepartmentPage() {
   return (
     <div className="flex h-full bg-[#f4f7f9] overflow-hidden relative">
       {isListCollapsed && (
-        <button onClick={() => setIsListCollapsed(false)} className="absolute top-6 left-6 z-20 bg-white p-2.5 rounded-lg shadow-md border border-gray-200 text-[#05469B] hover:bg-blue-50 transition-all" title="M mở danh sách đơn vị"><PanelLeftOpen size={20} /></button>
+        <button onClick={() => setIsListCollapsed(false)} className="absolute top-6 left-6 z-20 bg-white p-2.5 rounded-lg shadow-md border border-gray-200 text-[#05469B] hover:bg-blue-50 transition-all lg:hidden" title="Mở danh sách đơn vị"><PanelLeftOpen size={20} /></button>
       )}
 
       {/* CỘT TRÁI */}
@@ -694,7 +698,7 @@ export default function DepartmentPage() {
           </div>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-            <input type="text" placeholder="Tìm đơn vị..." className="w-full pl-9 pr-4 py-2 bg-[#FFFFF0] border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#05469B] outline-none" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+            <input type="text" placeholder="Tìm đơn vị, showroom..." className="w-full pl-9 pr-4 py-2 bg-[#FFFFF0] border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#05469B] outline-none" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
           </div>
         </div>
 
@@ -743,13 +747,18 @@ export default function DepartmentPage() {
                     <span className={`px-2.5 py-1 rounded-md text-xs font-bold border ${isSelectedUnitDimmed ? 'bg-orange-50 text-orange-700 border-orange-200' : 'bg-emerald-50 text-emerald-700 border-emerald-100'}`}>{selectedUnit.trangThai || 'Hoạt động'}</span>
                     {selectedUnit.Phia && <span className="px-2.5 py-1 bg-gray-50 text-gray-600 rounded-md text-xs border border-gray-200">{selectedUnit.Phia}</span>}
                     
+                    {/* TÍCH HỢP HIỂN THỊ CÁC TAG KINH DOANH CHO SHOWROOM QUẢN TRỊ */}
                     {selectedUnit.loaiHinh === 'Showroom Quản trị' && selectedUnit.KinhDoanh && (
                       <>
                         <div className="w-px h-4 bg-gray-300 hidden sm:block mx-1"></div>
                         {selectedUnit.KinhDoanh.split(',').map((kd: string, idx: number) => {
                           const kdTrim = kd.trim();
                           if(!kdTrim) return null;
-                          return (<span key={idx} className="px-2 py-1 bg-[#00559B] text-white rounded text-[10px] font-black uppercase tracking-wider shadow-sm">{kdTrim}</span>)
+                          return (
+                            <span key={idx} className="px-2 py-1 bg-[#00559B] text-white rounded text-[10px] font-black uppercase tracking-wider shadow-sm">
+                              {kdTrim}
+                            </span>
+                          )
                         })}
                       </>
                     )}
@@ -761,10 +770,9 @@ export default function DepartmentPage() {
                 </div>
               </div>
 
-              {/* WRAPPER BỌC CÁC PHẦN CHI TIẾT */}
               <div className={`space-y-8 transition-all duration-300 ${isSelectedUnitDimmed ? 'opacity-40 pointer-events-none select-none grayscale-[30%]' : ''}`}>
                 
-                {/* A. THÔNG TIN LÃNH ĐẠO */}
+                {/* A. LÃNH ĐẠO */}
                 <section>
                   <h3 className="text-lg font-black text-[#05469B] mb-5 flex items-center gap-2 uppercase tracking-wider"><div className="w-1.5 h-6 bg-[#05469B] rounded-full"></div> A. THÔNG TIN LÃNH ĐẠO</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -774,7 +782,7 @@ export default function DepartmentPage() {
                   </div>
                 </section>
 
-                {/* B. PHỤ TRÁCH DV HỖ TRỢ & PT NHÂN SỰ */}
+                {/* B. HỖ TRỢ & NHÂN SỰ */}
                 <section>
                   <h3 className="text-lg font-black text-[#05469B] mb-5 flex items-center gap-2 uppercase tracking-wider"><div className="w-1.5 h-6 bg-[#05469B] rounded-full"></div> B. PHỤ TRÁCH DV HỖ TRỢ & PT NHÂN SỰ</h3>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
@@ -786,18 +794,41 @@ export default function DepartmentPage() {
                 
                 {/* C. QUY MÔ MẠNG LƯỚI */}
                 <section>
-                  <h3 className="text-lg font-black text-[#05469B] mb-5 flex items-center gap-2 uppercase tracking-wider"><div className="w-1.5 h-6 bg-[#05469B] rounded-full"></div> {isParentUnit ? 'C. QUY MÔ HỆ THỐNG TRỰC THUỘC' : 'C. THÔNG TIN CƠ SỞ VẬT CHẤT'}</h3>
+                  <h3 className="text-lg font-black text-[#05469B] mb-5 flex items-center gap-2 uppercase tracking-wider">
+                    <div className="w-1.5 h-6 bg-[#05469B] rounded-full"></div> {isParentUnit ? 'C. QUY MÔ HỆ THỐNG TRỰC THUỘC' : 'C. THÔNG TIN CƠ SỞ VẬT CHẤT'}
+                  </h3>
                   
                   {isParentUnit && branchStats && (
                     <div className="mb-6 bg-white p-5 rounded-2xl border border-gray-200 shadow-sm animate-in fade-in">
-                      <h4 className="font-bold text-[#05469B] mb-4 flex items-center gap-2"><Layers size={18} /> Sức mạnh Mạng lưới</h4>
+                      <h4 className="font-bold text-[#05469B] mb-4 flex items-center gap-2">
+                        <Layers size={18} /> Sức mạnh Mạng lưới
+                      </h4>
                       <div className="flex flex-col md:flex-row gap-4 items-stretch">
-                        <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 flex flex-col justify-center items-center md:w-1/4 shrink-0"><span className="text-[11px] font-bold text-blue-600 uppercase tracking-wider mb-1">Tổng Đơn vị</span><span className="text-4xl font-black text-[#05469B]">{branchStats.total}</span></div>
+                        <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 flex flex-col justify-center items-center md:w-1/4 shrink-0">
+                          <span className="text-[11px] font-bold text-blue-600 uppercase tracking-wider mb-1">Tổng Đơn vị</span>
+                          <span className="text-4xl font-black text-[#05469B]">{branchStats.total}</span>
+                        </div>
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 flex-1">
-                          <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 flex flex-col items-center justify-center text-center"><Store className="text-indigo-600 mb-1" size={24}/><span className="text-2xl font-black text-gray-800">{branchStats.srQt}</span><span className="text-[10px] font-bold text-gray-500 uppercase mt-1">SR Quản trị</span></div>
-                          <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 flex flex-col items-center justify-center text-center"><Briefcase className="text-emerald-600 mb-1" size={24}/><span className="text-2xl font-black text-gray-800">{branchStats.sr}</span><span className="text-[10px] font-bold text-gray-500 uppercase mt-1">Showroom</span></div>
-                          <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 flex flex-col items-center justify-center text-center"><MapPin className="text-orange-600 mb-1" size={24}/><span className="text-2xl font-black text-gray-800">{branchStats.dkd}</span><span className="text-[10px] font-bold text-gray-500 uppercase mt-1">Điểm Kinh Doanh</span></div>
-                          <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 flex flex-col items-center justify-center text-center"><Warehouse className="text-gray-600 mb-1" size={24}/><span className="text-2xl font-black text-gray-800">{branchStats.kho}</span><span className="text-[10px] font-bold text-gray-500 uppercase mt-1">Kho Xe</span></div>
+                          <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 flex flex-col items-center justify-center text-center">
+                            <Store className="text-indigo-600 mb-1" size={24}/>
+                            <span className="text-2xl font-black text-gray-800">{branchStats.srQt}</span>
+                            <span className="text-[10px] font-bold text-gray-500 uppercase mt-1 line-clamp-1">SR Quản trị</span>
+                          </div>
+                          <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 flex flex-col items-center justify-center text-center">
+                            <Briefcase className="text-emerald-600 mb-1" size={24}/>
+                            <span className="text-2xl font-black text-gray-800">{branchStats.sr}</span>
+                            <span className="text-[10px] font-bold text-gray-500 uppercase mt-1">Showroom</span>
+                          </div>
+                          <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 flex flex-col items-center justify-center text-center">
+                            <MapPin className="text-orange-600 mb-1" size={24}/>
+                            <span className="text-2xl font-black text-gray-800">{branchStats.dkd}</span>
+                            <span className="text-[10px] font-bold text-gray-500 uppercase mt-1 line-clamp-1">Điểm Kinh Doanh</span>
+                          </div>
+                          <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 flex flex-col items-center justify-center text-center">
+                            <Warehouse className="text-gray-600 mb-1" size={24}/>
+                            <span className="text-2xl font-black text-gray-800">{branchStats.kho}</span>
+                            <span className="text-[10px] font-bold text-gray-500 uppercase mt-1">Kho Xe</span>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -805,30 +836,112 @@ export default function DepartmentPage() {
 
                   {isParentUnit && aggregatedStats ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 animate-in fade-in">
-                      <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-blue-200 transition-all relative overflow-hidden group flex items-center gap-4"><div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 z-10"><Maximize2 size={24} strokeWidth={2} /></div><div className="relative z-10 flex-1"><p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">Tổng diện tích mặt bằng</p><p className="text-2xl font-black text-gray-800">{formatCurrency(aggregatedStats.totalDienTich)} <span className="text-sm font-semibold text-gray-500">m²</span></p></div></div>
-                      <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-cyan-200 transition-all relative overflow-hidden group flex items-center gap-4"><div className="w-12 h-12 rounded-xl bg-cyan-50 text-cyan-600 flex items-center justify-center shrink-0 z-10"><DoorOpen size={24} strokeWidth={2} /></div><div className="relative z-10 flex-1"><p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">Tổng số cổng an ninh</p><p className="text-2xl font-black text-gray-800">{formatCurrency(aggregatedStats.totalCong)} <span className="text-sm font-semibold text-gray-500">Cổng</span></p></div></div>
-                      <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-orange-200 transition-all relative overflow-hidden group flex items-center gap-4"><div className="w-12 h-12 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center shrink-0 z-10"><Coffee size={24} strokeWidth={2} /></div><div className="relative z-10 flex-1"><p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">Tổng số phòng chờ</p><p className="text-2xl font-black text-gray-800">{formatCurrency(aggregatedStats.totalPhongCho)} <span className="text-sm font-semibold text-gray-500">Phòng</span></p></div></div>
-                      <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-emerald-200 transition-all relative overflow-hidden group flex items-center gap-4"><div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 z-10"><UserCheck size={24} strokeWidth={2} /></div><div className="relative z-10 flex-1"><p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">Tổng lượt khách trung bình</p><p className="text-2xl font-black text-gray-800">{formatCurrency(aggregatedStats.totalKhach)} <span className="text-sm font-semibold text-gray-500">/ ngày</span></p></div></div>
-                      <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-rose-200 transition-all relative overflow-hidden group flex items-center gap-4"><div className="w-12 h-12 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0 z-10"><Users size={24} strokeWidth={2} /></div><div className="relative z-10 flex-1"><p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">Tổng nhân sự hệ thống</p><p className="text-2xl font-black text-gray-800">{formatCurrency(aggregatedStats.totalNhanSu)} <span className="text-sm font-semibold text-gray-500">Người</span></p></div></div>
+                      <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-blue-200 transition-all relative overflow-hidden group flex items-center gap-4">
+                        <Maximize2 className="absolute -right-4 -bottom-4 w-20 h-20 text-blue-500 opacity-5 group-hover:opacity-10 group-hover:scale-110 transition-all duration-500" strokeWidth={1.5} />
+                        <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 z-10"><Maximize2 size={24} strokeWidth={2} /></div>
+                        <div className="relative z-10 flex-1">
+                          <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">Tổng diện tích mặt bằng</p>
+                          <p className="text-2xl font-black text-gray-800">{formatCurrency(aggregatedStats.totalDienTich)} <span className="text-sm font-semibold text-gray-500">m²</span></p>
+                        </div>
+                      </div>
+                      <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-cyan-200 transition-all relative overflow-hidden group flex items-center gap-4">
+                        <DoorOpen className="absolute -right-4 -bottom-4 w-20 h-20 text-cyan-500 opacity-5 group-hover:opacity-10 group-hover:scale-110 transition-all duration-500" strokeWidth={1.5} />
+                        <div className="w-12 h-12 rounded-xl bg-cyan-50 text-cyan-600 flex items-center justify-center shrink-0 z-10"><DoorOpen size={24} strokeWidth={2} /></div>
+                        <div className="relative z-10 flex-1">
+                          <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">Tổng số cổng an ninh</p>
+                          <p className="text-2xl font-black text-gray-800">{formatCurrency(aggregatedStats.totalCong)} <span className="text-sm font-semibold text-gray-500">Cổng</span></p>
+                        </div>
+                      </div>
+                      <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-orange-200 transition-all relative overflow-hidden group flex items-center gap-4">
+                        <Coffee className="absolute -right-4 -bottom-4 w-20 h-20 text-orange-500 opacity-5 group-hover:opacity-10 group-hover:scale-110 transition-all duration-500" strokeWidth={1.5} />
+                        <div className="w-12 h-12 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center shrink-0 z-10"><Coffee size={24} strokeWidth={2} /></div>
+                        <div className="relative z-10 flex-1">
+                          <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">Tổng số phòng chờ</p>
+                          <p className="text-2xl font-black text-gray-800">{formatCurrency(aggregatedStats.totalPhongCho)} <span className="text-sm font-semibold text-gray-500">Phòng</span></p>
+                        </div>
+                      </div>
+                      <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-emerald-200 transition-all relative overflow-hidden group flex items-center gap-4">
+                        <UserCheck className="absolute -right-4 -bottom-4 w-20 h-20 text-emerald-500 opacity-5 group-hover:opacity-10 group-hover:scale-110 transition-all duration-500" strokeWidth={1.5} />
+                        <div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 z-10"><UserCheck size={24} strokeWidth={2} /></div>
+                        <div className="relative z-10 flex-1">
+                          <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">Tổng lượt khách trung bình</p>
+                          <p className="text-2xl font-black text-gray-800">{formatCurrency(aggregatedStats.totalKhach)} <span className="text-sm font-semibold text-gray-500">/ ngày</span></p>
+                        </div>
+                      </div>
+                      <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-rose-200 transition-all relative overflow-hidden group flex items-center gap-4">
+                        <Users className="absolute -right-4 -bottom-4 w-20 h-20 text-rose-500 opacity-5 group-hover:opacity-10 group-hover:scale-110 transition-all duration-500" strokeWidth={1.5} />
+                        <div className="w-12 h-12 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0 z-10"><Users size={24} strokeWidth={2} /></div>
+                        <div className="relative z-10 flex-1">
+                          <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">Tổng nhân sự hệ thống</p>
+                          <p className="text-2xl font-black text-gray-800">{formatCurrency(aggregatedStats.totalNhanSu)} <span className="text-sm font-semibold text-gray-500">Người</span></p>
+                        </div>
+                      </div>
                     </div>
                   ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                      <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-blue-200 transition-all relative overflow-hidden group flex items-center gap-4"><div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 z-10"><Maximize2 size={24} strokeWidth={2} /></div><div className="relative z-10 flex-1"><p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">Diện tích sàn</p><p className="text-2xl font-black text-gray-800">{formatCurrency(selectedUnit.DienTich || 0)} <span className="text-sm font-semibold text-gray-500">m²</span></p></div></div>
-                      <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-purple-200 transition-all relative overflow-hidden group flex items-center gap-4"><div className="w-12 h-12 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0 z-10"><Layers size={24} strokeWidth={2} /></div><div className="relative z-10 flex-1"><p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">Quy mô</p><p className="text-2xl font-black text-gray-800">{selectedUnit.SoHam || 0} <span className="text-sm font-semibold text-gray-500">Hầm</span> / {selectedUnit.SoTang || 0} <span className="text-sm font-semibold text-gray-500">Tầng</span></p></div></div>
-                      <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-cyan-200 transition-all relative overflow-hidden group flex items-center gap-4"><div className="w-12 h-12 rounded-xl bg-cyan-50 text-cyan-600 flex items-center justify-center shrink-0 z-10"><DoorOpen size={24} strokeWidth={2} /></div><div className="relative z-10 flex-1"><p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">Số cổng</p><p className="text-2xl font-black text-gray-800">{selectedUnit.SoCong || 0} <span className="text-sm font-semibold text-gray-500">Cổng</span></p></div></div>
-                      <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-orange-200 transition-all relative overflow-hidden group flex items-center gap-4"><div className="w-12 h-12 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center shrink-0 z-10"><Coffee size={24} strokeWidth={2} /></div><div className="relative z-10 flex-1"><p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">Số phòng chờ</p><p className="text-2xl font-black text-gray-800">{selectedUnit.SoPhongCho || 0} <span className="text-sm font-semibold text-gray-500">Phòng</span></p></div></div>
-                      <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-emerald-200 transition-all relative overflow-hidden group flex items-center gap-4"><div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 z-10"><UserCheck size={24} strokeWidth={2} /></div><div className="relative z-10 flex-1"><p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">Khách TB ra vào</p><p className="text-2xl font-black text-gray-800">{formatCurrency(selectedUnit.LuotKhachBQ || 0)} <span className="text-sm font-semibold text-gray-500">/ ngày</span></p></div></div>
-                      <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-rose-200 transition-all relative overflow-hidden group flex items-center gap-4"><div className="w-12 h-12 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0 z-10"><Users size={24} strokeWidth={2} /></div><div className="relative z-10 flex-1"><p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">Nhân sự Đơn vị</p><p className="text-2xl font-black text-gray-800">{formatCurrency(selectedUnit.TongNhanSu || 0)} <span className="text-sm font-semibold text-gray-500">Người</span></p></div></div>
+                      <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-blue-200 transition-all relative overflow-hidden group flex items-center gap-4">
+                        <Maximize2 className="absolute -right-4 -bottom-4 w-20 h-20 text-blue-500 opacity-5 group-hover:opacity-10 group-hover:scale-110 transition-all duration-500" strokeWidth={1.5} />
+                        <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 z-10"><Maximize2 size={24} strokeWidth={2} /></div>
+                        <div className="relative z-10 flex-1">
+                          <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">Diện tích sàn</p>
+                          <p className="text-2xl font-black text-gray-800">{formatCurrency(selectedUnit.DienTich || 0)} <span className="text-sm font-semibold text-gray-500">m²</span></p>
+                        </div>
+                      </div>
+                      <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-purple-200 transition-all relative overflow-hidden group flex items-center gap-4">
+                        <Layers className="absolute -right-4 -bottom-4 w-20 h-20 text-purple-500 opacity-5 group-hover:opacity-10 group-hover:scale-110 transition-all duration-500" strokeWidth={1.5} />
+                        <div className="w-12 h-12 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0 z-10"><Layers size={24} strokeWidth={2} /></div>
+                        <div className="relative z-10 flex-1">
+                          <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">Quy mô</p>
+                          <p className="text-2xl font-black text-gray-800">{selectedUnit.SoHam || 0} <span className="text-sm font-semibold text-gray-500">Hầm</span> / {selectedUnit.SoTang || 0} <span className="text-sm font-semibold text-gray-500">Tầng</span></p>
+                        </div>
+                      </div>
+                      <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-cyan-200 transition-all relative overflow-hidden group flex items-center gap-4">
+                        <DoorOpen className="absolute -right-4 -bottom-4 w-20 h-20 text-cyan-500 opacity-5 group-hover:opacity-10 group-hover:scale-110 transition-all duration-500" strokeWidth={1.5} />
+                        <div className="w-12 h-12 rounded-xl bg-cyan-50 text-cyan-600 flex items-center justify-center shrink-0 z-10"><DoorOpen size={24} strokeWidth={2} /></div>
+                        <div className="relative z-10 flex-1">
+                          <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">Số cổng</p>
+                          <p className="text-2xl font-black text-gray-800">{selectedUnit.SoCong || 0} <span className="text-sm font-semibold text-gray-500">Cổng</span></p>
+                        </div>
+                      </div>
+                      <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-orange-200 transition-all relative overflow-hidden group flex items-center gap-4">
+                        <Coffee className="absolute -right-4 -bottom-4 w-20 h-20 text-orange-500 opacity-5 group-hover:opacity-10 group-hover:scale-110 transition-all duration-500" strokeWidth={1.5} />
+                        <div className="w-12 h-12 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center shrink-0 z-10"><Coffee size={24} strokeWidth={2} /></div>
+                        <div className="relative z-10 flex-1">
+                          <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">Số phòng chờ</p>
+                          <p className="text-2xl font-black text-gray-800">{selectedUnit.SoPhongCho || 0} <span className="text-sm font-semibold text-gray-500">Phòng</span></p>
+                        </div>
+                      </div>
+                      <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-emerald-200 transition-all relative overflow-hidden group flex items-center gap-4">
+                        <UserCheck className="absolute -right-4 -bottom-4 w-20 h-20 text-emerald-500 opacity-5 group-hover:opacity-10 group-hover:scale-110 transition-all duration-500" strokeWidth={1.5} />
+                        <div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 z-10"><UserCheck size={24} strokeWidth={2} /></div>
+                        <div className="relative z-10 flex-1">
+                          <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">Khách TB ra vào</p>
+                          <p className="text-2xl font-black text-gray-800">{formatCurrency(selectedUnit.LuotKhachBQ || 0)} <span className="text-sm font-semibold text-gray-500">/ ngày</span></p>
+                        </div>
+                      </div>
+                      <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-rose-200 transition-all relative overflow-hidden group flex items-center gap-4">
+                        <Users className="absolute -right-4 -bottom-4 w-20 h-20 text-rose-500 opacity-5 group-hover:opacity-10 group-hover:scale-110 transition-all duration-500" strokeWidth={1.5} />
+                        <div className="w-12 h-12 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0 z-10"><Users size={24} strokeWidth={2} /></div>
+                        <div className="relative z-10 flex-1">
+                          <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">Nhân sự Đơn vị</p>
+                          <p className="text-2xl font-black text-gray-800">{formatCurrency(selectedUnit.TongNhanSu || 0)} <span className="text-sm font-semibold text-gray-500">Người</span></p>
+                        </div>
+                      </div>
                     </div>
                   )}
                 </section>
-
-                {/* D. AN NINH */}
+                
+                {/* 🟢 D. AN NINH & HỆ THỐNG CAMERA */}
                 <section className="animate-in fade-in duration-500">
                   <div className="flex justify-between items-center mb-5">
-                    <h3 className="text-lg font-black text-[#05469B] flex items-center gap-2 uppercase tracking-wider"><div className="w-1.5 h-6 bg-[#05469B] rounded-full"></div> {isParentUnit ? 'D. TỔNG HỢP AN NINH TOÀN CỤM & CƠ SỞ' : 'D. AN NINH & HỆ THỐNG CAMERA'}</h3>
-                    {currentAnNinh && (<button onClick={openSecurityModal} className="px-4 py-2 text-sm font-bold text-[#05469B] bg-blue-50 hover:bg-blue-100 rounded-lg flex items-center gap-2 transition-colors border border-blue-100 shadow-sm"><Edit size={16} /> Cập nhật</button>)}
+                    <h3 className="text-lg font-black text-[#05469B] flex items-center gap-2 uppercase tracking-wider">
+                      <div className="w-1.5 h-6 bg-[#05469B] rounded-full"></div> {isParentUnit ? 'D. TỔNG HỢP AN NINH TOÀN CỤM' : 'D. AN NINH & HỆ THỐNG CAMERA'}
+                    </h3>
+                    <button onClick={openSecurityModal} className="px-4 py-2 text-sm font-bold text-[#05469B] bg-blue-50 hover:bg-blue-100 rounded-lg flex items-center gap-2 transition-colors border border-blue-100 shadow-sm">
+                      {currentAnNinh ? <><Edit size={16} /> Cập nhật</> : <><Plus size={16} />AN-BV & HT Camera</>}
+                    </button>
                   </div>
+
                   {isParentUnit && aggregatedSecurity && (
                     <div className="mb-6 p-5 bg-indigo-50/30 rounded-2xl border border-indigo-100 shadow-sm">
                       <h4 className="font-bold text-indigo-800 mb-4 flex items-center gap-2"><Layers size={18} /> Số liệu Tổng hợp Toàn Cụm</h4>
@@ -853,11 +966,12 @@ export default function DepartmentPage() {
                       </div>
                     </div>
                   )}
+
                   {currentAnNinh ? (
                     <div className="space-y-5 animate-in fade-in duration-300">
                       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
                         <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex flex-col">
-                          <h4 className="font-bold text-[#05469B] mb-4 flex items-center gap-2 border-b border-gray-100 pb-2"><Users size={18} /> Lực lượng Bảo vệ</h4>
+                          <h4 className="font-bold text-[#05469B] mb-4 flex items-center gap-2 border-b border-gray-100 pb-2"><Users size={18} /> Lực lượng Bảo vệ (Trụ sở)</h4>
                           <div className="space-y-3 text-sm flex-1">
                              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-0"><span className="text-gray-500 font-medium whitespace-nowrap shrink-0">Tổng ANBV / Định biên:</span><span className="font-black text-[#05469B] sm:text-right">{currentAnNinh.TongANBV || 0} / {currentAnNinh.DinhbienANBV || 0}</span></div>
                              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-0"><span className="text-gray-500 font-medium whitespace-nowrap shrink-0">Bảo vệ Nội bộ:</span><span className="font-bold text-gray-800 sm:text-right">{currentAnNinh.SoBaoVeNoiBo || 0} người</span></div>
@@ -872,8 +986,16 @@ export default function DepartmentPage() {
                           </div>
                           <div className="mt-4 pt-4 border-t border-gray-100">
                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                <div className="bg-amber-50/50 p-3 rounded-lg border border-amber-100 flex flex-col justify-center"><p className="text-[10px] font-bold text-amber-800 mb-1 flex items-center gap-1"><Sun size={12}/> CA NGÀY</p><div className="text-xs text-gray-600 flex justify-between mb-0.5"><span className="whitespace-nowrap shrink-0">Cố định:</span> <b>{currentAnNinh.Ngaycd || 0} người</b></div><div className="text-xs text-gray-600 flex justify-between"><span className="whitespace-nowrap shrink-0">Tuần tra:</span> <b>{currentAnNinh.Ngaytuantra || 0} người</b></div></div>
-                                <div className="bg-indigo-50/50 p-3 rounded-lg border border-indigo-100 flex flex-col justify-center"><p className="text-[10px] font-bold text-indigo-800 mb-1 flex items-center gap-1"><Moon size={12}/> CA ĐÊM</p><div className="text-xs text-gray-600 flex justify-between mb-0.5"><span className="whitespace-nowrap shrink-0">Cố định:</span> <b>{currentAnNinh.Demcd || 0} người</b></div><div className="text-xs text-gray-600 flex justify-between"><span className="whitespace-nowrap shrink-0">Tuần tra:</span> <b>{currentAnNinh.Demtruantra || 0} người</b></div></div>
+                                <div className="bg-amber-50/50 p-3 rounded-lg border border-amber-100 flex flex-col justify-center">
+                                   <p className="text-[10px] font-bold text-amber-800 mb-1 flex items-center gap-1"><Sun size={12}/> CA NGÀY</p>
+                                   <div className="text-xs text-gray-600 flex justify-between mb-0.5"><span className="whitespace-nowrap shrink-0">Cố định:</span> <b>{currentAnNinh.Ngaycd || 0} người</b></div>
+                                   <div className="text-xs text-gray-600 flex justify-between"><span className="whitespace-nowrap shrink-0">Tuần tra:</span> <b>{currentAnNinh.Ngaytuantra || 0} người</b></div>
+                                </div>
+                                <div className="bg-indigo-50/50 p-3 rounded-lg border border-indigo-100 flex flex-col justify-center">
+                                   <p className="text-[10px] font-bold text-indigo-800 mb-1 flex items-center gap-1"><Moon size={12}/> CA ĐÊM</p>
+                                   <div className="text-xs text-gray-600 flex justify-between mb-0.5"><span className="whitespace-nowrap shrink-0">Cố định:</span> <b>{currentAnNinh.Demcd || 0} người</b></div>
+                                   <div className="text-xs text-gray-600 flex justify-between"><span className="whitespace-nowrap shrink-0">Tuần tra:</span> <b>{currentAnNinh.Demtruantra || 0} người</b></div>
+                                </div>
                              </div>
                              <div className="mt-4">
                                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 sm:gap-3 bg-gradient-to-r from-amber-50 to-indigo-50 px-4 py-3 rounded-lg border border-gray-200 shadow-sm">
@@ -886,16 +1008,38 @@ export default function DepartmentPage() {
                         <div className="bg-emerald-50/50 p-5 rounded-xl border border-emerald-100 shadow-sm flex flex-col h-full">
                            <h4 className="font-bold text-emerald-700 mb-4 flex items-center gap-2 border-b border-emerald-200 pb-2"><Compass size={18} /> Đặc điểm Địa bàn & Phương án</h4>
                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-5 flex-1">
-                              <div className="bg-white p-3 rounded-lg border border-emerald-100/50 shadow-sm"><p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Tiếp giáp Trước</p><p className="text-sm font-semibold text-gray-700 line-clamp-2" title={currentAnNinh.TiepGiapTruoc}>{currentAnNinh.TiepGiapTruoc || '---'}</p></div>
-                              <div className="bg-white p-3 rounded-lg border border-emerald-100/50 shadow-sm"><p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Tiếp giáp Sau</p><p className="text-sm font-semibold text-gray-700 line-clamp-2" title={currentAnNinh.TiepGiapSau}>{currentAnNinh.TiepGiapSau || '---'}</p></div>
-                              <div className="bg-white p-3 rounded-lg border border-emerald-100/50 shadow-sm"><p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Tiếp giáp Trái</p><p className="text-sm font-semibold text-gray-700 line-clamp-2" title={currentAnNinh.TiepGiapTrai}>{currentAnNinh.TiepGiapTrai || '---'}</p></div>
-                              <div className="bg-white p-3 rounded-lg border border-emerald-100/50 shadow-sm"><p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Tiếp giáp Phải</p><p className="text-sm font-semibold text-gray-700 line-clamp-2" title={currentAnNinh.TiepGiapPhai}>{currentAnNinh.TiepGiapPhai || '---'}</p></div>
+                              <div className="bg-white p-3 rounded-lg border border-emerald-100/50 shadow-sm">
+                                <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Tiếp giáp Trước</p>
+                                <p className="text-sm font-semibold text-gray-700 line-clamp-2" title={currentAnNinh.TiepGiapTruoc}>{currentAnNinh.TiepGiapTruoc || '---'}</p>
+                              </div>
+                              <div className="bg-white p-3 rounded-lg border border-emerald-100/50 shadow-sm">
+                                <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Tiếp giáp Sau</p>
+                                <p className="text-sm font-semibold text-gray-700 line-clamp-2" title={currentAnNinh.TiepGiapSau}>{currentAnNinh.TiepGiapSau || '---'}</p>
+                              </div>
+                              <div className="bg-white p-3 rounded-lg border border-emerald-100/50 shadow-sm">
+                                <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Tiếp giáp Trái</p>
+                                <p className="text-sm font-semibold text-gray-700 line-clamp-2" title={currentAnNinh.TiepGiapTrai}>{currentAnNinh.TiepGiapTrai || '---'}</p>
+                              </div>
+                              <div className="bg-white p-3 rounded-lg border border-emerald-100/50 shadow-sm">
+                                <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Tiếp giáp Phải</p>
+                                <p className="text-sm font-semibold text-gray-700 line-clamp-2" title={currentAnNinh.TiepGiapPhai}>{currentAnNinh.TiepGiapPhai || '---'}</p>
+                              </div>
                            </div>
                            <div className="pt-4 border-t border-emerald-200/50">
                               <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">Đánh giá Tình hình ANTT Khu vực</p>
-                              <div className="bg-white text-emerald-800 p-3 rounded-lg border border-emerald-100 shadow-sm text-sm font-medium whitespace-pre-wrap mb-4">{currentAnNinh.TinhHinhKhuVuc || 'Chưa cập nhật tình hình...'}</div>
+                              <div className="bg-white text-emerald-800 p-3 rounded-lg border border-emerald-100 shadow-sm text-sm font-medium whitespace-pre-wrap mb-4">
+                                {currentAnNinh.TinhHinhKhuVuc || 'Chưa cập nhật tình hình...'}
+                              </div>
                               <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">Phương án ANBV</p>
-                              {currentAnNinh.Link_PhuongAnAN ? (<a href={currentAnNinh.Link_PhuongAnAN} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-2 w-full p-3 bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 rounded-lg text-sm font-bold transition-colors shadow-sm"><LinkIcon size={16}/> Xem File Đính Kèm</a>) : (<div className="flex items-center justify-center gap-2 w-full p-3 bg-white text-gray-400 border border-dashed border-gray-200 rounded-lg text-sm font-medium">Chưa cập nhật file</div>)}
+                              {currentAnNinh.Link_PhuongAnAN ? (
+                                <a href={currentAnNinh.Link_PhuongAnAN} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-2 w-full p-3 bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 rounded-lg text-sm font-bold transition-colors shadow-sm">
+                                  <LinkIcon size={16}/> Xem File Đính Kèm
+                                </a>
+                              ) : (
+                                <div className="flex items-center justify-center gap-2 w-full p-3 bg-white text-gray-400 border border-dashed border-gray-200 rounded-lg text-sm font-medium">
+                                  Chưa cập nhật file
+                                </div>
+                              )}
                            </div>
                         </div>
                       </div>
@@ -910,131 +1054,207 @@ export default function DepartmentPage() {
                              </div>
                              <div className="lg:col-span-1">
                                {Number(currentAnNinh.CAMHuHong) > 0 ? (
-                                  <div className="flex flex-col h-full p-3 bg-red-50/50 rounded-lg border border-red-100"><span className="text-red-700 font-bold text-xs mb-1 uppercase">Lý do hư hỏng:</span><span className="font-semibold text-red-800 text-sm flex-1 whitespace-pre-wrap break-words">{currentAnNinh.LyDoHuCam || '---'}</span></div>
-                               ) : (<div className="flex flex-col h-full p-3 bg-gray-50 rounded-lg border border-dashed border-gray-200 items-center justify-center text-gray-400"><span className="text-xs font-medium">Hệ thống hoạt động tốt</span></div>)}
+                                  <div className="flex flex-col h-full p-3 bg-red-50/50 rounded-lg border border-red-100">
+                                    <span className="text-red-700 font-bold text-xs mb-1 uppercase">Lý do hư hỏng:</span>
+                                    <span className="font-semibold text-red-800 text-sm flex-1 whitespace-pre-wrap break-words">{currentAnNinh.LyDoHuCam || '---'}</span>
+                                  </div>
+                               ) : (
+                                  <div className="flex flex-col h-full p-3 bg-gray-50 rounded-lg border border-dashed border-gray-200 items-center justify-center text-gray-400">
+                                    <span className="text-xs font-medium">Hệ thống hoạt động tốt</span>
+                                  </div>
+                               )}
                              </div>
                              <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <div className="flex flex-col"><span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">Vị trí đặt hệ thống (Đầu ghi)</span><span className="font-bold text-gray-800 bg-gray-50 p-3 rounded-lg border border-gray-100 flex-1 whitespace-pre-wrap break-words">{currentAnNinh.ViTriDatHeThong || '---'}</span></div>
-                                <div className="flex flex-col"><span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">Vị trí giám sát chính</span><span className="font-bold text-gray-800 bg-gray-50 p-3 rounded-lg border border-gray-100 flex-1 whitespace-pre-wrap break-words">{currentAnNinh.ViTriGiamSat || '---'}</span></div>
+                                <div className="flex flex-col">
+                                  <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">Vị trí đặt hệ thống (Đầu ghi)</span>
+                                  <span className="font-bold text-gray-800 bg-gray-50 p-3 rounded-lg border border-gray-100 flex-1 whitespace-pre-wrap break-words">{currentAnNinh.ViTriDatHeThong || '---'}</span>
+                                </div>
+                                <div className="flex flex-col">
+                                  <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">Vị trí giám sát chính</span>
+                                  <span className="font-bold text-gray-800 bg-gray-50 p-3 rounded-lg border border-gray-100 flex-1 whitespace-pre-wrap break-words">{currentAnNinh.ViTriGiamSat || '---'}</span>
+                                </div>
                              </div>
                           </div>
                       </div>
                     </div>
                   ) : (
-                    <div onClick={openSecurityModal} className="bg-white hover:bg-indigo-50/50 cursor-pointer p-10 rounded-2xl border-2 border-dashed border-gray-300 hover:border-indigo-300 text-center transition-all group shadow-sm">
-                      <Shield size={48} className="mx-auto text-gray-300 group-hover:text-indigo-400 mb-4 transition-colors" />
-                      <h4 className="text-lg font-bold text-gray-700 group-hover:text-indigo-700 mb-1">Khai báo Hồ sơ An Ninh & Camera</h4>
-                      <p className="text-sm text-gray-400">Click vào đây để khai báo dữ liệu bảo vệ, phân ca trực và khu vực tiếp giáp.</p>
-                    </div>
+                    !isParentUnit && (
+                      <div onClick={openSecurityModal} className="bg-white hover:bg-indigo-50/50 cursor-pointer p-10 rounded-2xl border-2 border-dashed border-gray-300 hover:border-indigo-300 text-center transition-all group shadow-sm">
+                        <Shield size={48} className="mx-auto text-gray-300 group-hover:text-indigo-400 mb-4 transition-colors" />
+                        <h4 className="text-lg font-bold text-gray-700 group-hover:text-indigo-700 mb-1">Khai báo Hồ sơ An Ninh & Camera</h4>
+                        <p className="text-sm text-gray-400">Click vào đây để khai báo dữ liệu bảo vệ, phân ca trực và khu vực tiếp giáp.</p>
+                      </div>
+                    )
                   )}
                 </section>
 
-                {/* F. PCCC */}
-                <section>
+                {/* 🟢 F. PHÒNG CHỐNG CHÁY NỔ */}
+                <section className="animate-in fade-in duration-500">
                   <div className="flex justify-between items-center mb-5">
-                    <h3 className="text-lg font-black text-[#05469B] flex items-center gap-2 uppercase tracking-wider"><div className="w-1.5 h-6 bg-[#05469B] rounded-full"></div> {isParentUnit ? 'F. TỔNG HỢP PCCC TOÀN CỤM' : 'F. PHÒNG CHỐNG CHÁY NỔ'}</h3>
-                    {!isParentUnit && currentPccc && (<button onClick={openPcccModal} className="px-4 py-2 text-sm font-bold text-red-600 bg-red-50 hover:bg-red-100 rounded-lg flex items-center gap-2 transition-colors border border-red-100 shadow-sm"><Edit size={16} /> Cập nhật</button>)}
+                    <h3 className="text-lg font-black text-[#05469B] flex items-center gap-2 uppercase tracking-wider">
+                      <div className="w-1.5 h-6 bg-[#05469B] rounded-full"></div> {isParentUnit ? 'F. TỔNG HỢP PCCC TOÀN CỤM' : 'F. PHÒNG CHỐNG CHÁY NỔ'}
+                    </h3>
+                    <button onClick={openPcccModal} className="px-4 py-2 text-sm font-bold text-red-600 bg-red-50 hover:bg-red-100 rounded-lg flex items-center gap-2 transition-colors border border-red-100 shadow-sm">
+                      {currentPccc ? <><Edit size={16} /> Cập nhật</> : <><Plus size={16} /> Khai báo PCCN</>}
+                    </button>
                   </div>
-                  {isParentUnit ? (() => {
+
+                  {isParentUnit && (() => {
                     const childPCCCs = pcccData.filter(p => selectedUnitSubordinates.includes(p.ID_DonVi));
                     const totalPCCC = childPCCCs.length;
                     const hoSoLoi = childPCCCs.filter(p => p.LoiTonTaiChuaKhacPhuc || p.TrangThaiBaoChay === 'Lỗi' || p.TrangThaiBom === 'Lỗi').length;
                     const hoSoChuan = totalPCCC - hoSoLoi;
                     return (
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 animate-in fade-in">
-                        <div className="bg-red-50 p-5 rounded-2xl border border-red-100 shadow-sm flex items-center justify-between"><div><p className="text-xs font-bold text-red-600 uppercase mb-1">Cơ sở đã khai báo</p><p className="text-3xl font-black text-red-700">{totalPCCC}</p></div><Flame size={40} className="text-red-200"/></div>
-                        <div className="bg-emerald-50 p-5 rounded-2xl border border-emerald-100 shadow-sm flex items-center justify-between"><div><p className="text-xs font-bold text-emerald-600 uppercase mb-1">Hệ thống Tốt / Nghiệm thu</p><p className="text-3xl font-black text-emerald-700">{hoSoChuan}</p></div><Shield size={40} className="text-emerald-200"/></div>
-                        <div className="bg-orange-50 p-5 rounded-2xl border border-orange-100 shadow-sm flex items-center justify-between"><div><p className="text-xs font-bold text-orange-600 uppercase mb-1">Đang bị Lỗi / Có tồn tại</p><p className="text-3xl font-black text-orange-700">{hoSoLoi}</p></div><AlertCircle size={40} className="text-orange-200"/></div>
-                      </div>
-                    );
-                  })() : (() => {
-                    if (!currentPccc) {
-                      return (<div onClick={openPcccModal} className="bg-white hover:bg-red-50/50 cursor-pointer p-10 rounded-2xl border-2 border-dashed border-gray-300 hover:border-red-300 text-center transition-all group shadow-sm"><Flame size={48} className="mx-auto text-gray-300 group-hover:text-red-400 mb-4 transition-colors" /><h4 className="text-lg font-bold text-gray-700 group-hover:text-red-700 mb-1">Cập nhật Hồ sơ PCCC</h4><p className="text-sm text-gray-400">Click vào đây để khai báo hệ thống và tình trạng an toàn PCCC.</p></div>);
-                    }
-                    return (
-                      <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm animate-in fade-in">
-                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="space-y-3">
-                              <h4 className="font-bold text-red-700 border-b border-gray-100 pb-2 text-sm flex items-center gap-1.5"><FileText size={16}/> Pháp lý & Hệ thống</h4>
-                              <div className="flex justify-between text-sm"><span className="text-gray-500">Tình trạng Pháp lý:</span><span className="font-bold text-gray-800">{currentPccc.TinhTrangPhapLy}</span></div>
-                              <div className="flex justify-between text-sm"><span className="text-gray-500">Đội trưởng PCCC:</span><span className="font-bold text-[#05469B] text-right">{currentPccc.TenDoiTruong || 'Chưa cập nhật'} {currentPccc.SDTDoiTruong && <span className="block text-xs font-normal text-gray-500">{currentPccc.SDTDoiTruong}</span>}</span></div>
-                              <div className="flex justify-between text-sm"><span className="text-gray-500">Hệ thống Báo cháy:</span><span className={`font-bold ${currentPccc.TrangThaiBaoChay === 'Bình thường' ? 'text-emerald-600' : 'text-red-600'}`}>{currentPccc.TrangThaiBaoChay}</span></div>
-                              <div className="flex justify-between text-sm"><span className="text-gray-500">Hệ thống Bơm:</span><span className={`font-bold ${currentPccc.TrangThaiBom === 'Sẵn sàng' ? 'text-emerald-600' : 'text-red-600'}`}>{currentPccc.TrangThaiBom}</span></div>
-                              <div className="flex justify-between text-sm pt-2 border-t border-gray-50"><span className="text-gray-500">Bình (Bột/CO2/Đẩy/Pin):</span><span className="font-bold text-gray-800">{Number(currentPccc.SoLuongBinhBot||0)} / {Number(currentPccc.SoLuongBinhCO2||0)} / {Number(currentPccc.SoLuongBinhXeDay||0)} / {Number(currentPccc.SoLuongBinhPinDien||0)}</span></div>
-                            </div>
-                            <div className="space-y-3 border-l border-gray-100 pl-6">
-                              <h4 className="font-bold text-orange-600 border-b border-gray-100 pb-2 text-sm flex items-center gap-1.5"><AlertCircle size={16}/> Cảnh báo & Tồn tại</h4>
-                              <div className="flex justify-between text-sm"><span className="text-gray-500">Khu vực rủi ro:</span><span className="font-semibold text-gray-800 text-right">{currentPccc.KhuVucRuiRoCao || 'Không có'}</span></div>
-                              <div className="mt-2">
-                                <span className="text-gray-500 text-sm block mb-1">Lỗi / Tồn tại chưa khắc phục:</span>
-                                {currentPccc.LoiTonTaiChuaKhacPhuc ? (<div className="bg-red-50 text-red-700 p-2 rounded text-xs font-semibold border border-red-100">{currentPccc.LoiTonTaiChuaKhacPhuc}</div>) : (<div className="bg-emerald-50 text-emerald-600 p-2 rounded text-xs font-semibold border border-emerald-100">Đảm bảo an toàn</div>)}
-                              </div>
-                            </div>
-                         </div>
+                      <div className="mb-6 p-5 bg-indigo-50/30 rounded-2xl border border-indigo-100 shadow-sm">
+                        <h4 className="font-bold text-indigo-800 mb-4 flex items-center gap-2"><Layers size={18} /> Số liệu Tổng hợp Toàn Cụm</h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 animate-in fade-in">
+                          <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex items-center justify-between">
+                            <div><p className="text-[10px] font-bold text-red-600 uppercase mb-1">Cơ sở đã khai báo</p><p className="text-2xl font-black text-red-700">{totalPCCC}</p></div>
+                            <Flame size={32} className="text-red-200"/>
+                          </div>
+                          <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex items-center justify-between">
+                            <div><p className="text-[10px] font-bold text-emerald-600 uppercase mb-1">Tốt / Nghiệm thu</p><p className="text-2xl font-black text-emerald-700">{hoSoChuan}</p></div>
+                            <Shield size={32} className="text-emerald-200"/>
+                          </div>
+                          <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex items-center justify-between">
+                            <div><p className="text-[10px] font-bold text-orange-600 uppercase mb-1">Bị Lỗi / Có tồn tại</p><p className="text-2xl font-black text-orange-700">{hoSoLoi}</p></div>
+                            <AlertCircle size={32} className="text-orange-200"/>
+                          </div>
+                        </div>
                       </div>
                     );
                   })()}
+
+                  {currentPccc ? (
+                    <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm animate-in fade-in">
+                       <h4 className="font-bold text-[#05469B] mb-4 flex items-center gap-2 border-b border-gray-100 pb-2"><Flame size={18} /> Thông tin PCCC Trụ sở</h4>
+                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div className="space-y-3">
+                            <h4 className="font-bold text-red-700 border-b border-gray-100 pb-2 text-sm flex items-center gap-1.5"><FileText size={16}/> Pháp lý & Hệ thống</h4>
+                            <div className="flex justify-between text-sm"><span className="text-gray-500">Tình trạng Pháp lý:</span><span className="font-bold text-gray-800">{currentPccc.TinhTrangPhapLy}</span></div>
+                            <div className="flex justify-between text-sm"><span className="text-gray-500">Đội trưởng PCCC:</span><span className="font-bold text-[#05469B] text-right">{currentPccc.TenDoiTruong || 'Chưa cập nhật'} {currentPccc.SDTDoiTruong && <span className="block text-xs font-normal text-gray-500">{currentPccc.SDTDoiTruong}</span>}</span></div>
+                            <div className="flex justify-between text-sm"><span className="text-gray-500">Hệ thống Báo cháy:</span><span className={`font-bold ${currentPccc.TrangThaiBaoChay === 'Bình thường' ? 'text-emerald-600' : 'text-red-600'}`}>{currentPccc.TrangThaiBaoChay}</span></div>
+                            <div className="flex justify-between text-sm"><span className="text-gray-500">Hệ thống Bơm:</span><span className={`font-bold ${currentPccc.TrangThaiBom === 'Sẵn sàng' ? 'text-emerald-600' : 'text-red-600'}`}>{currentPccc.TrangThaiBom}</span></div>
+                            <div className="flex justify-between text-sm pt-2 border-t border-gray-50"><span className="text-gray-500">Bình (Bột/CO2/Đẩy/Pin):</span><span className="font-bold text-gray-800">{Number(currentPccc.SoLuongBinhBot||0)} / {Number(currentPccc.SoLuongBinhCO2||0)} / {Number(currentPccc.SoLuongBinhXeDay||0)} / {Number(currentPccc.SoLuongBinhPinDien||0)}</span></div>
+                          </div>
+                          <div className="space-y-3 border-l border-gray-100 pl-6">
+                            <h4 className="font-bold text-orange-600 border-b border-gray-100 pb-2 text-sm flex items-center gap-1.5"><AlertCircle size={16}/> Cảnh báo & Tồn tại</h4>
+                            <div className="flex justify-between text-sm"><span className="text-gray-500">Khu vực rủi ro:</span><span className="font-semibold text-gray-800 text-right">{currentPccc.KhuVucRuiRoCao || 'Không có'}</span></div>
+                            <div className="mt-2">
+                              <span className="text-gray-500 text-sm block mb-1">Lỗi / Tồn tại chưa khắc phục:</span>
+                              {currentPccc.LoiTonTaiChuaKhacPhuc ? (
+                                <div className="bg-red-50 text-red-700 p-2 rounded text-xs font-semibold border border-red-100">{currentPccc.LoiTonTaiChuaKhacPhuc}</div>
+                              ) : (
+                                <div className="bg-emerald-50 text-emerald-600 p-2 rounded text-xs font-semibold border border-emerald-100">Đảm bảo an toàn</div>
+                              )}
+                            </div>
+                          </div>
+                       </div>
+                    </div>
+                  ) : (
+                    !isParentUnit && (
+                      <div onClick={openPcccModal} className="bg-white hover:bg-red-50/50 cursor-pointer p-10 rounded-2xl border-2 border-dashed border-gray-300 hover:border-red-300 text-center transition-all group shadow-sm">
+                        <Flame size={48} className="mx-auto text-gray-300 group-hover:text-red-400 mb-4 transition-colors" />
+                        <h4 className="text-lg font-bold text-gray-700 group-hover:text-red-700 mb-1">Khai báo Hồ sơ PCCC</h4>
+                        <p className="text-sm text-gray-400">Click vào đây để khai báo hệ thống và tình trạng an toàn PCCC.</p>
+                      </div>
+                    )
+                  )}
                 </section>
 
-                {/* G. ATVSLD */}
-                <section>
+                {/* 🟢 G. AN TOÀN VỆ SINH LAO ĐỘNG */}
+                <section className="animate-in fade-in duration-500">
                   <div className="flex justify-between items-center mb-5">
-                    <h3 className="text-lg font-black text-[#05469B] flex items-center gap-2 uppercase tracking-wider"><div className="w-1.5 h-6 bg-[#05469B] rounded-full"></div> {isParentUnit ? 'G. TỔNG HỢP ATVSLĐ TOÀN CỤM' : 'G. AN TOÀN VỆ SINH LAO ĐỘNG'}</h3>
-                    {!isParentUnit && currentAtvsld && (<button onClick={openAtvsldModal} className="px-4 py-2 text-sm font-bold text-emerald-600 bg-emerald-50 hover:bg-emerald-100 rounded-lg flex items-center gap-2 transition-colors border border-emerald-100 shadow-sm"><Edit size={16} /> Cập nhật</button>)}
+                    <h3 className="text-lg font-black text-[#05469B] flex items-center gap-2 uppercase tracking-wider">
+                      <div className="w-1.5 h-6 bg-[#05469B] rounded-full"></div> {isParentUnit ? 'G. TỔNG HỢP ATVSLĐ TOÀN CỤM' : 'G. AN TOÀN VỆ SINH LAO ĐỘNG'}
+                    </h3>
+                    <button onClick={openAtvsldModal} className="px-4 py-2 text-sm font-bold text-emerald-600 bg-emerald-50 hover:bg-emerald-100 rounded-lg flex items-center gap-2 transition-colors border border-emerald-100 shadow-sm">
+                      {currentAtvsld ? <><Edit size={16} /> Cập nhật</> : <><Plus size={16} /> Khai báo ATVSLĐ</>}
+                    </button>
                   </div>
-                  {isParentUnit ? (() => {
+
+                  {isParentUnit && (() => {
                     const childData = atvsldData.filter(p => selectedUnitSubordinates.includes(p.ID_DonVi));
                     const totalThietBi = childData.reduce((sum, item) => sum + (Number(item.SL_ThietBiNghiemNgat) || 0), 0);
                     const totalLoi = childData.reduce((sum, item) => sum + (Number(item.SL_ThietBiQuaHanKD) || 0), 0);
                     const totalTaiNan = childData.reduce((sum, item) => sum + (Number(item.SoTaiNanTrongNam) || 0), 0);
                     return (
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 animate-in fade-in">
-                        <div className="bg-emerald-50 p-5 rounded-2xl border border-emerald-100 shadow-sm flex items-center justify-between"><div><p className="text-xs font-bold text-emerald-600 uppercase mb-1">Cơ sở đã khai báo</p><p className="text-3xl font-black text-emerald-700">{childData.length}</p></div><HardHat size={40} className="text-emerald-200"/></div>
-                        <div className={`p-5 rounded-2xl border shadow-sm flex items-center justify-between ${totalLoi > 0 ? 'bg-red-50 border-red-200' : 'bg-blue-50 border-blue-100'}`}><div><p className={`text-xs font-bold uppercase mb-1 ${totalLoi > 0 ? 'text-red-600' : 'text-blue-600'}`}>Thiết bị Nguy hiểm / Quá hạn</p><p className={`text-3xl font-black ${totalLoi > 0 ? 'text-red-700' : 'text-blue-700'}`}>{totalThietBi} / {totalLoi}</p></div><AlertCircle size={40} className={totalLoi > 0 ? 'text-red-200' : 'text-blue-200'}/></div>
-                        <div className={`p-5 rounded-2xl border shadow-sm flex items-center justify-between ${totalTaiNan > 0 ? 'bg-orange-50 border-orange-200' : 'bg-gray-50 border-gray-200'}`}><div><p className={`text-xs font-bold uppercase mb-1 ${totalTaiNan > 0 ? 'text-orange-600' : 'text-gray-500'}`}>Số sự cố / Tai nạn (Năm)</p><p className={`text-3xl font-black ${totalTaiNan > 0 ? 'text-orange-700' : 'text-gray-600'}`}>{totalTaiNan}</p></div><ShieldAlert size={40} className={totalTaiNan > 0 ? 'text-orange-200' : 'text-gray-200'}/></div>
-                      </div>
-                    );
-                  })() : (() => {
-                    if (!currentAtvsld) return (<div onClick={openAtvsldModal} className="bg-white hover:bg-emerald-50/50 cursor-pointer p-10 rounded-2xl border-2 border-dashed border-gray-300 hover:border-emerald-300 text-center transition-all group shadow-sm"><HardHat size={48} className="mx-auto text-gray-300 group-hover:text-emerald-400 mb-4 transition-colors" /><h4 className="text-lg font-bold text-gray-700 group-hover:text-emerald-700 mb-1">Cập nhật Hồ sơ ATVSLĐ</h4><p className="text-sm text-gray-400">Khai báo thiết bị kiểm định, môi trường, huấn luyện an toàn & sức khỏe.</p></div>);
-                    return (
-                      <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm animate-in fade-in">
-                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="space-y-3">
-                              <h4 className="font-bold text-emerald-700 border-b border-gray-100 pb-2 text-sm flex items-center gap-1.5"><Users size={16}/> Tổ chức & Huấn luyện</h4>
-                              <div className="flex justify-between text-sm"><span className="text-gray-500">Phụ trách ATVSLĐ:</span><span className="font-bold text-[#05469B] text-right">{currentAtvsld.NguoiPhuTrach || '---'}</span></div>
-                              <div className="flex justify-between text-sm"><span className="text-gray-500">Mạng lưới ATVS Viên:</span><span className="font-bold text-gray-800">{currentAtvsld.SL_MangLuoiATVSV || 0} Người</span></div>
-                              <div className="flex justify-between text-sm"><span className="text-gray-500">Khám SK / Bệnh Nghề nghiệp:</span><span className="font-bold text-gray-800">{formatToVN(currentAtvsld.NgayKhamSKGanNhat) || '---'} / {formatToVN(currentAtvsld.NgayKhamBenhNgheNghiep) || '---'}</span></div>
-                              <div className="flex justify-between text-sm"><span className="text-gray-500">Huấn luyện ATVSLĐ:</span><span className="font-bold text-emerald-600">{currentAtvsld.TyLeHoanThanhHL || '0%'} (Gần nhất: {formatToVN(currentAtvsld.NgayHuanLuyenGanNhat) || '---'})</span></div>
-                              <div className="flex justify-between text-sm pt-2 border-t border-gray-50"><span className="text-gray-500">Cấp phát BHLĐ:</span><span className={`font-bold ${currentAtvsld.TyLeCapPhatBHLD === 'Đầy đủ' ? 'text-emerald-600' : 'text-orange-600'}`}>{currentAtvsld.TyLeCapPhatBHLD}</span></div>
-                            </div>
-                            <div className="space-y-3 border-l border-gray-100 pl-6">
-                              <h4 className="font-bold text-red-600 border-b border-gray-100 pb-2 text-sm flex items-center gap-1.5"><AlertCircle size={16}/> Máy móc, Môi trường & Hiện trường</h4>
-                              <div className="flex justify-between text-sm"><span className="text-gray-500">Đo kiểm Môi trường:</span><span className="font-semibold text-gray-800 text-right">{formatToVN(currentAtvsld.NgayQuanTracMoiTruong) || 'Chưa đo'}</span></div>
-                              <div className="flex justify-between text-sm"><span className="text-gray-500">Thiết bị Nghiêm ngặt (Tổng/Quá hạn):</span><span className={`font-black ${Number(currentAtvsld.SL_ThietBiQuaHanKD) > 0 ? 'text-red-600 animate-pulse' : 'text-emerald-600'}`}>{currentAtvsld.SL_ThietBiNghiemNgat || 0} / {currentAtvsld.SL_ThietBiQuaHanKD || 0}</span></div>
-                              <div className="flex justify-between text-sm"><span className="text-gray-500">Số vụ Tai nạn (Năm):</span><span className={`font-bold ${Number(currentAtvsld.SoTaiNanTrongNam) > 0 ? 'text-orange-600' : 'text-gray-800'}`}>{currentAtvsld.SoTaiNanTrongNam || 0} Vụ</span></div>
-                              <div className="mt-2 pt-2 border-t border-gray-50">
-                                <span className="text-gray-500 text-sm block mb-1">Tuần tra & Lỗi hiện trường:</span>
-                                {currentAtvsld.CacLoiHienTruong ? (<div className="bg-red-50 text-red-700 p-2 rounded text-xs font-semibold border border-red-100">{currentAtvsld.CacLoiHienTruong}</div>) : (<div className="bg-emerald-50 text-emerald-600 p-2 rounded text-xs font-semibold border border-emerald-100">Không có lỗi / Đã xử lý (Kiểm tra: {formatToVN(currentAtvsld.NgayTuKiemTraGanNhat) || '---'})</div>)}
-                              </div>
-                            </div>
-                         </div>
+                      <div className="mb-6 p-5 bg-indigo-50/30 rounded-2xl border border-indigo-100 shadow-sm">
+                        <h4 className="font-bold text-indigo-800 mb-4 flex items-center gap-2"><Layers size={18} /> Số liệu Tổng hợp Toàn Cụm</h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 animate-in fade-in">
+                          <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex items-center justify-between">
+                            <div><p className="text-[10px] font-bold text-emerald-600 uppercase mb-1">Cơ sở đã khai báo</p><p className="text-2xl font-black text-emerald-700">{childData.length}</p></div>
+                            <HardHat size={32} className="text-emerald-200"/>
+                          </div>
+                          <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex items-center justify-between">
+                            <div><p className="text-[10px] font-bold text-red-600 uppercase mb-1">Thiết bị Quá hạn/Nguy hiểm</p><p className="text-2xl font-black text-red-700">{totalThietBi} / {totalLoi}</p></div>
+                            <AlertCircle size={32} className={totalLoi > 0 ? 'text-red-400' : 'text-gray-300'}/>
+                          </div>
+                          <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex items-center justify-between">
+                            <div><p className="text-[10px] font-bold text-orange-600 uppercase mb-1">Số sự cố / Tai nạn</p><p className="text-2xl font-black text-orange-700">{totalTaiNan}</p></div>
+                            <ShieldAlert size={32} className={totalTaiNan > 0 ? 'text-orange-400' : 'text-gray-300'}/>
+                          </div>
+                        </div>
                       </div>
                     );
                   })()}
+
+                  {currentAtvsld ? (
+                    <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm animate-in fade-in">
+                       <h4 className="font-bold text-[#05469B] mb-4 flex items-center gap-2 border-b border-gray-100 pb-2"><HardHat size={18} /> Thông tin ATVSLĐ Trụ sở</h4>
+                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div className="space-y-3">
+                            <h4 className="font-bold text-emerald-700 border-b border-gray-100 pb-2 text-sm flex items-center gap-1.5"><Users size={16}/> Tổ chức & Huấn luyện</h4>
+                            <div className="flex justify-between text-sm"><span className="text-gray-500">Phụ trách ATVSLĐ:</span><span className="font-bold text-[#05469B] text-right">{currentAtvsld.NguoiPhuTrach || '---'}</span></div>
+                            <div className="flex justify-between text-sm"><span className="text-gray-500">Mạng lưới ATVS Viên:</span><span className="font-bold text-gray-800">{currentAtvsld.SL_MangLuoiATVSV || 0} Người</span></div>
+                            <div className="flex justify-between text-sm"><span className="text-gray-500">Khám SK / Bệnh Nghề nghiệp:</span><span className="font-bold text-gray-800">{formatToVN(currentAtvsld.NgayKhamSKGanNhat) || '---'} / {formatToVN(currentAtvsld.NgayKhamBenhNgheNghiep) || '---'}</span></div>
+                            <div className="flex justify-between text-sm"><span className="text-gray-500">Huấn luyện ATVSLĐ:</span><span className="font-bold text-emerald-600">{currentAtvsld.TyLeHoanThanhHL || '0%'} (Gần nhất: {formatToVN(currentAtvsld.NgayHuanLuyenGanNhat) || '---'})</span></div>
+                            <div className="flex justify-between text-sm pt-2 border-t border-gray-50"><span className="text-gray-500">Cấp phát BHLĐ:</span><span className={`font-bold ${currentAtvsld.TyLeCapPhatBHLD === 'Đầy đủ' ? 'text-emerald-600' : 'text-orange-600'}`}>{currentAtvsld.TyLeCapPhatBHLD}</span></div>
+                          </div>
+                          <div className="space-y-3 border-l border-gray-100 pl-6">
+                            <h4 className="font-bold text-red-600 border-b border-gray-100 pb-2 text-sm flex items-center gap-1.5"><AlertCircle size={16}/> Máy móc, Môi trường & Hiện trường</h4>
+                            <div className="flex justify-between text-sm"><span className="text-gray-500">Đo kiểm Môi trường:</span><span className="font-semibold text-gray-800 text-right">{formatToVN(currentAtvsld.NgayQuanTracMoiTruong) || 'Chưa đo'}</span></div>
+                            <div className="flex justify-between text-sm"><span className="text-gray-500">Thiết bị Nghiêm ngặt (Tổng/Quá hạn):</span><span className={`font-black ${Number(currentAtvsld.SL_ThietBiQuaHanKD) > 0 ? 'text-red-600 animate-pulse' : 'text-emerald-600'}`}>{currentAtvsld.SL_ThietBiNghiemNgat || 0} / {currentAtvsld.SL_ThietBiQuaHanKD || 0}</span></div>
+                            <div className="flex justify-between text-sm"><span className="text-gray-500">Số vụ Tai nạn (Năm):</span><span className={`font-bold ${Number(currentAtvsld.SoTaiNanTrongNam) > 0 ? 'text-orange-600' : 'text-gray-800'}`}>{currentAtvsld.SoTaiNanTrongNam || 0} Vụ</span></div>
+                            <div className="mt-2 pt-2 border-t border-gray-50">
+                              <span className="text-gray-500 text-sm block mb-1">Tuần tra & Lỗi hiện trường:</span>
+                              {currentAtvsld.CacLoiHienTruong ? (
+                                <div className="bg-red-50 text-red-700 p-2 rounded text-xs font-semibold border border-red-100">{currentAtvsld.CacLoiHienTruong}</div>
+                              ) : (
+                                <div className="bg-emerald-50 text-emerald-600 p-2 rounded text-xs font-semibold border border-emerald-100">Không có lỗi / Đã xử lý (Kiểm tra: {formatToVN(currentAtvsld.NgayTuKiemTraGanNhat) || '---'})</div>
+                              )}
+                            </div>
+                          </div>
+                       </div>
+                    </div>
+                  ) : (
+                    !isParentUnit && (
+                      <div onClick={openAtvsldModal} className="bg-white hover:bg-emerald-50/50 cursor-pointer p-10 rounded-2xl border-2 border-dashed border-gray-300 hover:border-emerald-300 text-center transition-all group shadow-sm">
+                        <HardHat size={48} className="mx-auto text-gray-300 group-hover:text-emerald-400 mb-4 transition-colors" />
+                        <h4 className="text-lg font-bold text-gray-700 group-hover:text-emerald-700 mb-1">Khai báo Hồ sơ ATVSLĐ</h4>
+                        <p className="text-sm text-gray-400">Khai báo thiết bị kiểm định, môi trường, huấn luyện an toàn & sức khỏe.</p>
+                      </div>
+                    )
+                  )}
                 </section>
 
-                {/* H. PCTT */}
+                {/* H. PHÒNG CHỐNG THIÊN TAI */}
                 <section>
                   <div className="flex justify-between items-center mb-5"><h3 className="text-lg font-black text-[#05469B] flex items-center gap-2 uppercase tracking-wider"><div className="w-1.5 h-6 bg-[#05469B] rounded-full"></div> H. PHÒNG CHỐNG THIÊN TAI</h3></div>
                   <div className="bg-gray-50 hover:bg-blue-50/50 cursor-not-allowed p-8 rounded-xl border-2 border-dashed border-gray-200 text-center transition-all group shadow-sm"><CloudLightning size={40} className="mx-auto text-gray-300 group-hover:text-blue-400 mb-3 transition-colors" /><h4 className="text-base font-bold text-gray-600 group-hover:text-blue-700 mb-1">Dữ liệu PCTT chưa cập nhật</h4><p className="text-xs text-gray-400 group-hover:text-blue-500">Module này sẽ được mở khóa sau khi cấu hình Sheet dữ liệu hoàn tất.</p></div>
                 </section>
 
-                {/* I. PVHC */}
-                <section>
+                {/* 🟢 I. PHỤC VỤ HẬU CẦN */}
+                <section className="animate-in fade-in duration-500">
                   <div className="flex justify-between items-center mb-5">
-                    <h3 className="text-lg font-black text-[#05469B] flex items-center gap-2 uppercase tracking-wider"><div className="w-1.5 h-6 bg-[#05469B] rounded-full"></div> {isParentUnit ? 'I. TỔNG HỢP HẬU CẦN TOÀN CỤM & CƠ SỞ' : 'I. PHỤC VỤ HẬU CẦN'}</h3>
-                    {!isParentUnit && currentPvhc && (<button onClick={openPvhcModal} className="px-4 py-2 text-sm font-bold text-[#05469B] bg-blue-50 hover:bg-blue-100 rounded-lg flex items-center gap-2 transition-colors border border-blue-100 shadow-sm"><Edit size={16} /> Cập nhật</button>)}
+                    <h3 className="text-lg font-black text-[#05469B] flex items-center gap-2 uppercase tracking-wider">
+                      <div className="w-1.5 h-6 bg-[#05469B] rounded-full"></div> {isParentUnit ? 'I. TỔNG HỢP HẬU CẦN TOÀN CỤM' : 'I. PHỤC VỤ HẬU CẦN'}
+                    </h3>
+                    <button onClick={openPvhcModal} className="px-4 py-2 text-sm font-bold text-[#05469B] bg-blue-50 hover:bg-blue-100 rounded-lg flex items-center gap-2 transition-colors border border-blue-100 shadow-sm">
+                      {currentPvhc ? <><Edit size={16} /> Cập nhật</> : <><Plus size={16} /> Khai báo PVHC</>}
+                    </button>
                   </div>
+
                   {isParentUnit && aggregatedPvhc && (
                     <div className="mb-6 p-5 bg-indigo-50/30 rounded-2xl border border-indigo-100 shadow-sm">
                       <h4 className="font-bold text-indigo-800 mb-4 flex items-center gap-2"><Layers size={18} /> Số liệu Tổng hợp Toàn Cụm</h4>
@@ -1046,10 +1266,11 @@ export default function DepartmentPage() {
                       </div>
                     </div>
                   )}
+
                   {currentPvhc ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5 animate-in fade-in duration-300">
                       <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex flex-col">
-                        <div className="flex justify-between items-center border-b border-gray-100 pb-3 mb-4"><h4 className="font-bold text-emerald-700 flex items-center gap-2"><Pocket size={18} />Nội bộ</h4><span className="text-sm font-black text-[#05469B] bg-blue-50 px-3 py-1 rounded-md border border-blue-100">Hiện hữu: {currentPvhc.Hienhuu || 0} / Định biên: {currentPvhc.DinhBien || 0}</span></div>
+                        <div className="flex justify-between items-center border-b border-gray-100 pb-3 mb-4"><h4 className="font-bold text-[#05469B] flex items-center gap-2"><Pocket size={18} />Hậu Cần Nội Bộ (Trụ sở)</h4><span className="text-sm font-black text-[#05469B] bg-blue-50 px-3 py-1 rounded-md border border-blue-100">Hiện hữu: {currentPvhc.Hienhuu || 0} / Định biên: {currentPvhc.DinhBien || 0}</span></div>
                         <div className="space-y-4 flex-1">
                           <div className="flex justify-between items-center p-3 bg-emerald-50 rounded-lg border border-emerald-100"><span className="text-emerald-800 font-semibold text-sm flex items-center gap-2"><Coffee size={16}/> Phục vụ Khách chờ</span><span className="text-emerald-700 font-black">{currentPvhc.PVHC_KhachCho || 0} Người</span></div>
                           <div className="flex justify-between items-center p-3 bg-emerald-50 rounded-lg border border-emerald-100"><span className="text-emerald-800 font-semibold text-sm flex items-center gap-2"><Utensils size={16}/> Nhân viên Vệ sinh</span><span className="text-emerald-700 font-black">{currentPvhc.PVHC_Vesinh || 0} Người</span></div>
@@ -1069,11 +1290,13 @@ export default function DepartmentPage() {
                       ) : (<div className="bg-gray-50 p-5 rounded-2xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center text-gray-400"><Shield size={32} className="mb-2 opacity-30"/><p className="text-sm font-medium">Không có thuê ngoài dịch vụ</p></div>)}
                     </div>
                   ) : (
-                    <div onClick={openPvhcModal} className="bg-white hover:bg-indigo-50/50 cursor-pointer p-10 rounded-2xl border-2 border-dashed border-gray-300 hover:border-indigo-300 text-center transition-all group shadow-sm"><Utensils size={48} className="mx-auto text-gray-300 group-hover:text-indigo-400 mb-4 transition-colors" /><h4 className="text-lg font-bold text-gray-700 group-hover:text-indigo-700 mb-1">Khai báo Hồ sơ Phục vụ Hậu cần</h4><p className="text-sm text-gray-400">Click vào đây để khai báo nhân sự nội bộ, tạp vụ và thuê ngoài.</p></div>
+                    !isParentUnit && (
+                      <div onClick={openPvhcModal} className="bg-white hover:bg-indigo-50/50 cursor-pointer p-10 rounded-2xl border-2 border-dashed border-gray-300 hover:border-indigo-300 text-center transition-all group shadow-sm"><Utensils size={48} className="mx-auto text-gray-300 group-hover:text-indigo-400 mb-4 transition-colors" /><h4 className="text-lg font-bold text-gray-700 group-hover:text-indigo-700 mb-1">Khai báo Hồ sơ Phục vụ Hậu cần</h4><p className="text-sm text-gray-400">Click vào đây để khai báo nhân sự nội bộ, tạp vụ và thuê ngoài.</p></div>
+                    )
                   )}
                 </section>
 
-                {/* J. PHÒNG HỌP */}
+                {/* J. THÔNG TIN PHÒNG HỌP */}
                 <section>
                   <div className="flex justify-between items-center mb-5"><h3 className="text-lg font-black text-[#05469B] flex items-center gap-2 uppercase tracking-wider"><div className="w-1.5 h-6 bg-[#05469B] rounded-full"></div> J. THÔNG TIN PHÒNG HỌP</h3><button onClick={() => openPhModal('create')} className="px-4 py-2 text-sm font-bold text-fuchsia-600 bg-fuchsia-50 hover:bg-fuchsia-100 rounded-lg flex items-center gap-2 transition-colors border border-fuchsia-100 shadow-sm"><Plus size={16} /> Thêm Phòng họp</button></div>
                   <div className="flex flex-col gap-4">
@@ -1519,13 +1742,19 @@ export default function DepartmentPage() {
               <h3 className="text-xl font-bold text-red-700 flex items-center gap-2"><Flame size={24}/> {pcccFormData.ID_PCCC ? 'Cập nhật Hồ sơ PCCC' : 'Tạo Hồ sơ PCCC Mới'}</h3>
               <button onClick={() => setIsPcccModalOpen(false)} disabled={submitting} className="text-gray-400 hover:text-red-500 rounded-full p-1.5 bg-white shadow-sm transition-colors"><X className="w-6 h-6" /></button>
             </div>
+            
             <form onSubmit={handlePcccSave} className="p-6 overflow-y-auto space-y-6 flex-1 min-h-0 custom-scrollbar">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div className="space-y-6">
                   <div className="bg-blue-50/40 p-5 rounded-xl border border-blue-100 shadow-sm">
                     <h4 className="font-bold text-blue-800 mb-4 flex items-center gap-2 border-b border-blue-200 pb-2"><FileText size={18}/> 1. Pháp lý, Bảo hiểm & Báo cáo</h4>
                     <div className="space-y-4">
-                      <div><label className="block text-xs font-bold text-gray-700 mb-1">Đơn vị / Cơ sở *</label><select required name="ID_DonVi" value={pcccFormData.ID_DonVi || ''} onChange={(e) => handleInputChange(e, 'pccc')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-gray-100 outline-none text-gray-600 cursor-not-allowed" style={{ fontFamily: 'monospace, sans-serif' }} disabled><option value={selectedUnitId || ''}>{donViMap[selectedUnitId || ''] || selectedUnitId}</option></select></div>
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1">Đơn vị / Cơ sở *</label>
+                        <select required name="ID_DonVi" value={pcccFormData.ID_DonVi || ''} onChange={(e) => handleInputChange(e, 'pccc')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-gray-100 outline-none text-gray-600 cursor-not-allowed" style={{ fontFamily: 'monospace, sans-serif' }} disabled>
+                          <option value={selectedUnitId || ''}>{donViMap[selectedUnitId || ''] || selectedUnitId}</option>
+                        </select>
+                      </div>
                       <div className="grid grid-cols-2 gap-4">
                         <div><label className="block text-xs font-bold text-gray-700 mb-1">Tình trạng Pháp lý</label><select name="TinhTrangPhapLy" value={pcccFormData.TinhTrangPhapLy || 'Nghiệm thu'} onChange={(e) => handleInputChange(e, 'pccc')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-blue-500 font-bold text-emerald-700"><option value="Nghiệm thu">Nghiệm thu</option><option value="Đã thẩm duyệt">Đã thẩm duyệt</option><option value="Chưa có">Chưa có</option></select></div>
                         <div><label className="block text-[10px] font-bold text-red-600 mb-1 uppercase">Hạn Bảo hiểm Cháy nổ *</label><input type="date" required name="HanBaoHiemChayNo" value={pcccFormData.HanBaoHiemChayNo ? pcccFormData.HanBaoHiemChayNo.split('T')[0] : ''} onChange={(e) => handleInputChange(e, 'pccc')} className="w-full p-2 border border-red-300 rounded-lg bg-red-50 outline-none focus:ring-2 focus:ring-red-500 font-bold text-red-700 text-sm" /></div>
@@ -1533,24 +1762,29 @@ export default function DepartmentPage() {
                         <div><label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Tự kiểm tra gần nhất</label><input type="date" name="NgayTuKiemTraGanNhat" value={pcccFormData.NgayTuKiemTraGanNhat ? pcccFormData.NgayTuKiemTraGanNhat.split('T')[0] : ''} onChange={(e) => handleInputChange(e, 'pccc')} className="w-full p-2 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-blue-500 font-bold text-gray-700 text-sm" title="Định kỳ 1 tháng/lần" /></div>
                       </div>
                       <div><label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Ngày Báo cáo CA gần nhất (Định kỳ 6 tháng)</label><input type="date" name="NgayBaoCaoCongAnGanNhat" value={pcccFormData.NgayBaoCaoCongAnGanNhat ? pcccFormData.NgayBaoCaoCongAnGanNhat.split('T')[0] : ''} onChange={(e) => handleInputChange(e, 'pccc')} className="w-full p-2 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-blue-500 font-bold text-gray-700 text-sm" /></div>
-                      <div><label className="block text-xs font-bold text-gray-700 mb-1">Link Hồ sơ PCCC cơ sở (Drive)</label><input type="url" name="Link_HoSoPCCC" value={pcccFormData.Link_HoSoPCCC || ''} onChange={(e) => handleInputChange(e, 'pccc')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-blue-500 text-blue-600" /></div>
-                      <div><label className="block text-xs font-bold text-gray-700 mb-1">Link Phương án PCCC & CNCH</label><input type="url" name="Link_PhuongAnPCCC_CNCH" value={pcccFormData.Link_PhuongAnPCCC_CNCH || ''} onChange={(e) => handleInputChange(e, 'pccc')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-blue-500 text-blue-600" /></div>
+                      <div><label className="block text-xs font-bold text-gray-700 mb-1">Link Hồ sơ PCCC cơ sở (Drive)</label><input type="url" name="Link_HoSoPCCC" value={pcccFormData.Link_HoSoPCCC || ''} onChange={(e) => handleInputChange(e, 'pccc')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-blue-500 text-blue-600" placeholder="https://drive.google.com/..." /></div>
+                      <div><label className="block text-xs font-bold text-gray-700 mb-1">Link Phương án PCCC & CNCH</label><input type="url" name="Link_PhuongAnPCCC_CNCH" value={pcccFormData.Link_PhuongAnPCCC_CNCH || ''} onChange={(e) => handleInputChange(e, 'pccc')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-blue-500 text-blue-600" placeholder="https://drive.google.com/..." /></div>
                     </div>
                   </div>
+
                   <div className="bg-emerald-50/40 p-5 rounded-xl border border-emerald-100 shadow-sm">
                     <h4 className="font-bold text-emerald-800 mb-4 flex items-center gap-2 border-b border-emerald-200 pb-2"><Users size={18}/> 2. Đội PCCC Cơ sở & Diễn tập</h4>
                     <div className="grid grid-cols-2 gap-4">
                       <div><label className="block text-xs font-bold text-gray-700 mb-1">Tổng NS Đội PCCC (Người)</label><input type="number" name="SoNhanSuDoiPCCC" value={pcccFormData.SoNhanSuDoiPCCC || ''} onChange={(e) => handleInputChange(e, 'pccc')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-emerald-500" /></div>
                       <div><label className="block text-xs font-bold text-gray-700 mb-1">Ngày Diễn tập gần nhất</label><input type="date" name="NgayDienTapGanNhat" value={pcccFormData.NgayDienTapGanNhat ? pcccFormData.NgayDienTapGanNhat.split('T')[0] : ''} onChange={(e) => handleInputChange(e, 'pccc')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-emerald-500 text-gray-700 font-bold" /></div>
+                      
                       <div className="col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4 pt-3 border-t border-emerald-100/50">
                         <div className="md:col-span-2"><label className="block text-[10px] font-bold text-gray-700 mb-1 uppercase">Đội trưởng PCCC</label><input type="text" name="TenDoiTruong" value={pcccFormData.TenDoiTruong || ''} onChange={(e) => handleInputChange(e, 'pccc')} className="w-full p-2 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-emerald-500 text-sm font-bold text-[#05469B]" placeholder="Họ và tên..." /></div>
                         <div><label className="block text-[10px] font-bold text-gray-700 mb-1 uppercase">SĐT</label><input type="text" name="SDTDoiTruong" value={pcccFormData.SDTDoiTruong || ''} onChange={(e) => handleInputChange(e, 'pccc')} className="w-full p-2 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-emerald-500 text-sm" placeholder="Nhập SĐT..." /></div>
                         <div className="md:col-span-3"><label className="block text-[10px] font-bold text-gray-700 mb-1 uppercase">Chức danh Đội trưởng</label><input type="text" name="ChucDanhDoiTruong" value={pcccFormData.ChucDanhDoiTruong || ''} onChange={(e) => handleInputChange(e, 'pccc')} className="w-full p-2 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-emerald-500 text-sm" placeholder="VD: Giám đốc SR, Trưởng phòng..." /></div>
                       </div>
-                      <div className="col-span-2 pt-3"><label className="block text-xs font-bold text-gray-700 mb-1">Link QĐ Thành lập đội & Chứng chỉ HL</label><input type="url" name="Link_HoSoDoiPCCC" value={pcccFormData.Link_HoSoDoiPCCC || ''} onChange={(e) => handleInputChange(e, 'pccc')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-emerald-500 text-blue-600" /></div>
+
+                      <div className="col-span-2 pt-3"><label className="block text-xs font-bold text-gray-700 mb-1">Link QĐ Thành lập đội & Chứng chỉ HL</label><input type="url" name="Link_HoSoDoiPCCC" value={pcccFormData.Link_HoSoDoiPCCC || ''} onChange={(e) => handleInputChange(e, 'pccc')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-emerald-500 text-blue-600" placeholder="https://drive.google.com/..." /></div>
                     </div>
                   </div>
                 </div>
+
+                {/* CỘT 2: TRANG THIẾT BỊ VÀ TỒN TẠI */}
                 <div className="space-y-6">
                   <div className="bg-orange-50/40 p-5 rounded-xl border border-orange-100 shadow-sm">
                     <h4 className="font-bold text-orange-800 mb-4 flex items-center gap-2 border-b border-orange-200 pb-2"><Droplets size={18}/> 3. Hệ thống cố định & Bình chữa cháy</h4>
@@ -1562,27 +1796,44 @@ export default function DepartmentPage() {
                         <div><label className="block text-xs font-bold text-gray-700 mb-1">Trạng thái Bơm</label><select name="TrangThaiBom" value={pcccFormData.TrangThaiBom || 'Sẵn sàng'} onChange={(e) => handleInputChange(e, 'pccc')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-orange-500 font-bold"><option value="Sẵn sàng" className="text-emerald-600">🟢 Sẵn sàng</option><option value="Lỗi" className="text-red-600">🔴 Bơm hỏng / Lỗi</option></select></div>
                       </div>
                       <div><label className="block text-xs font-bold text-gray-700 mb-1">Vị trí Tủ TT Báo cháy (Để ngắt chuông giả)</label><input type="text" name="ViTriTuBaoChay" value={pcccFormData.ViTriTuBaoChay || ''} onChange={(e) => handleInputChange(e, 'pccc')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-orange-500" placeholder="VD: Gầm cầu thang tầng 1..." /></div>
+                      
                       <div className="grid grid-cols-2 md:grid-cols-5 gap-3 border-t border-orange-200 pt-4">
                         <div><label className="block text-[10px] font-bold text-gray-700 mb-1">Bình Bột</label><input type="number" name="SoLuongBinhBot" value={pcccFormData.SoLuongBinhBot || ''} onChange={(e) => handleInputChange(e, 'pccc')} className="w-full p-2 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-orange-500 text-sm" /></div>
                         <div><label className="block text-[10px] font-bold text-gray-700 mb-1">Bình CO2</label><input type="number" name="SoLuongBinhCO2" value={pcccFormData.SoLuongBinhCO2 || ''} onChange={(e) => handleInputChange(e, 'pccc')} className="w-full p-2 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-orange-500 text-sm" /></div>
                         <div><label className="block text-[10px] font-bold text-gray-700 mb-1">Xe đẩy 35kg</label><input type="number" name="SoLuongBinhXeDay" value={pcccFormData.SoLuongBinhXeDay || ''} onChange={(e) => handleInputChange(e, 'pccc')} className="w-full p-2 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-orange-500 text-sm" /></div>
                         <div><label className="block text-[10px] font-bold text-gray-700 mb-1">Phuy Cát</label><input type="number" name="SoLuongPhuyCat" value={pcccFormData.SoLuongPhuyCat || ''} onChange={(e) => handleInputChange(e, 'pccc')} className="w-full p-2 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-orange-500 text-sm" /></div>
                         <div><label className="block text-[10px] font-bold text-emerald-700 mb-1 flex items-center gap-1"><BatteryWarning size={12}/> Bình Pin EV</label><input type="number" name="SoLuongBinhPinDien" value={pcccFormData.SoLuongBinhPinDien || ''} onChange={(e) => handleInputChange(e, 'pccc')} className="w-full p-2 border border-emerald-300 rounded-lg bg-emerald-50 outline-none focus:ring-2 focus:ring-emerald-500 text-sm font-bold text-emerald-800" /></div>
-                        <div className="col-span-2 md:col-span-5 mt-2"><label className="block text-[10px] font-bold text-red-600 mb-1 uppercase">Hạn Bơm Sạc / Bảo Dưỡng (Lô gần nhất) *</label><input type="date" required name="NgayBomSacGannhat" value={pcccFormData.NgayBomSacGannhat ? pcccFormData.NgayBomSacGannhat.split('T')[0] : ''} onChange={(e) => handleInputChange(e, 'pccc')} className="w-full p-2 border border-red-300 rounded-lg bg-red-50 text-red-700 font-bold outline-none focus:ring-2 focus:ring-red-500 text-sm" title="Ngày này dùng để kích hoạt cảnh báo đỏ/cam trên hệ thống" /></div>
-                        <div className="col-span-2 md:col-span-5 mt-1"><label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Chi tiết các Lô bình (Phân loại hạn)</label><textarea name="ChiTietBomSac" value={pcccFormData.ChiTietBomSac || ''} onChange={(e) => handleInputChange(e, 'pccc')} rows={2} className="w-full p-2 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-orange-500 text-sm resize-none" placeholder="VD: Lô 1 (10 bình bột): Hết hạn 15/05/2026. Lô 2 (5 CO2): Hết hạn 20/08/2026..."></textarea></div>
+
+                        <div className="col-span-2 md:col-span-5 mt-2">
+                           <label className="block text-[10px] font-bold text-red-600 mb-1 uppercase">Hạn Bơm Sạc / Bảo Dưỡng (Lô gần nhất) *</label>
+                           <input type="date" required name="NgayBomSacGannhat" value={pcccFormData.NgayBomSacGannhat ? pcccFormData.NgayBomSacGannhat.split('T')[0] : ''} onChange={(e) => handleInputChange(e, 'pccc')} className="w-full p-2 border border-red-300 rounded-lg bg-red-50 text-red-700 font-bold outline-none focus:ring-2 focus:ring-red-500 text-sm" title="Ngày này dùng để kích hoạt cảnh báo đỏ/cam trên hệ thống" />
+                        </div>
+                        
+                        <div className="col-span-2 md:col-span-5 mt-1">
+                          <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Chi tiết các Lô bình (Phân loại hạn)</label>
+                          <textarea name="ChiTietBomSac" value={pcccFormData.ChiTietBomSac || ''} onChange={(e) => handleInputChange(e, 'pccc')} rows={2} className="w-full p-2 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-orange-500 text-sm resize-none" placeholder="VD: Lô 1 (10 bình bột): Hết hạn 15/05/2026. Lô 2 (5 CO2): Hết hạn 20/08/2026..."></textarea>
+                        </div>
                       </div>
                     </div>
                   </div>
+
                   <div className="bg-red-50/40 p-5 rounded-xl border border-red-200 shadow-sm">
                     <h4 className="font-bold text-red-800 mb-4 flex items-center gap-2 border-b border-red-200 pb-2"><BellRing size={18}/> 4. Cảnh báo rủi ro & Tồn tại</h4>
                     <div className="space-y-4">
                       <div><label className="block text-xs font-bold text-gray-700 mb-1">Khu vực rủi ro cháy nổ cao (Ghi chú)</label><input type="text" name="KhuVucRuiRoCao" value={pcccFormData.KhuVucRuiRoCao || ''} onChange={(e) => handleInputChange(e, 'pccc')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-red-500" placeholder="VD: Kho sơn tĩnh điện, Kho phế liệu..." /></div>
-                      <div><label className="block text-xs font-bold text-red-700 mb-1">Lỗi / Tồn tại chưa khắc phục (Do CA yêu cầu)</label><textarea name="LoiTonTaiChuaKhacPhuc" value={pcccFormData.LoiTonTaiChuaKhacPhuc || ''} onChange={(e) => handleInputChange(e, 'pccc')} rows={2} className="w-full p-2.5 border border-red-300 rounded-lg bg-white outline-none focus:ring-2 focus:ring-red-500 resize-none font-medium text-red-800" placeholder="Ghi nhận các lỗi hệ thống, kiến nghị của Công an chưa làm xong..."></textarea></div>
-                      <div><label className="block text-xs font-bold text-gray-700 mb-1">Ghi chú chung</label><textarea name="GhiChu" value={pcccFormData.GhiChu || ''} onChange={(e) => handleInputChange(e, 'pccc')} rows={1} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-red-500 resize-none"></textarea></div>
+                      <div>
+                        <label className="block text-xs font-bold text-red-700 mb-1">Lỗi / Tồn tại chưa khắc phục (Do CA yêu cầu)</label>
+                        <textarea name="LoiTonTaiChuaKhacPhuc" value={pcccFormData.LoiTonTaiChuaKhacPhuc || ''} onChange={(e) => handleInputChange(e, 'pccc')} rows={2} className="w-full p-2.5 border border-red-300 rounded-lg bg-white outline-none focus:ring-2 focus:ring-red-500 resize-none font-medium text-red-800" placeholder="Ghi nhận các lỗi hệ thống, kiến nghị của Công an chưa làm xong..."></textarea>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1">Ghi chú chung</label>
+                        <textarea name="GhiChu" value={pcccFormData.GhiChu || ''} onChange={(e) => handleInputChange(e, 'pccc')} rows={1} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-red-500 resize-none"></textarea>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
+
               <div className="pt-5 border-t border-gray-100 flex justify-end gap-3 mt-8 shrink-0">
                 <button type="button" onClick={() => setIsPcccModalOpen(false)} className="px-8 py-3 bg-gray-100 text-gray-700 hover:bg-gray-200 rounded-xl font-bold transition-colors">Hủy</button>
                 <button type="submit" disabled={submitting} className="px-8 py-3 text-white bg-red-600 hover:bg-red-700 rounded-xl font-bold flex items-center gap-2 shadow-lg transition-colors">{submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />} Lưu Hồ Sơ PCCC</button>
@@ -1600,8 +1851,11 @@ export default function DepartmentPage() {
               <h3 className="text-xl font-bold text-emerald-800 flex items-center gap-2"><HardHat size={24}/> {atvsldFormData.ID_ATVSLD ? 'Cập nhật Hồ sơ ATVSLĐ' : 'Tạo Hồ sơ ATVSLĐ'}</h3>
               <button onClick={() => setIsAtvsldModalOpen(false)} disabled={submitting} className="text-emerald-400 hover:text-red-500 rounded-full p-1.5 bg-white shadow-sm transition-colors"><X className="w-6 h-6" /></button>
             </div>
+            
             <form onSubmit={handleAtvsldSave} className="p-6 overflow-y-auto space-y-6 flex-1 min-h-0 custom-scrollbar">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                
+                {/* CỘT 1 */}
                 <div className="space-y-6">
                   <div className="bg-blue-50/40 p-5 rounded-xl border border-blue-100 shadow-sm">
                     <h4 className="font-bold text-blue-800 mb-4 flex items-center gap-2 border-b border-blue-200 pb-2"><Users size={18}/> 1. Tổ chức & Nhân sự</h4>
@@ -1612,6 +1866,7 @@ export default function DepartmentPage() {
                       <div className="col-span-2"><label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">Link Quyết định / Quy trình / Kế hoạch năm</label><input type="url" name="Link_HoSoQuyDinh" value={atvsldFormData.Link_HoSoQuyDinh || ''} onChange={(e) => handleInputChange(e, 'atvsld')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-blue-500 text-blue-600" placeholder="https://drive.google.com/..." /></div>
                     </div>
                   </div>
+
                   <div className="bg-emerald-50/40 p-5 rounded-xl border border-emerald-100 shadow-sm">
                     <h4 className="font-bold text-emerald-800 mb-4 flex items-center gap-2 border-b border-emerald-200 pb-2"><Shield size={18}/> 2. Sức khỏe & Huấn luyện</h4>
                     <div className="grid grid-cols-2 gap-4">
@@ -1622,6 +1877,8 @@ export default function DepartmentPage() {
                     </div>
                   </div>
                 </div>
+
+                {/* CỘT 2 */}
                 <div className="space-y-6">
                   <div className="bg-orange-50/40 p-5 rounded-xl border border-orange-100 shadow-sm">
                     <h4 className="font-bold text-orange-800 mb-4 flex items-center gap-2 border-b border-orange-200 pb-2"><Settings size={18}/> 3. Máy móc & Môi trường</h4>
@@ -1631,6 +1888,7 @@ export default function DepartmentPage() {
                       <div className="col-span-2"><label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">Ngày Đo kiểm Môi trường LĐ gần nhất</label><input type="date" name="NgayQuanTracMoiTruong" value={atvsldFormData.NgayQuanTracMoiTruong ? atvsldFormData.NgayQuanTracMoiTruong.split('T')[0] : ''} onChange={(e) => handleInputChange(e, 'atvsld')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-orange-500 font-bold text-gray-700" /></div>
                     </div>
                   </div>
+
                   <div className="bg-red-50/40 p-5 rounded-xl border border-red-200 shadow-sm">
                     <h4 className="font-bold text-red-800 mb-4 flex items-center gap-2 border-b border-red-200 pb-2"><AlertCircle size={18}/> 4. Hiện trường & Sự cố</h4>
                     <div className="space-y-4">
@@ -1638,12 +1896,16 @@ export default function DepartmentPage() {
                         <div><label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">Ngày Tự KT / Checklist</label><input type="date" name="NgayTuKiemTraGanNhat" value={atvsldFormData.NgayTuKiemTraGanNhat ? atvsldFormData.NgayTuKiemTraGanNhat.split('T')[0] : ''} onChange={(e) => handleInputChange(e, 'atvsld')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-red-500" /></div>
                         <div><label className="block text-[10px] font-bold text-red-600 mb-1 uppercase">Số vụ Tai nạn LĐ (Năm)</label><input type="number" name="SoTaiNanTrongNam" value={atvsldFormData.SoTaiNanTrongNam || '0'} onChange={(e) => handleInputChange(e, 'atvsld')} className="w-full p-2.5 border border-red-300 rounded-lg bg-white outline-none focus:ring-2 focus:ring-red-500 font-bold text-red-700" /></div>
                       </div>
-                      <div><label className="block text-xs font-bold text-red-700 mb-1">Các rủi ro / Lỗi hiện trường cần khắc phục</label><textarea name="CacLoiHienTruong" value={atvsldFormData.CacLoiHienTruong || ''} onChange={(e) => handleInputChange(e, 'atvsld')} rows={2} className="w-full p-2.5 border border-red-300 rounded-lg bg-white outline-none focus:ring-2 focus:ring-red-500 resize-none font-medium text-red-800" placeholder="VD: Sàn xưởng trơn trượt, chưa đeo dây đai an toàn..."></textarea></div>
+                      <div>
+                        <label className="block text-xs font-bold text-red-700 mb-1">Các rủi ro / Lỗi hiện trường cần khắc phục</label>
+                        <textarea name="CacLoiHienTruong" value={atvsldFormData.CacLoiHienTruong || ''} onChange={(e) => handleInputChange(e, 'atvsld')} rows={2} className="w-full p-2.5 border border-red-300 rounded-lg bg-white outline-none focus:ring-2 focus:ring-red-500 resize-none font-medium text-red-800" placeholder="VD: Sàn xưởng trơn trượt, chưa đeo dây đai an toàn..."></textarea>
+                      </div>
                       <div><label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">Link Biên bản tuần tra (Checklist PDF)</label><input type="url" name="Link_BienBanChecklist" value={atvsldFormData.Link_BienBanChecklist || ''} onChange={(e) => handleInputChange(e, 'atvsld')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-red-500 text-blue-600" /></div>
                     </div>
                   </div>
                 </div>
               </div>
+
               <div className="pt-5 border-t border-gray-100 flex justify-end gap-3 mt-8 shrink-0">
                 <button type="button" onClick={() => setIsAtvsldModalOpen(false)} className="px-8 py-3 bg-gray-100 text-gray-700 hover:bg-gray-200 rounded-xl font-bold transition-colors">Hủy</button>
                 <button type="submit" disabled={submitting} className="px-8 py-3 text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl font-bold flex items-center gap-2 shadow-lg transition-colors">{submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />} Lưu ATVSLĐ</button>
