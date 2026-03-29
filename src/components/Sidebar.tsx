@@ -3,6 +3,7 @@ import {
   LayoutDashboard, 
   Building2, 
   Users, 
+  Flame, // <-- IMPORT ICON PCCC
   Car, 
   MonitorSmartphone, 
   FileText, 
@@ -107,6 +108,18 @@ export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
             >
               <Users size={18} />
               {!isCollapsed && <span className="text-sm">Thông tin Nhân sự</span>}
+            </button>
+
+            {/* 🟢 NÚT MỚI: PHÒNG CHÁY CHỮA CHÁY */}
+            <button
+              onClick={() => setActiveTab('firesafety')}
+              title="Phòng cháy chữa cháy"
+              className={`w-full flex items-center ${isCollapsed ? 'justify-center py-3' : 'gap-3 px-3 py-2.5'} rounded-lg font-semibold transition-all duration-200 ${
+                activeTab === 'firesafety' ? 'bg-white/10 text-white shadow-sm' : 'text-blue-100 hover:bg-white/5 hover:text-white'
+              }`}
+            >
+              <Flame size={18} />
+              {!isCollapsed && <span className="text-sm">Phòng cháy chữa cháy</span>}
             </button>
 
             <button
