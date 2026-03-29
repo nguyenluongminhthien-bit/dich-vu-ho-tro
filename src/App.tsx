@@ -9,9 +9,10 @@ import DepartmentPage from './pages/DepartmentPage';
 import VehiclePage from './pages/VehiclePage';
 import DocumentPage from './pages/DocumentPage'; 
 import PolicyPage from './pages/PolicyPage'; 
-import EquipmentPage from './pages/EquipmentPage'; // MỚI THÊM: MODULE THIẾT BỊ
+import EquipmentPage from './pages/EquipmentPage'; 
+import FireSafetyPage from './pages/FireSafetyPage'; // MỚI THÊM: MODULE PCCC
 
-// MỚI THÊM: IMPORT 2 TRANG HỆ THỐNG
+// Import các trang Hệ thống
 import AccountPage from './pages/AccountPage';
 import LogPage from './pages/LogPage';
 
@@ -45,7 +46,6 @@ function AppContent() {
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
       
       {/* Khu vực nội dung bên phải */}
-      {/* MỚI: Thêm class 'relative' vào main để chứa các thẻ absolute bên trong */}
       <main className="flex-1 h-full overflow-hidden bg-[#f4f7f9] relative">
         
         {/* TUYỆT CHIÊU GIỮ CACHE: Tải tất cả các trang cùng lúc, nhưng dùng CSS 'hidden' để ẩn đi những trang chưa cần xem */}
@@ -55,6 +55,11 @@ function AppContent() {
         
         <div className={`absolute inset-0 transition-opacity duration-200 ${activeTab === 'personnel' ? 'opacity-100 z-10' : 'opacity-0 pointer-events-none -z-10'}`}>
           <PersonnelPage />
+        </div>
+
+        {/* 🟢 MỚI THÊM: KHỐI HIỂN THỊ TRANG PCCC */}
+        <div className={`absolute inset-0 transition-opacity duration-200 ${activeTab === 'firesafety' ? 'opacity-100 z-10' : 'opacity-0 pointer-events-none -z-10'}`}>
+          <FireSafetyPage />
         </div>
         
         <div className={`absolute inset-0 transition-opacity duration-200 ${activeTab === 'vehicles' ? 'opacity-100 z-10' : 'opacity-0 pointer-events-none -z-10'}`}>
