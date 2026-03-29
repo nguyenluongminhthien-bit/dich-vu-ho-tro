@@ -5,10 +5,11 @@ import {
   PanelLeftClose, PanelLeftOpen, Shield, Camera, Users, Map, 
   Link as LinkIcon, FileText, Briefcase, ExternalLink,
   Maximize2, Layers, DoorOpen, Coffee, UserCheck, Copy, CheckCheck,
-  Flame, HardHat, CloudLightning, Utensils, Monitor,
+  HardHat, CloudLightning, Utensils, Monitor,
   Projector, Video, LayoutTemplate, MousePointerClick, 
   SquarePen, PenTool, Wand2, Compass, Clock, Sun, Moon,
-  MonitorSmartphone, Tag, Car, Pocket, Store, Warehouse
+  MonitorSmartphone, Tag, Car, Pocket, Store, Warehouse,
+  Flame, ShieldAlert, Droplets, BellRing, BatteryWarning
 } from 'lucide-react';
 import { apiService } from '../services/api';
 import { DonVi, Personnel, AnNinh, PhapNhan, PhongHop, TS_Xe, ThietBi } from '../types';
@@ -28,7 +29,29 @@ const safeGet = (obj: any, key: string) => {
 
 const getSecId = (sec: any) => safeGet(sec, 'ID_AnNinh') || safeGet(sec, 'id');
 const getPvhcId = (p: any) => safeGet(p, 'ID_PVHC') || safeGet(p, 'id');
+const getPcccId = (p: any) => safeGet(p, 'ID_PCCC') || safeGet(p, 'id');
 const getUnitIdSafe = (item: any) => safeGet(item, 'ID_DonVi');
+
+// 🟢 [BỘ KHÓA NGÀY THÁNG]: CHỐNG JAVASCRIPT TỰ ĐỘNG ĐẢO NGƯỢC THÁNG VÀ NGÀY
+const normalizeDateToISO = (val: any) => {
+  if (!val) return '';
+  const str = String(val).trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(str)) return str.substring(0, 10);
+  if (/^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{4}$/.test(str)) {
+    const parts = str.split(/[\/\-]/);
+    return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+  }
+  return str;
+};
+
+const formatToVN = (isoStr: string) => {
+  if (!isoStr) return '';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(isoStr)) {
+    const parts = isoStr.split('-');
+    return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  }
+  return isoStr; 
+};
 
 // TÍCH HỢP TRƯỜNG KINH DOANH VÀO KHỞI TẠO
 const initialFormState: Partial<DonVi> = {
@@ -64,7 +87,9 @@ export default function DepartmentPage() {
   const [xeData, setXeData] = useState<TS_Xe[]>([]);
   const [thietBiData, setThietBiData] = useState<ThietBi[]>([]);
   const [pvhcData, setPvhcData] = useState<any[]>([]);
-  const [pcccData, setPcccData] = useState<any[]>([]); 
+  const [pcccData, setPcccData] = useState<any[]>([]);
+  const [isPcccModalOpen, setIsPcccModalOpen] = useState(false);
+  const [pcccFormData, setPcccFormData] = useState<any>({}); 
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -98,9 +123,9 @@ export default function DepartmentPage() {
 
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
-  const [itemToDelete, setItemToDelete] = useState<{id: string, type: 'donvi' | 'phapnhan' | 'phonghop'} | null>(null);
+  const [itemToDelete, setItemToDelete] = useState<{id: string, type: 'donvi' | 'phapnhan' | 'phonghop' | 'pccc'} | null>(null);
 
-  // 🟢 [KHU VỰC: LẤY DỮ LIỆU TỪ GOOGLE SHEETS]
+// 🟢 [KHU VỰC: LẤY DỮ LIỆU TỪ GOOGLE SHEETS]
   const loadData = async () => {
     setLoading(true); setError(null);
     try { 
@@ -110,11 +135,23 @@ export default function DepartmentPage() {
         apiService.getXe ? apiService.getXe().catch(() => []) : Promise.resolve([]),
         apiService.getThietBi ? apiService.getThietBi().catch(() => []) : Promise.resolve([]),
         apiService.getPVHC ? apiService.getPVHC().catch(() => []) : Promise.resolve([]),
-        apiService.getPCCC ? apiService.getPCCC().catch(() => []) : Promise.resolve([]) // <-- GỌI API PCCC MỚI
+        apiService.getPCCC ? apiService.getPCCC().catch(() => []) : Promise.resolve([]) // <-- GỌI API PCCC
       ]);
       setData(dvResult); setPersonnelData(nsResult); setAnNinhData(anResult || []); setPhapNhanData(pnResult || []); setPhongHopData(phResult || []);
       setXeData(xeResult || []); setThietBiData(tbResult || []); setPvhcData(pvhcResult || []);
-      setPcccData(pcResult || []); // <-- LƯU STATE PCCC
+      
+      // 🟢 BỔ SUNG ÉP KIỂU NGÀY THÁNG ĐỂ KHÔNG BỊ LỖI MM/DD/YYYY
+      const cleanPccc = (pcResult || []).map((item: any) => ({
+        ...item,
+        HanBaoHiemChayNo: normalizeDateToISO(item.HanBaoHiemChayNo),
+        HanKiemDinhChongSet: normalizeDateToISO(item.HanKiemDinhChongSet),
+        NgayTuKiemTraGanNhat: normalizeDateToISO(item.NgayTuKiemTraGanNhat),
+        NgayBaoCaoCongAnGanNhat: normalizeDateToISO(item.NgayBaoCaoCongAnGanNhat),
+        NgayDienTapGanNhat: normalizeDateToISO(item.NgayDienTapGanNhat),
+        NgayBomSacGannhat: normalizeDateToISO(item.NgayBomSacGannhat),
+      }));
+      setPcccData(cleanPccc); // <-- LƯU STATE PCCC ĐÃ LÀM SẠCH
+
     } 
     catch (err: any) { setError(err.message || 'Lỗi tải dữ liệu. Vui lòng kiểm tra lại kết nối mạng.'); } 
     finally { setLoading(false); }
@@ -561,7 +598,7 @@ export default function DepartmentPage() {
     finally { setSubmitting(false); }
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>, formType: 'pn' | 'ph' | 'sec' | 'pvhc' = 'pn') => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>, formType: 'pn' | 'ph' | 'sec' | 'pvhc' | 'pccc' = 'pn') => {
     const { name, value, type } = e.target;
     let finalValue: string | boolean = type === 'checkbox' ? (e.target as HTMLInputElement).checked : value;
 
@@ -574,6 +611,9 @@ export default function DepartmentPage() {
     else if (formType === 'pvhc') {
       if (name === 'ChiPhiThue') finalValue = value.replace(/\D/g, '');
       setPvhcFormData((prev: any) => ({ ...prev, [name]: finalValue }));
+    }
+    else if (formType === 'pccc') {
+      setPcccFormData((prev: any) => ({ ...prev, [name]: finalValue }));
     }
   };
 
@@ -593,6 +633,16 @@ export default function DepartmentPage() {
           const itemId = item.ID_Phonghop || item.iD_Phonghop || item.ID_PhongHop;
           return itemId !== itemToDelete.id;
         }));
+      } else if (itemToDelete.type === 'phonghop') {
+        await apiService.delete(itemToDelete.id, "PhongHop");
+        setPhongHopData(prev => prev.filter(item => {
+          const itemId = item.ID_Phonghop || item.iD_Phonghop || item.ID_PhongHop;
+          return itemId !== itemToDelete.id;
+        }));
+      // 🟢 DÁN THÊM KHỐI NÀY VÀO DƯỚI PHÒNG HỌP:
+      } else if (itemToDelete.type === 'pccc') {
+        await apiService.delete(itemToDelete.id, "HS_PCCC");
+        setPcccData(prev => prev.filter(item => getPcccId(item) !== itemToDelete.id));
       }
       setIsConfirmOpen(false); setItemToDelete(null);
     } catch (err: any) { setError(err.message || 'Lỗi xóa dữ liệu.'); } 
@@ -706,6 +756,52 @@ export default function DepartmentPage() {
       }
       setIsPvhcModalOpen(false);
     } catch (err: any) { setError(err.message || 'Lỗi lưu dữ liệu Hậu cần.'); } 
+    finally { setSubmitting(false); }
+  };
+
+  // 👉 HÀM MỞ MODAL VÀ LƯU DỮ LIỆU PCCC
+  const currentPccc = useMemo(() => pcccData.find(item => getUnitIdSafe(item) === selectedUnitId) || null, [pcccData, selectedUnitId]);
+
+  const openPcccModal = () => {
+    if (currentPccc) {
+      setPcccFormData({ ...currentPccc, ID_PCCC: getPcccId(currentPccc) });
+    } else {
+      setPcccFormData({
+        ID_PCCC: '', ID_DonVi: selectedUnitId || '', TinhTrangPhapLy: 'Nghiệm thu', HanBaoHiemChayNo: '', HanKiemDinhChongSet: '',
+        NgayTuKiemTraGanNhat: '', NgayBaoCaoCongAnGanNhat: '', SoNhanSuDoiPCCC: '', NgayDienTapGanNhat: '', Link_HoSoDoiPCCC: '',
+        TenDoiTruong: '', ChucDanhDoiTruong: '', SDTDoiTruong: '', // THÔNG TIN ĐỘI TRƯỞNG
+        HeThongBaoChay: 'Tự động', HeThongBom: 'Chữa cháy vách tường', ViTriTuBaoChay: '', TrangThaiBaoChay: 'Bình thường', TrangThaiBom: 'Sẵn sàng',
+        SoLuongBinhBot: '', SoLuongBinhCO2: '', SoLuongBinhXeDay: '', SoLuongPhuyCat: '', SoLuongBinhPinDien: '', // BÌNH PIN EV
+        NgayBomSacGannhat: '', ChiTietBomSac: '',
+        KhuVucRuiRoCao: '', LoiTonTaiChuaKhacPhuc: '', Link_HoSoPCCC: '', Link_PhuongAnPCCC_CNCH: '', GhiChu: ''
+      });
+    }
+    setIsPcccModalOpen(true);
+  };
+
+  const handlePcccSave = async (e: React.FormEvent) => {
+    e.preventDefault(); setSubmitting(true); setError(null);
+    const currentId = getPcccId(pcccFormData);
+    let finalData = { ...pcccFormData };
+    if (currentId) {
+      finalData.ID_PCCC = currentId;
+      finalData.iD_PCCC = currentId;
+      finalData.Id_PCCC = currentId;
+    }
+
+    try {
+      const mode = currentId ? 'update' : 'create';
+      const res = await apiService.save(finalData, mode, "HS_PCCC");
+      const savedId = res?.newId || res?.id || currentId || `PC-${Date.now()}`;
+      finalData.ID_PCCC = savedId;
+
+      if (mode === 'create') {
+        setPcccData(prev => [finalData, ...prev]);
+      } else {
+        setPcccData(prev => prev.map(item => getPcccId(item) === currentId ? finalData : item));
+      }
+      setIsPcccModalOpen(false);
+    } catch (err: any) { setError(err.message || 'Lỗi lưu dữ liệu PCCC.'); } 
     finally { setSubmitting(false); }
   };
 
@@ -1180,16 +1276,20 @@ export default function DepartmentPage() {
                   )}
                 </section>
 
-                {/* 🟢 F. PHÒNG CHỐNG CHÁY NỔ (ĐÃ LIÊN KẾT MODULE) */}
+{/* 🟢 F. PHÒNG CHỐNG CHÁY NỔ (ĐÃ LIÊN KẾT MODULE) */}
                 <section>
                   <div className="flex justify-between items-center mb-5">
                     <h3 className="text-lg font-black text-[#05469B] flex items-center gap-2 uppercase tracking-wider">
                       <div className="w-1.5 h-6 bg-[#05469B] rounded-full"></div> {isParentUnit ? 'F. TỔNG HỢP PCCC TOÀN CỤM' : 'F. PHÒNG CHỐNG CHÁY NỔ'}
                     </h3>
+                    {!isParentUnit && currentPccc && (
+                      <button onClick={openPcccModal} className="px-4 py-2 text-sm font-bold text-red-600 bg-red-50 hover:bg-red-100 rounded-lg flex items-center gap-2 transition-colors border border-red-100 shadow-sm">
+                        <Edit size={16} /> Cập nhật
+                      </button>
+                    )}
                   </div>
 
                   {isParentUnit ? (() => {
-                    // TÍNH TOÁN CHO CÔNG TY MẸ
                     const childPCCCs = pcccData.filter(p => selectedUnitSubordinates.includes(p.ID_DonVi));
                     const totalPCCC = childPCCCs.length;
                     const hoSoLoi = childPCCCs.filter(p => p.LoiTonTaiChuaKhacPhuc || p.TrangThaiBaoChay === 'Lỗi' || p.TrangThaiBom === 'Lỗi').length;
@@ -1211,34 +1311,35 @@ export default function DepartmentPage() {
                       </div>
                     );
                   })() : (() => {
-                    // TÍNH TOÁN CHO ĐƠN VỊ ĐƠN LẺ
-                    const pccc = pcccData.find(p => p.ID_DonVi === selectedUnitId);
-                    if (!pccc) return (
-                      <div className="bg-gray-50 p-8 rounded-xl border-2 border-dashed border-gray-200 text-center shadow-sm">
-                        <Flame size={40} className="mx-auto text-gray-300 mb-3" />
-                        <h4 className="text-base font-bold text-gray-600 mb-1">Dữ liệu PCCC chưa khai báo</h4>
-                        <p className="text-xs text-gray-400">Hãy sang Module Quản lý PCCC để tạo hồ sơ cho đơn vị này.</p>
-                      </div>
-                    );
+                    if (!currentPccc) {
+                      return (
+                        <div onClick={openPcccModal} className="bg-white hover:bg-red-50/50 cursor-pointer p-10 rounded-2xl border-2 border-dashed border-gray-300 hover:border-red-300 text-center transition-all group shadow-sm">
+                          <Flame size={48} className="mx-auto text-gray-300 group-hover:text-red-400 mb-4 transition-colors" />
+                          <h4 className="text-lg font-bold text-gray-700 group-hover:text-red-700 mb-1">Cập nhật Hồ sơ PCCC</h4>
+                          <p className="text-sm text-gray-400">Click vào đây để khai báo hệ thống và tình trạng an toàn PCCC.</p>
+                        </div>
+                      );
+                    }
                     
                     return (
                       <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm animate-in fade-in">
                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div className="space-y-3">
                               <h4 className="font-bold text-red-700 border-b border-gray-100 pb-2 text-sm flex items-center gap-1.5"><FileText size={16}/> Pháp lý & Hệ thống</h4>
-                              <div className="flex justify-between text-sm"><span className="text-gray-500">Tình trạng Pháp lý:</span><span className="font-bold text-gray-800">{pccc.TinhTrangPhapLy}</span></div>
-                              <div className="flex justify-between text-sm"><span className="text-gray-500">Hệ thống Báo cháy:</span><span className={`font-bold ${pccc.TrangThaiBaoChay === 'Bình thường' ? 'text-emerald-600' : 'text-red-600'}`}>{pccc.TrangThaiBaoChay}</span></div>
-                              <div className="flex justify-between text-sm"><span className="text-gray-500">Hệ thống Bơm:</span><span className={`font-bold ${pccc.TrangThaiBom === 'Sẵn sàng' ? 'text-emerald-600' : 'text-red-600'}`}>{pccc.TrangThaiBom}</span></div>
-                              <div className="flex justify-between text-sm pt-2 border-t border-gray-50"><span className="text-gray-500">Bình chữa cháy:</span><span className="font-bold text-gray-800">{Number(pccc.SoLuongBinhBot||0) + Number(pccc.SoLuongBinhCO2||0)} Bình</span></div>
+                              <div className="flex justify-between text-sm"><span className="text-gray-500">Tình trạng Pháp lý:</span><span className="font-bold text-gray-800">{currentPccc.TinhTrangPhapLy}</span></div>
+                              <div className="flex justify-between text-sm"><span className="text-gray-500">Đội trưởng PCCC:</span><span className="font-bold text-[#05469B] text-right">{currentPccc.TenDoiTruong || 'Chưa cập nhật'} {currentPccc.SDTDoiTruong && <span className="block text-xs font-normal text-gray-500">{currentPccc.SDTDoiTruong}</span>}</span></div>
+                              <div className="flex justify-between text-sm"><span className="text-gray-500">Hệ thống Báo cháy:</span><span className={`font-bold ${currentPccc.TrangThaiBaoChay === 'Bình thường' ? 'text-emerald-600' : 'text-red-600'}`}>{currentPccc.TrangThaiBaoChay}</span></div>
+                              <div className="flex justify-between text-sm"><span className="text-gray-500">Hệ thống Bơm:</span><span className={`font-bold ${currentPccc.TrangThaiBom === 'Sẵn sàng' ? 'text-emerald-600' : 'text-red-600'}`}>{currentPccc.TrangThaiBom}</span></div>
+                              <div className="flex justify-between text-sm pt-2 border-t border-gray-50"><span className="text-gray-500">Bình (Bột/CO2/Đẩy/Pin):</span><span className="font-bold text-gray-800">{Number(currentPccc.SoLuongBinhBot||0)} / {Number(currentPccc.SoLuongBinhCO2||0)} / {Number(currentPccc.SoLuongBinhXeDay||0)} / {Number(currentPccc.SoLuongBinhPinDien||0)}</span></div>
                             </div>
                             
                             <div className="space-y-3 border-l border-gray-100 pl-6">
                               <h4 className="font-bold text-orange-600 border-b border-gray-100 pb-2 text-sm flex items-center gap-1.5"><AlertCircle size={16}/> Cảnh báo & Tồn tại</h4>
-                              <div className="flex justify-between text-sm"><span className="text-gray-500">Khu vực rủi ro:</span><span className="font-semibold text-gray-800 text-right">{pccc.KhuVucRuiRoCao || 'Không có'}</span></div>
+                              <div className="flex justify-between text-sm"><span className="text-gray-500">Khu vực rủi ro:</span><span className="font-semibold text-gray-800 text-right">{currentPccc.KhuVucRuiRoCao || 'Không có'}</span></div>
                               <div className="mt-2">
                                 <span className="text-gray-500 text-sm block mb-1">Lỗi / Tồn tại chưa khắc phục:</span>
-                                {pccc.LoiTonTaiChuaKhacPhuc ? (
-                                  <div className="bg-red-50 text-red-700 p-2 rounded text-xs font-semibold border border-red-100">{pccc.LoiTonTaiChuaKhacPhuc}</div>
+                                {currentPccc.LoiTonTaiChuaKhacPhuc ? (
+                                  <div className="bg-red-50 text-red-700 p-2 rounded text-xs font-semibold border border-red-100">{currentPccc.LoiTonTaiChuaKhacPhuc}</div>
                                 ) : (
                                   <div className="bg-emerald-50 text-emerald-600 p-2 rounded text-xs font-semibold border border-emerald-100">Đảm bảo an toàn</div>
                                 )}
@@ -1677,402 +1778,109 @@ export default function DepartmentPage() {
         </div>
       </div>
 
-      {/* 🟢 [KHU VỰC: MODAL CẬP NHẬT AN NINH & CAMERA] */}
-      {isSecurityModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+{/* 🟢 [KHU VỰC: MODAL PCCC MỚI THÊM VÀO ĐÂY] */}
+      {isPcccModalOpen && (
+        <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm transition-all duration-300 ${!isListCollapsed ? 'lg:pl-80' : ''}`}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl flex flex-col max-h-[90vh] animate-in fade-in zoom-in duration-200">
-            <div className="flex justify-between items-center p-5 border-b border-indigo-100 bg-indigo-50 rounded-t-2xl text-indigo-900">
-              <h3 className="text-xl font-bold flex items-center gap-2"><Shield size={24}/> Cập nhật An ninh & Hệ thống Camera</h3>
-              <button onClick={() => setIsSecurityModalOpen(false)} disabled={submitting} className="text-indigo-400 hover:text-red-500 rounded-full p-1.5 bg-white shadow-sm"><X className="w-6 h-6" /></button>
+            <div className="flex justify-between p-5 border-b border-gray-100 bg-red-50 rounded-t-2xl shrink-0">
+              <h3 className="text-xl font-bold text-red-700 flex items-center gap-2"><Flame size={24}/> {pcccFormData.ID_PCCC ? 'Cập nhật Hồ sơ PCCC' : 'Tạo Hồ sơ PCCC Mới'}</h3>
+              <button onClick={() => setIsPcccModalOpen(false)} disabled={submitting} className="text-gray-400 hover:text-red-500 rounded-full p-1.5 bg-white shadow-sm transition-colors"><X className="w-6 h-6" /></button>
             </div>
             
-            <form onSubmit={handleSecuritySave} className="p-6 overflow-y-auto space-y-6">
-              
-              {/* KHỐI 1: LỰC LƯỢNG BẢO VỆ */}
-              <div className="bg-blue-50/50 p-5 rounded-xl border border-blue-100">
-                <h4 className="font-bold text-blue-800 mb-4 flex items-center gap-2 border-b border-blue-200 pb-2"><Users size={18}/> Lực lượng Bảo vệ</h4>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                  <div><label className="block text-xs font-bold text-gray-700 mb-1">Định biên ANBV (Người)</label><input type="number" name="DinhbienANBV" value={securityFormData.DinhbienANBV || ''} onChange={(e) => handleInputChange(e, 'sec')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-blue-500" /></div>
-                  <div><label className="block text-xs font-bold text-gray-700 mb-1">Bảo vệ Nội bộ (Người)</label><input type="number" name="SoBaoVeNoiBo" value={securityFormData.SoBaoVeNoiBo || ''} onChange={(e) => handleInputChange(e, 'sec')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-blue-500" /></div>
-                  <div><label className="block text-xs font-bold text-gray-700 mb-1">Bảo vệ Dịch vụ (Người)</label><input type="number" name="SoBaoVeDichvu" value={securityFormData.SoBaoVeDichvu || ''} onChange={(e) => handleInputChange(e, 'sec')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-blue-500" /></div>
-                </div>
-                
-                {Number(securityFormData.SoBaoVeDichvu) >= 1 && (
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-5 mt-4 pt-4 border-t border-blue-100 animate-in fade-in slide-in-from-top-2">
-                    <div className="md:col-span-2"><label className="block text-xs font-bold text-gray-700 mb-1">Vị trí BV Dịch vụ (Mô tả)</label><input type="text" name="VitrBVDV" value={securityFormData.VitrBVDV || ''} onChange={(e) => handleInputChange(e, 'sec')} placeholder="Cổng chính, cổng phụ..." className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-blue-500" /></div>
-                    <div><label className="block text-xs font-bold text-gray-700 mb-1">Nhà cung cấp BV</label><input type="text" name="NCC_DichVu" value={securityFormData.NCC_DichVu || ''} onChange={(e) => handleInputChange(e, 'sec')} placeholder="YUKI, Sepre 24..." className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-blue-500" /></div>
-                    <div><label className="block text-xs font-bold text-red-600 mb-1">Chi phí thuê (VNĐ/Tháng)</label><input type="text" name="ChiPhiThue" value={formatCurrency(securityFormData.ChiPhiThue)} onChange={(e) => handleInputChange(e, 'sec')} placeholder="Nhập số tiền..." className="w-full p-2.5 border border-red-200 text-red-600 font-bold rounded-lg bg-red-50 focus:bg-white outline-none focus:ring-2 focus:ring-red-500" /></div>
-                  </div>
-                )}
-              </div>
-
-              {/* KHỐI 2: PHÂN BỔ CA TRỰC */}
-              <div className="bg-amber-50/50 p-5 rounded-xl border border-amber-100">
-                <h4 className="font-bold text-amber-800 mb-4 flex items-center gap-2 border-b border-amber-200 pb-2"><Clock size={18}/> Phân bổ Ca trực</h4>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                  <div><label className="block text-[10px] font-bold text-amber-700 mb-1 uppercase flex items-center gap-1"><Sun size={12}/> Ngày (Cố định)</label><input type="number" name="Ngaycd" value={securityFormData.Ngaycd || ''} onChange={(e) => handleInputChange(e, 'sec')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-amber-500" /></div>
-                  <div><label className="block text-[10px] font-bold text-amber-700 mb-1 uppercase flex items-center gap-1"><Sun size={12}/> Ngày (Tuần tra)</label><input type="number" name="Ngaytuantra" value={securityFormData.Ngaytuantra || ''} onChange={(e) => handleInputChange(e, 'sec')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-amber-500" /></div>
-                  <div><label className="block text-[10px] font-bold text-indigo-700 mb-1 uppercase flex items-center gap-1"><Moon size={12}/> Đêm (Cố định)</label><input type="number" name="Demcd" value={securityFormData.Demcd || ''} onChange={(e) => handleInputChange(e, 'sec')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-indigo-500" /></div>
-                  <div><label className="block text-[10px] font-bold text-indigo-700 mb-1 uppercase flex items-center gap-1"><Moon size={12}/> Đêm (Tuần tra)</label><input type="number" name="Demtruantra" value={securityFormData.Demtruantra || ''} onChange={(e) => handleInputChange(e, 'sec')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-indigo-500" /></div>
-                </div>
-                {/* TRƯỜNG DỮ LIỆU MỚI: Bố trí nghỉ ca */}
-                <div><label className="block text-xs font-bold text-gray-700 mb-1">Bố trí nghỉ ca / Đổi ca</label><textarea name="BoTriNghiCa" value={securityFormData.BoTriNghiCa || ''} onChange={(e) => handleInputChange(e, 'sec')} rows={2} placeholder="Mô tả cách thức bố trí người nghỉ ca, đổi ca..." className="w-full p-2.5 border border-gray-200 rounded-lg bg-white resize-none outline-none focus:ring-2 focus:ring-amber-500"></textarea></div>
-              </div>
-
-              {/* KHỐI 3: HỆ THỐNG GIÁM SÁT */}
-              <div className="bg-gray-50 p-5 rounded-xl border border-gray-200">
-                <h4 className="font-bold text-gray-800 mb-4 flex items-center gap-2 border-b border-gray-200 pb-2"><Camera size={18}/> Hệ thống Giám sát</h4>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                  <div><label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Tổng SL (Mắt)</label><input type="number" name="SLCAM" value={securityFormData.SLCAM || ''} onChange={(e) => handleInputChange(e, 'sec')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-indigo-500" /></div>
-                  <div><label className="block text-[10px] font-bold text-emerald-600 mb-1 uppercase">Hoạt động</label><input type="number" name="CAMHD" value={securityFormData.CAMHD || ''} onChange={(e) => handleInputChange(e, 'sec')} className="w-full p-2.5 border border-emerald-200 rounded-lg bg-emerald-50 outline-none focus:ring-2 focus:ring-emerald-500 font-bold text-emerald-700" /></div>
-                  <div><label className="block text-[10px] font-bold text-red-600 mb-1 uppercase">Hư hỏng</label><input type="number" name="CAMHuHong" value={securityFormData.CAMHuHong || ''} onChange={(e) => handleInputChange(e, 'sec')} className="w-full p-2.5 border border-red-200 rounded-lg bg-red-50 outline-none focus:ring-2 focus:ring-red-500 font-bold text-red-700" /></div>
-                  <div><label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Lưu hình (Ngày)</label><input type="number" name="ThoiGianLuu" value={securityFormData.ThoiGianLuu || ''} onChange={(e) => handleInputChange(e, 'sec')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-indigo-500" /></div>
-                </div>
-
-                {Number(securityFormData.CAMHuHong) > 0 && (
-                   <div className="mb-4 p-4 bg-red-50/50 rounded-lg border border-red-100 animate-in fade-in zoom-in duration-200">
-                     <label className="block text-xs font-bold text-red-700 mb-2">Lý do Camera hư/hỏng</label>
-                     <select 
-                       value={securityFormData.LyDoHuCam && !['Sự cố nguồn điện', 'Dây tín hiệu và Jack kết nối', 'Lỗi phần cứng Camera', 'Lỗi đầu ghi (DVR/NVR) và Lưu trữ', 'Vấn đề phần mềm & Mạng'].includes(securityFormData.LyDoHuCam) ? 'Khác' : (securityFormData.LyDoHuCam || '')} 
-                       onChange={(e) => {
-                          const val = e.target.value;
-                          setSecurityFormData({...securityFormData, LyDoHuCam: val === 'Khác' ? 'Khác' : val});
-                       }}
-                       className="w-full p-2.5 border border-red-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-red-500 text-sm font-medium text-red-800 mb-2"
-                     >
-                       <option value="">-- Chọn lý do --</option>
-                       <option value="Sự cố nguồn điện">Sự cố nguồn điện</option>
-                       <option value="Dây tín hiệu và Jack kết nối">Dây tín hiệu và Jack kết nối</option>
-                       <option value="Lỗi phần cứng Camera">Lỗi phần cứng Camera</option>
-                       <option value="Lỗi đầu ghi (DVR/NVR) và Lưu trữ">Lỗi đầu ghi (DVR/NVR) và Lưu trữ</option>
-                       <option value="Vấn đề phần mềm & Mạng">Vấn đề phần mềm & Mạng</option>
-                       <option value="Khác">Khác (Nhập lý do cụ thể...)</option>
-                     </select>
-
-                     {(securityFormData.LyDoHuCam && !['Sự cố nguồn điện', 'Dây tín hiệu và Jack kết nối', 'Lỗi phần cứng Camera', 'Lỗi đầu ghi (DVR/NVR) và Lưu trữ', 'Vấn đề phần mềm & Mạng', ''].includes(securityFormData.LyDoHuCam)) && (
-                       <input type="text" 
-                          value={securityFormData.LyDoHuCam === 'Khác' ? '' : securityFormData.LyDoHuCam}
-                          onChange={(e) => setSecurityFormData({...securityFormData, LyDoHuCam: e.target.value || 'Khác'})}
-                          placeholder="Gõ lý do hư hỏng cụ thể..."
-                          className="w-full p-2.5 border border-red-300 rounded-lg bg-white outline-none focus:ring-2 focus:ring-red-500 text-sm"
-                       />
-                     )}
-                   </div>
-                )}
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Vị trí đặt hệ thống (Đầu ghi)</label>
-                    <input type="text" name="ViTriDatHeThong" value={securityFormData.ViTriDatHeThong || ''} onChange={(e) => handleInputChange(e, 'sec')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-indigo-500" placeholder="VD: Phòng IT, Phòng Giám đốc..." />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Vị trí giám sát chính</label>
-                    <textarea name="ViTriGiamSat" value={securityFormData.ViTriGiamSat || ''} onChange={(e) => handleInputChange(e, 'sec')} rows={1} placeholder="Mô tả các góc giám sát quan trọng..." className="w-full p-2.5 border border-gray-200 rounded-lg bg-white resize-none outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
-                  </div>
-                </div>
-              </div>
-
-              {/* KHỐI 4: ĐẶC ĐIỂM ĐỊA BÀN */}
-              <div className="bg-emerald-50/50 p-5 rounded-xl border border-emerald-100">
-                <h4 className="font-bold text-emerald-800 mb-4 flex items-center gap-2 border-b border-emerald-200 pb-2"><Compass size={18}/> Đặc điểm Địa bàn</h4>
-                <div className="space-y-5">
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div><label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Tiếp giáp phía Trước</label><input type="text" name="TiepGiapTruoc" value={securityFormData.TiepGiapTruoc || ''} onChange={(e) => handleInputChange(e, 'sec')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-emerald-500" /></div>
-                    <div><label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Tiếp giáp phía Sau</label><input type="text" name="TiepGiapSau" value={securityFormData.TiepGiapSau || ''} onChange={(e) => handleInputChange(e, 'sec')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-emerald-500" /></div>
-                    <div><label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Tiếp giáp phía Trái</label><input type="text" name="TiepGiapTrai" value={securityFormData.TiepGiapTrai || ''} onChange={(e) => handleInputChange(e, 'sec')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-emerald-500" /></div>
-                    <div><label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Tiếp giáp phía Phải</label><input type="text" name="TiepGiapPhai" value={securityFormData.TiepGiapPhai || ''} onChange={(e) => handleInputChange(e, 'sec')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-emerald-500" /></div>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-emerald-800 mb-1">Đánh giá Tình hình ANTT Khu vực</label>
-                    <input type="text" name="TinhHinhKhuVuc" value={securityFormData.TinhHinhKhuVuc || ''} onChange={(e) => handleInputChange(e, 'sec')} placeholder="VD: Phức tạp, Thường xuyên mất cắp, An ninh tốt..." className="w-full p-2.5 border border-emerald-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-emerald-500" />
-                  </div>
-                </div>
-              </div>
-
-              {/* KHỐI 5: PHƯƠNG ÁN ANBV */}
-              <div className="bg-purple-50/50 p-5 rounded-xl border border-purple-100">
-                 <h4 className="font-bold text-purple-800 mb-4 flex items-center gap-2 border-b border-purple-200 pb-2"><FileText size={18}/> Phương án ANBV</h4>
-                 <div>
-                   <label className="block text-xs font-bold text-gray-700 mb-1">Link Phương án ANBV (Drive/PDF)</label>
-                   <div className="relative">
-                     <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-                     <input type="url" name="Link_PhuongAnAN" value={securityFormData.Link_PhuongAnAN || ''} onChange={(e) => handleInputChange(e, 'sec')} placeholder="Dán link phương án..." className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-lg bg-white text-blue-600 outline-none focus:ring-2 focus:ring-purple-500" />
-                   </div>
-                 </div>
-              </div>
-
-              <div className="pt-4 flex justify-end gap-3 mt-6 border-t border-gray-100">
-                <button type="button" onClick={() => setIsSecurityModalOpen(false)} className="px-8 py-3 bg-gray-100 text-gray-700 rounded-xl font-bold hover:bg-gray-200 transition-colors shadow-sm">Hủy</button>
-                <button type="submit" disabled={submitting} className="px-8 py-3 bg-[#05469B] text-white rounded-xl font-bold flex items-center gap-2 hover:bg-[#04367a] shadow-md transition-colors">{submitting ? <Loader2 className="animate-spin"/> : <Save/>} Lưu Cập Nhật</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* 🟢 [KHU VỰC: MODAL PHỤC VỤ HẬU CẦN (PVHC)] */}
-      {isPvhcModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[90vh] animate-in fade-in zoom-in duration-200">
-            <div className="flex justify-between items-center p-5 border-b border-emerald-100 bg-emerald-50 rounded-t-2xl text-emerald-900">
-              <h3 className="text-xl font-bold flex items-center gap-2"><Utensils size={24}/> Cập nhật Phục vụ Hậu cần</h3>
-              <button onClick={() => setIsPvhcModalOpen(false)} disabled={submitting} className="text-emerald-400 hover:text-red-500 rounded-full p-1.5 bg-white shadow-sm"><X className="w-6 h-6" /></button>
-            </div>
-            
-            <form onSubmit={handlePvhcSave} className="p-6 overflow-y-auto space-y-6">
-              
-              <div className="bg-emerald-50/50 p-5 rounded-xl border border-emerald-100">
-                <h4 className="font-bold text-emerald-800 mb-4 flex items-center gap-2 border-b border-emerald-200 pb-2"><Pocket size={18}/> 1. Lực lượng Nội bộ</h4>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-1">Định biên (Người) *</label>
-                    <input type="number" required name="DinhBien" value={pvhcFormData.DinhBien || ''} onChange={(e) => handleInputChange(e, 'pvhc')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-emerald-500" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-1">NV Khách chờ (Trà nước)</label>
-                    <input type="number" name="PVHC_KhachCho" value={pvhcFormData.PVHC_KhachCho || ''} onChange={(e) => handleInputChange(e, 'pvhc')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-emerald-500" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-1">NV Vệ sinh (Tạp vụ)</label>
-                    <input type="number" name="PVHC_Vesinh" value={pvhcFormData.PVHC_Vesinh || ''} onChange={(e) => handleInputChange(e, 'pvhc')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-emerald-500" />
-                  </div>
-                </div>
-                <p className="text-[10px] text-gray-500 mt-3 italic">* Hệ thống sẽ tự động tính <strong>Hiện hữu</strong> = Khách chờ + Vệ sinh</p>
-              </div>
-
-              <div className="bg-orange-50/50 p-5 rounded-xl border border-orange-100">
-                <h4 className="font-bold text-orange-800 mb-4 flex items-center gap-2 border-b border-orange-200 pb-2"><Briefcase size={18}/> 2. Dịch vụ Thuê ngoài</h4>
-                
-                {/* Dòng 1: Số lượng và Vị trí */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-5">
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-1">Số lượng Thuê ngoài (Người)</label>
-                    <input type="number" name="PVHC_DichVu" value={pvhcFormData.PVHC_DichVu || ''} onChange={(e) => handleInputChange(e, 'pvhc')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-orange-500" />
-                  </div>
-                  
-                  {Number(pvhcFormData.PVHC_DichVu) > 0 && (
-                    <div className="animate-in fade-in">
-                      <label className="block text-xs font-bold text-gray-700 mb-1">Vị trí đảm nhận *</label>
-                      <input type="text" required name="Vitri" value={pvhcFormData.Vitri || ''} onChange={(e) => handleInputChange(e, 'pvhc')} placeholder="VD: Khách chờ, Vệ sinh..." className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-orange-500" />
-                    </div>
-                  )}
-                </div>
-                
-                {/* Dòng 2: Nhà cung cấp và Chi phí */}
-                {Number(pvhcFormData.PVHC_DichVu) > 0 && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 pt-4 border-t border-orange-100 animate-in fade-in">
-                    <div>
-                      <label className="block text-xs font-bold text-gray-700 mb-1">Nhà cung cấp *</label>
-                      <input type="text" required name="NCC_DichVu" value={pvhcFormData.NCC_DichVu || ''} onChange={(e) => handleInputChange(e, 'pvhc')} placeholder="Tên công ty thuê ngoài..." className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-orange-500" />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold text-red-600 mb-1">Chi phí thuê / tháng (VNĐ) *</label>
-                      <input type="text" required name="ChiPhiThue" value={formatCurrency(pvhcFormData.ChiPhiThue)} onChange={(e) => handleInputChange(e, 'pvhc')} placeholder="Nhập số tiền..." className="w-full p-2.5 border border-red-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-red-500 font-bold text-red-600" />
+            <form onSubmit={handlePcccSave} className="p-6 overflow-y-auto space-y-6 flex-1 min-h-0 custom-scrollbar">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="space-y-6">
+                  <div className="bg-blue-50/40 p-5 rounded-xl border border-blue-100 shadow-sm">
+                    <h4 className="font-bold text-blue-800 mb-4 flex items-center gap-2 border-b border-blue-200 pb-2"><FileText size={18}/> 1. Pháp lý, Bảo hiểm & Báo cáo</h4>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1">Đơn vị / Cơ sở *</label>
+                        <select required name="ID_DonVi" value={pcccFormData.ID_DonVi || ''} onChange={(e) => handleInputChange(e, 'pccc')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-gray-100 outline-none text-gray-600 cursor-not-allowed" style={{ fontFamily: 'monospace, sans-serif' }} disabled>
+                          <option value={selectedUnitId || ''}>{donViMap[selectedUnitId || ''] || selectedUnitId}</option>
+                        </select>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div><label className="block text-xs font-bold text-gray-700 mb-1">Tình trạng Pháp lý</label><select name="TinhTrangPhapLy" value={pcccFormData.TinhTrangPhapLy || 'Nghiệm thu'} onChange={(e) => handleInputChange(e, 'pccc')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-blue-500 font-bold text-emerald-700"><option value="Nghiệm thu">Nghiệm thu</option><option value="Đã thẩm duyệt">Đã thẩm duyệt</option><option value="Chưa có">Chưa có</option></select></div>
+                        <div><label className="block text-[10px] font-bold text-red-600 mb-1 uppercase">Hạn Bảo hiểm Cháy nổ *</label><input type="date" required name="HanBaoHiemChayNo" value={pcccFormData.HanBaoHiemChayNo ? pcccFormData.HanBaoHiemChayNo.split('T')[0] : ''} onChange={(e) => handleInputChange(e, 'pccc')} className="w-full p-2 border border-red-300 rounded-lg bg-red-50 outline-none focus:ring-2 focus:ring-red-500 font-bold text-red-700 text-sm" /></div>
+                        <div><label className="block text-[10px] font-bold text-orange-600 mb-1 uppercase">Hạn Đo Đ.trở Chống sét *</label><input type="date" required name="HanKiemDinhChongSet" value={pcccFormData.HanKiemDinhChongSet ? pcccFormData.HanKiemDinhChongSet.split('T')[0] : ''} onChange={(e) => handleInputChange(e, 'pccc')} className="w-full p-2 border border-orange-300 rounded-lg bg-orange-50 outline-none focus:ring-2 focus:ring-orange-500 font-bold text-orange-700 text-sm" /></div>
+                        <div><label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Tự kiểm tra gần nhất</label><input type="date" name="NgayTuKiemTraGanNhat" value={pcccFormData.NgayTuKiemTraGanNhat ? pcccFormData.NgayTuKiemTraGanNhat.split('T')[0] : ''} onChange={(e) => handleInputChange(e, 'pccc')} className="w-full p-2 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-blue-500 font-bold text-gray-700 text-sm" title="Định kỳ 1 tháng/lần" /></div>
+                      </div>
+                      <div><label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Ngày Báo cáo CA gần nhất (Định kỳ 6 tháng)</label><input type="date" name="NgayBaoCaoCongAnGanNhat" value={pcccFormData.NgayBaoCaoCongAnGanNhat ? pcccFormData.NgayBaoCaoCongAnGanNhat.split('T')[0] : ''} onChange={(e) => handleInputChange(e, 'pccc')} className="w-full p-2 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-blue-500 font-bold text-gray-700 text-sm" /></div>
+                      <div><label className="block text-xs font-bold text-gray-700 mb-1">Link Hồ sơ PCCC cơ sở (Drive)</label><input type="url" name="Link_HoSoPCCC" value={pcccFormData.Link_HoSoPCCC || ''} onChange={(e) => handleInputChange(e, 'pccc')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-blue-500 text-blue-600" placeholder="https://drive.google.com/..." /></div>
+                      <div><label className="block text-xs font-bold text-gray-700 mb-1">Link Phương án PCCC & CNCH</label><input type="url" name="Link_PhuongAnPCCC_CNCH" value={pcccFormData.Link_PhuongAnPCCC_CNCH || ''} onChange={(e) => handleInputChange(e, 'pccc')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-blue-500 text-blue-600" placeholder="https://drive.google.com/..." /></div>
                     </div>
                   </div>
-                )}
-              </div>
 
-              <div className="pt-4 flex justify-end gap-3 mt-6 border-t border-gray-100">
-                <button type="button" onClick={() => setIsPvhcModalOpen(false)} className="px-8 py-3 bg-gray-100 text-gray-700 rounded-xl font-bold hover:bg-gray-200 transition-colors shadow-sm">Hủy</button>
-                <button type="submit" disabled={submitting} className="px-8 py-3 bg-[#05469B] text-white rounded-xl font-bold flex items-center gap-2 hover:bg-[#04367a] shadow-md transition-colors">{submitting ? <Loader2 className="animate-spin"/> : <Save/>} Lưu Cập Nhật</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+                  <div className="bg-emerald-50/40 p-5 rounded-xl border border-emerald-100 shadow-sm">
+                    <h4 className="font-bold text-emerald-800 mb-4 flex items-center gap-2 border-b border-emerald-200 pb-2"><Users size={18}/> 2. Đội PCCC Cơ sở & Diễn tập</h4>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div><label className="block text-xs font-bold text-gray-700 mb-1">Tổng NS Đội PCCC (Người)</label><input type="number" name="SoNhanSuDoiPCCC" value={pcccFormData.SoNhanSuDoiPCCC || ''} onChange={(e) => handleInputChange(e, 'pccc')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-emerald-500" /></div>
+                      <div><label className="block text-xs font-bold text-gray-700 mb-1">Ngày Diễn tập gần nhất</label><input type="date" name="NgayDienTapGanNhat" value={pcccFormData.NgayDienTapGanNhat ? pcccFormData.NgayDienTapGanNhat.split('T')[0] : ''} onChange={(e) => handleInputChange(e, 'pccc')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-emerald-500 text-gray-700 font-bold" /></div>
+                      
+                      <div className="col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4 pt-3 border-t border-emerald-100/50">
+                        <div className="md:col-span-2"><label className="block text-[10px] font-bold text-gray-700 mb-1 uppercase">Đội trưởng PCCC</label><input type="text" name="TenDoiTruong" value={pcccFormData.TenDoiTruong || ''} onChange={(e) => handleInputChange(e, 'pccc')} className="w-full p-2 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-emerald-500 text-sm font-bold text-[#05469B]" placeholder="Họ và tên..." /></div>
+                        <div><label className="block text-[10px] font-bold text-gray-700 mb-1 uppercase">SĐT</label><input type="text" name="SDTDoiTruong" value={pcccFormData.SDTDoiTruong || ''} onChange={(e) => handleInputChange(e, 'pccc')} className="w-full p-2 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-emerald-500 text-sm" placeholder="Nhập SĐT..." /></div>
+                        <div className="md:col-span-3"><label className="block text-[10px] font-bold text-gray-700 mb-1 uppercase">Chức danh Đội trưởng</label><input type="text" name="ChucDanhDoiTruong" value={pcccFormData.ChucDanhDoiTruong || ''} onChange={(e) => handleInputChange(e, 'pccc')} className="w-full p-2 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-emerald-500 text-sm" placeholder="VD: Giám đốc SR, Trưởng phòng..." /></div>
+                      </div>
 
-      {/* --- FORM PHÒNG HỌP --- */}
-      {isPhModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl flex flex-col max-h-[90vh] animate-in fade-in zoom-in duration-200">
-            <div className="flex justify-between items-center p-5 border-b border-fuchsia-100 bg-fuchsia-50 rounded-t-2xl text-fuchsia-900">
-              <h3 className="text-xl font-bold flex items-center gap-2"><Monitor size={24}/> {phModalMode === 'create' ? 'Thêm Phòng họp mới' : 'Cập nhật Phòng họp'}</h3>
-              <button onClick={() => setIsPhModalOpen(false)} disabled={submitting} className="text-fuchsia-400 hover:text-red-500 rounded-full p-1.5 bg-white shadow-sm"><X className="w-6 h-6" /></button>
-            </div>
-            
-            <form onSubmit={handlePhSave} className="p-6 overflow-y-auto space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
-                <div className="md:col-span-2"><label className="block text-xs font-bold text-gray-600 mb-1">Tên Phòng họp *</label><input type="text" required name="Tenphonghop" value={phFormData.Tenphonghop || ''} onChange={(e) => handleInputChange(e, 'ph')} placeholder="VD: Phòng họp Tầng 2..." className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-fuchsia-500 font-bold text-gray-800" /></div>
-                <div><label className="block text-xs font-bold text-gray-600 mb-1">Vị trí *</label><input type="text" required name="Vitri" value={phFormData.Vitri || ''} onChange={(e) => handleInputChange(e, 'ph')} placeholder="VD: Lầu 2, Tòa nhà A..." className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-fuchsia-500" /></div>
-                <div><label className="block text-xs font-bold text-gray-600 mb-1">Sức chứa tối đa (Người) *</label><input type="number" required name="Succhua" value={phFormData.Succhua || ''} onChange={(e) => handleInputChange(e, 'ph')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-fuchsia-500" /></div>
-              </div>
-
-              <div className="bg-gray-50 p-5 rounded-xl border border-gray-200 space-y-5">
-                <h4 className="text-sm font-bold text-[#05469B] flex items-center gap-2 border-b border-gray-200 pb-2"><Projector size={16}/> Trang thiết bị</h4>
-                
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                  <div className="md:col-span-2"><label className="block text-xs font-bold text-gray-600 mb-1">Thiết bị trình chiếu (Loại - Inch)</label><input type="text" name="TBtrinhchieu" value={phFormData.TBtrinhchieu || ''} onChange={(e) => handleInputChange(e, 'ph')} placeholder="VD: Tivi - 100 inch hoặc Máy chiếu - 120 inch..." className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-fuchsia-500" /></div>
-                  <div><label className="block text-xs font-bold text-gray-600 mb-1">Số lượng Bút Laser</label><input type="number" name="Butchi" value={phFormData.Butchi || ''} onChange={(e) => handleInputChange(e, 'ph')} placeholder="Nhập số lượng..." className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-fuchsia-500" /></div>
+                      <div className="col-span-2 pt-3"><label className="block text-xs font-bold text-gray-700 mb-1">Link QĐ Thành lập đội & Chứng chỉ HL</label><input type="url" name="Link_HoSoDoiPCCC" value={pcccFormData.Link_HoSoDoiPCCC || ''} onChange={(e) => handleInputChange(e, 'pccc')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-emerald-500 text-blue-600" placeholder="https://drive.google.com/..." /></div>
+                    </div>
+                  </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-                  <label className="flex items-center p-3 border border-gray-200 rounded-lg bg-white cursor-pointer hover:border-fuchsia-500 transition-colors shadow-sm"><input type="checkbox" name="TBHopOnline" checked={phFormData.TBHopOnline || false} onChange={(e) => handleInputChange(e, 'ph')} className="w-4 h-4 text-fuchsia-600 rounded border-gray-300 mr-2.5 focus:ring-fuchsia-500" /><span className="text-xs font-bold text-gray-700">Thiết bị Họp Online</span></label>
-                  <label className="flex items-center p-3 border border-gray-200 rounded-lg bg-white cursor-pointer hover:border-fuchsia-500 transition-colors shadow-sm"><input type="checkbox" name="Bangviet" checked={phFormData.Bangviet || false} onChange={(e) => handleInputChange(e, 'ph')} className="w-4 h-4 text-fuchsia-600 rounded border-gray-300 mr-2.5 focus:ring-fuchsia-500" /><span className="text-xs font-bold text-gray-700">Bảng viết</span></label>
-                  <label className="flex items-center p-3 border border-gray-200 rounded-lg bg-white cursor-pointer hover:border-fuchsia-500 transition-colors shadow-sm"><input type="checkbox" name="TBchuyenslide" checked={phFormData.TBchuyenslide || false} onChange={(e) => handleInputChange(e, 'ph')} className="w-4 h-4 text-fuchsia-600 rounded border-gray-300 mr-2.5 focus:ring-fuchsia-500" /><span className="text-xs font-bold text-gray-700">Bút chuyển slide</span></label>
-                  <div className="flex flex-col justify-center bg-white border border-gray-200 rounded-lg p-2 px-3 shadow-sm">
-                    <label className="block text-[10px] font-bold text-gray-400 mb-1">MÀU BÚT LÔNG</label>
-                    <div className="flex gap-3">
-                      {['Xanh', 'Đỏ', 'Đen'].map(color => {
-                        const isChecked = phFormData.Butviet?.includes(color);
-                        return (
-                          <label key={color} className="flex items-center cursor-pointer group"><input type="checkbox" checked={isChecked} onChange={(e) => handleButVietChange(color, e.target.checked)} className="w-3.5 h-3.5 rounded border-gray-300 text-fuchsia-600 focus:ring-fuchsia-500 mr-1" /><span className={`text-xs font-medium transition-colors ${isChecked ? 'text-gray-800' : 'text-gray-500 group-hover:text-fuchsia-600'}`}>{color}</span></label>
-                        )
-                      })}
+                {/* CỘT 2: TRANG THIẾT BỊ VÀ TỒN TẠI */}
+                <div className="space-y-6">
+                  <div className="bg-orange-50/40 p-5 rounded-xl border border-orange-100 shadow-sm">
+                    <h4 className="font-bold text-orange-800 mb-4 flex items-center gap-2 border-b border-orange-200 pb-2"><Droplets size={18}/> 3. Hệ thống cố định & Bình chữa cháy</h4>
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div><label className="block text-xs font-bold text-gray-700 mb-1">Hệ thống Báo cháy</label><select name="HeThongBaoChay" value={pcccFormData.HeThongBaoChay || 'Tự động'} onChange={(e) => handleInputChange(e, 'pccc')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-orange-500"><option value="Tự động">Tự động</option><option value="Bán tự động">Bán tự động</option><option value="Không có">Không có</option></select></div>
+                        <div><label className="block text-xs font-bold text-gray-700 mb-1">Hệ thống Bơm (Nước)</label><select name="HeThongBom" value={pcccFormData.HeThongBom || 'Chữa cháy vách tường'} onChange={(e) => handleInputChange(e, 'pccc')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-orange-500"><option value="Chữa cháy vách tường">CC Vách tường</option><option value="Sprinkler tự động">Sprinkler tự động</option><option value="Không có">Không có</option></select></div>
+                        <div><label className="block text-xs font-bold text-gray-700 mb-1">Trạng thái Báo cháy</label><select name="TrangThaiBaoChay" value={pcccFormData.TrangThaiBaoChay || 'Bình thường'} onChange={(e) => handleInputChange(e, 'pccc')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-orange-500 font-bold"><option value="Bình thường" className="text-emerald-600">🟢 Bình thường</option><option value="Lỗi" className="text-red-600">🔴 Đang báo Lỗi</option></select></div>
+                        <div><label className="block text-xs font-bold text-gray-700 mb-1">Trạng thái Bơm</label><select name="TrangThaiBom" value={pcccFormData.TrangThaiBom || 'Sẵn sàng'} onChange={(e) => handleInputChange(e, 'pccc')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-orange-500 font-bold"><option value="Sẵn sàng" className="text-emerald-600">🟢 Sẵn sàng</option><option value="Lỗi" className="text-red-600">🔴 Bơm hỏng / Lỗi</option></select></div>
+                      </div>
+                      <div><label className="block text-xs font-bold text-gray-700 mb-1">Vị trí Tủ TT Báo cháy (Để ngắt chuông giả)</label><input type="text" name="ViTriTuBaoChay" value={pcccFormData.ViTriTuBaoChay || ''} onChange={(e) => handleInputChange(e, 'pccc')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-orange-500" placeholder="VD: Gầm cầu thang tầng 1..." /></div>
+                      
+                      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 border-t border-orange-200 pt-4">
+                        <div><label className="block text-[10px] font-bold text-gray-700 mb-1">Bình Bột</label><input type="number" name="SoLuongBinhBot" value={pcccFormData.SoLuongBinhBot || ''} onChange={(e) => handleInputChange(e, 'pccc')} className="w-full p-2 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-orange-500 text-sm" /></div>
+                        <div><label className="block text-[10px] font-bold text-gray-700 mb-1">Bình CO2</label><input type="number" name="SoLuongBinhCO2" value={pcccFormData.SoLuongBinhCO2 || ''} onChange={(e) => handleInputChange(e, 'pccc')} className="w-full p-2 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-orange-500 text-sm" /></div>
+                        <div><label className="block text-[10px] font-bold text-gray-700 mb-1">Xe đẩy 35kg</label><input type="number" name="SoLuongBinhXeDay" value={pcccFormData.SoLuongBinhXeDay || ''} onChange={(e) => handleInputChange(e, 'pccc')} className="w-full p-2 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-orange-500 text-sm" /></div>
+                        <div><label className="block text-[10px] font-bold text-gray-700 mb-1">Phuy Cát</label><input type="number" name="SoLuongPhuyCat" value={pcccFormData.SoLuongPhuyCat || ''} onChange={(e) => handleInputChange(e, 'pccc')} className="w-full p-2 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-orange-500 text-sm" /></div>
+                        <div><label className="block text-[10px] font-bold text-emerald-700 mb-1 flex items-center gap-1"><BatteryWarning size={12}/> Bình Pin EV</label><input type="number" name="SoLuongBinhPinDien" value={pcccFormData.SoLuongBinhPinDien || ''} onChange={(e) => handleInputChange(e, 'pccc')} className="w-full p-2 border border-emerald-300 rounded-lg bg-emerald-50 outline-none focus:ring-2 focus:ring-emerald-500 text-sm font-bold text-emerald-800" /></div>
+
+                        <div className="col-span-2 md:col-span-5 mt-2">
+                           <label className="block text-[10px] font-bold text-red-600 mb-1 uppercase">Hạn Bơm Sạc / Bảo Dưỡng (Lô gần nhất) *</label>
+                           <input type="date" required name="NgayBomSacGannhat" value={pcccFormData.NgayBomSacGannhat ? pcccFormData.NgayBomSacGannhat.split('T')[0] : ''} onChange={(e) => handleInputChange(e, 'pccc')} className="w-full p-2 border border-red-300 rounded-lg bg-red-50 text-red-700 font-bold outline-none focus:ring-2 focus:ring-red-500 text-sm" title="Ngày này dùng để kích hoạt cảnh báo đỏ/cam trên hệ thống" />
+                        </div>
+                        
+                        <div className="col-span-2 md:col-span-5 mt-1">
+                          <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Chi tiết các Lô bình (Phân loại hạn)</label>
+                          <textarea name="ChiTietBomSac" value={pcccFormData.ChiTietBomSac || ''} onChange={(e) => handleInputChange(e, 'pccc')} rows={2} className="w-full p-2 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-orange-500 text-sm resize-none" placeholder="VD: Lô 1 (10 bình bột): Hết hạn 15/05/2026. Lô 2 (5 CO2): Hết hạn 20/08/2026..."></textarea>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-red-50/40 p-5 rounded-xl border border-red-200 shadow-sm">
+                    <h4 className="font-bold text-red-800 mb-4 flex items-center gap-2 border-b border-red-200 pb-2"><BellRing size={18}/> 4. Cảnh báo rủi ro & Tồn tại</h4>
+                    <div className="space-y-4">
+                      <div><label className="block text-xs font-bold text-gray-700 mb-1">Khu vực rủi ro cháy nổ cao (Ghi chú)</label><input type="text" name="KhuVucRuiRoCao" value={pcccFormData.KhuVucRuiRoCao || ''} onChange={(e) => handleInputChange(e, 'pccc')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-red-500" placeholder="VD: Kho sơn tĩnh điện, Kho phế liệu..." /></div>
+                      <div>
+                        <label className="block text-xs font-bold text-red-700 mb-1">Lỗi / Tồn tại chưa khắc phục (Do CA yêu cầu)</label>
+                        <textarea name="LoiTonTaiChuaKhacPhuc" value={pcccFormData.LoiTonTaiChuaKhacPhuc || ''} onChange={(e) => handleInputChange(e, 'pccc')} rows={2} className="w-full p-2.5 border border-red-300 rounded-lg bg-white outline-none focus:ring-2 focus:ring-red-500 resize-none font-medium text-red-800" placeholder="Ghi nhận các lỗi hệ thống, kiến nghị của Công an chưa làm xong..."></textarea>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1">Ghi chú chung</label>
+                        <textarea name="GhiChu" value={pcccFormData.GhiChu || ''} onChange={(e) => handleInputChange(e, 'pccc')} rows={1} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-red-500 resize-none"></textarea>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <div><label className="block text-xs font-bold text-gray-600 mb-1">Link Layout Phòng (Drive / File PDF)</label><input type="url" name="Layout" value={phFormData.Layout || ''} onChange={(e) => handleInputChange(e, 'ph')} placeholder="Dán link layout..." className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-fuchsia-500 text-blue-600" /></div>
-                <div><label className="block text-xs font-bold text-gray-600 mb-1">Ghi chú khác</label><input type="text" name="Ghichu" value={phFormData.Ghichu || ''} onChange={(e) => handleInputChange(e, 'ph')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-fuchsia-500" /></div>
-              </div>
-
-              <div className="pt-4 border-t border-gray-100 flex justify-end gap-3 mt-6">
-                <button type="button" onClick={() => setIsPhModalOpen(false)} className="px-8 py-3 bg-gray-100 text-gray-700 hover:bg-gray-200 font-bold rounded-xl transition-colors">Hủy</button>
-                <button type="submit" disabled={submitting} className="px-8 py-3 text-white bg-fuchsia-600 hover:bg-fuchsia-700 font-bold rounded-xl flex items-center gap-2 shadow-md transition-colors">{submitting ? <Loader2 className="animate-spin" /> : 'Lưu Phòng Họp'}</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* --- FORM PHÁP NHÂN --- */}
-      {isPnModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl flex flex-col max-h-[90vh] animate-in fade-in zoom-in duration-200">
-            <div className="flex justify-between items-center p-5 border-b border-orange-100 bg-orange-50 rounded-t-2xl text-orange-900">
-              <h3 className="text-xl font-bold flex items-center gap-2"><Briefcase size={24}/> {pnModalMode === 'create' ? 'Thêm Pháp nhân mới' : 'Cập nhật Pháp nhân'}</h3>
-              <button onClick={() => setIsPnModalOpen(false)} disabled={submitting} className="text-orange-400 hover:text-red-500 rounded-full p-1.5 bg-white shadow-sm"><X className="w-6 h-6" /></button>
-            </div>
-            
-            <form onSubmit={handlePnSave} className="p-6 overflow-y-auto space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                <div className="md:col-span-2"><label className="block text-xs font-bold text-gray-600 mb-1">Tên Công ty (Pháp nhân) *</label><input type="text" required name="TenCongty" value={pnFormData.TenCongty || ''} onChange={(e) => handleInputChange(e, 'pn')} placeholder="VD: Công ty TNHH MTV Phân phối Ô tô..." className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-orange-500 font-bold text-gray-800" /></div>
-                <div><label className="block text-xs font-bold text-gray-600 mb-1">Mã số thuế (MST) *</label><input type="text" required name="MST" value={pnFormData.MST || ''} onChange={(e) => handleInputChange(e, 'pn')} placeholder="Nhập MST..." className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-orange-500 font-bold text-orange-700 tracking-widest" /></div>
-                
-                {/* TRƯỜNG CHỌN ĐƠN VỊ ÁP DỤNG MỚI BỔ SUNG */}
-                <div className="md:col-span-3">
-                  <label className="block text-xs font-bold text-gray-600 mb-1">Đơn vị trực thuộc *</label>
-                  <select required name="ID_DonVi" value={pnFormData.ID_DonVi || ''} onChange={(e) => handleInputChange(e, 'pn')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-orange-500 font-bold text-[#05469B]" style={{ fontFamily: 'monospace, sans-serif' }}>
-                    <option value="">-- Chọn Đơn vị --</option>
-                    {buildHierarchicalOptions(data.filter(dv => selectedUnitSubordinates.includes(getUnitIdSafe(dv)))).map(({ unit, prefix }) => (
-                      <option key={unit.ID_DonVi} value={unit.ID_DonVi} className="font-normal text-gray-700">
-                        {prefix}{getUnitEmoji(unit.loaiHinh)} {unit.TenDonVi}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="md:col-span-2"><label className="block text-xs font-bold text-gray-600 mb-1">Địa chỉ đăng ký kinh doanh</label><input type="text" name="Diachi" value={pnFormData.Diachi || ''} onChange={(e) => handleInputChange(e, 'pn')} placeholder="Địa chỉ ghi trên Giấy phép kinh doanh..." className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-orange-500" /></div>
-                <div><label className="block text-xs font-bold text-gray-600 mb-1">Email nhận Hóa đơn</label><input type="email" name="Mail" value={pnFormData.Mail || ''} onChange={(e) => handleInputChange(e, 'pn')} placeholder="ketoan@thaco.com.vn..." className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-orange-500" /></div>
-                <div className="md:col-span-3"><label className="block text-xs font-bold text-gray-600 mb-1">Link Giấy phép Kinh doanh (Drive / File scan)</label><input type="url" name="GPKD" value={pnFormData.GPKD || ''} onChange={(e) => handleInputChange(e, 'pn')} placeholder="Dán link file đính kèm..." className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-orange-500 text-blue-600" /></div>
-              </div>
-
-              <div className="pt-4 border-t border-gray-100 flex justify-end gap-3 mt-6">
-                <button type="button" onClick={() => setIsPnModalOpen(false)} className="px-8 py-3 bg-gray-100 text-gray-700 hover:bg-gray-200 font-bold rounded-xl transition-colors">Hủy</button>
-                <button type="submit" disabled={submitting} className="px-8 py-3 text-white bg-orange-600 hover:bg-orange-700 font-bold rounded-xl flex items-center gap-2 shadow-md transition-colors">{submitting ? <Loader2 className="animate-spin" /> : 'Lưu Pháp nhân'}</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL ĐƠN VỊ CHÍNH */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl flex flex-col max-h-[90vh] animate-in fade-in zoom-in duration-200">
-            <div className="flex justify-between p-5 border-b bg-gray-50 rounded-t-2xl">
-              <h3 className="text-xl font-bold text-[#05469B]">{modalMode === 'create' ? 'Thêm Đơn vị' : 'Cập nhật Đơn vị'}</h3>
-              <button onClick={() => setIsModalOpen(false)} disabled={submitting} className="text-gray-400 hover:text-red-500 rounded-full p-1.5 bg-white shadow-sm"><X className="w-6 h-6" /></button>
-            </div>
-            <form onSubmit={handleSave} className="p-6 overflow-y-auto space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                
-                {/* TRƯỜNG ID BỊ VÔ HIỆU HÓA */}
-                <div>
-                  <label className="block text-xs font-bold mb-1 text-gray-600">Mã Đơn Vị (ID) *</label>
-                  <input type="text" required name="ID_DonVi" value={formData.ID_DonVi || ''} onChange={(e) => setFormData({...formData, ID_DonVi: e.target.value})} disabled className="w-full p-2.5 border rounded-lg bg-gray-100 text-gray-600 cursor-not-allowed outline-none" />
-                </div>
-                
-                <div className="md:col-span-2"><label className="block text-xs font-bold mb-1 text-gray-600">Tên Đơn Vị *</label><input type="text" required name="TenDonVi" value={formData.TenDonVi || ''} onChange={(e) => setFormData({...formData, TenDonVi: e.target.value})} className="w-full p-2.5 border rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-blue-500" /></div>
-                
-                {/* TRƯỜNG CẤP QUẢN LÝ MẸ ĐÃ ĐƯỢC TÍCH HỢP HIERARCHY */}
-                <div>
-                  <label className="block text-xs font-bold mb-1 text-gray-600">Cấp Quản Lý (Mẹ) *</label>
-                  <select required name="CapQuanLy" value={formData.CapQuanLy || ''} onChange={(e) => setFormData({...formData, CapQuanLy: e.target.value})} className="w-full p-2.5 border rounded-lg bg-[#FFFFF0] font-bold text-[#05469B] outline-none focus:ring-2 focus:ring-blue-500" style={{ fontFamily: 'monospace, sans-serif' }}>
-                    <option value="">-- Chọn Cấp QL --</option>
-                    <option value="HO" className="text-red-600">🏢 Tổng Công Ty (HO)</option>
-                    {buildHierarchicalOptions(data.filter(d => getUnitIdSafe(d) !== formData.ID_DonVi)).map(({ unit, prefix }) => (
-                      <option key={unit.ID_DonVi} value={unit.ID_DonVi} className="font-normal text-gray-700">
-                        {prefix}{getUnitEmoji(unit.loaiHinh)} {unit.TenDonVi}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                
-                <div><label className="block text-xs font-bold mb-1 text-gray-600">Khu vực (Phía)</label><select name="Phia" value={formData.Phia || 'VPĐH'} onChange={(e) => setFormData({...formData, Phia: e.target.value})} className="w-full p-2.5 border rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-blue-500"><option value="VPĐH">VPĐH</option><option value="CTTT Phía Nam">CTTT Phía Nam</option><option value="CTTT Phía Bắc">CTTT Phía Bắc</option></select></div>
-                
-                {/* TRƯỜNG LOẠI HÌNH ĐƯỢC CHUẨN HÓA DANH SÁCH */}
-                <div>
-                  <label className="block text-xs font-bold mb-1 text-gray-600">Loại hình</label>
-                  <select name="loaiHinh" value={formData.loaiHinh || 'Showroom Quản trị'} onChange={(e) => setFormData({...formData, loaiHinh: e.target.value})} className="w-full p-2.5 border rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-blue-500">
-                    <option value="Tổng Công ty">Tổng Công ty</option>
-                    <option value="Công ty Tỉnh/TP">Công ty Tỉnh/TP</option>
-                    <option value="Showroom Quản trị">Showroom Quản trị</option>
-                    <option value="Showroom">Showroom</option>
-                    <option value="Điểm Kinh doanh">Điểm Kinh doanh</option>
-                    <option value="Kho xe">Kho xe</option>
-                  </select>
-                </div>
-                
-                <div><label className="block text-xs font-bold mb-1 text-gray-600">Trạng thái</label><select name="trangThai" value={formData.trangThai || 'Hoạt động'} onChange={(e) => setFormData({...formData, trangThai: e.target.value})} className="w-full p-2.5 border rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-blue-500 font-bold text-gray-700"><option value="Hoạt động">Hoạt động</option><option value="Đại lý">Đại lý</option><option value="Đầu tư mới">Đầu tư mới</option><option value="Ngừng hoạt động">Ngừng hoạt động</option></select></div>
-                <div className="md:col-span-2"><label className="block text-xs font-bold mb-1 text-gray-600">Địa chỉ</label><input type="text" name="DiaChi" value={formData.DiaChi || ''} onChange={(e) => setFormData({...formData, DiaChi: e.target.value})} className="w-full p-2.5 border rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-blue-500" /></div>
-              </div>
-
-              {/* TÍCH HỢP TRƯỜNG KINH DOANH CHO SHOWROOM QUẢN TRỊ */}
-              {formData.loaiHinh === 'Showroom Quản trị' && (
-                <div className="bg-[#00559B]/5 p-4 rounded-xl border border-[#00559B]/20 mt-2 animate-in fade-in">
-                  <label className="block text-xs font-bold text-[#00559B] mb-3 uppercase tracking-wider">Thương hiệu Kinh Doanh (Chỉ dành cho SR Quản trị)</label>
-                  <div className="flex flex-wrap gap-3 mb-4">
-                     {KINH_DOANH_OPTIONS.map(opt => {
-                       const isChecked = (formData.KinhDoanh || '').split(',').map((s:string)=>s.trim()).includes(opt);
-                       return (
-                         <label key={opt} className="flex items-center gap-1.5 cursor-pointer bg-white px-3 py-1.5 rounded-lg border border-[#00559B]/20 shadow-sm hover:border-[#00559B] transition-colors">
-                           <input type="checkbox" checked={isChecked} onChange={(e) => handleKinhDoanhChange(opt, e.target.checked)} className="w-4 h-4 text-[#00559B] rounded border-gray-300 focus:ring-[#00559B] cursor-pointer"/>
-                           <span className="text-xs font-bold text-gray-700">{opt}</span>
-                         </label>
-                       )
-                     })}
-                     {/* Render các Brand do người dùng tự gõ thêm */}
-                     {(formData.KinhDoanh || '').split(',').map((s:string)=>s.trim()).filter(Boolean).filter((opt:string) => !KINH_DOANH_OPTIONS.includes(opt)).map((opt:string) => (
-                        <label key={opt} className="flex items-center gap-1.5 cursor-pointer bg-white px-3 py-1.5 rounded-lg border border-[#00559B]/20 shadow-sm hover:border-[#00559B] transition-colors">
-                           <input type="checkbox" checked={true} onChange={(e) => handleKinhDoanhChange(opt, e.target.checked)} className="w-4 h-4 text-[#00559B] rounded border-gray-300 focus:ring-[#00559B] cursor-pointer"/>
-                           <span className="text-xs font-bold text-gray-700">{opt}</span>
-                         </label>
-                     ))}
-                  </div>
-                  <div className="flex gap-2 items-center max-w-sm">
-                    <input type="text" value={customKD} onChange={e => setCustomKD(e.target.value)} placeholder="Nhập thương hiệu khác..." className="w-full p-2 border border-gray-200 rounded-lg bg-white text-sm outline-none focus:ring-2 focus:ring-[#00559B]" onKeyDown={e => {if (e.key==='Enter') { e.preventDefault(); addCustomKD(); }}} />
-                    <button type="button" onClick={addCustomKD} className="px-4 py-2 bg-[#00559B] hover:bg-[#04367a] text-white font-bold rounded-lg text-sm transition-colors shadow-sm">Thêm</button>
-                  </div>
-                </div>
-              )}
-
-              <hr className="border-gray-100"/>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-5">
-                <div><label className="block text-xs font-bold mb-1 text-gray-600">Diện tích (m²)</label><input type="number" name="DienTich" value={formData.DienTich || ''} onChange={(e) => setFormData({...formData, DienTich: e.target.value})} className="w-full p-2.5 border rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-blue-500" /></div>
-                <div><label className="block text-xs font-bold mb-1 text-gray-600">Số Tầng</label><input type="number" name="SoTang" value={formData.SoTang || ''} onChange={(e) => setFormData({...formData, SoTang: e.target.value})} className="w-full p-2.5 border rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-blue-500" /></div>
-                <div><label className="block text-xs font-bold mb-1 text-gray-600">Số Hầm</label><input type="number" name="SoHam" value={formData.SoHam || ''} onChange={(e) => setFormData({...formData, SoHam: e.target.value})} className="w-full p-2.5 border rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-blue-500" /></div>
-                <div><label className="block text-xs font-bold mb-1 text-gray-600">Số Cổng</label><input type="number" name="SoCong" value={formData.SoCong || ''} onChange={(e) => setFormData({...formData, SoCong: e.target.value})} className="w-full p-2.5 border rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-blue-500" /></div>
-                <div><label className="block text-xs font-bold mb-1 text-gray-600">Phòng chờ</label><input type="number" name="SoPhongCho" value={formData.SoPhongCho || ''} onChange={(e) => setFormData({...formData, SoPhongCho: e.target.value})} className="w-full p-2.5 border rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-blue-500" /></div>
-                <div><label className="block text-xs font-bold mb-1 text-gray-600">Khách/Ngày</label><input type="number" name="LuotKhachBQ" value={formData.LuotKhachBQ || ''} onChange={(e) => setFormData({...formData, LuotKhachBQ: e.target.value})} className="w-full p-2.5 border rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-blue-500" /></div>
-                <div className="md:col-span-3"><label className="block text-xs font-bold mb-1 text-gray-600">Tổng CB-NV tại đơn vị</label><input type="number" name="TongNhanSu" value={formData.TongNhanSu || ''} onChange={(e) => setFormData({...formData, TongNhanSu: e.target.value})} className="w-full p-2.5 border rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-blue-500" /></div>
-              </div>
-              <div className="pt-5 border-t border-gray-100 flex justify-end gap-3 mt-8">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="px-8 py-3 bg-gray-100 text-gray-700 hover:bg-gray-200 font-bold rounded-xl transition-colors">Hủy</button>
-                <button type="submit" disabled={submitting} className="px-8 py-3 text-white bg-[#05469B] hover:bg-[#04367a] font-bold rounded-xl flex items-center gap-2 shadow-lg transition-colors">{submitting ? <Loader2 className="animate-spin" /> : 'Lưu Thay Đổi'}</button>
+              <div className="pt-5 border-t border-gray-100 flex justify-end gap-3 mt-8 shrink-0">
+                <button type="button" onClick={() => setIsPcccModalOpen(false)} className="px-8 py-3 bg-gray-100 text-gray-700 hover:bg-gray-200 rounded-xl font-bold transition-colors">Hủy</button>
+                <button type="submit" disabled={submitting} className="px-8 py-3 text-white bg-red-600 hover:bg-red-700 rounded-xl font-bold flex items-center gap-2 shadow-lg transition-colors">{submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />} Lưu Hồ Sơ PCCC</button>
               </div>
             </form>
           </div>
