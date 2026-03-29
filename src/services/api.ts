@@ -84,7 +84,15 @@ export const apiService = {
   
   // 🟢 [ĐÃ THÊM MỚI: API GỌI DỮ LIỆU PHỤC VỤ HẬU CẦN]
   getPVHC: async (): Promise<any[]> => fetchWithCache('HS_PVHC'),
+// 🟢 [ĐÃ THÊM MỚI: API GỌI DỮ LIỆU PHỤC VỤ HẬU CẦN]
+  getPVHC: async (): Promise<any[]> => fetchWithCache('HS_PVHC'),
 
+  // 🟢 [ĐÃ THÊM MỚI: API GỌI DỮ LIỆU PCCC]
+  getPCCC: async (): Promise<any[]> => fetchWithCache('HS_PCCC'),
+
+  // 👉 2 HÀM MỚI ĐÃ ĐƯỢC THÊM LẠI ĐỂ FIX LỖI CHO TRANG TÀI KHOẢN VÀ NHẬT KÝ
+  getUsers: async (): Promise<User[]> => fetchWithCache('Config_Users'),
+  
   // 👉 2 HÀM MỚI ĐÃ ĐƯỢC THÊM LẠI ĐỂ FIX LỖI CHO TRANG TÀI KHOẢN VÀ NHẬT KÝ
   getUsers: async (): Promise<User[]> => fetchWithCache('Config_Users'),
   getLogs: async (): Promise<SysLog[]> => fetchWithCache('Sys_Logs'),
