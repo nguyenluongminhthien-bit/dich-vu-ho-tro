@@ -308,3 +308,20 @@ export interface PCCC {
   Link_PhuongAnPCCC_CNCH: string;
   GhiChu: string;
 }
+
+export interface PCTT {
+  ID_PCTT: string;
+  ID_DonVi: string;
+  DoiTruongPCTT: string;
+  SoNhanSuDoi: string | number;
+  Link_PhuongAnPCTT: string;
+  ViTriDiDoi: string;
+  NgayKiemTraPCTT: string;
+  TinhTrangHaTang: string;
+  TinhTrangBaoHiem: string;
+  NgayCapNhatTaiSan: string;
+  SoVuThienTai: string | number;
+  Link_HoSoBoiThuong: string;
+  TinhTrangKhacPhuc: string;
+  GhiChu: string;
+}
