@@ -276,37 +276,45 @@ export interface ATVSLD {
   GhiChu: string;
 }
 
-export interface PCCC {
+export interface HS_PCCC {
   ID_PCCC: string;
   ID_DonVi: string;
-  TinhTrangPhapLy: string;
-  HanBaoHiemChayNo: string;
-  HanKiemDinhChongSet: string;
-  NgayTuKiemTraGanNhat: string;
-  NgayBaoCaoCongAnGanNhat: string;
-  SoNhanSuDoiPCCC: string | number;
-  TenDoiTruong: string;
-  ChucDanhDoiTruong: string;
-  SDTDoiTruong: string;
-  NgayDienTapGanNhat: string;
-  Link_HoSoDoiPCCC: string;
-  HeThongBaoChay: string;
-  HeThongBom: string;
-  ViTriTuBaoChay: string;
-  TrangThaiBaoChay: string;
-  TrangThaiBom: string;
-  SoLuongBinhBot: string | number;
-  SoLuongBinhCO2: string | number;
-  SoLuongBinhXeDay: string | number;
-  SoLuongPhuyCat: string | number;
-  SoLuongBinhPinDien: string | number;
-  NgayBomSacGannhat: string;
-  ChiTietBomSac: string;
-  KhuVucRuiRoCao: string;
-  LoiTonTaiChuaKhacPhuc: string;
-  Link_HoSoPCCC: string;
-  Link_PhuongAnPCCC_CNCH: string;
-  GhiChu: string;
+  GiayPhepPCCC: string;
+  BaoHiemChayNo: string;
+  NgayHetHanBH: string;
+  HoTenDoiTruong_PCCC: string;
+  SDT: string;
+  ChucVu: string;
+  TongSoThanhVien: string | number;
+  SLHuyDongBanNgay: string | number;
+  SLHuyDongBanDem: string | number;
+  NgayDienTap: string;
+  LinkPhuongAn_PCCC: string;
+  TongSoThanhVien: string | number;
+  SDT_PCCC: string;
+  SDTUB: string;
+  SDTPCCC_CATT: string;
+  SDT_CAX: string;
+  SDT_DienLuc: string;
+  SDT_CapThoatNuoc: string;
+  STD_YTe: string;
+  HT_BaoChayTuDong: string;
+  HT_ChuaChayTuDongNuoc: string;
+  HT_ChuaChayNuoc: string;
+}
+}
+
+export interface TS_PCCC {
+  ID_TBPCCC: string;
+  ID_DonVi: string;
+  NhomHeThong: string;
+  LoaiThietBi: string;
+  SoLuong: number | string;
+  DonViTinh: string;
+  ViTriBoTri: string;
+  NgayBomsac: string;
+  NgayHetHan: string;
+  TinhTrang: string;
 }
 
 export interface PCTT {
