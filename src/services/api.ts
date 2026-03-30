@@ -68,7 +68,7 @@ export const apiService = {
   },
 
   // ===============================================
-  // CÁC HÀM TẢI DỮ LIỆU
+  // CÁC HÀM TẢI DỮ LIỆU ĐÃ ĐƯỢC CHUẨN HÓA LẠI
   // ===============================================
   getPersonnel: async (): Promise<Personnel[]> => fetchWithCache('NS_DichVu'),
   getDonVi: async (): Promise<DonVi[]> => fetchWithCache('DM_Donvi'),
@@ -82,29 +82,40 @@ export const apiService = {
   getThietBi: async (): Promise<any[]> => fetchWithCache('TS_ThietBi'),
   getNhatKyThietBi: async (): Promise<any[]> => fetchWithCache('NK_ThietBi'),
   
-  // 🟢 [ĐÃ THÊM MỚI: API GỌI DỮ LIỆU PHỤC VỤ HẬU CẦN]
+  // Các hàm module mở rộng
   getPVHC: async (): Promise<any[]> => fetchWithCache('HS_PVHC'),
-// 🟢 [ĐÃ THÊM MỚI: API GỌI DỮ LIỆU PHỤC VỤ HẬU CẦN]
-  getPVHC: async (): Promise<any[]> => fetchWithCache('HS_PVHC'),
-
-  // 🟢 [ĐÃ THÊM MỚI: API GỌI DỮ LIỆU PCCC]
-  getPCCC: async (): Promise<any[]> => fetchWithCache('HS_PCCC'),
-
-// 🟢 [ĐÃ THÊM MỚI: API GỌI DỮ LIỆU ATVSLĐ]
   getATVSLD: async (): Promise<any[]> => fetchWithCache('HS_ATVSLD'),
-
-  // 🟢 [ĐÃ THÊM MỚI: API GỌI DỮ LIỆU PCTT]
   getPCTT: async (): Promise<any[]> => fetchWithCache('HS_PCTT'),
-  
-  // 👉 2 HÀM MỚI ĐÃ ĐƯỢC THÊM LẠI ĐỂ FIX LỖI CHO TRANG TÀI KHOẢN VÀ NHẬT KÝ
-  getUsers: async (): Promise<User[]> => fetchWithCache('Config_Users'),
 
-  // 👉 2 HÀM MỚI ĐÃ ĐƯỢC THÊM LẠI ĐỂ FIX LỖI CHO TRANG TÀI KHOẢN VÀ NHẬT KÝ
+  // 🟢 THÊM MỚI 2 HÀM LẤY DỮ LIỆU PHÒNG CHÁY CHỮA CHÁY
+  getPCCC: async (): Promise<any[]> => fetchWithCache('HS_PCCC'),
+  getTsPCCC: async (): Promise<any[]> => fetchWithCache('TS_PCCC'),
+  
   getUsers: async (): Promise<User[]> => fetchWithCache('Config_Users'),
   getLogs: async (): Promise<SysLog[]> => fetchWithCache('Sys_Logs'),
 
-  // 3. HÀM LƯU DỮ LIỆU CÓ TÍCH HỢP AUTO-LOGGING
+  // 3. HÀM LƯU DỮ LIỆU (NÂNG CẤP ĐỂ LƯU ĐƯỢC MẢNG NHIỀU DÒNG THIẾT BỊ)
   save: async (data: any, action: 'create' | 'update', sheetName: string) => {
+    // 🟢 XỬ LÝ NẾU LÀ MỘT MẢNG DỮ LIỆU (VD: Danh sách bình chữa cháy)
+    if (Array.isArray(data)) {
+      const results = [];
+      for (const row of data) {
+        // Tự động nhận diện: Có ID thiết bị thì update, chưa có thì tạo mới
+        const rowAction = row.ID_TBPCCC ? 'update' : 'create';
+        const response = await fetch(API_URL, {
+          method: 'POST', 
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify({ action: rowAction, rowData: row, sheetName })
+        });
+        if (!response.ok) throw new Error(`Lỗi lưu mảng ${sheetName}`);
+        results.push(await response.json());
+      }
+      delete apiCache[sheetName];
+      apiService.writeLog('CẬP NHẬT MẢNG', `Bảng: ${sheetName} | Lưu ${data.length} bản ghi`);
+      return results;
+    }
+
+    // 🟢 XỬ LÝ LƯU 1 DÒNG DỮ LIỆU NHƯ BÌNH THƯỜNG
     const response = await fetch(API_URL, {
       method: 'POST', 
       headers: { "Content-Type": "text/plain;charset=utf-8" },
@@ -116,7 +127,7 @@ export const apiService = {
     
     // Tự động ghi Log
     const tenHanhDong = action === 'create' ? 'THÊM MỚI' : 'CẬP NHẬT';
-    const ID_TaiSan = data.ID_Xe || data.ID_NhanSu || data.ID_TTB || data.ID_VanBan || data.ID_DonVi || data.ID_User || 'Dữ liệu mới';
+    const ID_TaiSan = data.ID_Xe || data.ID_NhanSu || data.ID_TTB || data.ID_VanBan || data.ID_DonVi || data.ID_User || data.ID_PCCC || 'Dữ liệu mới';
     apiService.writeLog(tenHanhDong, `Bảng: ${sheetName} | ID Đối tượng: ${ID_TaiSan}`);
 
     return response.json();
