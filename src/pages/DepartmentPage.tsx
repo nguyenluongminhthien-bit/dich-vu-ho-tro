@@ -727,7 +727,7 @@ export default function DepartmentPage() {
   return (
     <div className="flex h-full bg-[#f4f7f9] overflow-hidden relative">
       {isListCollapsed && (
-        <button onClick={() => setIsListCollapsed(false)} className="absolute top-6 left-6 z-20 bg-white p-2.5 rounded-lg shadow-md border border-gray-200 text-[#05469B] hover:bg-blue-50 transition-all" title="Mở danh sách đơn vị"><PanelLeftOpen size={20} /></button>
+        <button onClick={() => setIsListCollapsed(false)} className="absolute top-6 left-6 z-20 bg-white p-2.5 rounded-lg shadow-md border border-gray-200 text-[#05469B] hover:bg-blue-50 transition-all lg:hidden" title="Mở danh sách đơn vị"><PanelLeftOpen size={20} /></button>
       )}
 
       {/* CỘT TRÁI */}
@@ -1666,8 +1666,8 @@ export default function DepartmentPage() {
                 <h4 className="font-bold text-emerald-800 mb-4 flex items-center gap-2 border-b border-emerald-200 pb-2"><Pocket size={18}/> 1. Lực lượng Nội bộ</h4>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
                   <div><label className="block text-xs font-bold text-gray-700 mb-1">Định biên (Người) *</label><input type="number" required name="DinhBien" value={pvhcFormData.DinhBien || ''} onChange={(e) => handleInputChange(e, 'pvhc')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-emerald-500" /></div>
-                  <div><label className="block text-xs font-bold text-gray-700 mb-1">NV Khách chờ (Trà nước)</label><input type="number" name="PVHC_KhachCho" value={pvhcFormData.PVHC_KhachCho || ''} onChange={(e) => handleInputChange(e, 'pvhc')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-emerald-500" /></div>
-                  <div><label className="block text-xs font-bold text-gray-700 mb-1">NV Vệ sinh (Tạp vụ)</label><input type="number" name="PVHC_Vesinh" value={pvhcFormData.PVHC_Vesinh || ''} onChange={(e) => handleInputChange(e, 'pvhc')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-emerald-500" /></div>
+                  <div><label className="block text-xs font-bold text-gray-700 mb-1">NV Khách chờ (Phòng chờ)</label><input type="number" name="PVHC_KhachCho" value={pvhcFormData.PVHC_KhachCho || ''} onChange={(e) => handleInputChange(e, 'pvhc')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-emerald-500" /></div>
+                  <div><label className="block text-xs font-bold text-gray-700 mb-1">NV Vệ sinh (Vệ sinh - 5S)</label><input type="number" name="PVHC_Vesinh" value={pvhcFormData.PVHC_Vesinh || ''} onChange={(e) => handleInputChange(e, 'pvhc')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-emerald-500" /></div>
                 </div>
                 <p className="text-[10px] text-gray-500 mt-3 italic">* Hệ thống sẽ tự động tính <strong>Hiện hữu</strong> = Khách chờ + Vệ sinh</p>
               </div>
