@@ -284,12 +284,20 @@ export default function DepartmentPage() {
     };
   }, [isParentUnit, selectedUnitSubordinates, data, selectedUnitId]);
 
+  // Thống kê: Cơ sở vật chất
   const aggregatedStats = useMemo(() => {
     if (!isParentUnit) return null;
     let totalDienTich = 0, totalPhongCho = 0, totalCong = 0, totalKhach = 0, totalNhanSu = 0, childCount = 0;
+    let showroomCount = 0, diemKdCount = 0, xuongDvCount = 0; // Thêm biến đếm Xưởng DV
+
     data.forEach(dv => {
       if (selectedUnitSubordinates.includes(dv.ID_DonVi) && dv.trangThai === 'Hoạt động') {
-        if (dv.ID_DonVi !== selectedUnitId) { childCount++; }
+        if (dv.ID_DonVi !== selectedUnitId) {
+          childCount++;
+          if (dv.loaiHinh === 'Showroom') showroomCount++;
+          if (dv.loaiHinh === 'Điểm Kinh Doanh') diemKdCount++;
+          if (dv.loaiHinh === 'Xưởng Dịch vụ') xuongDvCount++; // Đếm thêm Xưởng Dịch vụ
+        }
         totalDienTich += Number(dv.DienTich) || 0;
         totalPhongCho += Number(dv.SoPhongCho) || 0;
         totalCong += Number(dv.SoCong) || 0;
@@ -297,7 +305,8 @@ export default function DepartmentPage() {
         totalNhanSu += Number(dv.TongNhanSu) || 0;
       }
     });
-    return { childCount, totalDienTich, totalPhongCho, totalCong, totalKhach, totalNhanSu };
+
+    return { childCount, showroomCount, diemKdCount, xuongDvCount, totalDienTich, totalPhongCho, totalCong, totalKhach, totalNhanSu };
   }, [isParentUnit, selectedUnitSubordinates, data, selectedUnitId]);
 
   const aggregatedSecurity = useMemo(() => {
@@ -849,23 +858,32 @@ export default function DepartmentPage() {
                           <span className="text-[11px] font-bold text-blue-600 uppercase tracking-wider mb-1">Tổng Đơn vị</span>
                           <span className="text-4xl font-black text-[#05469B]">{branchStats.total}</span>
                         </div>
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 flex-1">
-                          <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 flex flex-col items-center justify-center text-center">
+                        {/* Đã chỉnh lưới thành lg:grid-cols-5 để chứa đủ 5 thẻ ngang hàng */}
+                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 flex-1">
+                          <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 flex flex-col items-center justify-center text-center hover:border-indigo-300 transition-colors">
                             <Store className="text-indigo-600 mb-1" size={24}/>
                             <span className="text-2xl font-black text-gray-800">{branchStats.srQt}</span>
                             <span className="text-[10px] font-bold text-gray-500 uppercase mt-1 line-clamp-1">SR Quản trị</span>
                           </div>
-                          <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 flex flex-col items-center justify-center text-center">
+                          <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 flex flex-col items-center justify-center text-center hover:border-emerald-300 transition-colors">
                             <Briefcase className="text-emerald-600 mb-1" size={24}/>
                             <span className="text-2xl font-black text-gray-800">{branchStats.sr}</span>
                             <span className="text-[10px] font-bold text-gray-500 uppercase mt-1">Showroom</span>
                           </div>
-                          <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 flex flex-col items-center justify-center text-center">
+                          
+                          {/* ĐÃ SỬA: Thẻ Xưởng Dịch vụ đồng bộ thiết kế với các thẻ khác */}
+                          <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 flex flex-col items-center justify-center text-center hover:border-amber-300 transition-colors">
+                            <Warehouse className="text-amber-600 mb-1" size={24}/>
+                            <span className="text-2xl font-black text-gray-800">{aggregatedStats?.xuongDvCount || 0}</span>
+                            <span className="text-[10px] font-bold text-gray-500 uppercase mt-1">Xưởng Dịch vụ</span>
+                          </div>
+
+                          <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 flex flex-col items-center justify-center text-center hover:border-orange-300 transition-colors">
                             <MapPin className="text-orange-600 mb-1" size={24}/>
                             <span className="text-2xl font-black text-gray-800">{branchStats.dkd}</span>
                             <span className="text-[10px] font-bold text-gray-500 uppercase mt-1 line-clamp-1">Điểm Kinh Doanh</span>
                           </div>
-                          <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 flex flex-col items-center justify-center text-center">
+                          <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 flex flex-col items-center justify-center text-center hover:border-gray-400 transition-colors">
                             <Warehouse className="text-gray-600 mb-1" size={24}/>
                             <span className="text-2xl font-black text-gray-800">{branchStats.kho}</span>
                             <span className="text-[10px] font-bold text-gray-500 uppercase mt-1">Kho Xe</span>
@@ -1084,37 +1102,48 @@ export default function DepartmentPage() {
                            </div>
                         </div>
                       </div>
+                      {/* Khối 3: Hệ thống giám sát - Nằm ngang full bên dưới */}
                       <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex flex-col w-full">
                           <h4 className="font-bold text-[#05469B] mb-4 flex items-center gap-2 border-b border-gray-100 pb-2"><Camera size={18} /> Hệ thống Giám sát</h4>
-                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                             <div className="space-y-3 text-sm">
-                               <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-0"><span className="text-gray-500 font-medium whitespace-nowrap shrink-0">Tổng số Camera:</span><span className="font-black text-gray-800 sm:ml-2">{currentAnNinh.SLCAM || 0} Mắt</span></div>
-                               <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-0"><span className="text-gray-500 font-medium whitespace-nowrap shrink-0">Camera hoạt động:</span><span className="font-bold text-emerald-600 sm:ml-2">{currentAnNinh.CAMHD || 0} Mắt</span></div>
-                               <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-0"><span className="text-gray-500 font-medium whitespace-nowrap shrink-0">Camera hư/hỏng:</span><span className="font-bold text-red-600 sm:ml-2">{currentAnNinh.CAMHuHong || 0} Mắt</span></div>
-                               <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-0 pt-2 border-t border-gray-50"><span className="text-gray-500 font-medium whitespace-nowrap shrink-0">Thời gian lưu hình:</span><span className="font-bold text-gray-800 sm:ml-2">{currentAnNinh.ThoiGianLuu || '---'} Ngày</span></div>
-                             </div>
-                             <div className="lg:col-span-1">
-                               {Number(currentAnNinh.CAMHuHong) > 0 ? (
-                                  <div className="flex flex-col h-full p-3 bg-red-50/50 rounded-lg border border-red-100">
-                                    <span className="text-red-700 font-bold text-xs mb-1 uppercase">Lý do hư hỏng:</span>
-                                    <span className="font-semibold text-red-800 text-sm flex-1 whitespace-pre-wrap break-words">{currentAnNinh.LyDoHuCam || '---'}</span>
-                                  </div>
-                               ) : (
-                                  <div className="flex flex-col h-full p-3 bg-gray-50 rounded-lg border border-dashed border-gray-200 items-center justify-center text-gray-400">
-                                    <span className="text-xs font-medium">Hệ thống hoạt động tốt</span>
-                                  </div>
-                               )}
-                             </div>
-                             <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <div className="flex flex-col">
-                                  <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">Vị trí đặt hệ thống (Đầu ghi)</span>
-                                  <span className="font-bold text-gray-800 bg-gray-50 p-3 rounded-lg border border-gray-100 flex-1 whitespace-pre-wrap break-words">{currentAnNinh.ViTriDatHeThong || '---'}</span>
-                                </div>
-                                <div className="flex flex-col">
-                                  <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">Vị trí giám sát chính</span>
-                                  <span className="font-bold text-gray-800 bg-gray-50 p-3 rounded-lg border border-gray-100 flex-1 whitespace-pre-wrap break-words">{currentAnNinh.ViTriGiamSat || '---'}</span>
-                                </div>
-                             </div>
+                          
+                          {/* Hàng 1: Thống kê số lượng */}
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-5">
+                            <div className="bg-gray-50 p-3 rounded-xl border border-gray-200 text-center flex flex-col justify-center">
+                              <p className="text-[10px] font-bold text-gray-500 uppercase mb-1">Tổng số Camera</p>
+                              <p className="text-xl font-black text-[#05469B]">{currentAnNinh.SLCAM || 0} <span className="text-sm font-semibold text-gray-500">Mắt</span></p>
+                            </div>
+                            <div className="bg-emerald-50 p-3 rounded-xl border border-emerald-100 text-center flex flex-col justify-center">
+                              <p className="text-[10px] font-bold text-emerald-600 uppercase mb-1">Đang hoạt động</p>
+                              <p className="text-xl font-black text-emerald-700">{currentAnNinh.CAMHD || 0} <span className="text-sm font-semibold text-emerald-600/70">Mắt</span></p>
+                            </div>
+                            <div className="bg-red-50 p-3 rounded-xl border border-red-100 text-center flex flex-col justify-center">
+                              <p className="text-[10px] font-bold text-red-600 uppercase mb-1">Đang hư hỏng</p>
+                              <p className="text-xl font-black text-red-700">{currentAnNinh.CAMHuHong || 0} <span className="text-sm font-semibold text-red-600/70">Mắt</span></p>
+                            </div>
+                            <div className="bg-indigo-50 p-3 rounded-xl border border-indigo-100 text-center flex flex-col justify-center">
+                              <p className="text-[10px] font-bold text-indigo-600 uppercase mb-1">Thời gian lưu hình</p>
+                              <p className="text-xl font-black text-indigo-700">{currentAnNinh.ThoiGianLuu || '---'} <span className="text-sm font-semibold text-indigo-600/70">Ngày</span></p>
+                            </div>
+                          </div>
+
+                          {/* Hàng 2: Thông tin chi tiết (Vị trí & Lý do) */}
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-stretch">
+                            <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 flex flex-col">
+                              <span className="text-[10px] font-bold text-blue-600 uppercase tracking-wider mb-2">Vị trí đặt hệ thống (Đầu ghi)</span>
+                              <span className="font-bold text-blue-900 text-sm whitespace-pre-wrap break-words">{currentAnNinh.ViTriDatHeThong || '---'}</span>
+                            </div>
+                            <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-100 flex flex-col">
+                              <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider mb-2">Vị trí giám sát chính</span>
+                              <span className="font-bold text-emerald-900 text-sm whitespace-pre-wrap break-words">{currentAnNinh.ViTriGiamSat || '---'}</span>
+                            </div>
+                            <div className="bg-red-50 p-4 rounded-xl border border-red-100 flex flex-col">
+                              <span className="text-[10px] font-bold text-red-600 uppercase tracking-wider mb-2">Lý do hư hỏng</span>
+                              {Number(currentAnNinh.CAMHuHong) > 0 ? (
+                                <span className="font-bold text-red-900 text-sm whitespace-pre-wrap break-words">{currentAnNinh.LyDoHuCam || '---'}</span>
+                              ) : (
+                                <span className="font-medium text-red-400 italic text-sm">Hệ thống hoạt động tốt</span>
+                              )}
+                            </div>
                           </div>
                       </div>
                     </div>
@@ -1797,7 +1826,7 @@ export default function DepartmentPage() {
                 <div>
                   <label className="block text-xs font-bold mb-1 text-gray-600">Loại hình</label>
                   <select name="loaiHinh" value={formData.loaiHinh || 'Showroom Quản trị'} onChange={(e) => setFormData({...formData, loaiHinh: e.target.value})} className="w-full p-2.5 border rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-blue-500">
-                    <option value="Tổng Công ty">Tổng Công ty</option><option value="Công ty Tỉnh/TP">Công ty Tỉnh/TP</option><option value="Showroom Quản trị">Showroom Quản trị</option><option value="Showroom">Showroom</option><option value="Điểm Kinh doanh">Điểm Kinh doanh</option><option value="Kho xe">Kho xe</option>
+                    <option value="Tổng Công ty">Tổng Công ty</option><option value="Công ty Tỉnh/TP">Công ty Tỉnh/TP</option><option value="Showroom Quản trị">Showroom Quản trị</option><option value="Showroom">Showroom</option><option value="Xưởng Dịch vụ">Xưởng Dịch vụ</option><option value="Điểm Kinh doanh">Điểm Kinh doanh</option><option value="Kho xe">Kho xe</option>
                   </select>
                 </div>
                 <div><label className="block text-xs font-bold mb-1 text-gray-600">Trạng thái</label><select name="trangThai" value={formData.trangThai || 'Hoạt động'} onChange={(e) => setFormData({...formData, trangThai: e.target.value})} className="w-full p-2.5 border rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-blue-500 font-bold text-gray-700"><option value="Hoạt động">Hoạt động</option><option value="Đại lý">Đại lý</option><option value="Đầu tư mới">Đầu tư mới</option><option value="Ngừng hoạt động">Ngừng hoạt động</option></select></div>
