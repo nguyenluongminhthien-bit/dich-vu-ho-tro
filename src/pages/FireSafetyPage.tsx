@@ -541,19 +541,19 @@ export default function FireSafetyPage() {
                     
                     <p className="text-xs italic text-gray-500 mb-3 px-1">Kê khai chi tiết các thiết bị thuộc các hệ thống trên (Tủ điều khiển, Bình chữa cháy, Đầu báo khói...)</p>
                     
-                    <div className="w-full border border-gray-200 rounded-xl overflow-hidden">
-                      <table className="w-full text-left border-collapse table-fixed">
+                   <div className="w-full border border-gray-200 rounded-xl overflow-hidden overflow-x-auto custom-scrollbar">
+                      <table className="w-full text-left border-collapse min-w-[800px]">
                         <thead>
-                          <tr className="bg-gray-50 border-b border-gray-200 text-[10px] font-bold text-gray-500 uppercase">
-                            <th className="p-2 w-[22%]">Nhóm Hệ Thống</th>
+                          <tr className="bg-gray-50 border-b border-gray-200 text-[10px] font-bold text-gray-500 uppercase whitespace-nowrap">
+                            <th className="p-2 w-[18%]">Nhóm Hệ Thống</th>
                             <th className="p-2 w-[20%]">Tên/Loại Thiết Bị</th>
-                            <th className="p-2 w-[8%] text-center">Số lượng</th>
-                            <th className="p-2 w-[8%]">ĐVT</th>
-                            <th className="p-2 w-[12%]">Vị trí bố trí</th>
-                            <th className="p-2 w-[12%]">Ngày bơm sạc/KT</th>
-                            <th className="p-2 w-[12%] text-red-600">Hạn sạc tiếp theo</th>
-                            <th className="p-2 w-[12%]">Tình trạng</th>
-                            {modalMode !== 'view' && <th className="p-2 w-[5%] text-center">#</th>}
+                            <th className="p-2 w-[7%] text-center">Số lượng</th>
+                            <th className="p-2 w-[7%]">ĐVT</th>
+                            <th className="p-2 w-[14%]">Vị trí bố trí</th>
+                            <th className="p-2 w-[10%]">Ngày bơm sạc/KT</th>
+                            <th className="p-2 w-[10%] text-red-600">Hạn sạc tiếp theo</th>
+                            <th className="p-2 w-[10%]">Tình trạng</th>
+                            {modalMode !== 'view' && <th className="p-2 w-[4%] text-center">#</th>}
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200">
