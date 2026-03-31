@@ -360,11 +360,11 @@ export default function FireSafetyPage() {
             <table className="w-full text-left border-collapse min-w-[1300px]">
               <thead>
                 <tr className="bg-[#f8fafc] border-b border-gray-200 text-xs font-bold text-gray-600 uppercase tracking-wider">
-                  <th className="p-4 w-[25%]">Cơ sở / Đơn vị & Pháp lý</th>
-                  <th className="p-4 w-[20%]">Đội PCCC & Diễn tập</th>
+                  <th className="p-4 w-[20%]">Cơ sở / Đơn vị & Pháp lý</th>
+                  <th className="p-4 w-[25%]">Đội PCCC & Diễn tập</th>
                   <th className="p-4 w-[20%]">Thiết bị & Cảnh báo</th>
-                  <th className="p-4 w-[25%]">Tổng quan Hệ thống</th>
-                  <th className="p-4 text-center w-[10%]">Thao tác</th> 
+                  <th className="p-4 w-[20%]">Tổng quan Hệ thống</th>
+                  <th className="p-4 text-center w-[15%]">Thao tác</th> 
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
@@ -542,9 +542,9 @@ export default function FireSafetyPage() {
                     <p className="text-xs italic text-gray-500 mb-3 px-1">Kê khai chi tiết các thiết bị thuộc các hệ thống trên (Tủ điều khiển, Bình chữa cháy, Đầu báo khói...)</p>
                     
                    <div className="w-full border border-gray-200 rounded-xl overflow-hidden overflow-x-auto custom-scrollbar">
-                      <table className="w-full text-left border-collapse min-w-[800px]">
+                      <table className="w-full text-left border-collapse table-fixed">
                         <thead>
-                          <tr className="bg-gray-50 border-b border-gray-200 text-[10px] font-bold text-gray-500 uppercase whitespace-nowrap">
+                          <tr className="bg-gray-50 border-b border-gray-200 text-[10px] font-bold text-gray-500 uppercase leading-tight">
                             <th className="p-2 w-[18%]">Nhóm Hệ Thống</th>
                             <th className="p-2 w-[20%]">Tên/Loại Thiết Bị</th>
                             <th className="p-2 w-[7%] text-center">Số lượng</th>
