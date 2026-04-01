@@ -194,9 +194,20 @@ export default function DocumentPage() {
     }
 
     result.sort((a, b) => {
+      // 1. Tiêu chí 1: Sắp xếp theo Ngày ban hành (Mới nhất lên đầu)
       const dateA = a.NgayBanHanh ? new Date(a.NgayBanHanh).getTime() : 0;
       const dateB = b.NgayBanHanh ? new Date(b.NgayBanHanh).getTime() : 0;
-      return dateB - dateA;
+      
+      if (dateB !== dateA) {
+        return dateB - dateA;
+      }
+
+      // 2. Tiêu chí 2: Nếu cùng ngày -> Sắp xếp theo Số hiệu (Số lớn nhất lên đầu)
+      // Lấy các chữ số ở đầu chuỗi (VD: "125/TB-THACO" -> 125, "09/CV" -> 9)
+      const numA = parseInt(String(a.Sohieu || '').match(/^\d+/)?.[0] || '0', 10);
+      const numB = parseInt(String(b.Sohieu || '').match(/^\d+/)?.[0] || '0', 10);
+      
+      return numB - numA;
     });
 
     return result;
