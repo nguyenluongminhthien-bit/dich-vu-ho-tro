@@ -178,11 +178,30 @@ export default function PersonnelPage() {
     setExpandedParents(prev => prev.includes(parentId) ? prev.filter(id => id !== parentId) : [...prev, parentId]);
   };
 
+  // 1. Hàm đệ quy tìm tất cả các đơn vị con, cháu, chắt...
+  const getAllSubordinateIds = (unitId: string, allUnits: DonVi[]): string[] => {
+    const subordinates = allUnits.filter(u => u.CapQuanLy === unitId);
+    let ids = subordinates.map(u => u.ID_DonVi);
+    subordinates.forEach(sub => { ids = [...ids, ...getAllSubordinateIds(sub.ID_DonVi, allUnits)]; });
+    return ids;
+  };
+
+  // 2. Tạo danh sách ID bao gồm Đơn vị đang chọn + Tất cả con cháu của nó
+  const selectedUnitSubordinates = useMemo(() => {
+    if (!selectedUnitFilter) return [];
+    const subIds = getAllSubordinateIds(selectedUnitFilter, donViList);
+    return [selectedUnitFilter, ...subIds];
+  }, [selectedUnitFilter, donViList]);
+
+  // 3. Cập nhật bộ lọc
   const filteredPersonnel = useMemo(() => {
     let result = data.filter(item => allowedDonViIds.includes(item.ID_DonVi));
+    
     if (selectedUnitFilter) {
-      result = result.filter(item => item.ID_DonVi === selectedUnitFilter);
+      // THAY ĐỔI: So sánh .includes() thay vì ===
+      result = result.filter(item => selectedUnitSubordinates.includes(item.ID_DonVi));
     }
+
     if (personnelSearchTerm) {
       const lower = personnelSearchTerm.toLowerCase();
       result = result.filter(item => 
@@ -193,7 +212,7 @@ export default function PersonnelPage() {
       );
     }
     return result;
-  }, [data, personnelSearchTerm, selectedUnitFilter, allowedDonViIds, donViMap]);
+  }, [data, personnelSearchTerm, selectedUnitFilter, allowedDonViIds, donViMap, selectedUnitSubordinates]);
 
   const selectedUnitName = useMemo(() => {
     if (!selectedUnitFilter) return 'Tất cả Đơn vị';
