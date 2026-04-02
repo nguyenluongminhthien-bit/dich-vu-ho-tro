@@ -199,22 +199,20 @@ export interface VanBan {
   Hieuluc: string;
   Nghiepvu: string;
   Link_FileDinhKem: string;
-  VBthaythe: string; // THÊM DÒNG NÀY
+  VBthaythe: string;
+  Mat: boolean | string;
+
+  // 👇 BỔ SUNG 7 CỘT MỚI VÀO ĐÂY 👇
+  NoiGui_Nhan?: string;
+  SoDen?: string;
+  NgayNhan?: string;
+  DonVi_NguoiXuLy?: string;
+  HanXuLy?: string;
+  TrangThaiXuLy?: string;
+  MucDoKhan?: string;
   [key: string]: any;
 }
 
-export interface QuyDinhQuyTrinh {
-  ID_QDQT: string;
-  Phanloai: string;
-  Sohieu: string;
-  ngayBanHanh: string;
-  TieuDe: string;
-  Noidung: string;
-  Nghiepvu: string;
-  linkFile: string;
-  [key: string]: any;
-
-}
 export interface ThietBi {
   ID_TTB: string;
   ID_DonVi: string;
@@ -274,6 +272,7 @@ export interface ATVSLD {
   SoTaiNanTrongNam: string | number;
   Link_BienBanChecklist: string;
   GhiChu: string;
+  [key: string]: any;
 }
 
 export interface HS_PCCC {
@@ -301,6 +300,8 @@ export interface HS_PCCC {
   HT_BaoChayTuDong: string;
   HT_ChuaChayTuDongNuoc: string;
   HT_ChuaChayNuoc: string;
+  DungCuPCCC: string;
+  [key: string]: any;
 }
 }
 
@@ -315,6 +316,7 @@ export interface TS_PCCC {
   NgayBomsac: string;
   NgayHetHan: string;
   TinhTrang: string;
+  [key: string]: any;
 }
 
 export interface PCTT {
@@ -332,4 +334,5 @@ export interface PCTT {
   Link_HoSoBoiThuong: string;
   TinhTrangKhacPhuc: string;
   GhiChu: string;
+  [key: string]: any;
 }
