@@ -99,9 +99,26 @@ export default function DocumentPage() {
     });
   }, [vbData, user, donViList]);
 
-  // TẠO DANH SÁCH GỢI Ý TỪ LỊCH SỬ NHẬP LIỆU
+  // --- DANH SÁCH ĐEN (BLACKLIST) ---
+  // Điền tên những người đã nghỉ việc, hoặc các chức vụ cũ không muốn gợi ý nữa vào đây
+  const EXCLUDED_SUGGESTIONS = [
+    'Phạm Đăng Châu',
+    'Đàm Đình Thông',
+    'Nguyễn Thiện Mỹ',
+    // 'Thêm tên người khác vào đây...',
+  ];
+
+  // TẠO DANH SÁCH GỢI Ý TỪ LỊCH SỬ NHẬP LIỆU (ĐÃ LỌC BLACKLIST)
   const { suggestNguoiky, suggestChucvu, suggestNguoilayso, suggestBPlayso, suggestNghiepvu, suggestDonViXuLy } = useMemo(() => {
-    const getUnique = (field: string) => Array.from(new Set(vbData.map(item => item[field]).filter(Boolean))) as string[];
+    const getUnique = (field: string) => {
+      // 1. Lấy tất cả dữ liệu, loại bỏ ô trống
+      const allValues = vbData.map(item => item[field]).filter(Boolean);
+      // 2. Lọc trùng lặp
+      const uniqueValues = Array.from(new Set(allValues)) as string[];
+      // 3. Loại bỏ các tên/chữ nằm trong danh sách đen
+      return uniqueValues.filter(val => !EXCLUDED_SUGGESTIONS.includes(val.trim()));
+    };
+
     return {
       suggestNguoiky: getUnique('Nguoiky'),
       suggestChucvu: getUnique('Chucvu'),
