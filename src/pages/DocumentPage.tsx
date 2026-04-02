@@ -3,16 +3,28 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Search, Plus, Edit, Trash2, X, AlertCircle, Loader2, Save, 
   FileText, Building2, MapPin, ChevronDown, ChevronRight, PanelLeftClose, PanelLeftOpen,
-  Link as LinkIcon, Calendar, CheckCircle2, Bookmark, Eye, Lock
+  Link as LinkIcon, Calendar, CheckCircle2, Bookmark, Eye, Lock, Zap, Clock, Send
 } from 'lucide-react';
 import { apiService } from '../services/api';
 import { DonVi, VanBan } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 
-// HÀM KIỂM TRA VĂN BẢN MẬT (Nhận diện mọi định dạng trả về từ Google Sheets)
+// HÀM KIỂM TRA VĂN BẢN MẬT
 const isMatDocument = (val: any) => {
   if (val === true || val === 'TRUE' || val === 'true' || val === 'Có' || String(val).trim() === '1') return true;
   return false;
+};
+
+// HÀM LẤY NHÃN HIỂN THỊ ĐỘNG CHO NƠI GỬI/NHẬN
+const getNoiGuiNhanLabel = (phanLoai: string) => {
+  switch(phanLoai) {
+    case 'Công văn đến': return 'Cơ quan / Đơn vị gửi đến';
+    case 'Công văn đi': return 'Nơi nhận (Kính gửi / Đồng kính gửi)';
+    case 'Quyết định': return 'Đơn vị / Cá nhân nhận Quyết định';
+    case 'Tờ trình': return 'Kính gửi (Nơi nhận Tờ trình)';
+    case 'Thông báo': return 'Nơi nhận Thông báo';
+    default: return 'Nơi nhận / Gửi';
+  }
 };
 
 export default function DocumentPage() {
@@ -29,7 +41,7 @@ export default function DocumentPage() {
   const [unitSearchTerm, setUnitSearchTerm] = useState('');
   const [isListCollapsed, setIsListCollapsed] = useState(false);
   const [selectedUnitFilter, setSelectedUnitFilter] = useState<string | null>(null);
-  const [selectedPhanLoai, setSelectedPhanLoai] = useState<string | null>(null);
+  const [selectedPhanLoai, setSelectedPhanLoai] = useState<string | null>('Thông báo');
   const [selectedYear, setSelectedYear] = useState<string>('all'); 
   const [expandedParents, setExpandedParents] = useState<string[]>([]);
 
@@ -75,7 +87,6 @@ export default function DocumentPage() {
     if (!user) return [];
     if (user.idDonVi === 'ALL') return vbData;
     
-    // Tạo danh sách các đơn vị được phép quản lý (3 cấp)
     const level1 = [user.idDonVi];
     const level2 = donViList.filter(dv => level1.includes(dv.CapQuanLy)).map(dv => dv.ID_DonVi);
     const level3 = donViList.filter(dv => level2.includes(dv.CapQuanLy)).map(dv => dv.ID_DonVi);
@@ -89,18 +100,19 @@ export default function DocumentPage() {
   }, [vbData, user, donViList]);
 
   // TẠO DANH SÁCH GỢI Ý TỪ LỊCH SỬ NHẬP LIỆU
-  const { suggestNguoiky, suggestChucvu, suggestNguoilayso, suggestBPlayso, suggestNghiepvu } = useMemo(() => {
+  const { suggestNguoiky, suggestChucvu, suggestNguoilayso, suggestBPlayso, suggestNghiepvu, suggestDonViXuLy } = useMemo(() => {
     const getUnique = (field: string) => Array.from(new Set(vbData.map(item => item[field]).filter(Boolean))) as string[];
     return {
       suggestNguoiky: getUnique('Nguoiky'),
       suggestChucvu: getUnique('Chucvu'),
       suggestNguoilayso: getUnique('Nguoilayso'),
       suggestBPlayso: getUnique('BPlayso'),
-      suggestNghiepvu: getUnique('Nghiepvu')
+      suggestNghiepvu: getUnique('Nghiepvu'),
+      suggestDonViXuLy: getUnique('DonVi_NguoiXuLy')
     };
   }, [vbData]);
 
-  // LỌC VÀ TẠO CÂY ĐƠN VỊ BÊN TRÁI (PHÂN QUYỀN CHUẨN)
+  // LỌC VÀ TẠO CÂY ĐƠN VỊ BÊN TRÁI
   const allowedDonViIds = useMemo(() => {
     if (!user) return [];
     if (user.idDonVi === 'ALL') return donViList.map(dv => dv.ID_DonVi);
@@ -113,7 +125,7 @@ export default function DocumentPage() {
     return donViList.filter(dv => allAllowed.includes(dv.ID_DonVi)).map(dv => dv.ID_DonVi);
   }, [user, donViList]);
 
-  // --- FIX TÌM KIẾM CÂY THƯ MỤC CỰC THÔNG MINH VÀ CHỐNG TRẮNG TRANG ---
+  // FIX TÌM KIẾM CÂY THƯ MỤC CỰC THÔNG MINH
   const filteredUnits = useMemo(() => {
     let baseUnits = donViList.filter(dv => allowedDonViIds.includes(dv.ID_DonVi));
     if (!unitSearchTerm) return baseUnits;
@@ -122,7 +134,6 @@ export default function DocumentPage() {
     const matchedIds = new Set<string>();
 
     baseUnits.forEach(u => {
-      // Ép String để không bị lỗi với ID số
       if (String(u.TenDonVi || '').toLowerCase().includes(lower) || String(u.ID_DonVi || '').toLowerCase().includes(lower)) {
         matchedIds.add(u.ID_DonVi);
         
@@ -175,7 +186,7 @@ export default function DocumentPage() {
     return Array.from(years).sort((a, b) => Number(b) - Number(a));
   }, [visibleDocuments]);
 
-  // --- LỌC VĂN BẢN TRÊN BẢNG ---
+  // LỌC VĂN BẢN TRÊN BẢNG
   const filteredDocs = useMemo(() => {
     let result = [...visibleDocuments];
     
@@ -194,19 +205,14 @@ export default function DocumentPage() {
     }
 
     result.sort((a, b) => {
-      // 1. Tiêu chí 1: Sắp xếp theo Ngày ban hành (Mới nhất lên đầu)
+      // 1. Theo Ngày ban hành
       const dateA = a.NgayBanHanh ? new Date(a.NgayBanHanh).getTime() : 0;
       const dateB = b.NgayBanHanh ? new Date(b.NgayBanHanh).getTime() : 0;
-      
-      if (dateB !== dateA) {
-        return dateB - dateA;
-      }
+      if (dateB !== dateA) return dateB - dateA;
 
-      // 2. Tiêu chí 2: Nếu cùng ngày -> Sắp xếp theo Số hiệu (Số lớn nhất lên đầu)
-      // Lấy các chữ số ở đầu chuỗi (VD: "125/TB-THACO" -> 125, "09/CV" -> 9)
+      // 2. Theo Số hiệu (Nếu cùng ngày)
       const numA = parseInt(String(a.Sohieu || '').match(/^\d+/)?.[0] || '0', 10);
       const numB = parseInt(String(b.Sohieu || '').match(/^\d+/)?.[0] || '0', 10);
-      
       return numB - numA;
     });
 
@@ -219,16 +225,25 @@ export default function DocumentPage() {
     return unit ? unit.TenDonVi : 'Đơn vị không xác định';
   }, [selectedUnitFilter, donViList]);
 
+  // HÀM MỞ MODAL & KHỞI TẠO STATE
   const openModal = (mode: 'create' | 'update', item?: any) => {
     setModalMode(mode);
     if (item) { 
-      setFormData({ ...item, NgayBanHanh: item.NgayBanHanh ? item.NgayBanHanh.split('T')[0] : '', Mat: isMatDocument(item.Mat) }); 
+      setFormData({ 
+        ...item, 
+        NgayBanHanh: item.NgayBanHanh ? item.NgayBanHanh.split('T')[0] : '', 
+        NgayNhan: item.NgayNhan ? item.NgayNhan.split('T')[0] : '', 
+        HanXuLy: item.HanXuLy ? item.HanXuLy.split('T')[0] : '', 
+        Mat: isMatDocument(item.Mat) 
+      }); 
     } else {
       setFormData({
         ID_VanBan: '', ID_DonVi: selectedUnitFilter || (user?.idDonVi !== 'ALL' ? user?.idDonVi : ''), 
-        Phanloai: 'Thông báo', Sohieu: '', NgayBanHanh: new Date().toISOString().split('T')[0], TieuDe: '', Noidung: '', 
+        Phanloai: 'Thông báo', MucDoKhan: 'Bình thường', Sohieu: '', NgayBanHanh: new Date().toISOString().split('T')[0], 
+        TieuDe: '', Noidung: '', Link_FileDinhKem: '', NoiGui_Nhan: '', SoDen: '', NgayNhan: '', 
+        DonVi_NguoiXuLy: '', HanXuLy: '', TrangThaiXuLy: 'Chờ xử lý',
         Nguoiky: '', Chucvu: '', Nguoilayso: '', BPlayso: '', Phamviapdung: 'Toàn hệ thống', 
-        Hieuluc: 'Còn hiệu lực', Nghiepvu: '', Link_FileDinhKem: '', VBthaythe: '', Mat: false
+        Hieuluc: 'Còn hiệu lực', Nghiepvu: '', VBthaythe: '', Mat: false
       });
     }
     setIsModalOpen(true); setError(null);
@@ -239,14 +254,26 @@ export default function DocumentPage() {
     if (!formData.ID_DonVi) return alert("Vui lòng chọn Đơn vị ban hành/lưu trữ!");
     if (formData.Hieuluc === 'Thay thế VB khác' && !formData.VBthaythe) return alert("Vui lòng dán Link văn bản bị thay thế!");
     
+    // Tự động clear các trường không thuộc về phân loại đó
+    let finalData = { ...formData };
+    if (finalData.Phanloai !== 'Công văn đến') {
+      finalData.SoDen = '';
+      finalData.NgayNhan = '';
+    }
+    if (finalData.Phanloai !== 'Công văn đến' && finalData.Phanloai !== 'Tờ trình') {
+      finalData.DonVi_NguoiXuLy = '';
+      finalData.HanXuLy = '';
+      finalData.TrangThaiXuLy = '';
+    }
+
     setSubmitting(true); setError(null);
     try {
-      const response = await apiService.save(formData, modalMode, "VB_TB");
+      const response = await apiService.save(finalData, modalMode, "VB_TB");
       if (modalMode === 'create') {
-        const newItem = { ...formData, ID_VanBan: response.newId };
+        const newItem = { ...finalData, ID_VanBan: response.newId || `VB-${Date.now()}` };
         setVbData(prev => [newItem, ...prev]); 
       } else {
-        setVbData(prev => prev.map(item => item.ID_VanBan === formData.ID_VanBan ? formData : item));
+        setVbData(prev => prev.map(item => item.ID_VanBan === finalData.ID_VanBan ? finalData : item));
       }
       setIsModalOpen(false); 
     } catch (err: any) { 
@@ -279,7 +306,6 @@ export default function DocumentPage() {
     }
   };
 
-  // TỰ ĐỘNG MỞ MENU CÂY KHI TÌM KIẾM
   const renderUnitTree = (parent: DonVi, level: number = 1) => {
     const children = getChildUnits(parent.ID_DonVi);
     const isExpanded = expandedParents.includes(parent.ID_DonVi) || !!unitSearchTerm;
@@ -292,9 +318,7 @@ export default function DocumentPage() {
           className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold transition-colors ${selectedUnitFilter === parent.ID_DonVi ? 'bg-blue-50 text-[#05469B]' : 'text-gray-700 hover:bg-gray-50'} ${isParentDimmed ? 'opacity-50' : ''}`}
         >
           {children.length > 0 ? (isExpanded ? <ChevronDown size={16} className="text-gray-400 shrink-0" /> : <ChevronRight size={16} className="text-gray-400 shrink-0" />) : <div className="w-4 shrink-0" />}
-          
           <span className="shrink-0">{getUnitEmoji(parent.loaiHinh)}</span>
-          
           <span className="truncate text-left">{parent.TenDonVi}</span>
         </button>
         
@@ -309,7 +333,6 @@ export default function DocumentPage() {
 
   return (
     <div className="flex h-full bg-[#f4f7f9] overflow-hidden relative">
-      {/* NÚT MỞ RỘNG CỘT TRÁI NẾU BỊ ẨN */}
       {isListCollapsed && (
         <button onClick={() => setIsListCollapsed(false)} className="absolute top-6 left-6 z-20 bg-white p-2.5 rounded-lg shadow-md border border-gray-200 text-[#05469B] hover:bg-blue-50 transition-all">
           <PanelLeftOpen size={20} />
@@ -324,11 +347,13 @@ export default function DocumentPage() {
             <button onClick={() => setIsListCollapsed(true)} className="p-1.5 text-gray-400 hover:text-[#05469B] hover:bg-blue-50 rounded-md transition-colors"><PanelLeftClose size={18} /></button>
           </div>
           
-          <div className="flex bg-gray-100 p-1 rounded-lg mb-4">
-            <button onClick={() => setSelectedPhanLoai(null)} className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${!selectedPhanLoai ? 'bg-white text-[#05469B] shadow-sm' : 'text-gray-500 hover:text-[#05469B]'}`}>Tất cả</button>
-            <button onClick={() => setSelectedPhanLoai('Thông báo')} className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${selectedPhanLoai === 'Thông báo' ? 'bg-white text-[#05469B] shadow-sm' : 'text-gray-500 hover:text-[#05469B]'}`}>T.Báo</button>
-            <button onClick={() => setSelectedPhanLoai('Công văn đến')} className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${selectedPhanLoai === 'Công văn đến' ? 'bg-white text-[#05469B] shadow-sm' : 'text-gray-500 hover:text-[#05469B]'}`}>CV Đến</button>
-            <button onClick={() => setSelectedPhanLoai('Công văn đi')} className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${selectedPhanLoai === 'Công văn đi' ? 'bg-white text-[#05469B] shadow-sm' : 'text-gray-500 hover:text-[#05469B]'}`}>CV Đi</button>
+          <div className="grid grid-cols-3 gap-1 bg-gray-100 p-1 rounded-lg mb-4">
+            <button onClick={() => setSelectedPhanLoai('Thông báo')} className={`py-1.5 text-xs font-bold rounded-md transition-all ${selectedPhanLoai === 'Thông báo' ? 'bg-white text-[#05469B] shadow-sm' : 'text-gray-500 hover:text-[#05469B]'}`}>T.Báo</button>
+            <button onClick={() => setSelectedPhanLoai('Quyết định')} className={`py-1.5 text-xs font-bold rounded-md transition-all ${selectedPhanLoai === 'Quyết định' ? 'bg-white text-[#05469B] shadow-sm' : 'text-gray-500 hover:text-[#05469B]'}`}>Q.Định</button>
+            <button onClick={() => setSelectedPhanLoai('Công văn đến')} className={`py-1.5 text-xs font-bold rounded-md transition-all ${selectedPhanLoai === 'Công văn đến' ? 'bg-white text-[#05469B] shadow-sm' : 'text-gray-500 hover:text-[#05469B]'}`}>CV Đến</button>
+            <button onClick={() => setSelectedPhanLoai('Công văn đi')} className={`py-1.5 text-xs font-bold rounded-md transition-all ${selectedPhanLoai === 'Công văn đi' ? 'bg-white text-[#05469B] shadow-sm' : 'text-gray-500 hover:text-[#05469B]'}`}>CV Đi</button>
+            <button onClick={() => setSelectedPhanLoai('Tờ trình')} className={`py-1.5 text-xs font-bold rounded-md transition-all ${selectedPhanLoai === 'Tờ trình' ? 'bg-white text-[#05469B] shadow-sm' : 'text-gray-500 hover:text-[#05469B]'}`}>T.Trình</button>
+            <button onClick={() => setSelectedPhanLoai(null)} className={`py-1.5 text-xs font-bold rounded-md transition-all ${!selectedPhanLoai ? 'bg-white text-[#05469B] shadow-sm' : 'text-gray-500 hover:text-[#05469B]'}`}>Tất cả</button>
           </div>
 
           <div className="relative">
@@ -362,12 +387,11 @@ export default function DocumentPage() {
       <div className="flex-1 overflow-y-auto p-4 sm:p-6 relative transition-all duration-300">
         <div className={`flex flex-col sm:flex-row justify-between items-center mb-6 gap-4 transition-all duration-300 ${isListCollapsed ? 'pl-10' : ''}`}>
           <div>
-            <h2 className="text-2xl font-bold text-[#05469B] flex items-center gap-2"><FileText size={28} /> Quản lý Văn bản - Thông báo</h2>
+            <h2 className="text-2xl font-bold text-[#05469B] flex items-center gap-2"><FileText size={28} /> Quản lý Văn bản - Tờ trình</h2>
             <p className="text-sm font-medium text-gray-500 mt-1">Lọc: <span className="text-emerald-600 font-bold">{selectedPhanLoai || 'Tất cả'}</span> • Khu vực: <span className="text-emerald-600 font-bold">{selectedUnitName}</span></p>
           </div>
           
           <div className="flex w-full sm:w-auto gap-3">
-            
             <select
               value={selectedYear}
               onChange={(e) => setSelectedYear(e.target.value)}
@@ -394,7 +418,7 @@ export default function DocumentPage() {
             <table className="w-full text-left border-collapse min-w-[1200px]">
               <thead>
                 <tr className="bg-[#f8fafc] border-b border-gray-200 text-xs font-bold text-gray-600 uppercase tracking-wider">
-                  <th className="p-4 w-36">Số hiệu</th>
+                  <th className="p-4 w-40">Số hiệu / Phân loại</th>
                   <th className="p-4 w-32">Ngày BH</th>
                   <th className="p-4">Tiêu đề & Nội dung</th>
                   <th className="p-4 w-48">Phạm vi áp dụng</th>
@@ -412,7 +436,11 @@ export default function DocumentPage() {
                   filteredDocs.map((item) => (
                     <tr key={item.ID_VanBan} className="hover:bg-blue-50/50 transition-colors group">
                       <td className="p-4">
-                        <span className="font-black text-[#05469B] bg-blue-50 px-2 py-1 rounded text-sm whitespace-nowrap border border-blue-100">{item.Sohieu}</span>
+                        <div className="flex items-center flex-wrap gap-1.5">
+                          <span className="font-black text-[#05469B] bg-blue-50 px-2 py-1 rounded text-sm whitespace-nowrap border border-blue-100">{item.Sohieu}</span>
+                          {item.MucDoKhan === 'Hỏa tốc' && <span className="text-[9px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-black border border-red-200 uppercase">HỎA TỐC</span>}
+                          {item.MucDoKhan === 'Khẩn' && <span className="text-[9px] bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded font-black border border-orange-200 uppercase">KHẨN</span>}
+                        </div>
                         <div className="mt-2 text-[10px] font-semibold text-gray-500 bg-gray-100 px-2 py-0.5 rounded inline-block uppercase">{item.Phanloai}</div>
                       </td>
                       <td className="p-4 text-sm font-medium text-gray-700 flex items-center gap-1.5 mt-2"><Calendar size={14} className="text-gray-400"/> {item.NgayBanHanh ? new Date(item.NgayBanHanh).toLocaleDateString('vi-VN') : '-'}</td>
@@ -474,11 +502,12 @@ export default function DocumentPage() {
       <datalist id="suggest-nguoilayso">{suggestNguoilayso.map(v => <option key={v} value={v} />)}</datalist>
       <datalist id="suggest-bplayso">{suggestBPlayso.map(v => <option key={v} value={v} />)}</datalist>
       <datalist id="suggest-nghiepvu">{suggestNghiepvu.map(v => <option key={v} value={v} />)}</datalist>
+      <datalist id="suggest-donvixuly">{suggestDonViXuLy.map(v => <option key={v} value={v} />)}</datalist>
 
-      {/* MODAL THÊM / SỬA VĂN BẢN */}
+      {/* MODAL THÊM / SỬA VĂN BẢN (FORM ĐỘNG) */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl flex flex-col max-h-[90vh] animate-in fade-in zoom-in duration-200">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl flex flex-col max-h-[90vh] animate-in fade-in zoom-in duration-200">
             <div className="flex justify-between p-5 border-b border-gray-100 bg-gray-50 rounded-t-2xl">
               <h3 className="text-xl font-bold text-[#05469B] flex items-center gap-2"><FileText size={24}/> {modalMode === 'create' ? 'Ban hành Văn bản / Thông báo Mới' : 'Cập nhật Văn bản'}</h3>
               <button onClick={() => setIsModalOpen(false)} disabled={submitting} className="text-gray-400 hover:text-red-500 rounded-full p-1.5 bg-white shadow-sm transition-colors"><X className="w-6 h-6" /></button>
@@ -486,95 +515,89 @@ export default function DocumentPage() {
             
             <form onSubmit={handleSave} className="p-6 overflow-y-auto space-y-6">
               
-              {/* KHỐI 1: THÔNG TIN CƠ BẢN */}
+              {/* KHỐI 1: THÔNG TIN HÀNH CHÍNH (CỐ ĐỊNH) */}
               <div className="bg-blue-50/40 p-5 rounded-xl border border-blue-100">
-                <h4 className="font-bold text-[#05469B] mb-4 flex items-center gap-2"><div className="w-2 h-6 bg-[#05469B] rounded-full"></div> Thông tin Hành chính</h4>
+                <h4 className="font-bold text-[#05469B] mb-4 flex items-center gap-2"><div className="w-2 h-6 bg-[#05469B] rounded-full"></div> 1. Thông tin Hành chính</h4>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
                   <div className="md:col-span-2">
                     <label className="block text-xs font-bold text-gray-700 mb-1">Đơn vị ban hành (Lưu trữ) *</label>
-                    <select 
-                      required 
-                      name="ID_DonVi" 
-                      value={formData.ID_DonVi || ''} 
-                      onChange={handleInputChange} 
-                      className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-bold text-[#05469B]"
-                      style={{ fontFamily: 'monospace, sans-serif' }}
-                    >
+                    <select required name="ID_DonVi" value={formData.ID_DonVi || ''} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-bold text-[#05469B]">
                       <option value="">-- Chọn đơn vị --</option>
                       {buildHierarchicalOptions(donViList.filter(dv => allowedDonViIds.includes(dv.ID_DonVi))).map(({ unit, prefix }) => (
-                        <option key={unit.ID_DonVi} value={unit.ID_DonVi} className="font-normal text-gray-700">
-                          {prefix}{getUnitEmoji(unit.loaiHinh)} {unit.TenDonVi}
-                        </option>
+                        <option key={unit.ID_DonVi} value={unit.ID_DonVi} className="font-normal text-gray-700">{prefix}{getUnitEmoji(unit.loaiHinh)} {unit.TenDonVi}</option>
                       ))}
                     </select>
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-gray-700 mb-1">Phân loại *</label>
-                    <select required name="Phanloai" value={formData.Phanloai || 'Thông báo'} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]">
-                      <option value="Thông báo">Thông báo</option><option value="Công văn đến">Công văn đến</option><option value="Công văn đi">Công văn đi</option>
+                    <select required name="Phanloai" value={formData.Phanloai || 'Thông báo'} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-bold text-gray-800">
+                      <option value="Thông báo">Thông báo</option>
+                      <option value="Quyết định">Quyết định</option>
+                      <option value="Tờ trình">Tờ trình</option>
+                      <option value="Công văn đến">Công văn đến</option>
+                      <option value="Công văn đi">Công văn đi</option>
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-1">Trạng thái (Hiệu lực) *</label>
-                    <select required name="Hieuluc" value={formData.Hieuluc || 'Còn hiệu lực'} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-bold text-[#05469B]">
-                      <option value="Còn hiệu lực">Còn hiệu lực</option><option value="Hết hiệu lực">Hết hiệu lực</option><option value="Thay thế VB khác">Thay thế VB khác</option>
+                    <label className="block text-xs font-bold text-red-600 mb-1">Độ khẩn *</label>
+                    <select name="MucDoKhan" value={formData.MucDoKhan || 'Bình thường'} onChange={handleInputChange} className={`w-full p-2.5 border rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-red-500 font-bold ${formData.MucDoKhan === 'Hỏa tốc' ? 'text-red-700 border-red-300' : formData.MucDoKhan === 'Khẩn' ? 'text-orange-600 border-orange-300' : 'text-gray-700 border-gray-200'}`}>
+                      <option value="Bình thường">Bình thường</option><option value="Khẩn">Khẩn</option><option value="Hỏa tốc">Hỏa tốc</option>
                     </select>
                   </div>
 
-                  {formData.Hieuluc === 'Thay thế VB khác' && (
-                    <div className="col-span-2 md:col-span-4 bg-orange-50 p-3 rounded-lg border border-orange-200 animate-in fade-in zoom-in duration-200">
-                      <label className="block text-xs font-bold text-orange-700 mb-1">Link Văn bản bị thay thế (Dán link vào đây) *</label>
-                      <div className="relative">
-                        <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-orange-400" size={16} />
-                        <input type="url" required name="VBthaythe" value={formData.VBthaythe || ''} onChange={handleInputChange} className="w-full pl-9 pr-4 py-2 border border-orange-300 rounded-md bg-white outline-none focus:ring-2 focus:ring-orange-500 text-blue-600 text-sm font-medium" placeholder="Dán link Google Drive của văn bản cũ..." />
-                      </div>
-                    </div>
-                  )}
-
                   <div><label className="block text-xs font-bold text-gray-700 mb-1">Số hiệu *</label><input type="text" required name="Sohieu" value={formData.Sohieu || ''} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-black text-gray-800 tracking-wider" placeholder="VD: 123/TB-THaco..." /></div>
                   <div><label className="block text-xs font-bold text-gray-700 mb-1">Ngày ban hành *</label><input type="date" required name="NgayBanHanh" value={formData.NgayBanHanh || ''} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-bold" /></div>
+                  
                   <div className="md:col-span-2">
                     <label className="block text-xs font-bold text-gray-700 mb-1">Phạm vi áp dụng (Hiển thị cho) *</label>
-                    <select 
-                      required 
-                      name="Phamviapdung" 
-                      value={formData.Phamviapdung || 'Toàn hệ thống'} 
-                      onChange={handleInputChange} 
-                      className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-bold text-[#05469B]"
-                      style={{ fontFamily: 'monospace, sans-serif' }}
-                    >
+                    <select required name="Phamviapdung" value={formData.Phamviapdung || 'Toàn hệ thống'} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-bold text-[#05469B]">
                       <option value="Toàn hệ thống">🌍 Áp dụng Toàn hệ thống</option>
                       <optgroup label="Hoặc Chỉ định Đơn vị cụ thể:">
                         {buildHierarchicalOptions(donViList).map(({ unit, prefix }) => (
-                          <option key={unit.ID_DonVi} value={unit.ID_DonVi} className="font-normal text-gray-700">
-                            {prefix}{getUnitEmoji(unit.loaiHinh)} {unit.TenDonVi}
-                          </option>
+                          <option key={unit.ID_DonVi} value={unit.ID_DonVi} className="font-normal text-gray-700">{prefix}{getUnitEmoji(unit.loaiHinh)} {unit.TenDonVi}</option>
                         ))}
                       </optgroup>
                     </select>
                   </div>
 
-                  {/* NÚT CHỌN VĂN BẢN MẬT */}
                   <div className="col-span-2 md:col-span-4 mt-1">
                     <label className="inline-flex items-center p-3 border border-red-200 rounded-lg bg-red-50 cursor-pointer hover:bg-red-100 transition-colors shadow-sm w-max">
-                      <input 
-                        type="checkbox" 
-                        name="Mat" 
-                        checked={!!formData.Mat} 
-                        onChange={(e) => setFormData((prev: any) => ({ ...prev, Mat: e.target.checked }))} 
-                        className="w-4 h-4 text-red-600 rounded border-red-300 mr-2.5 focus:ring-red-500" 
-                      />
+                      <input type="checkbox" name="Mat" checked={!!formData.Mat} onChange={(e) => setFormData((prev: any) => ({ ...prev, Mat: e.target.checked }))} className="w-4 h-4 text-red-600 rounded border-red-300 mr-2.5 focus:ring-red-500" />
                       <Lock size={16} className="text-red-600 mr-1.5" />
-                      <span className="text-sm font-bold text-red-700">Đánh dấu là Văn bản MẬT (Chỉ cảnh báo thị giác)</span>
+                      <span className="text-sm font-bold text-red-700">Đánh dấu là Văn bản MẬT (Cảnh báo thị giác)</span>
                     </label>
                   </div>
-
                 </div>
               </div>
 
-              {/* KHỐI 2: NỘI DUNG CHÍNH */}
+              {/* KHỐI 2: THÔNG TIN LUÂN CHUYỂN (ĐỘNG) */}
+              {formData.Phanloai !== 'Thông báo' && (
+                <div className="bg-indigo-50/40 p-5 rounded-xl border border-indigo-100 animate-in fade-in zoom-in duration-200">
+                  <h4 className="font-bold text-indigo-800 mb-4 flex items-center gap-2"><div className="w-2 h-6 bg-indigo-500 rounded-full"></div> 2. Thông tin Luân chuyển</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
+                    <div className={formData.Phanloai === 'Công văn đến' ? 'md:col-span-2' : 'md:col-span-4'}>
+                      <label className="block text-xs font-bold text-indigo-800 mb-1 uppercase">{getNoiGuiNhanLabel(formData.Phanloai)} *</label>
+                      <input type="text" required name="NoiGui_Nhan" value={formData.NoiGui_Nhan || ''} onChange={handleInputChange} className="w-full p-2.5 border border-indigo-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Tên cơ quan, đơn vị, cá nhân..." />
+                    </div>
+                    {formData.Phanloai === 'Công văn đến' && (
+                      <>
+                        <div>
+                          <label className="block text-xs font-bold text-indigo-800 mb-1 uppercase">Số đến nội bộ *</label>
+                          <input type="text" required name="SoDen" value={formData.SoDen || ''} onChange={handleInputChange} className="w-full p-2.5 border border-indigo-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-indigo-500 font-bold" placeholder="VD: 01/Đ..." />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-indigo-800 mb-1 uppercase">Ngày nhận *</label>
+                          <input type="date" required name="NgayNhan" value={formData.NgayNhan || ''} onChange={handleInputChange} className="w-full p-2.5 border border-indigo-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-indigo-500" />
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* KHỐI 3: NỘI DUNG CHÍNH */}
               <div className="bg-gray-50 p-5 rounded-xl border border-gray-200">
-                <h4 className="font-bold text-gray-800 mb-4 flex items-center gap-2"><div className="w-2 h-6 bg-gray-400 rounded-full"></div> Nội dung Văn bản</h4>
+                <h4 className="font-bold text-gray-800 mb-4 flex items-center gap-2"><div className="w-2 h-6 bg-gray-400 rounded-full"></div> 3. Nội dung Văn bản</h4>
                 <div className="space-y-4">
                   <div>
                     <label className="block text-xs font-bold text-gray-700 mb-1">Tiêu đề *</label>
@@ -594,34 +617,63 @@ export default function DocumentPage() {
                 </div>
               </div>
 
-              {/* KHỐI 3: THÔNG TIN THÊM */}
+              {/* KHỐI 4: THEO DÕI XỬ LÝ & PHỤ TRỢ */}
               <div className="bg-orange-50/40 p-5 rounded-xl border border-orange-100">
-                <h4 className="font-bold text-orange-800 mb-4 flex items-center gap-2"><div className="w-2 h-6 bg-orange-500 rounded-full"></div> Thông tin thêm</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-1">Người ký</label>
-                    <input list="suggest-nguoiky" type="text" name="Nguoiky" value={formData.Nguoiky || ''} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" placeholder="Họ tên người ký..." />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-1">Chức vụ người ký</label>
-                    <input list="suggest-chucvu" type="text" name="Chucvu" value={formData.Chucvu || ''} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" placeholder="VD: Giám đốc, Trưởng phòng..." />
-                  </div>
+                <h4 className="font-bold text-orange-800 mb-4 flex items-center gap-2"><div className="w-2 h-6 bg-orange-500 rounded-full"></div> 4. Theo dõi Xử lý & Thông tin Phụ trợ</h4>
+                
+                <div className="space-y-6">
+                  {/* Khu vực Xử lý (Chỉ hiện khi là Tờ trình hoặc CV Đến) */}
+                  {(formData.Phanloai === 'Công văn đến' || formData.Phanloai === 'Tờ trình') && (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-5 pb-6 border-b border-orange-200 animate-in fade-in zoom-in">
+                      <div>
+                        <label className="block text-xs font-bold text-red-700 mb-1 flex items-center gap-1"><Zap size={14}/> Đơn vị / Người xử lý</label>
+                        <input list="suggest-donvixuly" name="DonVi_NguoiXuLy" value={formData.DonVi_NguoiXuLy || ''} onChange={handleInputChange} className="w-full p-2.5 border border-red-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-red-500" placeholder="Giao cho..." />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-red-700 mb-1 flex items-center gap-1"><Clock size={14}/> Hạn xử lý (Deadline)</label>
+                        <input type="date" name="HanXuLy" value={formData.HanXuLy || ''} onChange={handleInputChange} className="w-full p-2.5 border border-red-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-red-500" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-orange-700 mb-1 flex items-center gap-1"><Send size={14}/> Trạng thái Xử lý</label>
+                        <select name="TrangThaiXuLy" value={formData.TrangThaiXuLy || 'Chờ xử lý'} onChange={handleInputChange} className="w-full p-2.5 border border-orange-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-orange-500 font-bold text-orange-800">
+                          <option value="Chờ xử lý">Chờ xử lý</option>
+                          <option value="Đang xử lý">Đang xử lý</option>
+                          <option value="Đã hoàn thành">Đã hoàn thành</option>
+                        </select>
+                      </div>
+                    </div>
+                  )}
 
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-1">Người lấy số</label>
-                    <input list="suggest-nguoilayso" type="text" name="Nguoilayso" value={formData.Nguoilayso || ''} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" placeholder="Họ tên nhân viên..." />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-1">Bộ phận lấy số</label>
-                    <input list="suggest-bplayso" type="text" name="BPlayso" value={formData.BPlayso || ''} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" placeholder="VD: Phòng HCNS..." />
-                  </div>
+                  {/* Khu vực Phụ trợ */}
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div><label className="block text-xs font-bold text-gray-700 mb-1">Người ký</label><input list="suggest-nguoiky" type="text" name="Nguoiky" value={formData.Nguoiky || ''} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-[#05469B]" placeholder="Họ tên người ký..." /></div>
+                    <div><label className="block text-xs font-bold text-gray-700 mb-1">Chức vụ người ký</label><input list="suggest-chucvu" type="text" name="Chucvu" value={formData.Chucvu || ''} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-[#05469B]" placeholder="VD: Giám đốc..." /></div>
+                    <div><label className="block text-xs font-bold text-gray-700 mb-1">Người lấy số</label><input list="suggest-nguoilayso" type="text" name="Nguoilayso" value={formData.Nguoilayso || ''} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-[#05469B]" placeholder="Nhân viên..." /></div>
+                    <div><label className="block text-xs font-bold text-gray-700 mb-1">Bộ phận lấy số</label><input list="suggest-bplayso" type="text" name="BPlayso" value={formData.BPlayso || ''} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-[#05469B]" placeholder="Phòng HCNS..." /></div>
 
-                  <div className="md:col-span-2">
-                    <label className="block text-xs font-bold text-gray-700 mb-1">Phân loại Nghiệp vụ</label>
-                    <input list="suggest-nghiepvu" type="text" name="Nghiepvu" value={formData.Nghiepvu || ''} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" placeholder="Kinh doanh, Nhân sự, Dịch vụ..." />
-                  </div>
+                    <div className="md:col-span-2">
+                      <label className="block text-xs font-bold text-gray-700 mb-1">Phân loại Nghiệp vụ</label>
+                      <input list="suggest-nghiepvu" type="text" name="Nghiepvu" value={formData.Nghiepvu || ''} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-[#05469B]" placeholder="Kinh doanh, Nhân sự, Dịch vụ..." />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="block text-xs font-bold text-gray-700 mb-1">Tình trạng Hiệu lực *</label>
+                      <select required name="Hieuluc" value={formData.Hieuluc || 'Còn hiệu lực'} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-[#05469B] font-bold text-[#05469B]">
+                        <option value="Còn hiệu lực">Còn hiệu lực</option>
+                        <option value="Hết hiệu lực">Hết hiệu lực</option>
+                        <option value="Thay thế VB khác">Thay thế VB khác</option>
+                      </select>
+                    </div>
 
+                    {formData.Hieuluc === 'Thay thế VB khác' && (
+                      <div className="col-span-1 md:col-span-4 bg-orange-50 p-3 rounded-lg border border-orange-300 mt-2 animate-in fade-in zoom-in duration-200">
+                        <label className="block text-xs font-bold text-orange-800 mb-1">Link Văn bản bị thay thế (Dán link vào đây) *</label>
+                        <div className="relative">
+                          <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-orange-500" size={16} />
+                          <input type="url" required name="VBthaythe" value={formData.VBthaythe || ''} onChange={handleInputChange} className="w-full pl-9 pr-4 py-2.5 border border-orange-300 rounded-lg bg-white outline-none focus:ring-2 focus:ring-orange-500 text-blue-600 text-sm font-medium" placeholder="Dán link Google Drive của văn bản cũ..." />
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -637,20 +689,17 @@ export default function DocumentPage() {
       {/* MODAL XEM CHI TIẾT */}
       {isViewModalOpen && viewData && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl flex flex-col max-h-[90vh] animate-in fade-in zoom-in duration-200">
-            <div className="flex justify-between p-5 border-b border-gray-100 bg-[#05469B] text-white rounded-t-2xl">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl flex flex-col max-h-[90vh] animate-in fade-in zoom-in duration-200">
+            <div className="flex justify-between p-5 border-b border-gray-100 bg-[#05469B] text-white rounded-t-2xl shrink-0">
               <h3 className="text-xl font-bold flex items-center gap-2"><FileText size={24}/> Chi tiết Văn bản</h3>
               <button onClick={() => setIsViewModalOpen(false)} className="text-blue-200 hover:text-white rounded-full p-1 transition-colors"><X className="w-6 h-6" /></button>
             </div>
             
             <div className="p-6 overflow-y-auto">
               
-              {/* BANNER CẢNH BÁO MẬT */}
               {isMatDocument(viewData.Mat) && (
                 <div className="mb-5 p-3.5 bg-red-50 border border-red-200 rounded-xl flex items-center gap-3 shadow-sm">
-                  <div className="w-10 h-10 rounded-full bg-red-100 text-red-600 flex items-center justify-center shrink-0">
-                    <Lock size={20} />
-                  </div>
+                  <div className="w-10 h-10 rounded-full bg-red-100 text-red-600 flex items-center justify-center shrink-0"><Lock size={20} /></div>
                   <div>
                     <p className="text-sm font-black text-red-700 uppercase">Tài liệu Mật</p>
                     <p className="text-xs font-medium text-red-600">Đề nghị không sao chép, chụp ảnh hay phát tán ra bên ngoài dưới mọi hình thức.</p>
@@ -659,9 +708,16 @@ export default function DocumentPage() {
               )}
 
               <div className="mb-6">
-                <div className="flex items-center gap-3 mb-2">
+                <div className="flex flex-wrap items-center gap-3 mb-2">
                   <span className="bg-blue-100 text-[#05469B] font-black px-3 py-1 rounded text-lg border border-blue-200">{viewData.Sohieu}</span>
                   <span className="bg-gray-100 text-gray-600 font-bold px-2 py-1 rounded text-xs uppercase">{viewData.Phanloai}</span>
+                  
+                  {viewData.MucDoKhan && viewData.MucDoKhan !== 'Bình thường' && (
+                    <span className={`px-2.5 py-1 rounded text-xs font-black border uppercase ${viewData.MucDoKhan === 'Hỏa tốc' ? 'bg-red-100 text-red-700 border-red-300 animate-pulse' : 'bg-orange-100 text-orange-700 border-orange-300'}`}>
+                      {viewData.MucDoKhan}
+                    </span>
+                  )}
+                  
                   <span className={`px-2 py-1 rounded text-xs font-bold ${viewData.Hieuluc === 'Còn hiệu lực' ? 'bg-green-100 text-green-700' : viewData.Hieuluc === 'Hết hiệu lực' ? 'bg-gray-200 text-gray-700' : 'bg-orange-100 text-orange-700'}`}>
                     {viewData.Hieuluc}
                   </span>
@@ -670,20 +726,55 @@ export default function DocumentPage() {
                 <p className="text-sm text-gray-500 mt-2 flex items-center gap-2"><Calendar size={14}/> Ban hành: <span className="font-bold text-gray-700">{viewData.NgayBanHanh ? new Date(viewData.NgayBanHanh).toLocaleDateString('vi-VN') : '-'}</span></p>
               </div>
 
-              <div className="bg-gray-50 p-4 rounded-xl border border-gray-100 mb-6 text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
+              <div className="bg-gray-50 p-4 rounded-xl border border-gray-100 mb-6 text-sm text-gray-700 whitespace-pre-wrap leading-relaxed shadow-inner">
                 {viewData.Noidung || <span className="italic text-gray-400">Không có trích yếu nội dung.</span>}
               </div>
 
-              <div className="grid grid-cols-2 gap-4 mb-6 bg-blue-50/50 p-4 rounded-xl border border-blue-100">
-                <div><p className="text-xs text-gray-500 uppercase font-bold mb-1">Nơi ban hành</p><p className="font-semibold text-[#05469B]">{donViMap[viewData.ID_DonVi] || viewData.ID_DonVi}</p></div>
-                <div><p className="text-xs text-gray-500 uppercase font-bold mb-1">Phạm vi áp dụng</p><p className="font-semibold text-[#05469B]">{viewData.Phamviapdung === 'Toàn hệ thống' ? '🌍 Toàn hệ thống' : donViMap[viewData.Phamviapdung] || viewData.Phamviapdung}</p></div>
-                <div><p className="text-xs text-gray-500 uppercase font-bold mb-1">Người ký</p><p className="font-semibold text-gray-800">{viewData.Nguoiky || '-'} <span className="text-gray-500 font-normal">({viewData.Chucvu || '-'})</span></p></div>
-                <div><p className="text-xs text-gray-500 uppercase font-bold mb-1">Nghiệp vụ</p><p className="font-semibold text-gray-800">{viewData.Nghiepvu || '-'}</p></div>
+              {(viewData.Phanloai === 'Công văn đến' || viewData.Phanloai === 'Tờ trình') && (
+                <div className="mb-6 p-4 rounded-xl border border-orange-200 bg-orange-50/50 shadow-sm">
+                  <h4 className="text-sm font-bold text-orange-800 mb-3 flex items-center gap-2"><Clock size={16}/> Theo dõi Xử lý</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div><p className="text-xs text-gray-500 font-bold mb-1 uppercase">Đơn vị / Người xử lý</p><p className="font-semibold text-gray-800">{viewData.DonVi_NguoiXuLy || 'Chưa giao việc'}</p></div>
+                    <div><p className="text-xs text-gray-500 font-bold mb-1 uppercase">Hạn xử lý</p><p className="font-semibold text-red-600">{viewData.HanXuLy ? new Date(viewData.HanXuLy).toLocaleDateString('vi-VN') : '-'}</p></div>
+                    <div>
+                      <p className="text-xs text-gray-500 font-bold mb-1 uppercase">Trạng thái</p>
+                      <p className={`font-bold ${viewData.TrangThaiXuLy === 'Đã hoàn thành' ? 'text-green-600' : viewData.TrangThaiXuLy === 'Đang xử lý' ? 'text-blue-600' : 'text-orange-600'}`}>
+                        {viewData.TrangThaiXuLy || 'Chờ xử lý'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 bg-blue-50/30 p-4 rounded-xl border border-blue-100">
+                <div className="col-span-2"><p className="text-xs text-gray-500 uppercase font-bold mb-1">Nơi ban hành (Lưu trữ)</p><p className="font-semibold text-[#05469B]">{donViMap[viewData.ID_DonVi] || viewData.ID_DonVi}</p></div>
+                <div className="col-span-2"><p className="text-xs text-gray-500 uppercase font-bold mb-1">Phạm vi áp dụng</p><p className="font-semibold text-[#05469B]">{viewData.Phamviapdung === 'Toàn hệ thống' ? '🌍 Toàn hệ thống' : donViMap[viewData.Phamviapdung] || viewData.Phamviapdung}</p></div>
+                
+                {viewData.Phanloai !== 'Thông báo' && (
+                  <div className="col-span-2 md:col-span-4 border-t border-blue-100/50 pt-3 mt-1 grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="col-span-1 md:col-span-2">
+                        <p className="text-xs text-gray-500 uppercase font-bold mb-1">{getNoiGuiNhanLabel(viewData.Phanloai)}</p>
+                        <p className="font-semibold text-gray-800">{viewData.NoiGui_Nhan || '-'}</p>
+                    </div>
+                    {viewData.Phanloai === 'Công văn đến' && (
+                      <>
+                        <div><p className="text-xs text-gray-500 uppercase font-bold mb-1">Số đến nội bộ</p><p className="font-black text-[#05469B]">{viewData.SoDen || '-'}</p></div>
+                        <div><p className="text-xs text-gray-500 uppercase font-bold mb-1">Ngày nhận CV</p><p className="font-semibold text-gray-800">{viewData.NgayNhan ? new Date(viewData.NgayNhan).toLocaleDateString('vi-VN') : '-'}</p></div>
+                      </>
+                    )}
+                  </div>
+                )}
+
+                <div className="col-span-2 md:col-span-4 border-t border-blue-100/50 pt-3 mt-1 grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div><p className="text-xs text-gray-500 uppercase font-bold mb-1">Người ký</p><p className="font-semibold text-gray-800">{viewData.Nguoiky || '-'} <span className="text-gray-500 font-normal">({viewData.Chucvu || '-'})</span></p></div>
+                  <div><p className="text-xs text-gray-500 uppercase font-bold mb-1">Người lấy số</p><p className="font-semibold text-gray-800">{viewData.Nguoilayso || '-'} <span className="text-gray-500 font-normal">({viewData.BPlayso || '-'})</span></p></div>
+                  <div className="col-span-2"><p className="text-xs text-gray-500 uppercase font-bold mb-1">Phân loại Nghiệp vụ</p><p className="font-semibold text-gray-800">{viewData.Nghiepvu || '-'}</p></div>
+                </div>
               </div>
 
               <div className="flex flex-col gap-3">
                 {viewData.Link_FileDinhKem && (
-                  <a href={viewData.Link_FileDinhKem} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-2 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-colors shadow-md">
+                  <a href={viewData.Link_FileDinhKem} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-2 py-3 bg-[#05469B] hover:bg-[#04367a] text-white rounded-xl font-bold transition-colors shadow-md">
                     <LinkIcon size={18}/> Mở File Đính Kèm
                   </a>
                 )}
