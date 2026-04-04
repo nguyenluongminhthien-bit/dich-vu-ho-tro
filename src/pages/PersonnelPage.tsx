@@ -3,12 +3,13 @@ import {
   Search, Plus, Edit, Trash2, X, AlertCircle, Loader2, Save, 
   Users, ShieldCheck, Flame, LifeBuoy, Heart, Activity, 
   Dumbbell, Car, Utensils, Coffee, Languages, Monitor, Copy, Eye, User as UserIcon, 
-  Building2, Phone, Mail, Info, MapPin, ChevronDown, ChevronRight, PanelLeftClose, PanelLeftOpen, CheckCheck, Briefcase
+  Building2, Phone, Mail, Info, MapPin, ChevronDown, ChevronRight, PanelLeftClose, PanelLeftOpen, CheckCheck, Briefcase,
+  LogOut, AlertTriangle
 } from 'lucide-react';
 import { apiService } from '../services/api';
-import { Personnel, DonVi } from '../types';
+import { Personnel, DonVi, ThietBi } from '../types';
 import { useAuth } from '../contexts/AuthContext';
-import { buildHierarchicalOptions, getUnitEmoji } from '../utils/hierarchy'; // IMPORT TÍNH NĂNG VẼ CÂY
+import { buildHierarchicalOptions, getUnitEmoji } from '../utils/hierarchy'; 
 
 // HÀM FORMAT SỐ ĐIỆN THOẠI 4-3-3
 const formatPhoneNumber = (val: string | number | undefined | null) => {
@@ -56,6 +57,13 @@ export default function PersonnelPage() {
 
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<string | null>(null);
+
+  // 🟢 [OFFBOARDING STATES]
+  const [isOffboardOpen, setIsOffboardOpen] = useState(false);
+  const [personnelToOffboard, setPersonnelToOffboard] = useState<Personnel | null>(null);
+  const [unreturnedAssets, setUnreturnedAssets] = useState<any[]>([]);
+  const [forceOffboard, setForceOffboard] = useState(false);
+  const [checkingAssets, setCheckingAssets] = useState(false);
 
   const [copiedRole, setCopiedRole] = useState<string | null>(null);
 
@@ -112,19 +120,18 @@ export default function PersonnelPage() {
     return donViList.filter(dv => allAllowed.includes(dv.ID_DonVi)).map(dv => dv.ID_DonVi);
   }, [user, donViList]);
 
-  const calculateSeniority = (startDate: string) => {
+  const calculateSeniority = (startDate: string, trangThai: string, endDate: string) => {
     if (!startDate) return 'Chưa có';
     const start = new Date(startDate);
-    const now = new Date();
-    let years = now.getFullYear() - start.getFullYear();
-    let months = now.getMonth() - start.getMonth();
+    const end = (trangThai === 'Đã nghỉ việc' && endDate) ? new Date(endDate) : new Date();
+    let years = end.getFullYear() - start.getFullYear();
+    let months = end.getMonth() - start.getMonth();
     if (months < 0) { years--; months += 12; }
     if (years === 0 && months === 0) return 'Mới nhận việc';
     if (years === 0) return `${months} tháng`;
     return `${years} năm ${months} tháng`;
   };
 
-  // --- FIX TÌM KIẾM CÂY THƯ MỤC CỰC THÔNG MINH (KÉO RỄ - XỔ CÀNH) ---
   const filteredUnits = useMemo(() => {
     let baseUnits = donViList.filter(dv => allowedDonViIds.includes(dv.ID_DonVi));
     if (!unitSearchTerm) return baseUnits;
@@ -132,12 +139,10 @@ export default function PersonnelPage() {
     const lower = unitSearchTerm.toLowerCase();
     const matchedIds = new Set<string>();
 
-    // 1. Tìm các đơn vị khớp trực tiếp với từ khóa
     baseUnits.forEach(u => {
       if (String(u.TenDonVi || '').toLowerCase().includes(lower) || String(u.ID_DonVi || '').toLowerCase().includes(lower)) {
         matchedIds.add(u.ID_DonVi);
         
-        // 2. Kéo theo các node Cha, Ông Nội... để giữ vững cấu trúc cây
         let parentId = u.CapQuanLy;
         while (parentId && parentId !== 'HO') {
           matchedIds.add(parentId);
@@ -147,7 +152,6 @@ export default function PersonnelPage() {
       }
     });
 
-    // 3. Xổ cành: Nếu Cha khớp từ khóa, hiện tất cả các Showroom con của nó
     const addChildren = (parentId: string) => {
       baseUnits.forEach(u => {
         if (u.CapQuanLy === parentId && !matchedIds.has(u.ID_DonVi)) {
@@ -178,7 +182,6 @@ export default function PersonnelPage() {
     setExpandedParents(prev => prev.includes(parentId) ? prev.filter(id => id !== parentId) : [...prev, parentId]);
   };
 
-  // 1. Hàm đệ quy tìm tất cả các đơn vị con, cháu, chắt...
   const getAllSubordinateIds = (unitId: string, allUnits: DonVi[]): string[] => {
     const subordinates = allUnits.filter(u => u.CapQuanLy === unitId);
     let ids = subordinates.map(u => u.ID_DonVi);
@@ -186,19 +189,16 @@ export default function PersonnelPage() {
     return ids;
   };
 
-  // 2. Tạo danh sách ID bao gồm Đơn vị đang chọn + Tất cả con cháu của nó
   const selectedUnitSubordinates = useMemo(() => {
     if (!selectedUnitFilter) return [];
     const subIds = getAllSubordinateIds(selectedUnitFilter, donViList);
     return [selectedUnitFilter, ...subIds];
   }, [selectedUnitFilter, donViList]);
 
-  // 3. Cập nhật bộ lọc
   const filteredPersonnel = useMemo(() => {
     let result = data.filter(item => allowedDonViIds.includes(item.ID_DonVi));
     
     if (selectedUnitFilter) {
-      // THAY ĐỔI: So sánh .includes() thay vì ===
       result = result.filter(item => selectedUnitSubordinates.includes(item.ID_DonVi));
     }
 
@@ -211,7 +211,14 @@ export default function PersonnelPage() {
         String(item.ChucVu || '').toLowerCase().includes(lower) 
       );
     }
-    return result;
+
+    // Đưa người nghỉ việc xuống cuối danh sách
+    return result.sort((a, b) => {
+      if (a.TrangThai === 'Đã nghỉ việc' && b.TrangThai !== 'Đã nghỉ việc') return 1;
+      if (a.TrangThai !== 'Đã nghỉ việc' && b.TrangThai === 'Đã nghỉ việc') return -1;
+      return 0;
+    });
+
   }, [data, personnelSearchTerm, selectedUnitFilter, allowedDonViIds, donViMap, selectedUnitSubordinates]);
 
   const selectedUnitName = useMemo(() => {
@@ -223,7 +230,7 @@ export default function PersonnelPage() {
   const handleCopyMail = (roleType: 'LD' | 'DVHT' | 'NS') => {
     let emails: string[] = [];
     filteredPersonnel.forEach(p => {
-      if (!p.Email) return;
+      if (!p.Email || p.TrangThai === 'Đã nghỉ việc') return;
       const chucVu = String(p.ChucVu || '').toLowerCase();
       if (roleType === 'LD' && chucVu.includes('tổng giám đốc')) { emails.push(p.Email); } 
       else if (roleType === 'DVHT' && (chucVu.includes('dvht') || chucVu.includes('dịch vụ hỗ trợ'))) { emails.push(p.Email); } 
@@ -248,7 +255,8 @@ export default function PersonnelPage() {
         MaNV: '', HoTen: '', ChucVu: '', SDT: '', Email: '', GioiTinh: 'Nam', NamSinh: '', NgayNhanViec: '', 
         ID_DonVi: selectedUnitFilter || '', PhanLoai: 'Lãnh đạo', TrinhDoHocVan: '', ThuNhap: '', MoTaNgoaiHinh: '', GhiChu: '', GPLX: '',
         CC_ATVSLD: false, CC_ANBV: false, CC_PCCC: false, CC_CHCN: false, CC_SoCapCuu: false, CC_CPR: false, 
-        CC_VoThuat: false, CC_GPLX: false, CC_ATTP: false, CC_PhaChe: false, CC_NgoaiNgu: false, CC_TinHoc: false
+        CC_VoThuat: false, CC_GPLX: false, CC_ATTP: false, CC_PhaChe: false, CC_NgoaiNgu: false, CC_TinHoc: false,
+        TrangThai: 'Đang làm việc'
       });
     }
     setIsModalOpen(true); setError(null);
@@ -258,7 +266,7 @@ export default function PersonnelPage() {
 
   const handleDuplicate = (item: Personnel) => {
     setModalMode('create');
-    setFormData({ ...item, ID_NhanSu: '', ChucVu: item.ChucVu ? `${item.ChucVu} (Kiêm nhiệm)` : 'Kiêm nhiệm' });
+    setFormData({ ...item, ID_NhanSu: '', ChucVu: item.ChucVu ? `${item.ChucVu} (Kiêm nhiệm)` : 'Kiêm nhiệm', TrangThai: 'Đang làm việc', NgayNghiViec: '' });
     setIsModalOpen(true); setError(null);
   };
 
@@ -275,7 +283,12 @@ export default function PersonnelPage() {
       calculatedTuoi = age.toString();
     }
 
-    const finalDataToSave = { ...formData, Tuoi: calculatedTuoi, ThamNien: calculateSeniority(formData.NgayNhanViec || '') };
+    const finalDataToSave = { 
+      ...formData, 
+      Tuoi: calculatedTuoi, 
+      ThamNien: calculateSeniority(formData.NgayNhanViec || '', formData.TrangThai || 'Đang làm việc', formData.NgayNghiViec || ''),
+      TrangThai: formData.TrangThai || 'Đang làm việc'
+    };
 
     setSubmitting(true); setError(null);
     try {
@@ -301,6 +314,90 @@ export default function PersonnelPage() {
     finally { setSubmitting(false); }
   };
 
+  // 🟢 [XỬ LÝ OFFBOARDING QUÉT TÀI SẢN VÀ LƯU TRẠNG THÁI]
+  const handleOffboardClick = async (item: Personnel) => {
+    setPersonnelToOffboard(item);
+    setCheckingAssets(true);
+    setForceOffboard(false);
+    setIsOffboardOpen(true);
+    setUnreturnedAssets([]);
+
+    try {
+      const [thietBiRaw, nhatKyRaw] = await Promise.all([apiService.getThietBi(), apiService.getNhatKyThietBi()]);
+      const thietBiList: ThietBi[] = thietBiRaw || [];
+      const nhatKyList: any[] = nhatKyRaw || [];
+
+      // Gom nhóm nhật ký theo ID_TTB và lấy cái mới nhất
+      const latestLogsMap: Record<string, any> = {};
+      nhatKyList.forEach(log => {
+        const ttbId = log.ID_TTB;
+        if (!latestLogsMap[ttbId]) {
+          latestLogsMap[ttbId] = log;
+        } else {
+          const currentLogDate = new Date(log.NgayGhiNhan).getTime();
+          const savedLogDate = new Date(latestLogsMap[ttbId].NgayGhiNhan).getTime();
+          if (currentLogDate > savedLogDate) {
+            latestLogsMap[ttbId] = log;
+          }
+        }
+      });
+
+      // Tìm các thiết bị mà nhật ký cuối cùng là Giao cho nhân viên này VÀ chưa thu hồi
+      const foundAssets: any[] = [];
+      Object.values(latestLogsMap).forEach(log => {
+        if (log.MSNVNguoiDung_NguoiQL === item.MaNV && log.LoaiNhatKy !== 'Báo hỏng') {
+          const assetInfo = thietBiList.find(tb => tb.ID_TTB === log.ID_TTB);
+          if (assetInfo) {
+            foundAssets.push({
+              id: assetInfo.MaTaiSan || assetInfo.ID_TTB,
+              name: assetInfo.TenThietBi,
+              group: assetInfo.NhomThietBi,
+              sn: assetInfo.SoSeri || '-',
+              date: new Date(log.NgayGhiNhan).toLocaleDateString('vi-VN')
+            });
+          }
+        }
+      });
+
+      setUnreturnedAssets(foundAssets);
+    } catch (err) {
+      console.error("Lỗi khi check tài sản:", err);
+      alert("Cảnh báo: Không thể kết nối đến cơ sở dữ liệu Tài sản để kiểm tra. Vui lòng thử lại!");
+      setIsOffboardOpen(false);
+    } finally {
+      setCheckingAssets(false);
+    }
+  };
+
+  const confirmOffboard = async () => {
+    if (!personnelToOffboard) return;
+    
+    if (unreturnedAssets.length > 0 && !forceOffboard) {
+      alert("Vui lòng xác nhận đã xử lý xong tài sản trước khi cho nghỉ việc!");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      // THAY ĐỔI: Chuyển sang Cập nhật trạng thái "Đã nghỉ việc" thay vì xóa
+      const offboardData = {
+        ...personnelToOffboard,
+        TrangThai: 'Đã nghỉ việc',
+        NgayNghiViec: new Date().toISOString().split('T')[0]
+      };
+      
+      await apiService.save(offboardData, "update", "NS_DichVu");
+      
+      setData(prev => prev.map(item => item.ID_NhanSu === personnelToOffboard.ID_NhanSu ? offboardData : item));
+      setIsOffboardOpen(false);
+      setPersonnelToOffboard(null);
+    } catch (err: any) {
+      alert("Lỗi khi chốt nghỉ việc: " + err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, type } = e.target;
     let value: string | boolean = type === 'checkbox' ? (e.target as HTMLInputElement).checked : e.target.value;
@@ -320,10 +417,7 @@ export default function PersonnelPage() {
           className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold transition-colors ${selectedUnitFilter === parent.ID_DonVi ? 'bg-blue-50 text-[#05469B]' : 'text-gray-700 hover:bg-gray-50'} ${isParentDimmed ? 'opacity-50' : ''}`}
         >
           {children.length > 0 ? (isExpanded ? <ChevronDown size={16} className="text-gray-400 shrink-0" /> : <ChevronRight size={16} className="text-gray-400 shrink-0" />) : <div className="w-4 shrink-0" />}
-          
-          {/* Tích hợp Icon Emoji tự động */}
           <span className="shrink-0">{getUnitEmoji(parent.loaiHinh)}</span>
-          
           <span className="truncate text-left">{parent.TenDonVi}</span>
         </button>
         
@@ -338,7 +432,6 @@ export default function PersonnelPage() {
 
   return (
     <div className="flex h-full bg-[#f4f7f9] overflow-hidden relative">
-      {/* MOBILE MENU TOGGLE */}
       {isListCollapsed && (
         <button onClick={() => setIsListCollapsed(false)} className="absolute top-6 left-6 z-20 bg-white p-2.5 rounded-lg shadow-md border border-gray-200 text-[#05469B] hover:bg-blue-50 transition-all" title="Mở bộ lọc đơn vị">
           <PanelLeftOpen size={20} />
@@ -379,8 +472,6 @@ export default function PersonnelPage() {
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 sm:p-6 relative transition-all duration-300">
-        
-        {/* HEADER CÓ CHỨA 3 NÚT COPY MAIL */}
         <div className={`flex flex-col xl:flex-row justify-between items-start xl:items-center mb-6 gap-4 transition-all duration-300 ${isListCollapsed ? 'pl-10 lg:pl-12' : ''}`}>
           <div>
             <h2 className="text-2xl font-bold text-[#05469B] flex items-center gap-2"><Users size={28} /> Quản lý Nhân sự</h2>
@@ -388,7 +479,6 @@ export default function PersonnelPage() {
           </div>
           
           <div className="flex flex-col items-end gap-3 w-full xl:w-auto">
-            {/* Thanh Tìm kiếm & Thêm Mới */}
             <div className="flex flex-col sm:flex-row w-full sm:w-auto gap-3">
               <div className="relative w-full sm:w-72">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
@@ -397,7 +487,6 @@ export default function PersonnelPage() {
               <button onClick={() => openModal('create')} className="w-full sm:w-auto flex items-center justify-center gap-2 bg-[#05469B] hover:bg-[#04367a] text-white px-5 py-2.5 rounded-lg font-bold shadow-sm transition-all whitespace-nowrap"><Plus className="w-5 h-5" /> Thêm Mới</button>
             </div>
             
-            {/* 3 NÚT COPY MAIL */}
             <div className="flex flex-wrap justify-end gap-2 w-full sm:w-auto">
               <button onClick={() => handleCopyMail('LD')} className="text-[11px] font-bold px-3 py-1.5 border border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100 rounded flex items-center gap-1.5 transition-colors shadow-sm" title="Copy Mail Tổng Giám đốc">
                 {copiedRole === 'LD' ? <CheckCheck size={14} className="text-green-600"/> : <Copy size={14} />} Copy Mail LĐ
@@ -415,17 +504,17 @@ export default function PersonnelPage() {
         {error && <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-500 text-red-700 flex items-start gap-3 rounded-lg shadow-sm"><AlertCircle className="w-5 h-5 shrink-0 mt-0.5" /><p>{error}</p></div>}
 
         <div className={`bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden transition-all duration-300 ${isListCollapsed ? 'ml-10 lg:ml-0' : ''}`}>
-          <div className="overflow-x-auto w-full">
-            <table className="w-full text-left border-collapse min-w-[1050px]">
+          <div className="overflow-x-auto w-full custom-scrollbar">
+            <table className="w-full text-left border-collapse min-w-[1100px]">
               <thead>
                 <tr className="bg-[#f8fafc] border-b border-gray-200 text-xs font-bold text-gray-600 uppercase tracking-wider">
                   <th className="p-4 w-24 whitespace-nowrap">Mã NV</th>
-                  <th className="p-4 whitespace-nowrap">Họ Tên</th>
+                  <th className="p-4 whitespace-nowrap">Họ Tên / Trạng thái</th>
                   <th className="p-4 whitespace-nowrap">Đơn Vị</th>
                   <th className="p-4 whitespace-nowrap">Chức vụ</th>
                   <th className="p-4 w-32 whitespace-nowrap">SĐT</th>
                   <th className="p-4 w-32 whitespace-nowrap">Thâm niên</th>
-                  <th className="p-4 text-center w-40 whitespace-nowrap">Thao tác</th>
+                  <th className="p-4 text-center w-48 whitespace-nowrap">Thao tác</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
@@ -438,27 +527,33 @@ export default function PersonnelPage() {
                   </td></tr>
                 ) : (
                   filteredPersonnel.map((item) => (
-                    <tr key={item.ID_NhanSu} className="hover:bg-blue-50/50 transition-colors group">
+                    <tr key={item.ID_NhanSu} className={`hover:bg-blue-50/50 transition-colors group ${item.TrangThai === 'Đã nghỉ việc' ? 'opacity-60 bg-gray-50' : ''}`}>
                       <td className="p-4 font-semibold text-gray-800 whitespace-nowrap">{item.MaNV}</td>
-                      <td className="p-4 font-bold text-[#05469B] whitespace-nowrap">
-                        {item.HoTen}
+                      <td className="p-4 whitespace-nowrap">
+                        <p className="font-bold text-[#05469B]">{item.HoTen}</p>
+                        {item.TrangThai === 'Đã nghỉ việc' && <span className="text-[10px] font-bold text-red-600 bg-red-100 px-1.5 py-0.5 rounded uppercase mt-0.5 inline-block">Đã nghỉ việc</span>}
                       </td>
                       <td className="p-4 text-sm font-medium text-gray-700 whitespace-nowrap">{donViMap[item.ID_DonVi] || item.ID_DonVi || '-'}</td>
                       <td className="p-4 text-sm text-gray-600 whitespace-nowrap">{item.ChucVu}</td>
-                      
                       <td className="p-4 text-sm text-gray-600 whitespace-nowrap">{formatPhoneNumber(item.SDT)}</td>
-                      
                       <td className="p-4 text-sm font-medium text-emerald-600 whitespace-nowrap">
-                        <span className="bg-emerald-50/50 rounded-md inline-block px-2 py-1 border border-emerald-100">
-                          {calculateSeniority(item.NgayNhanViec)}
+                        <span className={`rounded-md inline-block px-2 py-1 border ${item.TrangThai === 'Đã nghỉ việc' ? 'bg-gray-100 text-gray-500 border-gray-200' : 'bg-emerald-50/50 border-emerald-100'}`}>
+                          {calculateSeniority(item.NgayNhanViec, item.TrangThai || 'Đang làm việc', item.NgayNghiViec || '')}
                         </span>
                       </td>
                       <td className="p-4">
                         <div className="flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button onClick={() => handleView(item)} className="p-2 text-indigo-600 hover:bg-indigo-100 rounded-md transition-colors" title="Xem chi tiết"><Eye className="w-4 h-4" /></button>
-                          <button onClick={() => handleDuplicate(item)} className="p-2 text-emerald-600 hover:bg-emerald-100 rounded-md transition-colors" title="Nhân bản (Tạo hồ sơ kiêm nhiệm)"><Copy className="w-4 h-4" /></button>
-                          <button onClick={() => openModal('update', item)} className="p-2 text-blue-600 hover:bg-blue-100 rounded-md transition-colors" title="Sửa"><Edit className="w-4 h-4" /></button>
-                          <button onClick={() => { setItemToDelete(item.ID_NhanSu); setIsConfirmOpen(true); }} className="p-2 text-red-600 hover:bg-red-100 rounded-md transition-colors" title="Xóa"><Trash2 className="w-4 h-4" /></button>
+                          {item.TrangThai !== 'Đã nghỉ việc' && (
+                            <>
+                              <button onClick={() => handleDuplicate(item)} className="p-2 text-emerald-600 hover:bg-emerald-100 rounded-md transition-colors" title="Nhân bản (Tạo hồ sơ kiêm nhiệm)"><Copy className="w-4 h-4" /></button>
+                              <button onClick={() => openModal('update', item)} className="p-2 text-blue-600 hover:bg-blue-100 rounded-md transition-colors" title="Sửa"><Edit className="w-4 h-4" /></button>
+                              <button onClick={() => handleOffboardClick(item)} className="p-2 text-orange-600 hover:bg-orange-100 rounded-md transition-colors border border-transparent hover:border-orange-200" title="Chốt nghỉ việc (Thu hồi tài sản)"><LogOut className="w-4 h-4" /></button>
+                            </>
+                          )}
+                          {item.TrangThai === 'Đã nghỉ việc' && (
+                            <button onClick={() => { setItemToDelete(item.ID_NhanSu); setIsConfirmOpen(true); }} className="p-2 text-red-600 hover:bg-red-100 rounded-md transition-colors" title="Xóa vĩnh viễn"><Trash2 className="w-4 h-4" /></button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -470,6 +565,95 @@ export default function PersonnelPage() {
         </div>
       </div>
 
+      {/* 🟢 [MODAL: OFFBOARDING & THU HỒI TÀI SẢN] */}
+      {isOffboardOpen && personnelToOffboard && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[90vh] animate-in zoom-in duration-200 overflow-hidden">
+            <div className="bg-orange-500 text-white p-5 flex items-start justify-between">
+              <div className="flex gap-4 items-center">
+                <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center shrink-0 border border-white/40"><LogOut size={24}/></div>
+                <div>
+                  <h3 className="text-xl font-black mb-1">Xác nhận Nghỉ việc</h3>
+                  <p className="text-orange-100 text-sm font-medium">{personnelToOffboard.HoTen} - {personnelToOffboard.MaNV}</p>
+                </div>
+              </div>
+              <button onClick={() => setIsOffboardOpen(false)} className="text-orange-100 hover:text-white p-1 rounded-full"><X size={24}/></button>
+            </div>
+
+            <div className="p-6 overflow-y-auto custom-scrollbar">
+              {checkingAssets ? (
+                <div className="flex flex-col items-center justify-center py-12">
+                  <Loader2 className="w-10 h-10 text-orange-500 animate-spin mb-4" />
+                  <p className="text-gray-600 font-bold">Đang quét hệ thống Tài sản & Nhật ký...</p>
+                </div>
+              ) : unreturnedAssets.length > 0 ? (
+                <div className="space-y-4">
+                  <div className="bg-red-50 border border-red-200 p-4 rounded-xl flex gap-3">
+                    <AlertTriangle className="text-red-500 shrink-0 w-6 h-6"/>
+                    <div>
+                      <h4 className="font-black text-red-700 mb-1">CẢNH BÁO: Nhân sự đang giữ Tài sản!</h4>
+                      <p className="text-sm text-red-600 font-medium mb-3">Hệ thống phát hiện nhân sự này đang là người nhận cuối cùng của các tài sản dưới đây. Vui lòng thu hồi hoặc bàn giao trước khi cho nghỉ.</p>
+                      
+                      <div className="bg-white rounded-lg border border-red-100 overflow-hidden">
+                        <table className="w-full text-left text-sm">
+                          <thead className="bg-red-50/50">
+                            <tr className="text-red-800 font-bold">
+                              <th className="p-2 border-b border-red-100">Mã / Tên Tài sản</th>
+                              <th className="p-2 border-b border-red-100">S/N</th>
+                              <th className="p-2 border-b border-red-100 text-right">Ngày nhận</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-red-50">
+                            {unreturnedAssets.map((asset, idx) => (
+                              <tr key={idx} className="border-b border-red-50 last:border-0 hover:bg-red-50/30">
+                                <td className="p-2">
+                                  <p className="font-bold text-gray-800">{asset.name}</p>
+                                  <p className="text-[10px] text-gray-500">{asset.id} • {asset.group}</p>
+                                </td>
+                                <td className="p-2 font-mono text-xs text-gray-600">{asset.sn}</td>
+                                <td className="p-2 text-right font-medium text-red-600">{asset.date}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+
+                  <label className="flex items-start gap-3 p-3 bg-gray-50 rounded-xl border border-gray-200 cursor-pointer hover:bg-gray-100 transition-colors">
+                    <input 
+                      type="checkbox" 
+                      checked={forceOffboard} 
+                      onChange={(e) => setForceOffboard(e.target.checked)}
+                      className="mt-1 w-5 h-5 rounded text-orange-500 focus:ring-orange-500 border-gray-300"
+                    />
+                    <span className="text-sm font-semibold text-gray-700">Tôi xác nhận đã thu hồi các tài sản này ngoài hệ thống, hoặc vẫn muốn chốt nghỉ việc ngay lập tức.</span>
+                  </label>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-8 bg-emerald-50 rounded-xl border border-emerald-100">
+                  <CheckCheck className="w-16 h-16 text-emerald-500 mb-3" />
+                  <h4 className="font-black text-emerald-700 text-lg mb-1">An toàn chốt nghỉ việc</h4>
+                  <p className="text-emerald-600 font-medium text-sm text-center px-4">Hệ thống không ghi nhận tài sản nào đang được giao cho nhân sự này.</p>
+                </div>
+              )}
+            </div>
+
+            <div className="p-5 border-t border-gray-100 bg-gray-50 flex justify-end gap-3 shrink-0">
+              <button onClick={() => setIsOffboardOpen(false)} className="px-6 py-2.5 bg-gray-200 text-gray-700 rounded-xl font-bold hover:bg-gray-300 transition-colors">Hủy bỏ</button>
+              <button 
+                onClick={confirmOffboard} 
+                disabled={submitting || (unreturnedAssets.length > 0 && !forceOffboard)}
+                className="px-6 py-2.5 bg-orange-500 text-white rounded-xl font-bold flex items-center gap-2 hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
+              >
+                {submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <LogOut className="w-5 h-5" />} 
+                Xác nhận Đã nghỉ việc
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {isViewModalOpen && viewData && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl flex flex-col max-h-[90vh] animate-in fade-in zoom-in duration-200">
@@ -478,12 +662,17 @@ export default function PersonnelPage() {
               <button onClick={() => setIsViewModalOpen(false)} className="text-white hover:text-red-300 hover:bg-white/10 rounded-full p-1.5 transition-colors"><X className="w-6 h-6" /></button>
             </div>
             
-            <div className="p-4 sm:p-6 overflow-y-auto space-y-6">
-              <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 sm:gap-6 border-b border-gray-100 pb-6 text-center sm:text-left">
+            <div className="p-4 sm:p-6 overflow-y-auto space-y-6 custom-scrollbar">
+              <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 sm:gap-6 border-b border-gray-100 pb-6 text-center sm:text-left relative">
+                
+                {viewData.TrangThai === 'Đã nghỉ việc' && (
+                  <div className="absolute top-0 right-0 bg-red-100 text-red-700 font-black px-3 py-1 rounded border border-red-200 flex items-center gap-1"><LogOut size={16}/> ĐÃ NGHỈ VIỆC</div>
+                )}
+
                 <div className="w-24 h-24 rounded-full bg-blue-100 text-[#05469B] flex items-center justify-center text-4xl font-black shrink-0 border-4 border-white shadow-md">
                   {viewData.HoTen?.charAt(0).toUpperCase() || 'U'}
                 </div>
-                <div className="flex-1">
+                <div className="flex-1 mt-2 sm:mt-0">
                   <div className="flex flex-col sm:flex-row items-center sm:items-baseline gap-2 sm:gap-3 mb-1">
                     <h2 className="text-2xl font-black text-gray-800">{viewData.HoTen}</h2>
                     <span className="px-2.5 py-0.5 bg-gray-100 border border-gray-200 rounded text-xs font-bold text-gray-600">ID: {viewData.MaNV}</span>
@@ -502,7 +691,12 @@ export default function PersonnelPage() {
                   <div><p className="text-xs text-gray-500 uppercase font-bold mb-1">Đơn vị</p><p className="font-semibold text-gray-800 break-words">{donViMap[viewData.ID_DonVi] || viewData.ID_DonVi || '---'}</p></div>
                   <div><p className="text-xs text-gray-500 uppercase font-bold mb-1">Phân loại</p><p className="font-semibold text-gray-800">{viewData.PhanLoai || '---'}</p></div>
                   <div><p className="text-xs text-gray-500 uppercase font-bold mb-1">Ngày nhận việc</p><p className="font-semibold text-gray-800">{viewData.NgayNhanViec ? new Date(viewData.NgayNhanViec).toLocaleDateString('vi-VN') : '---'}</p></div>
-                  <div><p className="text-xs text-gray-500 uppercase font-bold mb-1">Thâm niên</p><p className="font-semibold text-emerald-600">{calculateSeniority(viewData.NgayNhanViec)}</p></div>
+                  
+                  {viewData.TrangThai === 'Đã nghỉ việc' ? (
+                    <div><p className="text-xs text-red-500 uppercase font-bold mb-1">Ngày nghỉ việc</p><p className="font-semibold text-red-600">{viewData.NgayNghiViec ? new Date(viewData.NgayNghiViec).toLocaleDateString('vi-VN') : '---'}</p></div>
+                  ) : (
+                    <div><p className="text-xs text-gray-500 uppercase font-bold mb-1">Thâm niên</p><p className="font-semibold text-emerald-600">{calculateSeniority(viewData.NgayNhanViec, viewData.TrangThai || 'Đang làm việc', viewData.NgayNghiViec || '')}</p></div>
+                  )}
                 </div>
               </div>
 
@@ -579,7 +773,7 @@ export default function PersonnelPage() {
               <button onClick={() => setIsModalOpen(false)} disabled={submitting} className="text-gray-400 hover:text-red-500 rounded-full p-1.5 bg-white shadow-sm transition-colors"><X className="w-6 h-6" /></button>
             </div>
             
-            <form onSubmit={handleSave} className="p-4 sm:p-6 overflow-y-auto space-y-6">
+            <form onSubmit={handleSave} className="p-4 sm:p-6 overflow-y-auto space-y-6 custom-scrollbar">
               
               <div className="bg-blue-50/40 p-4 sm:p-5 rounded-xl border border-blue-100">
                 <h4 className="font-bold text-[#05469B] mb-4 flex items-center gap-2"><div className="w-2 h-6 bg-[#05469B] rounded-full"></div> Thông tin cá nhân</h4>
@@ -596,7 +790,6 @@ export default function PersonnelPage() {
               <div className="bg-gray-50 p-4 sm:p-5 rounded-xl border border-gray-200">
                 <h4 className="font-bold text-gray-800 mb-4 flex items-center gap-2"><div className="w-2 h-6 bg-gray-400 rounded-full"></div> Công việc</h4>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  {/* TÍCH HỢP CÂY ĐƠN VỊ VÀO SELECT VỚI MÀU VÀNG #FFFFF0 */}
                   <div className="md:col-span-1">
                     <label className="block text-xs font-bold text-gray-700 mb-1">Đơn vị công tác *</label>
                     <select 
@@ -626,7 +819,17 @@ export default function PersonnelPage() {
                       <option value="BV, ĐTKH">BV, ĐTKH</option>
                     </select>
                   </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">Trạng thái làm việc</label>
+                    <select name="TrangThai" value={formData.TrangThai || 'Đang làm việc'} onChange={handleInputChange} className={`w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-bold ${formData.TrangThai === 'Đã nghỉ việc' ? 'text-red-600' : 'text-emerald-600'}`}>
+                      <option value="Đang làm việc">Đang làm việc</option>
+                      <option value="Đã nghỉ việc">Đã nghỉ việc</option>
+                    </select>
+                  </div>
                   <div><label className="block text-xs font-bold text-gray-700 mb-1">Ngày nhận việc</label><input type="date" name="NgayNhanViec" value={formData.NgayNhanViec ? formData.NgayNhanViec.split('T')[0] : ''} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" /></div>
+                  {formData.TrangThai === 'Đã nghỉ việc' && (
+                    <div><label className="block text-xs font-bold text-red-600 mb-1">Ngày nghỉ việc</label><input type="date" name="NgayNghiViec" value={formData.NgayNghiViec ? formData.NgayNghiViec.split('T')[0] : ''} onChange={handleInputChange} className="w-full p-2.5 border border-red-200 rounded-lg bg-red-50 outline-none focus:ring-2 focus:ring-red-500 font-bold" /></div>
+                  )}
                   <div>
                     <label className="block text-xs font-bold text-gray-700 mb-1">Trình độ học vấn</label>
                     <select name="TrinhDoHocVan" value={formData.TrinhDoHocVan || ''} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]">
@@ -723,8 +926,8 @@ export default function PersonnelPage() {
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-sm text-center animate-in zoom-in duration-200">
             <div className="w-16 h-16 rounded-full bg-red-50 text-red-500 flex items-center justify-center mx-auto mb-4 border-4 border-red-100"><AlertCircle className="w-8 h-8" /></div>
-            <h3 className="text-xl font-bold text-gray-900 mb-2">Xác nhận xóa</h3>
-            <p className="text-gray-500 text-sm mb-6">Hành động này sẽ xóa nhân sự này vĩnh viễn.</p>
+            <h3 className="text-xl font-bold text-gray-900 mb-2">Xóa vĩnh viễn?</h3>
+            <p className="text-gray-500 text-sm mb-6">Hành động này sẽ xóa nhân sự này vĩnh viễn khỏi cơ sở dữ liệu. Không thể khôi phục.</p>
             <div className="flex gap-3">
               <button onClick={() => setIsConfirmOpen(false)} className="flex-1 py-3 bg-gray-100 text-gray-700 hover:bg-gray-200 rounded-xl font-bold transition-colors">Hủy</button>
               <button onClick={confirmDelete} disabled={submitting} className="flex-1 py-3 text-white bg-red-600 hover:bg-red-700 rounded-xl font-bold flex items-center justify-center gap-2 shadow-md transition-colors">{submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Trash2 className="w-5 h-5" />} Xóa</button>
