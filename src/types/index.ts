@@ -183,7 +183,7 @@ export interface PhongHop {
   [key: string]: any;
 }
 
-export interface VanBan {
+export interface VB_TB {
   ID_VanBan: string;
   ID_DonVi: string;
   Phanloai: string;
