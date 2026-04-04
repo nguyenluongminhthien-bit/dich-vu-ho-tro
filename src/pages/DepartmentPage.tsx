@@ -990,8 +990,12 @@ export default function DepartmentPage() {
                 {/* A. LÃNH ĐẠO */}
                 <section>
                   <h3 className="text-lg font-black text-[#05469B] mb-5 flex items-center gap-2 uppercase tracking-wider"><div className="w-1.5 h-6 bg-[#05469B] rounded-full"></div> A. THÔNG TIN LÃNH ĐẠO</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                    <PersonnelCard title="Giám đốc SR / Lãnh đạo" person={leader} roleDefault="Lãnh đạo" fieldKey="ID_GiamDoc" isLarge={true} />
+                  
+                  {/* 🟢 ĐÃ FIX: Chuyển thành lg:grid-cols-3 để chia làm 3 cột trên 1 hàng */}
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+                    
+                    {/* 🟢 ĐÃ FIX: Xóa chữ isLarge={true} để thẻ thu lại bằng kích thước 2 thẻ kia */}
+                    <PersonnelCard title="Giám đốc SR / Lãnh đạo" person={leader} roleDefault="Lãnh đạo" fieldKey="ID_GiamDoc" />
                     <PersonnelCard title="Phụ trách Kinh doanh xe" person={kdXe} roleDefault="PT KD Xe" fieldKey="ID_PTKDXe" />
                     <PersonnelCard title="Phụ trách Kinh doanh DVPT" person={kdDvpt} roleDefault="PT KD DVPT" fieldKey="ID_PTKDDVPT" />
                   </div>
