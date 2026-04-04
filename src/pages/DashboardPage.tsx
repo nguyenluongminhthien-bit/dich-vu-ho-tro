@@ -9,6 +9,50 @@ import {
   Flame, AlertTriangle, Activity, Briefcase, BellRing, FileText, ShieldAlert, ShieldCheck
 } from 'lucide-react';
 
+// 🟢 1. BỘ XỬ LÝ NGÀY THÁNG BẤT TỬ (Chống lỗi 1970/2001, tự động dịch múi giờ)
+const parseDateStrict = (val: any): Date | null => {
+  if (!val || val === 0 || val === '0') return null;
+  
+  const d = new Date(val);
+  if (!isNaN(d.getTime()) && d.getFullYear() > 2000) return d;
+
+  const s = String(val).trim().toLowerCase();
+  const mVN = s.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+  if (mVN) {
+    const d2 = new Date(parseInt(mVN[3], 10), parseInt(mVN[2], 10) - 1, parseInt(mVN[1], 10));
+    if (!isNaN(d2.getTime())) return d2;
+  }
+  
+  const numMatch = s.match(/\b(\d{5})\b/);
+  if (numMatch && Number(numMatch[1]) > 30000) {
+    return new Date((Number(numMatch[1]) - 25569) * 86400 * 1000);
+  }
+  return null;
+};
+
+// 🟢 2. THUẬT TOÁN TỰ ĐỘNG CỘNG THÁNG VÀO NGÀY BẮT ĐẦU (Nhận diện cả số "6" và chữ "6 tháng")
+const extractDateAndAddDuration = (durationRaw: any, startDateRaw: any): Date | null => {
+  const baseDate = parseDateStrict(startDateRaw);
+  if (!baseDate) return null;
+  
+  let monthsToAdd = 0;
+  const s = String(durationRaw).toLowerCase().trim();
+  
+  if (/^\d+$/.test(s)) {
+    monthsToAdd = parseInt(s, 10); // Nếu chỉ gõ số (VD: 6) -> tự hiểu là 6 tháng
+  } else {
+    const monthMatch = s.match(/(\d+)\s*tháng/);
+    const yearMatch = s.match(/(\d+)\s*năm/);
+    if (monthMatch) monthsToAdd = parseInt(monthMatch[1], 10);
+    else if (yearMatch) monthsToAdd = parseInt(yearMatch[1], 10) * 12;
+  }
+  
+  if (monthsToAdd > 0) {
+    baseDate.setMonth(baseDate.getMonth() + monthsToAdd);
+  }
+  return baseDate;
+};
+
 export default function DashboardPage() {
   const { user } = useAuth();
   const [donViList, setDonViList] = useState<DonVi[]>([]);
@@ -63,7 +107,7 @@ export default function DashboardPage() {
         setVbData(vbRes);
         setAnNinhData(anNinhRes);
       } catch (error) {
-        console.error("Lỗi nghiêm trọng khi tải dữ liệu Dashboard:", error);
+        console.error("Lỗi tải dữ liệu Dashboard:", error);
       } finally {
         setLoading(false);
       }
@@ -211,58 +255,67 @@ export default function DashboardPage() {
   const maxScaleNam = Math.max(...companyScaleStats.nam.map(i => i.count), 1);
   const maxScaleBac = Math.max(...companyScaleStats.bac.map(i => i.count), 1);
 
-  // 🟢 [BẢNG 1: CHỈ CẢNH BÁO PCCC SẮP HẾT HẠN <= 30 NGÀY]
   const pcccWarnings = useMemo(() => {
     const warnings: any[] = [];
     const today = new Date();
     today.setHours(0,0,0,0);
 
     tsPcccData.forEach(eq => {
-      if (currentSubordinateIds.includes(eq.ID_DonVi) && eq.NgayHetHan) {
-        const expDate = new Date(eq.NgayHetHan);
-        const diffTime = expDate.getTime() - today.getTime();
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-        
-        if (diffDays <= 30) {
-          warnings.push({
-            unitName: donViMap[eq.ID_DonVi] || eq.ID_DonVi,
-            itemName: eq.LoaiThietBi || 'Thiết bị PCCC',
-            daysLeft: diffDays,
-            dateStr: expDate.toLocaleDateString('vi-VN')
-          });
+      if (currentSubordinateIds.includes(eq.ID_DonVi)) {
+        const expDate = parseDateStrict(eq.NgayHetHan || eq.HanKiemDinh);
+        if (expDate) {
+          const diffTime = expDate.getTime() - today.getTime();
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+          if (diffDays <= 30) {
+            warnings.push({
+              unitName: donViMap[eq.ID_DonVi] || eq.ID_DonVi,
+              itemName: eq.LoaiThietBi || 'Thiết bị PCCC',
+              daysLeft: diffDays,
+              dateStr: expDate.toLocaleDateString('vi-VN')
+            });
+          }
         }
       }
     });
     return warnings.sort((a, b) => a.daysLeft - b.daysLeft);
   }, [tsPcccData, currentSubordinateIds, donViMap]);
 
-  // 🟢 [BẢNG 2: THỐNG KÊ TẤT CẢ ĐƠN VỊ THUÊ BẢO VỆ + CẢNH BÁO HỢP ĐỒNG]
+  // 🟢 [THỐNG KÊ ĐƠN VỊ THUÊ BẢO VỆ + CẢNH BÁO 30 NGÀY]
   const anNinhStatsList = useMemo(() => {
     const list: any[] = [];
     const today = new Date();
     today.setHours(0,0,0,0);
 
     anNinhData.forEach(an => {
-      // Chỉ lấy những đơn vị có thuê dịch vụ ngoài
+      // Chỉ lấy đơn vị có thuê dịch vụ ngoài
       if (currentSubordinateIds.includes(an.ID_DonVi) && an.NCC_DichVu && String(an.NCC_DichVu).trim() !== '') {
-        const rawDate = an.NgayHetHan || an.NgayHetHanHD || an.HanHopDong || an.HanHD; 
+        
         let expDate = null;
-        let diffDays = null;
-        let dateStr = '---';
+        
+        // 1. Lấy trực tiếp từ cột Ngày hết hạn (nếu có)
+        const directExpRaw = an.NgayHetHan || an.NgayHetHanHD || an.NgayKetThuc || an.NgayKT;
+        if (directExpRaw) {
+           expDate = parseDateStrict(directExpRaw);
+        }
 
-        if (rawDate) {
-          expDate = new Date(rawDate); 
-          if (isNaN(expDate.getTime()) && typeof rawDate === 'string') {
-            const parts = rawDate.split('/'); 
-            if (parts.length === 3) {
-              expDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`); 
-            }
-          }
-          if (!isNaN(expDate.getTime())) {
-            const diffTime = expDate.getTime() - today.getTime();
-            diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-            dateStr = expDate.toLocaleDateString('vi-VN');
-          }
+        // 2. Tự động tính toán (Hạn HĐ + Ngày Ký)
+        if (!expDate) {
+           // Gọi chính xác tên cột chứa số "6" (HanHopDong)
+           const durationRaw = an.HanHopDong || an.HanHD || an.ThoiHanHD || an.ThoiGianHD || an.Thoihan || an.ThoiGianLuu || an.ThoiHan || ''; 
+           // Gọi chính xác tên cột chứa ngày "2025-10-01" (NgayKyHD)
+           const startRaw = an.NgayKyHD || an.Ngaycd || an.NgayKy || an.NgayBatDau || '';
+           
+           // Áp dụng thuật toán cộng thời gian thông minh
+           expDate = extractDateAndAddDuration(durationRaw, startRaw);
+        }
+
+        let diffDays = null;
+        let dateStr = 'Chưa rõ hạn';
+
+        if (expDate) {
+          const diffTime = expDate.getTime() - today.getTime();
+          diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); // Tính số ngày còn lại (âm là quá hạn)
+          dateStr = expDate.toLocaleDateString('vi-VN');
         }
 
         list.push({
@@ -274,7 +327,7 @@ export default function DashboardPage() {
       }
     });
 
-    // Sắp xếp: Ai sắp hết hạn đưa lên đầu, ai còn xa hoặc không có ngày đưa xuống dưới
+    // Sắp xếp: Quá hạn/Sắp hết lên đầu
     return list.sort((a, b) => {
       if (a.daysLeft === null) return 1;
       if (b.daysLeft === null) return -1;
@@ -304,7 +357,8 @@ export default function DashboardPage() {
     
     vbData.forEach(vb => {
       if (currentSubordinateIds.includes(vb.ID_DonVi) && String(vb.Phanloai || '').toLowerCase().includes('thông báo')) {
-        if (vb.NgayBanHanh && new Date(vb.NgayBanHanh).getFullYear() === docYear) {
+        const d = parseDateStrict(vb.NgayBanHanh);
+        if (d && d.getFullYear() === docYear) {
           const deptName = vb.BPlayso || 'Khác';
           deptDocCounts[deptName] = (deptDocCounts[deptName] || 0) + 1;
         }
@@ -393,7 +447,7 @@ export default function DashboardPage() {
             {/* VÙNG 1: WIDGETS TỔNG QUAN QUY MÔ */}
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
               <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-center hover:shadow-md transition-shadow">
-                <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5"><Building2 size={14}/> Thượng Tầng Quản Trị</p>
+                <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5"><Building2 size={14}/>Quản Trị</p>
                 <div className="flex items-center justify-between px-2">
                   <div className="text-center">
                     <p className="text-2xl font-black text-[#05469B]">{vpdhUnits.length}</p>
@@ -633,7 +687,7 @@ export default function DashboardPage() {
                   <AlertTriangle className="text-red-600 shrink-0" size={20}/>
                   <h3 className="font-black text-red-800 text-sm uppercase tracking-wider">Cảnh báo: PCCC sắp hết hạn</h3>
                 </div>
-                <div className="p-0 overflow-x-auto flex-1 max-h-[300px] custom-scrollbar">
+                <div className="p-0 overflow-x-auto flex-1 max-h-[350px] custom-scrollbar">
                   {pcccWarnings.length === 0 ? (
                     <div className="h-full flex flex-col items-center justify-center text-gray-400 py-10">
                       <Flame size={40} className="mb-2 opacity-30 text-emerald-500"/>
@@ -678,7 +732,7 @@ export default function DashboardPage() {
                   <ShieldCheck className="text-[#05469B] shrink-0" size={20}/>
                   <h3 className="font-black text-[#05469B] text-sm uppercase tracking-wider">Hợp đồng Thuê DV Bảo vệ</h3>
                 </div>
-                <div className="p-0 overflow-x-auto flex-1 max-h-[300px] custom-scrollbar">
+                <div className="p-0 overflow-x-auto flex-1 max-h-[350px] custom-scrollbar">
                   {anNinhStatsList.length === 0 ? (
                     <div className="h-full flex flex-col items-center justify-center text-gray-400 py-10">
                       <ShieldAlert size={40} className="mb-2 opacity-30 text-gray-400"/>
@@ -696,6 +750,7 @@ export default function DashboardPage() {
                       </thead>
                       <tbody className="divide-y divide-gray-100">
                         {anNinhStatsList.map((stat, idx) => {
+                          // Cảnh báo khi tính ra ngày âm (< 0) hoặc sắp hết (<= 30)
                           const isWarning = stat.daysLeft !== null && stat.daysLeft <= 30;
                           return (
                             <tr key={idx} className={`transition-colors ${isWarning ? 'hover:bg-red-50/30' : 'hover:bg-blue-50/30'}`}>
