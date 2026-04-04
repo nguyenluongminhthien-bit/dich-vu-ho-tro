@@ -6,7 +6,7 @@ import { getUnitEmoji } from '../utils/hierarchy';
 import { 
   Building2, MapPin, ChevronDown, ChevronRight, PanelLeftClose, PanelLeftOpen,
   Search, Loader2, Filter, LayoutDashboard, Users, MonitorSmartphone,
-  Flame, AlertTriangle, Activity, Briefcase, BellRing, FileText
+  Flame, AlertTriangle, Activity, Briefcase, BellRing, FileText, ShieldAlert, ShieldCheck
 } from 'lucide-react';
 
 export default function DashboardPage() {
@@ -18,6 +18,7 @@ export default function DashboardPage() {
   const [tbData, setTbData] = useState<ThietBi[]>([]);
   const [tsPcccData, setTsPcccData] = useState<any[]>([]); 
   const [vbData, setVbData] = useState<any[]>([]); 
+  const [anNinhData, setAnNinhData] = useState<any[]>([]); 
   
   const [loading, setLoading] = useState(true);
 
@@ -26,6 +27,9 @@ export default function DashboardPage() {
   const [unitSearchTerm, setUnitSearchTerm] = useState('');
   const [selectedUnitFilter, setSelectedUnitFilter] = useState<string | null>(null);
   const [expandedParents, setExpandedParents] = useState<string[]>([]);
+  
+  const currentYear = new Date().getFullYear();
+  const [docYear, setDocYear] = useState<number>(currentYear);
 
   useEffect(() => {
     const loadData = async () => {
@@ -43,12 +47,13 @@ export default function DashboardPage() {
       };
 
       try {
-        const [dvRes, nsRes, tbRes, tsPcccRes, vbRes] = await Promise.all([
+        const [dvRes, nsRes, tbRes, tsPcccRes, vbRes, anNinhRes] = await Promise.all([
           safeCall(apiService.getDonVi),
           safeCall(apiService.getPersonnel),
           safeCall(apiService.getThietBi),
           safeCall((apiService as any).getTsPCCC),
-          safeCall((apiService as any).getVanBan) 
+          safeCall((apiService as any).getVanBan),
+          safeCall((apiService as any).getAnNinh) 
         ]);
 
         setDonViList(dvRes);
@@ -56,6 +61,7 @@ export default function DashboardPage() {
         setTbData(tbRes);
         setTsPcccData(tsPcccRes);
         setVbData(vbRes);
+        setAnNinhData(anNinhRes);
       } catch (error) {
         console.error("Lỗi nghiêm trọng khi tải dữ liệu Dashboard:", error);
       } finally {
@@ -168,7 +174,6 @@ export default function DashboardPage() {
     return unit ? unit.TenDonVi : 'Toàn bộ Tập đoàn';
   }, [selectedUnitFilter, donViList]);
 
-  // 🟢 [TÍNH TOÁN DỮ LIỆU WIDGETS DỰA VÀO BỘ LỌC]
   const currentSubordinateIds = useMemo(() => {
     if (!selectedUnitFilter) return donViList.map(u => u.ID_DonVi);
     return [selectedUnitFilter, ...getAllSubIds(selectedUnitFilter, donViList)];
@@ -185,7 +190,6 @@ export default function DashboardPage() {
     return { totalUnits, totalStaff };
   }, [currentSubordinateIds, donViList, nsData, selectedUnitFilter]);
 
-  // 🟢 [TÍNH TOÁN QUY MÔ CÔNG TY TỈNH THÀNH]
   const companyScaleStats = useMemo(() => {
     const activeNam = ctttNamUnits.filter(u => currentSubordinateIds.includes(u.ID_DonVi));
     const activeBac = ctttBacUnits.filter(u => currentSubordinateIds.includes(u.ID_DonVi));
@@ -198,21 +202,16 @@ export default function DashboardPage() {
           const dv = donViList.find(d => d.ID_DonVi === id);
           return dv ? isCountableUnit(dv) : false;
         }).length;
-
         return { id: u.ID_DonVi, name: u.TenDonVi, count: activeSubCount };
       }).sort((a, b) => b.count - a.count); 
     };
-
-    return {
-      nam: processScale(activeNam),
-      bac: processScale(activeBac)
-    };
+    return { nam: processScale(activeNam), bac: processScale(activeBac) };
   }, [ctttNamUnits, ctttBacUnits, currentSubordinateIds, donViList]);
 
   const maxScaleNam = Math.max(...companyScaleStats.nam.map(i => i.count), 1);
   const maxScaleBac = Math.max(...companyScaleStats.bac.map(i => i.count), 1);
 
-  // 🟢 [TÍNH TOÁN CẢNH BÁO PCCC BÌNH CHỮA CHÁY]
+  // 🟢 [BẢNG 1: CHỈ CẢNH BÁO PCCC SẮP HẾT HẠN <= 30 NGÀY]
   const pcccWarnings = useMemo(() => {
     const warnings: any[] = [];
     const today = new Date();
@@ -237,7 +236,52 @@ export default function DashboardPage() {
     return warnings.sort((a, b) => a.daysLeft - b.daysLeft);
   }, [tsPcccData, currentSubordinateIds, donViMap]);
 
-  // 🟢 [TÍNH TOÁN BIỂU ĐỒ CƠ CẤU NHÂN SỰ]
+  // 🟢 [BẢNG 2: THỐNG KÊ TẤT CẢ ĐƠN VỊ THUÊ BẢO VỆ + CẢNH BÁO HỢP ĐỒNG]
+  const anNinhStatsList = useMemo(() => {
+    const list: any[] = [];
+    const today = new Date();
+    today.setHours(0,0,0,0);
+
+    anNinhData.forEach(an => {
+      // Chỉ lấy những đơn vị có thuê dịch vụ ngoài
+      if (currentSubordinateIds.includes(an.ID_DonVi) && an.NCC_DichVu && String(an.NCC_DichVu).trim() !== '') {
+        const rawDate = an.NgayHetHan || an.NgayHetHanHD || an.HanHopDong || an.HanHD; 
+        let expDate = null;
+        let diffDays = null;
+        let dateStr = '---';
+
+        if (rawDate) {
+          expDate = new Date(rawDate); 
+          if (isNaN(expDate.getTime()) && typeof rawDate === 'string') {
+            const parts = rawDate.split('/'); 
+            if (parts.length === 3) {
+              expDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`); 
+            }
+          }
+          if (!isNaN(expDate.getTime())) {
+            const diffTime = expDate.getTime() - today.getTime();
+            diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            dateStr = expDate.toLocaleDateString('vi-VN');
+          }
+        }
+
+        list.push({
+          unitName: donViMap[an.ID_DonVi] || an.ID_DonVi,
+          provider: an.NCC_DichVu,
+          daysLeft: diffDays,
+          dateStr: dateStr
+        });
+      }
+    });
+
+    // Sắp xếp: Ai sắp hết hạn đưa lên đầu, ai còn xa hoặc không có ngày đưa xuống dưới
+    return list.sort((a, b) => {
+      if (a.daysLeft === null) return 1;
+      if (b.daysLeft === null) return -1;
+      return a.daysLeft - b.daysLeft;
+    });
+  }, [anNinhData, currentSubordinateIds, donViMap]);
+
   const staffChartData = useMemo(() => {
     const roleCounts: Record<string, number> = {};
     nsData.forEach(ns => {
@@ -255,14 +299,15 @@ export default function DashboardPage() {
     return { data: sortedData, maxCount };
   }, [nsData, currentSubordinateIds]);
 
-  // 🟢 [TÍNH TOÁN BIỂU ĐỒ THÔNG BÁO THEO PHÒNG BỘ PHẬN]
   const docChartData = useMemo(() => {
     const deptDocCounts: Record<string, number> = {};
     
     vbData.forEach(vb => {
       if (currentSubordinateIds.includes(vb.ID_DonVi) && String(vb.Phanloai || '').toLowerCase().includes('thông báo')) {
-        const deptName = vb.BPlayso || 'Khác';
-        deptDocCounts[deptName] = (deptDocCounts[deptName] || 0) + 1;
+        if (vb.NgayBanHanh && new Date(vb.NgayBanHanh).getFullYear() === docYear) {
+          const deptName = vb.BPlayso || 'Khác';
+          deptDocCounts[deptName] = (deptDocCounts[deptName] || 0) + 1;
+        }
       }
     });
 
@@ -273,9 +318,8 @@ export default function DashboardPage() {
 
     const maxCount = sortedData.length > 0 ? sortedData[0].count : 1;
     return { data: sortedData, maxCount };
-  }, [vbData, currentSubordinateIds]);
+  }, [vbData, currentSubordinateIds, docYear]);
 
-  // 🟢 [MỚI: TÍNH TOÁN TÀI SẢN PHÂN THEO NHÓM VÀ TÌNH TRẠNG CHI TIẾT]
   const assetChartData = useMemo(() => {
     const groupStats: Record<string, { total: number, dangSuDung: number, luuKho: number, suaChua: number, thanhLy: number }> = {};
     
@@ -283,26 +327,16 @@ export default function DashboardPage() {
       const groupName = tb.NhomThietBi || 'Chưa phân nhóm';
       const tt = String(tb.TinhTrang || '').toLowerCase();
       
-      if (!groupStats[groupName]) {
-        groupStats[groupName] = { total: 0, dangSuDung: 0, luuKho: 0, suaChua: 0, thanhLy: 0 };
-      }
-      
+      if (!groupStats[groupName]) { groupStats[groupName] = { total: 0, dangSuDung: 0, luuKho: 0, suaChua: 0, thanhLy: 0 }; }
       groupStats[groupName].total++;
       
-      if (tt.includes('đang sử dụng')) {
-        groupStats[groupName].dangSuDung++;
-      } else if (tt.includes('sửa chữa')) {
-        groupStats[groupName].suaChua++;
-      } else if (tt.includes('thanh lý') || tt.includes('hỏng')) {
-        groupStats[groupName].thanhLy++;
-      } else {
-        groupStats[groupName].luuKho++; // Chờ sử dụng, Lưu kho...
-      }
+      if (tt.includes('đang sử dụng')) { groupStats[groupName].dangSuDung++; } 
+      else if (tt.includes('sửa chữa')) { groupStats[groupName].suaChua++; } 
+      else if (tt.includes('thanh lý') || tt.includes('hỏng')) { groupStats[groupName].thanhLy++; } 
+      else { groupStats[groupName].luuKho++; }
     });
 
-    return Object.keys(groupStats)
-      .map(key => ({ name: key, ...groupStats[key] }))
-      .sort((a, b) => b.total - a.total); // Sắp xếp nhóm nào nhiều TS nhất lên đầu
+    return Object.keys(groupStats).map(key => ({ name: key, ...groupStats[key] })).sort((a, b) => b.total - a.total); 
   }, [tbData, currentSubordinateIds]);
 
   return (
@@ -313,7 +347,6 @@ export default function DashboardPage() {
         </button>
       )}
 
-      {/* 🟢 BỘ LỌC BÁO CÁO BÊN TRÁI */}
       <div className={`${isListCollapsed ? 'w-0 opacity-0 -ml-80 lg:ml-0' : 'w-80 opacity-100 absolute lg:relative inset-y-0 left-0'} transition-all duration-300 ease-in-out bg-white border-r border-gray-200 flex flex-col h-full shadow-2xl lg:shadow-sm z-50 lg:z-10 shrink-0 overflow-hidden`}>
         <div className="p-4 border-b border-gray-100 bg-blue-50/50">
           <div className="flex justify-between items-center mb-4">
@@ -340,7 +373,6 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* 🟢 GIAO DIỆN MAIN DASHBOARD */}
       <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 relative transition-all duration-300">
         
         <div className={`flex flex-col lg:flex-row justify-between items-start lg:items-center mb-8 gap-4 transition-all duration-300 ${isListCollapsed ? 'pl-10 lg:pl-12' : ''}`}>
@@ -358,7 +390,7 @@ export default function DashboardPage() {
         ) : (
           <div className="space-y-6">
             
-            {/* 🟢 VÙNG 1: WIDGETS TỔNG QUAN QUY MÔ */}
+            {/* VÙNG 1: WIDGETS TỔNG QUAN QUY MÔ */}
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
               <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-center hover:shadow-md transition-shadow">
                 <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5"><Building2 size={14}/> Thượng Tầng Quản Trị</p>
@@ -412,7 +444,7 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* 🟢 VÙNG 1.5: THỐNG KÊ QUY MÔ THEO MIỀN */}
+            {/* VÙNG 1.5: THỐNG KÊ QUY MÔ THEO MIỀN */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div className="bg-white p-5 rounded-2xl border border-orange-100 shadow-sm flex flex-col">
                 <div className="flex justify-between items-center mb-4 border-b border-orange-50 pb-3">
@@ -467,7 +499,7 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* 🟢 VÙNG 2: 3 BIỂU ĐỒ TRỰC QUAN TRÊN CÙNG 1 HÀNG NGANG (GRID COL 3) */}
+            {/* VÙNG 2: 3 BIỂU ĐỒ TRỰC QUAN */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               
               {/* 1. BIỂU ĐỒ CƠ CẤU NHÂN SỰ */}
@@ -502,18 +534,27 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              {/* 2. BIỂU ĐỒ THỐNG KÊ THÔNG BÁO VĂN BẢN (THEO BỘ PHẬN) */}
+              {/* 2. BIỂU ĐỒ THỐNG KÊ THÔNG BÁO VĂN BẢN (CÓ BỘ LỌC NĂM) */}
               <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex flex-col h-[450px]">
-                <div className="mb-6 shrink-0">
-                  <h3 className="text-lg font-bold text-[#05469B] flex items-center gap-2"><BellRing size={20}/> Thông báo Ban hành</h3>
-                  <p className="text-[11px] font-semibold text-gray-500 mt-1">Top 10 Phòng/Bộ phận phát hành nhiều nhất</p>
+                <div className="mb-6 shrink-0 flex justify-between items-start gap-2">
+                  <div>
+                    <h3 className="text-lg font-bold text-[#05469B] flex items-center gap-2"><BellRing size={20}/> Thông báo Ban hành</h3>
+                    <p className="text-[11px] font-semibold text-gray-500 mt-1">Top 10 Phòng/Bộ phận phát hành nhiều nhất</p>
+                  </div>
+                  <select 
+                    value={docYear} 
+                    onChange={(e) => setDocYear(Number(e.target.value))} 
+                    className="bg-blue-50 text-[#05469B] text-xs font-bold py-1.5 px-2 rounded-lg outline-none border border-blue-100 cursor-pointer shadow-sm"
+                  >
+                    {[currentYear + 1, currentYear, currentYear - 1, currentYear - 2].map(y => <option key={y} value={y}>Năm {y}</option>)}
+                  </select>
                 </div>
 
                 <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-4">
                   {docChartData.data.length === 0 ? (
                     <div className="h-full flex flex-col items-center justify-center text-gray-400">
                       <FileText size={40} className="mb-2 opacity-50"/>
-                      <p className="font-medium text-sm">Chưa có dữ liệu.</p>
+                      <p className="font-medium text-sm">Chưa có dữ liệu năm {docYear}.</p>
                     </div>
                   ) : (
                     docChartData.data.map((item, idx) => {
@@ -541,7 +582,6 @@ export default function DashboardPage() {
                   <p className="text-[11px] font-semibold text-gray-500 mt-1">Trạng thái chi tiết theo từng nhóm thiết bị</p>
                 </div>
 
-                {/* Chú thích màu sắc */}
                 <div className="flex flex-wrap gap-x-3 gap-y-2 mb-4 text-[10px] font-bold text-gray-600 bg-gray-50 p-2 rounded-lg shrink-0 border border-gray-100">
                   <div className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>Sử dụng</div>
                   <div className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-blue-400"></span>Lưu kho</div>
@@ -563,7 +603,6 @@ export default function DashboardPage() {
                           <span className="font-black text-[#05469B] shrink-0 text-xs bg-blue-50 px-2 py-0.5 rounded">Tổng: {item.total}</span>
                         </div>
                         
-                        {/* Thanh Stacked Bar chia % */}
                         <div className="flex h-2 w-full bg-gray-100 rounded-full overflow-hidden">
                           {item.dangSuDung > 0 && <div className="bg-emerald-500 transition-all duration-1000" style={{ width: `${(item.dangSuDung/item.total)*100}%` }}></div>}
                           {item.luuKho > 0 && <div className="bg-blue-400 transition-all duration-1000" style={{ width: `${(item.luuKho/item.total)*100}%` }}></div>}
@@ -571,7 +610,6 @@ export default function DashboardPage() {
                           {item.thanhLy > 0 && <div className="bg-red-500 transition-all duration-1000" style={{ width: `${(item.thanhLy/item.total)*100}%` }}></div>}
                         </div>
                         
-                        {/* Con số chi tiết bên dưới */}
                         <div className="flex flex-wrap gap-x-2 gap-y-0.5 text-[10px] font-bold">
                           {item.dangSuDung > 0 && <span className="text-emerald-600">ĐSD: {item.dangSuDung}</span>}
                           {item.luuKho > 0 && <span className="text-blue-500">LK: {item.luuKho}</span>}
@@ -586,45 +624,107 @@ export default function DashboardPage() {
 
             </div>
 
-            {/* 🟢 VÙNG 3: BẢNG CẢNH BÁO CHI TIẾT (PCCC) */}
-            {pcccWarnings.length > 0 && (
-              <div className="bg-white rounded-2xl border border-red-200 shadow-sm overflow-hidden animate-in slide-in-from-bottom-4">
-                <div className="bg-red-50 p-4 border-b border-red-100 flex items-center gap-2">
-                  <AlertTriangle className="text-red-600" size={20}/>
-                  <h3 className="font-black text-red-800 text-lg">Danh sách Cần lưu ý: Thiết bị PCCC sắp hết hạn kiểm định</h3>
+            {/* 🟢 VÙNG 3: BẢNG CẢNH BÁO CHI TIẾT (CHIA 2 CỘT PCCC & AN NINH) */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              
+              {/* BẢNG 1: PCCC SẮP HẾT HẠN KIỂM ĐỊNH */}
+              <div className="bg-white rounded-2xl border border-red-200 shadow-sm overflow-hidden flex flex-col">
+                <div className="bg-red-50 p-4 border-b border-red-100 flex items-center gap-2 shrink-0">
+                  <AlertTriangle className="text-red-600 shrink-0" size={20}/>
+                  <h3 className="font-black text-red-800 text-sm uppercase tracking-wider">Cảnh báo: PCCC sắp hết hạn</h3>
                 </div>
-                <div className="p-0 overflow-x-auto">
-                  <table className="w-full text-left text-sm">
-                    <thead className="bg-gray-50 text-gray-600 font-bold uppercase text-xs">
-                      <tr>
-                        <th className="p-4">Showroom / Đơn vị</th>
-                        <th className="p-4">Tên Thiết bị</th>
-                        <th className="p-4 text-center">Hạn kiểm định</th>
-                        <th className="p-4 text-right">Tình trạng</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {pcccWarnings.map((warn, idx) => (
-                        <tr key={idx} className="hover:bg-red-50/30 transition-colors">
-                          <td className="p-4 font-bold text-gray-800">{warn.unitName}</td>
-                          <td className="p-4 font-semibold text-[#05469B]">{warn.itemName}</td>
-                          <td className="p-4 text-center font-semibold">{warn.dateStr}</td>
-                          <td className="p-4 text-right">
-                            {warn.daysLeft < 0 ? (
-                              <span className="inline-block px-3 py-1 bg-red-100 text-red-700 font-black rounded-lg border border-red-200 animate-pulse">Quá hạn {Math.abs(warn.daysLeft)} ngày!</span>
-                            ) : warn.daysLeft === 0 ? (
-                              <span className="inline-block px-3 py-1 bg-red-100 text-red-700 font-black rounded-lg border border-red-200 animate-pulse">Hết hạn Hôm nay!</span>
-                            ) : (
-                              <span className="inline-block px-3 py-1 bg-orange-100 text-orange-700 font-bold rounded-lg border border-orange-200">Còn {warn.daysLeft} ngày</span>
-                            )}
-                          </td>
+                <div className="p-0 overflow-x-auto flex-1 max-h-[300px] custom-scrollbar">
+                  {pcccWarnings.length === 0 ? (
+                    <div className="h-full flex flex-col items-center justify-center text-gray-400 py-10">
+                      <Flame size={40} className="mb-2 opacity-30 text-emerald-500"/>
+                      <p className="font-medium text-sm text-emerald-600">Tất cả thiết bị đều an toàn.</p>
+                    </div>
+                  ) : (
+                    <table className="w-full text-left text-sm">
+                      <thead className="bg-gray-50 text-gray-600 font-bold uppercase text-[10px] tracking-wider sticky top-0 z-10">
+                        <tr>
+                          <th className="p-3">Đơn vị</th>
+                          <th className="p-3">Thiết bị</th>
+                          <th className="p-3 text-center">Hạn KĐ</th>
+                          <th className="p-3 text-right">Tình trạng</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {pcccWarnings.map((warn, idx) => (
+                          <tr key={idx} className="hover:bg-red-50/30 transition-colors">
+                            <td className="p-3 font-bold text-gray-800 text-xs">{warn.unitName}</td>
+                            <td className="p-3 font-semibold text-[#05469B] text-xs">{warn.itemName}</td>
+                            <td className="p-3 text-center font-semibold text-xs">{warn.dateStr}</td>
+                            <td className="p-3 text-right">
+                              {warn.daysLeft < 0 ? (
+                                <span className="inline-block px-2 py-0.5 bg-red-100 text-red-700 font-black rounded border border-red-200 text-[10px] animate-pulse">Trễ {Math.abs(warn.daysLeft)} ngày!</span>
+                              ) : warn.daysLeft === 0 ? (
+                                <span className="inline-block px-2 py-0.5 bg-red-100 text-red-700 font-black rounded border border-red-200 text-[10px] animate-pulse">Hết hạn Hôm nay!</span>
+                              ) : (
+                                <span className="inline-block px-2 py-0.5 bg-orange-100 text-orange-700 font-bold rounded border border-orange-200 text-[10px]">Còn {warn.daysLeft} ngày</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
                 </div>
               </div>
-            )}
+
+              {/* 🟢 BẢNG 2: THỐNG KÊ ĐƠN VỊ THUÊ BẢO VỆ + CẢNH BÁO */}
+              <div className="bg-white rounded-2xl border border-[#05469B]/20 shadow-sm overflow-hidden flex flex-col">
+                <div className="bg-blue-50 p-4 border-b border-blue-100 flex items-center gap-2 shrink-0">
+                  <ShieldCheck className="text-[#05469B] shrink-0" size={20}/>
+                  <h3 className="font-black text-[#05469B] text-sm uppercase tracking-wider">Hợp đồng Thuê DV Bảo vệ</h3>
+                </div>
+                <div className="p-0 overflow-x-auto flex-1 max-h-[300px] custom-scrollbar">
+                  {anNinhStatsList.length === 0 ? (
+                    <div className="h-full flex flex-col items-center justify-center text-gray-400 py-10">
+                      <ShieldAlert size={40} className="mb-2 opacity-30 text-gray-400"/>
+                      <p className="font-medium text-sm text-gray-500">Chưa có đơn vị nào thuê dịch vụ bảo vệ ngoài.</p>
+                    </div>
+                  ) : (
+                    <table className="w-full text-left text-sm">
+                      <thead className="bg-gray-50 text-gray-600 font-bold uppercase text-[10px] tracking-wider sticky top-0 z-10">
+                        <tr>
+                          <th className="p-3">Đơn vị thuê</th>
+                          <th className="p-3">Công ty Dịch vụ</th>
+                          <th className="p-3 text-center">Hạn HĐ</th>
+                          <th className="p-3 text-right">Tình trạng</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {anNinhStatsList.map((stat, idx) => {
+                          const isWarning = stat.daysLeft !== null && stat.daysLeft <= 30;
+                          return (
+                            <tr key={idx} className={`transition-colors ${isWarning ? 'hover:bg-red-50/30' : 'hover:bg-blue-50/30'}`}>
+                              <td className="p-3 font-bold text-gray-800 text-xs">{stat.unitName}</td>
+                              <td className="p-3 font-semibold text-[#05469B] text-xs">{stat.provider}</td>
+                              <td className="p-3 text-center font-semibold text-xs text-gray-600">{stat.dateStr}</td>
+                              <td className="p-3 text-right">
+                                {stat.daysLeft === null ? (
+                                  <span className="inline-block px-2 py-0.5 bg-gray-100 text-gray-500 font-bold rounded border border-gray-200 text-[10px]">Chưa rõ hạn</span>
+                                ) : stat.daysLeft < 0 ? (
+                                  <span className="inline-block px-2 py-0.5 bg-red-100 text-red-700 font-black rounded border border-red-200 text-[10px] animate-pulse">Quá hạn {Math.abs(stat.daysLeft)} ngày</span>
+                                ) : stat.daysLeft === 0 ? (
+                                  <span className="inline-block px-2 py-0.5 bg-red-100 text-red-700 font-black rounded border border-red-200 text-[10px] animate-pulse">Hết hạn Hôm nay!</span>
+                                ) : stat.daysLeft <= 30 ? (
+                                  <span className="inline-block px-2 py-0.5 bg-orange-100 text-orange-700 font-bold rounded border border-orange-200 text-[10px]">Sắp hết (Còn {stat.daysLeft} ngày)</span>
+                                ) : (
+                                  <span className="inline-block px-2 py-0.5 bg-emerald-50 text-emerald-600 font-bold rounded border border-emerald-200 text-[10px]">Đang hiệu lực</span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              </div>
+
+            </div>
 
           </div>
         )}
