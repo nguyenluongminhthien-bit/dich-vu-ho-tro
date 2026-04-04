@@ -48,7 +48,7 @@ export default function DashboardPage() {
           safeCall(apiService.getPersonnel),
           safeCall(apiService.getThietBi),
           safeCall((apiService as any).getTsPCCC),
-          safeCall((apiService as any).getVanBan)
+          safeCall((apiService as any).getVanBan) 
         ]);
 
         setDonViList(dvRes);
@@ -71,7 +71,6 @@ export default function DashboardPage() {
     return map;
   }, [donViList]);
 
-  // Hàm đệ quy dùng chung
   const getAllSubIds = (unitId: string, allUnits: DonVi[]): string[] => {
     const subs = allUnits.filter(u => u.CapQuanLy === unitId);
     let ids = subs.map(u => u.ID_DonVi);
@@ -79,13 +78,11 @@ export default function DashboardPage() {
     return ids;
   };
 
-  // 🟢 HÀM KIỂM TRA ĐƠN VỊ HỢP LỆ (Bỏ qua Đại lý, Dự án, Đầu tư mới)
   const isCountableUnit = (dv: DonVi) => {
     const status = String(dv.trangThai || '').toLowerCase();
     return !status.includes('đại lý') && !status.includes('dự án') && !status.includes('đầu tư mới');
   };
 
-  // 🟢 [LOGIC SLICER CÂY ĐƠN VỊ]
   const allowedDonViIds = useMemo(() => {
     if (!user) return [];
     if (user.idDonVi === 'ALL') return donViList.map(dv => dv.ID_DonVi);
@@ -171,7 +168,7 @@ export default function DashboardPage() {
     return unit ? unit.TenDonVi : 'Toàn bộ Tập đoàn';
   }, [selectedUnitFilter, donViList]);
 
-  // 🟢 [TÍNH TOÁN DỮ LIỆU WIDGETS DỰA VÀO BỘ LỌC VÀ LOẠI TRỪ DỰ ÁN/ĐẠI LÝ]
+  // 🟢 [TÍNH TOÁN DỮ LIỆU WIDGETS DỰA VÀO BỘ LỌC]
   const currentSubordinateIds = useMemo(() => {
     if (!selectedUnitFilter) return donViList.map(u => u.ID_DonVi);
     return [selectedUnitFilter, ...getAllSubIds(selectedUnitFilter, donViList)];
@@ -258,47 +255,54 @@ export default function DashboardPage() {
     return { data: sortedData, maxCount };
   }, [nsData, currentSubordinateIds]);
 
-  // 🟢 [TÍNH TOÁN BIỂU ĐỒ THÔNG BÁO THEO ĐƠN VỊ]
+  // 🟢 [TÍNH TOÁN BIỂU ĐỒ THÔNG BÁO THEO PHÒNG BỘ PHẬN]
   const docChartData = useMemo(() => {
-    const unitDocCounts: Record<string, number> = {};
+    const deptDocCounts: Record<string, number> = {};
     
     vbData.forEach(vb => {
-      if (currentSubordinateIds.includes(vb.ID_DonVi) && vb.Phanloai === 'Thông báo') {
-        const unitName = donViMap[vb.ID_DonVi] || vb.ID_DonVi;
-        unitDocCounts[unitName] = (unitDocCounts[unitName] || 0) + 1;
+      if (currentSubordinateIds.includes(vb.ID_DonVi) && String(vb.Phanloai || '').toLowerCase().includes('thông báo')) {
+        const deptName = vb.BPlayso || 'Khác';
+        deptDocCounts[deptName] = (deptDocCounts[deptName] || 0) + 1;
       }
     });
 
-    const sortedData = Object.keys(unitDocCounts)
-      .map(key => ({ name: key, count: unitDocCounts[key] }))
+    const sortedData = Object.keys(deptDocCounts)
+      .map(key => ({ name: key, count: deptDocCounts[key] }))
       .sort((a, b) => b.count - a.count)
-      .slice(0, 10); // Chỉ lấy Top 10 đơn vị gửi nhiều nhất
+      .slice(0, 10); 
 
     const maxCount = sortedData.length > 0 ? sortedData[0].count : 1;
     return { data: sortedData, maxCount };
-  }, [vbData, currentSubordinateIds, donViMap]);
+  }, [vbData, currentSubordinateIds]);
 
-  // 🟢 [TÍNH TOÁN BIỂU ĐỒ TÀI SẢN]
+  // 🟢 [MỚI: TÍNH TOÁN TÀI SẢN PHÂN THEO NHÓM VÀ TÌNH TRẠNG CHI TIẾT]
   const assetChartData = useMemo(() => {
-    const statusCounts: Record<string, number> = {
-      'Đang sử dụng': 0, 'Lưu kho': 0, 'Đang sửa chữa': 0, 'Thanh lý / Hỏng': 0
-    };
+    const groupStats: Record<string, { total: number, dangSuDung: number, luuKho: number, suaChua: number, thanhLy: number }> = {};
     
     tbData.filter(tb => currentSubordinateIds.includes(tb.ID_DonVi)).forEach(tb => {
-      const tt = String(tb.TinhTrang || '');
-      if (tt === 'Đang sử dụng') statusCounts['Đang sử dụng']++;
-      else if (tt === 'Đang sửa chữa') statusCounts['Đang sửa chữa']++;
-      else if (tt.includes('Thanh lý') || tt.includes('Hỏng')) statusCounts['Thanh lý / Hỏng']++;
-      else statusCounts['Lưu kho']++;
+      const groupName = tb.NhomThietBi || 'Chưa phân nhóm';
+      const tt = String(tb.TinhTrang || '').toLowerCase();
+      
+      if (!groupStats[groupName]) {
+        groupStats[groupName] = { total: 0, dangSuDung: 0, luuKho: 0, suaChua: 0, thanhLy: 0 };
+      }
+      
+      groupStats[groupName].total++;
+      
+      if (tt.includes('đang sử dụng')) {
+        groupStats[groupName].dangSuDung++;
+      } else if (tt.includes('sửa chữa')) {
+        groupStats[groupName].suaChua++;
+      } else if (tt.includes('thanh lý') || tt.includes('hỏng')) {
+        groupStats[groupName].thanhLy++;
+      } else {
+        groupStats[groupName].luuKho++; // Chờ sử dụng, Lưu kho...
+      }
     });
 
-    const total = Object.values(statusCounts).reduce((a, b) => a + b, 0) || 1;
-    return [
-      { label: 'Đang sử dụng', count: statusCounts['Đang sử dụng'], color: 'bg-emerald-500', pct: (statusCounts['Đang sử dụng']/total)*100 },
-      { label: 'Lưu kho', count: statusCounts['Lưu kho'], color: 'bg-blue-400', pct: (statusCounts['Lưu kho']/total)*100 },
-      { label: 'Sửa chữa', count: statusCounts['Đang sửa chữa'], color: 'bg-orange-400', pct: (statusCounts['Đang sửa chữa']/total)*100 },
-      { label: 'Thanh lý / Hỏng', count: statusCounts['Thanh lý / Hỏng'], color: 'bg-red-500', pct: (statusCounts['Thanh lý / Hỏng']/total)*100 },
-    ];
+    return Object.keys(groupStats)
+      .map(key => ({ name: key, ...groupStats[key] }))
+      .sort((a, b) => b.total - a.total); // Sắp xếp nhóm nào nhiều TS nhất lên đầu
   }, [tbData, currentSubordinateIds]);
 
   return (
@@ -356,7 +360,6 @@ export default function DashboardPage() {
             
             {/* 🟢 VÙNG 1: WIDGETS TỔNG QUAN QUY MÔ */}
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-              
               <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-center hover:shadow-md transition-shadow">
                 <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5"><Building2 size={14}/> Thượng Tầng Quản Trị</p>
                 <div className="flex items-center justify-between px-2">
@@ -411,7 +414,6 @@ export default function DashboardPage() {
 
             {/* 🟢 VÙNG 1.5: THỐNG KÊ QUY MÔ THEO MIỀN */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              
               <div className="bg-white p-5 rounded-2xl border border-orange-100 shadow-sm flex flex-col">
                 <div className="flex justify-between items-center mb-4 border-b border-orange-50 pb-3">
                   <h3 className="text-sm font-black text-orange-600 uppercase tracking-wider flex items-center gap-2"><MapPin size={18}/> Quy mô CTTT Phía Nam</h3>
@@ -423,7 +425,6 @@ export default function DashboardPage() {
                   ) : (
                     companyScaleStats.nam.map((item, idx) => (
                       <div key={item.id} className="flex items-center gap-3 group">
-                        {/* CỘT TÊN: Canh lề trái (text-left) */}
                         <div className="w-[140px] sm:w-[180px] xl:w-[220px] text-left shrink-0">
                           <p className="text-xs font-bold text-gray-700 truncate group-hover:text-orange-600 transition-colors" title={item.name}>
                             {idx + 1}. {item.name}
@@ -450,7 +451,6 @@ export default function DashboardPage() {
                   ) : (
                     companyScaleStats.bac.map((item, idx) => (
                       <div key={item.id} className="flex items-center gap-3 group">
-                        {/* CỘT TÊN: Canh lề trái (text-left) */}
                         <div className="w-[140px] sm:w-[180px] xl:w-[220px] text-left shrink-0">
                           <p className="text-xs font-bold text-gray-700 truncate group-hover:text-emerald-600 transition-colors" title={item.name}>
                             {idx + 1}. {item.name}
@@ -465,110 +465,122 @@ export default function DashboardPage() {
                   )}
                 </div>
               </div>
-
             </div>
 
-            {/* 🟢 VÙNG 2: BIỂU ĐỒ TRỰC QUAN (Chia cột: Trái 2/3, Phải 1/3) */}
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+            {/* 🟢 VÙNG 2: 3 BIỂU ĐỒ TRỰC QUAN TRÊN CÙNG 1 HÀNG NGANG (GRID COL 3) */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               
-              {/* CỘT TRÁI (Bao gồm Biểu đồ Nhân sự & Thông báo) */}
-              <div className="xl:col-span-2 flex flex-col gap-6">
-                
-                {/* 1. BIỂU ĐỒ CƠ CẤU NHÂN SỰ */}
-                <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex flex-col flex-1">
-                  <div className="flex justify-between items-center mb-6">
-                    <div>
-                      <h3 className="text-lg font-bold text-[#05469B] flex items-center gap-2"><Briefcase size={20}/> Cơ cấu Phân loại Nhân sự</h3>
-                      <p className="text-xs font-semibold text-gray-500 mt-1">Thống kê số lượng nhân sự đang làm việc theo từng nhóm nghiệp vụ</p>
-                    </div>
-                  </div>
-
-                  <div className="flex-1 flex flex-col justify-center space-y-4">
-                    {staffChartData.data.length === 0 ? (
-                      <div className="flex-1 flex flex-col items-center justify-center text-gray-400">
-                        <Users size={40} className="mb-2 opacity-50"/>
-                        <p className="font-medium text-sm">Chưa có dữ liệu nhân sự.</p>
-                      </div>
-                    ) : (
-                      staffChartData.data.map((item, idx) => {
-                        const widthPct = Math.max((item.count / staffChartData.maxCount) * 100, 2);
-                        return (
-                          <div key={idx} className="flex items-center gap-3 group">
-                            {/* 🔴 ĐÃ FIX: Đổi text-right thành text-left để căn lề trái chữ */}
-                            <div className="w-[140px] sm:w-[180px] xl:w-[220px] text-left shrink-0">
-                              <p className="text-xs font-bold text-gray-700 truncate group-hover:text-[#05469B] transition-colors" title={item.name}>{item.name}</p>
-                            </div>
-                            <div className="flex-1 flex items-center gap-2">
-                              <div className="h-6 bg-gradient-to-r from-blue-300 to-[#05469B] rounded-md transition-all duration-1000 ease-out shadow-sm" style={{ width: `${widthPct}%` }}></div>
-                              <span className="text-xs font-black text-gray-600">{item.count}</span>
-                            </div>
-                          </div>
-                        )
-                      })
-                    )}
-                  </div>
+              {/* 1. BIỂU ĐỒ CƠ CẤU NHÂN SỰ */}
+              <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex flex-col h-[450px]">
+                <div className="mb-6 shrink-0">
+                  <h3 className="text-lg font-bold text-[#05469B] flex items-center gap-2"><Briefcase size={20}/> Cơ cấu Phân loại Nhân sự</h3>
+                  <p className="text-[11px] font-semibold text-gray-500 mt-1">Số lượng nhân sự theo từng nhóm nghiệp vụ</p>
                 </div>
 
-                {/* 2. BIỂU ĐỒ THỐNG KÊ THÔNG BÁO VĂN BẢN */}
-                <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex flex-col flex-1">
-                  <div className="flex justify-between items-center mb-6">
-                    <div>
-                      <h3 className="text-lg font-bold text-[#05469B] flex items-center gap-2"><BellRing size={20}/> Tần suất Phát hành Thông báo</h3>
-                      <p className="text-xs font-semibold text-gray-500 mt-1">Top 10 đơn vị phát hành nhiều Thông báo nhất</p>
+                <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-4">
+                  {staffChartData.data.length === 0 ? (
+                    <div className="h-full flex flex-col items-center justify-center text-gray-400">
+                      <Users size={40} className="mb-2 opacity-50"/>
+                      <p className="font-medium text-sm">Chưa có dữ liệu.</p>
                     </div>
-                  </div>
-
-                  <div className="flex-1 flex flex-col justify-center space-y-4">
-                    {docChartData.data.length === 0 ? (
-                      <div className="flex-1 flex flex-col items-center justify-center text-gray-400">
-                        <FileText size={40} className="mb-2 opacity-50"/>
-                        <p className="font-medium text-sm">Chưa có dữ liệu Thông báo.</p>
-                      </div>
-                    ) : (
-                      docChartData.data.map((item, idx) => {
-                        const widthPct = Math.max((item.count / docChartData.maxCount) * 100, 2);
-                        return (
-                          <div key={idx} className="flex items-center gap-3 group">
-                            {/* 🔴 ĐÃ FIX: Canh lề trái tương tự biểu đồ nhân sự */}
-                            <div className="w-[140px] sm:w-[180px] xl:w-[220px] text-left shrink-0">
-                              <p className="text-xs font-bold text-gray-700 truncate group-hover:text-[#05469B] transition-colors" title={item.name}>{item.name}</p>
-                            </div>
-                            <div className="flex-1 flex items-center gap-2">
-                              <div className="h-6 bg-gradient-to-r from-blue-300 to-[#05469B] rounded-md transition-all duration-1000 ease-out shadow-sm" style={{ width: `${widthPct}%` }}></div>
-                              <span className="text-xs font-black text-gray-600">{item.count}</span>
-                            </div>
+                  ) : (
+                    staffChartData.data.map((item, idx) => {
+                      const widthPct = Math.max((item.count / staffChartData.maxCount) * 100, 2);
+                      return (
+                        <div key={idx} className="flex flex-col gap-1.5">
+                          <div className="flex justify-between items-end">
+                            <p className="text-xs font-bold text-gray-700 truncate pr-2">{item.name}</p>
+                            <span className="text-xs font-black text-[#05469B] shrink-0">{item.count}</span>
                           </div>
-                        )
-                      })
-                    )}
-                  </div>
-                </div>
-
-              </div>
-
-              {/* CỘT PHẢI (Biểu đồ Tình trạng Tài sản) */}
-              <div className="xl:col-span-1 flex flex-col h-full">
-                <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex flex-col h-full">
-                  <h3 className="text-lg font-bold text-[#05469B] flex items-center gap-2 mb-1"><Activity size={20}/> Tình trạng Tài sản</h3>
-                  <p className="text-xs font-semibold text-gray-500 mb-8">Tỷ trọng các tài sản đang quản lý</p>
-                  
-                  <div className="flex-1 flex flex-col justify-center">
-                    <div className="space-y-6">
-                      {assetChartData.map((item, idx) => (
-                        <div key={idx}>
-                          <div className="flex justify-between text-sm mb-2">
-                            <span className="font-bold text-gray-700 flex items-center gap-2">
-                              <span className={`w-3 h-3 rounded-full ${item.color}`}></span>{item.label}
-                            </span>
-                            <span className="font-black text-gray-900">{item.count} <span className="text-xs font-medium text-gray-400">({item.pct.toFixed(1)}%)</span></span>
-                          </div>
-                          <div className="w-full bg-gray-100 rounded-full h-3">
-                            <div className={`h-3 rounded-full ${item.color} transition-all duration-1000 ease-out`} style={{ width: `${item.pct}%` }}></div>
+                          <div className="w-full h-2.5 bg-gray-100 rounded-full overflow-hidden">
+                            <div className="h-full bg-gradient-to-r from-blue-300 to-[#05469B] rounded-full transition-all duration-1000 ease-out" style={{ width: `${widthPct}%` }}></div>
                           </div>
                         </div>
-                      ))}
+                      )
+                    })
+                  )}
+                </div>
+              </div>
+
+              {/* 2. BIỂU ĐỒ THỐNG KÊ THÔNG BÁO VĂN BẢN (THEO BỘ PHẬN) */}
+              <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex flex-col h-[450px]">
+                <div className="mb-6 shrink-0">
+                  <h3 className="text-lg font-bold text-[#05469B] flex items-center gap-2"><BellRing size={20}/> Thông báo Ban hành</h3>
+                  <p className="text-[11px] font-semibold text-gray-500 mt-1">Top 10 Phòng/Bộ phận phát hành nhiều nhất</p>
+                </div>
+
+                <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-4">
+                  {docChartData.data.length === 0 ? (
+                    <div className="h-full flex flex-col items-center justify-center text-gray-400">
+                      <FileText size={40} className="mb-2 opacity-50"/>
+                      <p className="font-medium text-sm">Chưa có dữ liệu.</p>
                     </div>
-                  </div>
+                  ) : (
+                    docChartData.data.map((item, idx) => {
+                      const widthPct = Math.max((item.count / docChartData.maxCount) * 100, 2);
+                      return (
+                        <div key={idx} className="flex flex-col gap-1.5">
+                          <div className="flex justify-between items-end">
+                            <p className="text-xs font-bold text-gray-700 truncate pr-2">{item.name}</p>
+                            <span className="text-xs font-black text-[#05469B] shrink-0">{item.count}</span>
+                          </div>
+                          <div className="w-full h-2.5 bg-gray-100 rounded-full overflow-hidden">
+                            <div className="h-full bg-gradient-to-r from-blue-300 to-[#05469B] rounded-full transition-all duration-1000 ease-out" style={{ width: `${widthPct}%` }}></div>
+                          </div>
+                        </div>
+                      )
+                    })
+                  )}
+                </div>
+              </div>
+
+              {/* 3. BIỂU ĐỒ TÌNH TRẠNG TÀI SẢN CHI TIẾT THEO NHÓM */}
+              <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex flex-col h-[450px]">
+                <div className="mb-4 shrink-0">
+                  <h3 className="text-lg font-bold text-[#05469B] flex items-center gap-2"><Activity size={20}/> Tình trạng Tài sản</h3>
+                  <p className="text-[11px] font-semibold text-gray-500 mt-1">Trạng thái chi tiết theo từng nhóm thiết bị</p>
+                </div>
+
+                {/* Chú thích màu sắc */}
+                <div className="flex flex-wrap gap-x-3 gap-y-2 mb-4 text-[10px] font-bold text-gray-600 bg-gray-50 p-2 rounded-lg shrink-0 border border-gray-100">
+                  <div className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>Sử dụng</div>
+                  <div className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-blue-400"></span>Lưu kho</div>
+                  <div className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-orange-400"></span>Sửa chữa</div>
+                  <div className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-red-500"></span>Hỏng/TL</div>
+                </div>
+                
+                <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-5">
+                  {assetChartData.length === 0 ? (
+                    <div className="h-full flex flex-col items-center justify-center text-gray-400">
+                      <MonitorSmartphone size={40} className="mb-2 opacity-50"/>
+                      <p className="font-medium text-sm">Chưa có dữ liệu tài sản.</p>
+                    </div>
+                  ) : (
+                    assetChartData.map((item, idx) => (
+                      <div key={idx} className="flex flex-col gap-1.5">
+                        <div className="flex justify-between items-center text-sm">
+                          <span className="font-bold text-gray-700 truncate pr-2" title={item.name}>{item.name}</span>
+                          <span className="font-black text-[#05469B] shrink-0 text-xs bg-blue-50 px-2 py-0.5 rounded">Tổng: {item.total}</span>
+                        </div>
+                        
+                        {/* Thanh Stacked Bar chia % */}
+                        <div className="flex h-2 w-full bg-gray-100 rounded-full overflow-hidden">
+                          {item.dangSuDung > 0 && <div className="bg-emerald-500 transition-all duration-1000" style={{ width: `${(item.dangSuDung/item.total)*100}%` }}></div>}
+                          {item.luuKho > 0 && <div className="bg-blue-400 transition-all duration-1000" style={{ width: `${(item.luuKho/item.total)*100}%` }}></div>}
+                          {item.suaChua > 0 && <div className="bg-orange-400 transition-all duration-1000" style={{ width: `${(item.suaChua/item.total)*100}%` }}></div>}
+                          {item.thanhLy > 0 && <div className="bg-red-500 transition-all duration-1000" style={{ width: `${(item.thanhLy/item.total)*100}%` }}></div>}
+                        </div>
+                        
+                        {/* Con số chi tiết bên dưới */}
+                        <div className="flex flex-wrap gap-x-2 gap-y-0.5 text-[10px] font-bold">
+                          {item.dangSuDung > 0 && <span className="text-emerald-600">ĐSD: {item.dangSuDung}</span>}
+                          {item.luuKho > 0 && <span className="text-blue-500">LK: {item.luuKho}</span>}
+                          {item.suaChua > 0 && <span className="text-orange-500">SC: {item.suaChua}</span>}
+                          {item.thanhLy > 0 && <span className="text-red-500">TL: {item.thanhLy}</span>}
+                        </div>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
 
