@@ -50,15 +50,14 @@ export default function PersonnelPage() {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<'create' | 'update'>('create');
-  const [formData, setFormData] = useState<Partial<Personnel>>({});
+  const [formData, setFormData] = useState<any>({});
   
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
-  const [viewData, setViewData] = useState<Personnel | null>(null);
+  const [viewData, setViewData] = useState<any | null>(null);
 
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<string | null>(null);
 
-  // 🟢 [OFFBOARDING STATES]
   const [isOffboardOpen, setIsOffboardOpen] = useState(false);
   const [personnelToOffboard, setPersonnelToOffboard] = useState<Personnel | null>(null);
   const [unreturnedAssets, setUnreturnedAssets] = useState<any[]>([]);
@@ -212,7 +211,6 @@ export default function PersonnelPage() {
       );
     }
 
-    // Đưa người nghỉ việc xuống cuối danh sách
     return result.sort((a, b) => {
       if (a.TrangThai === 'Đã nghỉ việc' && b.TrangThai !== 'Đã nghỉ việc') return 1;
       if (a.TrangThai !== 'Đã nghỉ việc' && b.TrangThai === 'Đã nghỉ việc') return -1;
@@ -247,12 +245,18 @@ export default function PersonnelPage() {
     });
   };
 
-  const openModal = (mode: 'create' | 'update', item?: Personnel) => {
+  const openModal = (mode: 'create' | 'update', item?: any) => {
     setModalMode(mode);
-    if (item) { setFormData({ ...item, SDT: formatPhoneNumber(item.SDT) }); } 
+    if (item) { 
+      setFormData({ 
+        ...item, 
+        SDT: formatPhoneNumber(item.SDT),
+        SDTCanhan: formatPhoneNumber(item.SDTCanhan) 
+      }); 
+    } 
     else {
       setFormData({
-        MaNV: '', HoTen: '', ChucVu: '', SDT: '', Email: '', GioiTinh: 'Nam', NamSinh: '', NgayNhanViec: '', 
+        MaNV: '', HoTen: '', ChucVu: '', SDT: '', SDTCanhan: '', Email: '', GioiTinh: 'Nam', NamSinh: '', NgayNhanViec: '', 
         ID_DonVi: selectedUnitFilter || '', PhanLoai: 'Lãnh đạo', TrinhDoHocVan: '', ThuNhap: '', MoTaNgoaiHinh: '', GhiChu: '', GPLX: '',
         CC_ATVSLD: false, CC_ANBV: false, CC_PCCC: false, CC_CHCN: false, CC_SoCapCuu: false, CC_CPR: false, 
         CC_VoThuat: false, CC_GPLX: false, CC_ATTP: false, CC_PhaChe: false, CC_NgoaiNgu: false, CC_TinHoc: false,
@@ -264,7 +268,7 @@ export default function PersonnelPage() {
 
   const handleView = (item: Personnel) => { setViewData(item); setIsViewModalOpen(true); };
 
-  const handleDuplicate = (item: Personnel) => {
+  const handleDuplicate = (item: any) => {
     setModalMode('create');
     setFormData({ ...item, ID_NhanSu: '', ChucVu: item.ChucVu ? `${item.ChucVu} (Kiêm nhiệm)` : 'Kiêm nhiệm', TrangThai: 'Đang làm việc', NgayNghiViec: '' });
     setIsModalOpen(true); setError(null);
@@ -314,7 +318,6 @@ export default function PersonnelPage() {
     finally { setSubmitting(false); }
   };
 
-  // 🟢 [XỬ LÝ OFFBOARDING QUÉT TÀI SẢN VÀ LƯU TRẠNG THÁI]
   const handleOffboardClick = async (item: Personnel) => {
     setPersonnelToOffboard(item);
     setCheckingAssets(true);
@@ -327,7 +330,6 @@ export default function PersonnelPage() {
       const thietBiList: ThietBi[] = thietBiRaw || [];
       const nhatKyList: any[] = nhatKyRaw || [];
 
-      // Gom nhóm nhật ký theo ID_TTB và lấy cái mới nhất
       const latestLogsMap: Record<string, any> = {};
       nhatKyList.forEach(log => {
         const ttbId = log.ID_TTB;
@@ -342,7 +344,6 @@ export default function PersonnelPage() {
         }
       });
 
-      // Tìm các thiết bị mà nhật ký cuối cùng là Giao cho nhân viên này VÀ chưa thu hồi
       const foundAssets: any[] = [];
       Object.values(latestLogsMap).forEach(log => {
         if (log.MSNVNguoiDung_NguoiQL === item.MaNV && log.LoaiNhatKy !== 'Báo hỏng') {
@@ -379,7 +380,6 @@ export default function PersonnelPage() {
 
     setSubmitting(true);
     try {
-      // THAY ĐỔI: Chuyển sang Cập nhật trạng thái "Đã nghỉ việc" thay vì xóa
       const offboardData = {
         ...personnelToOffboard,
         TrangThai: 'Đã nghỉ việc',
@@ -512,7 +512,8 @@ export default function PersonnelPage() {
                   <th className="p-4 whitespace-nowrap">Họ Tên / Trạng thái</th>
                   <th className="p-4 whitespace-nowrap">Đơn Vị</th>
                   <th className="p-4 whitespace-nowrap">Chức vụ</th>
-                  <th className="p-4 w-32 whitespace-nowrap">SĐT</th>
+                  {/* 🟢 ĐÃ FIX: Sửa tên cột SĐT */}
+                  <th className="p-4 w-36 whitespace-nowrap">Điện thoại</th>
                   <th className="p-4 w-32 whitespace-nowrap">Thâm niên</th>
                   <th className="p-4 text-center w-48 whitespace-nowrap">Thao tác</th>
                 </tr>
@@ -526,7 +527,7 @@ export default function PersonnelPage() {
                     <p className="text-lg font-medium">Không có nhân sự nào trong danh sách hiển thị.</p>
                   </td></tr>
                 ) : (
-                  filteredPersonnel.map((item) => (
+                  filteredPersonnel.map((item: any) => (
                     <tr key={item.ID_NhanSu} className={`hover:bg-blue-50/50 transition-colors group ${item.TrangThai === 'Đã nghỉ việc' ? 'opacity-60 bg-gray-50' : ''}`}>
                       <td className="p-4 font-semibold text-gray-800 whitespace-nowrap">{item.MaNV}</td>
                       <td className="p-4 whitespace-nowrap">
@@ -535,7 +536,24 @@ export default function PersonnelPage() {
                       </td>
                       <td className="p-4 text-sm font-medium text-gray-700 whitespace-nowrap">{donViMap[item.ID_DonVi] || item.ID_DonVi || '-'}</td>
                       <td className="p-4 text-sm text-gray-600 whitespace-nowrap">{item.ChucVu}</td>
-                      <td className="p-4 text-sm text-gray-600 whitespace-nowrap">{formatPhoneNumber(item.SDT)}</td>
+                      
+                      {/* 🟢 ĐÃ FIX: CHUYỂN SỐ ĐIỆN THOẠI THÀNH LINK BẤM GỌI (tel:) VÀ CHIA MÀU SẮC */}
+                      <td className="p-4 whitespace-nowrap">
+                        <div className="flex flex-col gap-1.5">
+                          {item.SDT && (
+                            <a href={`tel:${String(item.SDT).replace(/\D/g, '')}`} className="text-sm font-bold text-[#05469B] hover:underline flex items-center gap-1.5 w-fit" title="Gọi SĐT Công ty">
+                              <Phone size={13} className="text-blue-400" /> {formatPhoneNumber(item.SDT)}
+                            </a>
+                          )}
+                          {item.SDTCanhan && (
+                            <a href={`tel:${String(item.SDTCanhan).replace(/\D/g, '')}`} className="text-sm font-bold text-emerald-500 hover:underline flex items-center gap-1.5 w-fit" title="Gọi SĐT Cá nhân">
+                              <Phone size={13} className="text-emerald-400" /> {formatPhoneNumber(item.SDTCanhan)}
+                            </a>
+                          )}
+                          {!item.SDT && !item.SDTCanhan && <span className="text-sm text-gray-400 font-medium">---</span>}
+                        </div>
+                      </td>
+
                       <td className="p-4 text-sm font-medium text-emerald-600 whitespace-nowrap">
                         <span className={`rounded-md inline-block px-2 py-1 border ${item.TrangThai === 'Đã nghỉ việc' ? 'bg-gray-100 text-gray-500 border-gray-200' : 'bg-emerald-50/50 border-emerald-100'}`}>
                           {calculateSeniority(item.NgayNhanViec, item.TrangThai || 'Đang làm việc', item.NgayNghiViec || '')}
@@ -581,8 +599,23 @@ export default function PersonnelPage() {
             </div>
 
             <div className="p-6 overflow-y-auto custom-scrollbar">
+              
+              {/* 🟢 CẢNH BÁO THU HỒI SIM CÔNG TY (NẾU CÓ) */}
+              {personnelToOffboard.SDT && (
+                <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-xl flex gap-3 mb-4">
+                  <Phone className="text-yellow-600 shrink-0 w-6 h-6"/>
+                  <div>
+                    <h4 className="font-black text-yellow-800 mb-1">CẢNH BÁO: Thu hồi SIM Công ty!</h4>
+                    <p className="text-sm text-yellow-700 font-medium">
+                      Nhân sự này đang được cấp số điện thoại: <span className="font-black text-yellow-900">{formatPhoneNumber(personnelToOffboard.SDT)}</span>. 
+                      Vui lòng yêu cầu bàn giao lại SIM công ty trước khi hoàn tất thủ tục nghỉ việc.
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {checkingAssets ? (
-                <div className="flex flex-col items-center justify-center py-12">
+                <div className="flex flex-col items-center justify-center py-12 border border-gray-100 rounded-xl">
                   <Loader2 className="w-10 h-10 text-orange-500 animate-spin mb-4" />
                   <p className="text-gray-600 font-bold">Đang quét hệ thống Tài sản & Nhật ký...</p>
                 </div>
@@ -627,14 +660,14 @@ export default function PersonnelPage() {
                       onChange={(e) => setForceOffboard(e.target.checked)}
                       className="mt-1 w-5 h-5 rounded text-orange-500 focus:ring-orange-500 border-gray-300"
                     />
-                    <span className="text-sm font-semibold text-gray-700">Tôi xác nhận đã thu hồi các tài sản này ngoài hệ thống, hoặc vẫn muốn chốt nghỉ việc ngay lập tức.</span>
+                    <span className="text-sm font-semibold text-gray-700">Tôi xác nhận đã thu hồi các tài sản/SIM này ngoài hệ thống, hoặc vẫn muốn chốt nghỉ việc ngay lập tức.</span>
                   </label>
                 </div>
               ) : (
                 <div className="flex flex-col items-center justify-center py-8 bg-emerald-50 rounded-xl border border-emerald-100">
                   <CheckCheck className="w-16 h-16 text-emerald-500 mb-3" />
                   <h4 className="font-black text-emerald-700 text-lg mb-1">An toàn chốt nghỉ việc</h4>
-                  <p className="text-emerald-600 font-medium text-sm text-center px-4">Hệ thống không ghi nhận tài sản nào đang được giao cho nhân sự này.</p>
+                  <p className="text-emerald-600 font-medium text-sm text-center px-4">Hệ thống không ghi nhận thiết bị phần cứng nào đang được giao cho nhân sự này.</p>
                 </div>
               )}
             </div>
@@ -654,6 +687,7 @@ export default function PersonnelPage() {
         </div>
       )}
 
+      {/* 🟢 VIEW MODAL */}
       {isViewModalOpen && viewData && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl flex flex-col max-h-[90vh] animate-in fade-in zoom-in duration-200">
@@ -678,9 +712,20 @@ export default function PersonnelPage() {
                     <span className="px-2.5 py-0.5 bg-gray-100 border border-gray-200 rounded text-xs font-bold text-gray-600">ID: {viewData.MaNV}</span>
                   </div>
                   <p className="text-lg font-bold text-[#05469B] mb-3">{viewData.ChucVu}</p>
+                  
+                  {/* 🟢 HIỂN THỊ CẢ 2 SỐ ĐIỆN THOẠI TRONG MODAL */}
                   <div className="flex flex-col sm:flex-row flex-wrap justify-center sm:justify-start gap-3 sm:gap-4 text-sm text-gray-600 font-medium">
-                    <span className="flex items-center justify-center sm:justify-start gap-1.5"><Phone size={16} className="text-gray-400"/> {formatPhoneNumber(viewData.SDT) || 'Chưa có SĐT'}</span>
-                    <span className="flex items-center justify-center sm:justify-start gap-1.5"><Mail size={16} className="text-gray-400"/> {viewData.Email || 'Chưa có Email'}</span>
+                    {viewData.SDT && (
+                      <a href={`tel:${String(viewData.SDT).replace(/\D/g, '')}`} className="flex items-center justify-center sm:justify-start gap-1.5 bg-blue-50 px-2 py-1 rounded text-blue-800 border border-blue-100 hover:bg-blue-100 transition-colors">
+                        <Phone size={16} className="text-blue-500"/> SĐT Cty: <span className="font-bold">{formatPhoneNumber(viewData.SDT)}</span>
+                      </a>
+                    )}
+                    {viewData.SDTCanhan && (
+                      <a href={`tel:${String(viewData.SDTCanhan).replace(/\D/g, '')}`} className="flex items-center justify-center sm:justify-start gap-1.5 bg-emerald-50 px-2 py-1 rounded text-emerald-800 border border-emerald-200 hover:bg-emerald-100 transition-colors">
+                        <Phone size={16} className="text-emerald-500"/> SĐT Cá nhân: <span className="font-bold">{formatPhoneNumber(viewData.SDTCanhan)}</span>
+                      </a>
+                    )}
+                    <span className="flex items-center justify-center sm:justify-start gap-1.5 mt-1 sm:mt-0"><Mail size={16} className="text-gray-400"/> {viewData.Email || 'Chưa có Email'}</span>
                   </div>
                 </div>
               </div>
@@ -732,7 +777,7 @@ export default function PersonnelPage() {
                   {viewData.GPLX && viewData.GPLX !== 'Không có' && (
                     <div className="flex flex-wrap gap-2 items-center">
                       <span className="text-sm font-bold text-gray-600 mr-1 shrink-0">Bằng lái xe:</span>
-                      {viewData.GPLX.split(',').map((bang, idx) => (
+                      {viewData.GPLX.split(',').map((bang: string, idx: number) => (
                         <span key={idx} className="px-2.5 py-1 bg-blue-100 text-[#05469B] font-black rounded-md text-xs border border-blue-200">
                           Hạng {bang.trim()}
                         </span>
@@ -777,13 +822,22 @@ export default function PersonnelPage() {
               
               <div className="bg-blue-50/40 p-4 sm:p-5 rounded-xl border border-blue-100">
                 <h4 className="font-bold text-[#05469B] mb-4 flex items-center gap-2"><div className="w-2 h-6 bg-[#05469B] rounded-full"></div> Thông tin cá nhân</h4>
+                
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                   <div><label className="block text-xs font-bold text-gray-700 mb-1">Mã NV *</label><input type="text" required name="MaNV" value={formData.MaNV || ''} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" /></div>
                   <div className="md:col-span-2"><label className="block text-xs font-bold text-gray-700 mb-1">Họ và Tên *</label><input type="text" required name="HoTen" value={formData.HoTen || ''} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" /></div>
                   <div><label className="block text-xs font-bold text-gray-700 mb-1">Giới tính</label><select name="GioiTinh" value={formData.GioiTinh || 'Nam'} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]"><option value="Nam">Nam</option><option value="Nữ">Nữ</option></select></div>
+                  
                   <div><label className="block text-xs font-bold text-gray-700 mb-1">Năm sinh</label><input type="date" name="NamSinh" value={formData.NamSinh ? formData.NamSinh.split('T')[0] : ''} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" /></div>
-                  <div><label className="block text-xs font-bold text-gray-700 mb-1">Số điện thoại</label><input type="tel" name="SDT" value={formData.SDT || ''} onChange={(e) => setFormData({...formData, SDT: formatPhoneNumber(e.target.value)})} maxLength={13} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-bold tracking-wide" placeholder="09xx xxx xxx" /></div>
-                  <div className="md:col-span-2"><label className="block text-xs font-bold text-gray-700 mb-1">Email</label><input type="email" name="Email" value={formData.Email || ''} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" /></div>
+                  <div>
+                    <label className="block text-xs font-bold text-[#05469B] mb-1">SĐT Công ty (Sim cấp)</label>
+                    <input type="tel" name="SDT" value={formData.SDT || ''} onChange={(e) => setFormData({...formData, SDT: formatPhoneNumber(e.target.value)})} maxLength={13} className="w-full p-2.5 border border-blue-300 rounded-lg bg-blue-50 outline-none focus:ring-2 focus:ring-[#05469B] font-bold tracking-wide text-[#05469B]" placeholder="09xx xxx xxx" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">SĐT Cá nhân</label>
+                    <input type="tel" name="SDTCanhan" value={formData.SDTCanhan || ''} onChange={(e) => setFormData({...formData, SDTCanhan: formatPhoneNumber(e.target.value)})} maxLength={13} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-bold tracking-wide" placeholder="09xx xxx xxx" />
+                  </div>
+                  <div className="md:col-span-1"><label className="block text-xs font-bold text-gray-700 mb-1">Email</label><input type="email" name="Email" value={formData.Email || ''} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" /></div>
                 </div>
               </div>
 
