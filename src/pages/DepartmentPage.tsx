@@ -1194,7 +1194,7 @@ export default function DepartmentPage() {
                       {expiringContracts.length === 0 ? (
                         <div className="bg-white p-4 rounded-xl border border-emerald-100 text-center flex flex-col items-center shadow-sm">
                           <CheckCircle2 size={32} className="text-emerald-500 mb-2"/>
-                          <p className="text-emerald-700 font-bold text-sm">Tuyệt vời! Tất cả các hợp đồng bảo vệ toàn cụm đều đang trong thời hạn an toàn (&gt; 30 ngày).</p>
+                          <p className="text-emerald-700 font-bold text-sm">Các hợp đồng bảo vệ dịch vụ tại các Đơn vị trực thuộc đều đang trong thời hạn an toàn (&gt; 30 ngày).</p>
                         </div>
                       ) : (
                         <div className="overflow-x-auto bg-white rounded-xl border border-orange-200 shadow-sm">
