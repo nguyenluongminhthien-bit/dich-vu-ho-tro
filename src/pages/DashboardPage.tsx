@@ -489,7 +489,7 @@ export default function DashboardPage() {
             {/* 🟢 VÙNG 1: WIDGETS TỔNG QUAN QUY MÔ (ĐÃ CẬP NHẬT GIAO DIỆN 1 HÀNG) */}
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
               <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-center hover:shadow-md transition-shadow">
-                <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5"><Building2 size={14}/> Thượng Tầng Quản Trị</p>
+                <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5"><Building2 size={14}/>Hệ Thống Quản Trị</p>
                 <div className="flex items-center justify-between px-2">
                   <div className="text-center">
                     <p className="text-2xl font-black text-[#05469B]">{vpdhUnits.length}</p>
