@@ -6,13 +6,12 @@ import { getUnitEmoji } from '../utils/hierarchy';
 import { 
   Building2, MapPin, ChevronDown, ChevronRight, PanelLeftClose, PanelLeftOpen,
   Search, Loader2, Filter, LayoutDashboard, Users, MonitorSmartphone,
-  Flame, AlertTriangle, Activity, Briefcase, BellRing, FileText, ShieldAlert, ShieldCheck
+  Flame, AlertTriangle, Activity, Briefcase, BellRing, FileText, ShieldAlert, ShieldCheck, Video
 } from 'lucide-react';
 
-// 🟢 1. BỘ XỬ LÝ NGÀY THÁNG BẤT TỬ (Chống lỗi 1970/2001, tự động dịch múi giờ)
+// 🟢 1. BỘ XỬ LÝ NGÀY THÁNG BẤT TỬ
 const parseDateStrict = (val: any): Date | null => {
   if (!val || val === 0 || val === '0') return null;
-  
   const d = new Date(val);
   if (!isNaN(d.getTime()) && d.getFullYear() > 2000) return d;
 
@@ -30,7 +29,7 @@ const parseDateStrict = (val: any): Date | null => {
   return null;
 };
 
-// 🟢 2. THUẬT TOÁN TỰ ĐỘNG CỘNG THÁNG VÀO NGÀY BẮT ĐẦU (Nhận diện cả số "6" và chữ "6 tháng")
+// 🟢 2. THUẬT TOÁN TỰ ĐỘNG CỘNG THÁNG VÀO NGÀY BẮT ĐẦU
 const extractDateAndAddDuration = (durationRaw: any, startDateRaw: any): Date | null => {
   const baseDate = parseDateStrict(startDateRaw);
   if (!baseDate) return null;
@@ -39,7 +38,7 @@ const extractDateAndAddDuration = (durationRaw: any, startDateRaw: any): Date | 
   const s = String(durationRaw).toLowerCase().trim();
   
   if (/^\d+$/.test(s)) {
-    monthsToAdd = parseInt(s, 10); // Nếu chỉ gõ số (VD: 6) -> tự hiểu là 6 tháng
+    monthsToAdd = parseInt(s, 10);
   } else {
     const monthMatch = s.match(/(\d+)\s*tháng/);
     const yearMatch = s.match(/(\d+)\s*năm/);
@@ -78,7 +77,6 @@ export default function DashboardPage() {
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
-      
       const safeCall = async (apiFunc: any) => {
         if (typeof apiFunc !== 'function') return [];
         try {
@@ -213,9 +211,9 @@ export default function DashboardPage() {
   };
 
   const selectedUnitName = useMemo(() => {
-    if (!selectedUnitFilter) return 'Toàn bộ Tập đoàn';
+    if (!selectedUnitFilter) return 'Toàn bộ Hệ thống';
     const unit = donViList.find(d => d.ID_DonVi === selectedUnitFilter);
-    return unit ? unit.TenDonVi : 'Toàn bộ Tập đoàn';
+    return unit ? unit.TenDonVi : 'Toàn bộ Hệ thống';
   }, [selectedUnitFilter, donViList]);
 
   const currentSubordinateIds = useMemo(() => {
@@ -223,15 +221,29 @@ export default function DashboardPage() {
     return [selectedUnitFilter, ...getAllSubIds(selectedUnitFilter, donViList)];
   }, [selectedUnitFilter, donViList]);
 
-  const widgetStats = useMemo(() => {
-    const totalUnits = donViList.filter(dv => 
-      currentSubordinateIds.includes(dv.ID_DonVi) && 
-      dv.ID_DonVi !== selectedUnitFilter &&
-      isCountableUnit(dv)
-    ).length || 0;
+  // 🟢 TÍNH TOÁN DỮ LIỆU NHÂN SỰ CHO WIDGET GỘP TRÊN CÙNG
+  const { widgetStats, staffRolesStats } = useMemo(() => {
+    const totalUnits = donViList.filter(dv => currentSubordinateIds.includes(dv.ID_DonVi) && dv.ID_DonVi !== selectedUnitFilter && isCountableUnit(dv)).length || 0;
+    
+    let totalStaff = 0;
+    let dvht = 0;
+    let bv = 0;
+    let pvhc = 0;
 
-    const totalStaff = nsData.filter(ns => currentSubordinateIds.includes(ns.ID_DonVi) && ns.TrangThai !== 'Đã nghỉ việc').length;
-    return { totalUnits, totalStaff };
+    nsData.forEach(ns => {
+      if (currentSubordinateIds.includes(ns.ID_DonVi) && ns.TrangThai !== 'Đã nghỉ việc') {
+        totalStaff++;
+        const role = String(ns.PhanLoai || '').toUpperCase();
+        if (role.includes('PT DVHT KD')) dvht++;
+        if (role.includes('BV, ĐTKH') || role.includes('BẢO VỆ')) bv++;
+        if (role.includes('PVHC')) pvhc++;
+      }
+    });
+
+    return { 
+      widgetStats: { totalUnits, totalStaff }, 
+      staffRolesStats: { dvht, bv, pvhc } 
+    };
   }, [currentSubordinateIds, donViList, nsData, selectedUnitFilter]);
 
   const companyScaleStats = useMemo(() => {
@@ -255,8 +267,9 @@ export default function DashboardPage() {
   const maxScaleNam = Math.max(...companyScaleStats.nam.map(i => i.count), 1);
   const maxScaleBac = Math.max(...companyScaleStats.bac.map(i => i.count), 1);
 
-  const pcccWarnings = useMemo(() => {
-    const warnings: any[] = [];
+  // 🟢 [BẢNG 1: PCCC GOM NHÓM - CHỈ LẤY THIẾT BỊ SẮP HẾT HẠN]
+  const pcccWarningsGrouped = useMemo(() => {
+    const groups: Record<string, any> = {};
     const today = new Date();
     today.setHours(0,0,0,0);
 
@@ -266,46 +279,77 @@ export default function DashboardPage() {
         if (expDate) {
           const diffTime = expDate.getTime() - today.getTime();
           const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+          
           if (diffDays <= 30) {
-            warnings.push({
-              unitName: donViMap[eq.ID_DonVi] || eq.ID_DonVi,
-              itemName: eq.LoaiThietBi || 'Thiết bị PCCC',
-              daysLeft: diffDays,
-              dateStr: expDate.toLocaleDateString('vi-VN')
-            });
+            const unitName = donViMap[eq.ID_DonVi] || eq.ID_DonVi;
+            const dateStr = expDate.toLocaleDateString('vi-VN');
+            const key = `${unitName}_${dateStr}`;
+            
+            if(!groups[key]) {
+              groups[key] = {
+                unitName,
+                dateStr,
+                daysLeft: diffDays,
+                items: {} 
+              };
+            }
+            
+            const itemName = eq.LoaiThietBi || 'Thiết bị';
+            groups[key].items[itemName] = (groups[key].items[itemName] || 0) + 1;
           }
         }
       }
     });
-    return warnings.sort((a, b) => a.daysLeft - b.daysLeft);
+    return Object.values(groups).sort((a, b) => a.daysLeft - b.daysLeft);
   }, [tsPcccData, currentSubordinateIds, donViMap]);
 
-  // 🟢 [THỐNG KÊ ĐƠN VỊ THUÊ BẢO VỆ + CẢNH BÁO 30 NGÀY]
+  // 🟢 [BẢNG 2: THỐNG KÊ CAMERA TỪ SHEET AN NINH - CẬP NHẬT CÁC CỘT]
+  const cameraStatsList = useMemo(() => {
+    const list: any[] = [];
+    anNinhData.forEach(an => {
+      if (currentSubordinateIds.includes(an.ID_DonVi)) {
+        // Lấy Tổng SL
+        const tongCam = parseInt(String(an.SLCAM || 0).replace(/\D/g,''), 10) || 0;
+        // Lấy SL Hư Hỏng
+        const camHu = parseInt(String(an.CAMHuHong || 0).replace(/\D/g,''), 10) || 0; 
+        // Lấy SL Đang Hoạt Động
+        const camHD = parseInt(String(an.CAMHD || 0).replace(/\D/g,''), 10) || (tongCam > 0 ? tongCam - camHu : 0);
+        
+        const lyDoHu = an.LyDoHuCam || 'Chưa cập nhật lý do'; 
+        
+        if (tongCam > 0 || camHu > 0 || camHD > 0) {
+          list.push({
+            unitName: donViMap[an.ID_DonVi] || an.ID_DonVi,
+            tongCam,
+            camHD,
+            camHu,
+            lyDoHu
+          });
+        }
+      }
+    });
+    // Sắp xếp: Đơn vị hư nhiều xếp trước
+    return list.sort((a, b) => b.camHu - a.camHu);
+  }, [anNinhData, currentSubordinateIds, donViMap]);
+
+  // 🟢 [BẢNG 3: HỢP ĐỒNG BẢO VỆ DỊCH VỤ]
   const anNinhStatsList = useMemo(() => {
     const list: any[] = [];
     const today = new Date();
     today.setHours(0,0,0,0);
 
     anNinhData.forEach(an => {
-      // Chỉ lấy đơn vị có thuê dịch vụ ngoài
       if (currentSubordinateIds.includes(an.ID_DonVi) && an.NCC_DichVu && String(an.NCC_DichVu).trim() !== '') {
-        
         let expDate = null;
-        
-        // 1. Lấy trực tiếp từ cột Ngày hết hạn (nếu có)
         const directExpRaw = an.NgayHetHan || an.NgayHetHanHD || an.NgayKetThuc || an.NgayKT;
+        
         if (directExpRaw) {
            expDate = parseDateStrict(directExpRaw);
         }
 
-        // 2. Tự động tính toán (Hạn HĐ + Ngày Ký)
         if (!expDate) {
-           // Gọi chính xác tên cột chứa số "6" (HanHopDong)
            const durationRaw = an.HanHopDong || an.HanHD || an.ThoiHanHD || an.ThoiGianHD || an.Thoihan || an.ThoiGianLuu || an.ThoiHan || ''; 
-           // Gọi chính xác tên cột chứa ngày "2025-10-01" (NgayKyHD)
            const startRaw = an.NgayKyHD || an.Ngaycd || an.NgayKy || an.NgayBatDau || '';
-           
-           // Áp dụng thuật toán cộng thời gian thông minh
            expDate = extractDateAndAddDuration(durationRaw, startRaw);
         }
 
@@ -314,7 +358,7 @@ export default function DashboardPage() {
 
         if (expDate) {
           const diffTime = expDate.getTime() - today.getTime();
-          diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); // Tính số ngày còn lại (âm là quá hạn)
+          diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
           dateStr = expDate.toLocaleDateString('vi-VN');
         }
 
@@ -326,8 +370,6 @@ export default function DashboardPage() {
         });
       }
     });
-
-    // Sắp xếp: Quá hạn/Sắp hết lên đầu
     return list.sort((a, b) => {
       if (a.daysLeft === null) return 1;
       if (b.daysLeft === null) return -1;
@@ -414,7 +456,7 @@ export default function DashboardPage() {
         </div>
         <div className="flex-1 overflow-y-auto p-2 min-w-[319px] custom-scrollbar">
           <button onClick={() => setSelectedUnitFilter(null)} className={`w-full flex items-center gap-2 px-3 py-3 rounded-xl text-sm font-black mb-4 transition-all ${selectedUnitFilter === null ? 'bg-gradient-to-r from-[#05469B] to-[#0a5bc4] text-white shadow-md' : 'text-gray-600 hover:bg-blue-50'}`}>
-            <Building2 size={18} className={selectedUnitFilter === null ? 'text-blue-100' : 'text-[#05469B]'} /> Báo cáo Toàn Tập Đoàn
+            <Building2 size={18} className={selectedUnitFilter === null ? 'text-blue-100' : 'text-[#05469B]'} /> Báo cáo Tổng quan Hệ thống
           </button>
           <hr className="border-gray-100 mb-4 mx-2"/>
           {loading ? (<div className="flex justify-center p-8"><Loader2 className="animate-spin text-[#05469B]" /></div>) : (
@@ -444,10 +486,10 @@ export default function DashboardPage() {
         ) : (
           <div className="space-y-6">
             
-            {/* VÙNG 1: WIDGETS TỔNG QUAN QUY MÔ */}
+            {/* 🟢 VÙNG 1: WIDGETS TỔNG QUAN QUY MÔ (ĐÃ CẬP NHẬT GIAO DIỆN 1 HÀNG) */}
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
               <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-center hover:shadow-md transition-shadow">
-                <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5"><Building2 size={14}/>Quản Trị</p>
+                <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5"><Building2 size={14}/> Thượng Tầng Quản Trị</p>
                 <div className="flex items-center justify-between px-2">
                   <div className="text-center">
                     <p className="text-2xl font-black text-[#05469B]">{vpdhUnits.length}</p>
@@ -456,12 +498,12 @@ export default function DashboardPage() {
                   <div className="w-px h-8 bg-gray-100"></div>
                   <div className="text-center">
                     <p className="text-2xl font-black text-orange-600">{ctttNamUnits.length}</p>
-                    <p className="text-[10px] font-bold text-gray-400">MIỀN NAM</p>
+                    <p className="text-[10px] font-bold text-gray-400">PHÍA NAM</p>
                   </div>
                   <div className="w-px h-8 bg-gray-100"></div>
                   <div className="text-center">
                     <p className="text-2xl font-black text-emerald-600">{ctttBacUnits.length}</p>
-                    <p className="text-[10px] font-bold text-gray-400">MIỀN BẮC</p>
+                    <p className="text-[10px] font-bold text-gray-400">PHÍA BẮC</p>
                   </div>
                 </div>
               </div>
@@ -475,26 +517,33 @@ export default function DashboardPage() {
                 <div className="absolute -right-4 -bottom-4 opacity-5"><Building2 size={100}/></div>
               </div>
 
-              <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4 hover:shadow-md transition-shadow relative overflow-hidden">
-                <div className="w-14 h-14 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600 shrink-0 z-10"><Users size={28}/></div>
-                <div className="z-10">
-                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Tổng Nhân sự</p>
-                  <p className="text-3xl font-black text-gray-800">{widgetStats.totalStaff}</p>
+              {/* Ô TỔNG NHÂN SỰ VÀ CƠ CẤU (CHIẾM 2 CỘT NGANG) */}
+              <div className="xl:col-span-2 bg-white p-4 rounded-2xl border border-emerald-200 shadow-sm hover:shadow-md transition-shadow flex items-center justify-between relative overflow-hidden gap-4">
+                {/* Khối bên trái: Số lượng Tổng */}
+                <div className="flex items-center gap-3 shrink-0 z-10 pl-2 border-r border-gray-100 pr-6">
+                  <div className="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600 shrink-0 shadow-sm border border-emerald-100"><Users size={24}/></div>
+                  <div>
+                    <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-0.5">Tổng Nhân sự</p>
+                    <p className="text-3xl font-black text-gray-800 leading-none">{widgetStats.totalStaff}</p>
+                  </div>
                 </div>
-                <div className="absolute -right-4 -bottom-4 opacity-5"><Users size={100}/></div>
-              </div>
-
-              <div className={`p-5 rounded-2xl border shadow-sm flex items-center gap-4 transition-all relative overflow-hidden ${pcccWarnings.length > 0 ? 'bg-red-50 border-red-200 cursor-pointer hover:bg-red-100' : 'bg-gray-50 border-gray-200'}`}>
-                <div className={`w-14 h-14 rounded-full flex items-center justify-center shrink-0 z-10 ${pcccWarnings.length > 0 ? 'bg-red-500 text-white animate-pulse' : 'bg-gray-200 text-gray-400'}`}>
-                  <Flame size={28}/>
+                
+                {/* Khối bên phải: 3 cột cơ cấu nhỏ */}
+                <div className="flex-1 grid grid-cols-3 gap-3 z-10">
+                  <div className="bg-blue-50/70 rounded-xl py-2 px-1 text-center border border-blue-100/50 hover:bg-blue-100 transition-colors cursor-help" title="Nhân sự Phụ trách Dịch vụ Hỗ trợ Kinh doanh">
+                    <p className="text-[10px] font-bold text-[#05469B]/70 mb-0.5 uppercase">NS PT DVHT KD</p>
+                    <p className="font-black text-[#05469B] text-xl">{staffRolesStats.dvht}</p>
+                  </div>
+                  <div className="bg-blue-50/70 rounded-xl py-2 px-1 text-center border border-blue-100/50 hover:bg-blue-100 transition-colors cursor-help" title="Nhân sự Bảo vệ, Đối tác Khách hàng">
+                    <p className="text-[10px] font-bold text-[#05469B]/70 mb-0.5 uppercase">NS BV, ĐTKH</p>
+                    <p className="font-black text-[#05469B] text-xl">{staffRolesStats.bv}</p>
+                  </div>
+                  <div className="bg-blue-50/70 rounded-xl py-2 px-1 text-center border border-blue-100/50 hover:bg-blue-100 transition-colors cursor-help" title="Nhân sự Phục vụ Hành chính">
+                    <p className="text-[10px] font-bold text-[#05469B]/70 mb-0.5 uppercase">NS PVHC</p>
+                    <p className="font-black text-[#05469B] text-xl">{staffRolesStats.pvhc}</p>
+                  </div>
                 </div>
-                <div className="z-10">
-                  <p className={`text-xs font-bold uppercase tracking-wider mb-1 ${pcccWarnings.length > 0 ? 'text-red-700' : 'text-gray-500'}`}>Thiết bị PCCC</p>
-                  <p className={`text-xl font-black leading-tight ${pcccWarnings.length > 0 ? 'text-red-700' : 'text-gray-500'}`}>
-                    {pcccWarnings.length > 0 ? `${pcccWarnings.length} Thiết bị sắp hết hạn` : 'Đang an toàn'}
-                  </p>
-                </div>
-                <div className="absolute -right-4 -bottom-4 opacity-5"><AlertTriangle size={100}/></div>
+                <div className="absolute right-0 bottom-0 opacity-[0.03] pointer-events-none"><Users size={150}/></div>
               </div>
             </div>
 
@@ -678,96 +727,150 @@ export default function DashboardPage() {
 
             </div>
 
-            {/* 🟢 VÙNG 3: BẢNG CẢNH BÁO CHI TIẾT (CHIA 2 CỘT PCCC & AN NINH) */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* 🟢 VÙNG 3: BỐ CỤC 3 CỘT MỚI DÀNH CHO CÁC BẢNG CẢNH BÁO */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               
-              {/* BẢNG 1: PCCC SẮP HẾT HẠN KIỂM ĐỊNH */}
+              {/* BẢNG 1: CẢNH BÁO THIẾT BỊ PCCC (Sử dụng Tooltip khi Hover) */}
               <div className="bg-white rounded-2xl border border-red-200 shadow-sm overflow-hidden flex flex-col">
-                <div className="bg-red-50 p-4 border-b border-red-100 flex items-center gap-2 shrink-0">
-                  <AlertTriangle className="text-red-600 shrink-0" size={20}/>
-                  <h3 className="font-black text-red-800 text-sm uppercase tracking-wider">Cảnh báo: PCCC sắp hết hạn</h3>
+                <div className="bg-red-50 p-4 border-b border-red-100 flex items-center justify-between shrink-0">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="text-red-600 shrink-0" size={20}/>
+                    <h3 className="font-black text-red-800 text-sm uppercase tracking-wider">Cảnh báo PCCC sắp hết hạn</h3>
+                  </div>
+                  <span className="bg-red-600 text-white text-xs font-black px-2 py-0.5 rounded-full">{pcccWarningsGrouped.length}</span>
                 </div>
                 <div className="p-0 overflow-x-auto flex-1 max-h-[350px] custom-scrollbar">
-                  {pcccWarnings.length === 0 ? (
+                  {pcccWarningsGrouped.length === 0 ? (
                     <div className="h-full flex flex-col items-center justify-center text-gray-400 py-10">
                       <Flame size={40} className="mb-2 opacity-30 text-emerald-500"/>
                       <p className="font-medium text-sm text-emerald-600">Tất cả thiết bị đều an toàn.</p>
                     </div>
                   ) : (
-                    <table className="w-full text-left text-sm">
+                    <table className="w-full text-left text-sm cursor-default">
                       <thead className="bg-gray-50 text-gray-600 font-bold uppercase text-[10px] tracking-wider sticky top-0 z-10">
                         <tr>
                           <th className="p-3">Đơn vị</th>
-                          <th className="p-3">Thiết bị</th>
-                          <th className="p-3 text-center">Hạn KĐ</th>
+                          <th className="p-3 text-center">Hạn Kiểm định</th>
                           <th className="p-3 text-right">Tình trạng</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100">
-                        {pcccWarnings.map((warn, idx) => (
-                          <tr key={idx} className="hover:bg-red-50/30 transition-colors">
-                            <td className="p-3 font-bold text-gray-800 text-xs">{warn.unitName}</td>
-                            <td className="p-3 font-semibold text-[#05469B] text-xs">{warn.itemName}</td>
-                            <td className="p-3 text-center font-semibold text-xs">{warn.dateStr}</td>
-                            <td className="p-3 text-right">
-                              {warn.daysLeft < 0 ? (
-                                <span className="inline-block px-2 py-0.5 bg-red-100 text-red-700 font-black rounded border border-red-200 text-[10px] animate-pulse">Trễ {Math.abs(warn.daysLeft)} ngày!</span>
-                              ) : warn.daysLeft === 0 ? (
-                                <span className="inline-block px-2 py-0.5 bg-red-100 text-red-700 font-black rounded border border-red-200 text-[10px] animate-pulse">Hết hạn Hôm nay!</span>
-                              ) : (
-                                <span className="inline-block px-2 py-0.5 bg-orange-100 text-orange-700 font-bold rounded border border-orange-200 text-[10px]">Còn {warn.daysLeft} ngày</span>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
+                        {pcccWarningsGrouped.map((warn, idx) => {
+                          const tooltipText = Object.entries(warn.items).map(([name, count]) => `• ${name}: ${count} thiết bị`).join('\n');
+                          return (
+                            <tr key={idx} className="hover:bg-red-50/30 transition-colors cursor-help" title={tooltipText}>
+                              <td className="p-3 font-bold text-[#05469B] text-xs" title={tooltipText}>{warn.unitName}</td>
+                              <td className="p-3 text-center font-semibold text-xs text-gray-700" title={tooltipText}>{warn.dateStr}</td>
+                              <td className="p-3 text-right" title={tooltipText}>
+                                {warn.daysLeft < 0 ? (
+                                  <span className="inline-block px-2 py-0.5 bg-red-100 text-red-700 font-black rounded border border-red-200 text-[10px] animate-pulse">Trễ {Math.abs(warn.daysLeft)} ngày!</span>
+                                ) : warn.daysLeft === 0 ? (
+                                  <span className="inline-block px-2 py-0.5 bg-red-100 text-red-700 font-black rounded border border-red-200 text-[10px] animate-pulse">Hết hạn Hôm nay!</span>
+                                ) : (
+                                  <span className="inline-block px-2 py-0.5 bg-orange-100 text-orange-700 font-bold rounded border border-orange-200 text-[10px]">Còn {warn.daysLeft} ngày</span>
+                                )}
+                              </td>
+                            </tr>
+                          )
+                        })}
                       </tbody>
                     </table>
                   )}
                 </div>
               </div>
 
-              {/* 🟢 BẢNG 2: THỐNG KÊ ĐƠN VỊ THUÊ BẢO VỆ + CẢNH BÁO */}
-              <div className="bg-white rounded-2xl border border-[#05469B]/20 shadow-sm overflow-hidden flex flex-col">
-                <div className="bg-blue-50 p-4 border-b border-blue-100 flex items-center gap-2 shrink-0">
-                  <ShieldCheck className="text-[#05469B] shrink-0" size={20}/>
-                  <h3 className="font-black text-[#05469B] text-sm uppercase tracking-wider">Hợp đồng Thuê DV Bảo vệ</h3>
+              {/* 🟢 BẢNG 2: HỆ THỐNG GIÁM SÁT CAMERA */}
+              <div className="bg-white rounded-2xl border border-indigo-200 shadow-sm overflow-hidden flex flex-col">
+                <div className="bg-indigo-50 p-4 border-b border-indigo-100 flex items-center justify-between shrink-0">
+                  <div className="flex items-center gap-2">
+                    <Video className="text-indigo-600 shrink-0" size={20}/>
+                    <h3 className="font-black text-indigo-800 text-sm uppercase tracking-wider">Hệ thống Giám sát</h3>
+                  </div>
+                  <span className="bg-indigo-600 text-white text-xs font-black px-2 py-0.5 rounded-full">{cameraStatsList.length}</span>
+                </div>
+                <div className="p-0 overflow-x-auto flex-1 max-h-[350px] custom-scrollbar">
+                  {cameraStatsList.length === 0 ? (
+                    <div className="h-full flex flex-col items-center justify-center text-gray-400 py-10">
+                      <MonitorSmartphone size={40} className="mb-2 opacity-30 text-gray-400"/>
+                      <p className="font-medium text-sm text-gray-500">Chưa có dữ liệu hệ thống Camera.</p>
+                    </div>
+                  ) : (
+                    <table className="w-full text-left text-sm cursor-default">
+                      <thead className="bg-gray-50 text-gray-600 font-bold uppercase text-[10px] tracking-wider sticky top-0 z-10">
+                        <tr>
+                          <th className="p-3">Đơn vị</th>
+                          <th className="p-3 text-center">Tổng SL</th>
+                          <th className="p-3 text-center">Hoạt động</th>
+                          <th className="p-3 text-right">Hư/Hỏng</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {cameraStatsList.map((cam, idx) => {
+                          const tooltipText = cam.camHu > 0 ? `Lý do hỏng: ${cam.lyDoHu}` : 'Hệ thống Camera hoạt động tốt';
+                          return (
+                            <tr key={idx} className="hover:bg-indigo-50/30 transition-colors cursor-help" title={tooltipText}>
+                              <td className="p-3 font-bold text-[#05469B] text-xs" title={tooltipText}>{cam.unitName}</td>
+                              <td className="p-3 text-center font-black text-gray-700 text-xs" title={tooltipText}>{cam.tongCam}</td>
+                              <td className="p-3 text-center font-bold text-emerald-600 text-xs" title={tooltipText}>{cam.camHD}</td>
+                              <td className="p-3 text-right" title={tooltipText}>
+                                {cam.camHu > 0 ? (
+                                  <span className="inline-block px-2 py-0.5 bg-red-100 text-red-700 font-black rounded border border-red-200 text-[10px] animate-pulse">{cam.camHu} lỗi</span>
+                                ) : (
+                                  <span className="inline-block px-2 py-0.5 bg-emerald-50 text-emerald-600 font-bold rounded border border-emerald-200 text-[10px]">Tốt</span>
+                                )}
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              </div>
+
+              {/* BẢNG 3: HỢP ĐỒNG THUÊ DỊCH VỤ BẢO VỆ */}
+              <div className="bg-white rounded-2xl border border-blue-200 shadow-sm overflow-hidden flex flex-col">
+                <div className="bg-blue-50 p-4 border-b border-blue-100 flex items-center justify-between shrink-0">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck className="text-blue-600 shrink-0" size={20}/>
+                    <h3 className="font-black text-blue-800 text-sm uppercase tracking-wider">HĐ Thuê DV Bảo vệ</h3>
+                  </div>
+                  <span className="bg-blue-600 text-white text-xs font-black px-2 py-0.5 rounded-full">{anNinhStatsList.length}</span>
                 </div>
                 <div className="p-0 overflow-x-auto flex-1 max-h-[350px] custom-scrollbar">
                   {anNinhStatsList.length === 0 ? (
                     <div className="h-full flex flex-col items-center justify-center text-gray-400 py-10">
                       <ShieldAlert size={40} className="mb-2 opacity-30 text-gray-400"/>
-                      <p className="font-medium text-sm text-gray-500">Chưa có đơn vị nào thuê dịch vụ bảo vệ ngoài.</p>
+                      <p className="font-medium text-sm text-gray-500">Chưa có đơn vị thuê dịch vụ ngoài.</p>
                     </div>
                   ) : (
-                    <table className="w-full text-left text-sm">
+                    <table className="w-full text-left text-sm cursor-default">
                       <thead className="bg-gray-50 text-gray-600 font-bold uppercase text-[10px] tracking-wider sticky top-0 z-10">
                         <tr>
                           <th className="p-3">Đơn vị thuê</th>
-                          <th className="p-3">Công ty Dịch vụ</th>
                           <th className="p-3 text-center">Hạn HĐ</th>
                           <th className="p-3 text-right">Tình trạng</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100">
                         {anNinhStatsList.map((stat, idx) => {
-                          // Cảnh báo khi tính ra ngày âm (< 0) hoặc sắp hết (<= 30)
                           const isWarning = stat.daysLeft !== null && stat.daysLeft <= 30;
+                          const tooltipText = `NCC: ${stat.provider}`;
                           return (
-                            <tr key={idx} className={`transition-colors ${isWarning ? 'hover:bg-red-50/30' : 'hover:bg-blue-50/30'}`}>
-                              <td className="p-3 font-bold text-gray-800 text-xs">{stat.unitName}</td>
-                              <td className="p-3 font-semibold text-[#05469B] text-xs">{stat.provider}</td>
-                              <td className="p-3 text-center font-semibold text-xs text-gray-600">{stat.dateStr}</td>
-                              <td className="p-3 text-right">
+                            <tr key={idx} className={`transition-colors cursor-help ${isWarning ? 'hover:bg-red-50/30' : 'hover:bg-blue-50/30'}`} title={tooltipText}>
+                              <td className="p-3 font-bold text-[#05469B] text-xs truncate max-w-[120px]" title={tooltipText}>{stat.unitName}</td>
+                              <td className="p-3 text-center font-semibold text-xs text-gray-600" title={tooltipText}>{stat.dateStr}</td>
+                              <td className="p-3 text-right" title={tooltipText}>
                                 {stat.daysLeft === null ? (
-                                  <span className="inline-block px-2 py-0.5 bg-gray-100 text-gray-500 font-bold rounded border border-gray-200 text-[10px]">Chưa rõ hạn</span>
+                                  <span className="inline-block px-2 py-0.5 bg-gray-100 text-gray-500 font-bold rounded border border-gray-200 text-[10px]">Chưa rõ</span>
                                 ) : stat.daysLeft < 0 ? (
-                                  <span className="inline-block px-2 py-0.5 bg-red-100 text-red-700 font-black rounded border border-red-200 text-[10px] animate-pulse">Quá hạn {Math.abs(stat.daysLeft)} ngày</span>
+                                  <span className="inline-block px-2 py-0.5 bg-red-100 text-red-700 font-black rounded border border-red-200 text-[10px] animate-pulse">Quá hạn {Math.abs(stat.daysLeft)}</span>
                                 ) : stat.daysLeft === 0 ? (
-                                  <span className="inline-block px-2 py-0.5 bg-red-100 text-red-700 font-black rounded border border-red-200 text-[10px] animate-pulse">Hết hạn Hôm nay!</span>
+                                  <span className="inline-block px-2 py-0.5 bg-red-100 text-red-700 font-black rounded border border-red-200 text-[10px] animate-pulse">Hết hôm nay!</span>
                                 ) : stat.daysLeft <= 30 ? (
-                                  <span className="inline-block px-2 py-0.5 bg-orange-100 text-orange-700 font-bold rounded border border-orange-200 text-[10px]">Sắp hết (Còn {stat.daysLeft} ngày)</span>
+                                  <span className="inline-block px-2 py-0.5 bg-orange-100 text-orange-700 font-bold rounded border border-orange-200 text-[10px]">Còn {stat.daysLeft} ngày</span>
                                 ) : (
-                                  <span className="inline-block px-2 py-0.5 bg-emerald-50 text-emerald-600 font-bold rounded border border-emerald-200 text-[10px]">Đang hiệu lực</span>
+                                  <span className="inline-block px-2 py-0.5 bg-emerald-50 text-emerald-600 font-bold rounded border border-emerald-200 text-[10px]">Hiệu lực</span>
                                 )}
                               </td>
                             </tr>
