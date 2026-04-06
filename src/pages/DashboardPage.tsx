@@ -52,6 +52,17 @@ const extractDateAndAddDuration = (durationRaw: any, startDateRaw: any): Date | 
   return baseDate;
 };
 
+// 🟢 3. HÀM ĐỊNH DẠNG TIỀN TỆ (Thêm mới)
+const formatCurrency = (val: any) => {
+  if (!val) return 'Chưa cập nhật';
+  // Lọc lấy phần số
+  const num = Number(String(val).replace(/[^0-9.-]+/g,""));
+  // Nếu không phải số hợp lệ thì trả về nguyên bản chữ
+  if (isNaN(num) || num === 0) return String(val);
+  // Định dạng chuẩn Việt Nam
+  return num.toLocaleString('vi-VN') + ' VNĐ';
+};
+
 export default function DashboardPage() {
   const { user } = useAuth();
   const [donViList, setDonViList] = useState<DonVi[]>([]);
@@ -332,7 +343,7 @@ export default function DashboardPage() {
     return list.sort((a, b) => b.camHu - a.camHu);
   }, [anNinhData, currentSubordinateIds, donViMap]);
 
-  // 🟢 [BẢNG 3: HỢP ĐỒNG BẢO VỆ DỊCH VỤ]
+  // 🟢 [BẢNG 3: HỢP ĐỒNG BẢO VỆ DỊCH VỤ - BỔ SUNG CHI PHÍ]
   const anNinhStatsList = useMemo(() => {
     const list: any[] = [];
     const today = new Date();
@@ -362,11 +373,15 @@ export default function DashboardPage() {
           dateStr = expDate.toLocaleDateString('vi-VN');
         }
 
+        // Bổ sung lấy giá trị Chi phí thuê (hỗ trợ đọc từ nhiều tên cột khác nhau nếu sheet đổi tên)
+        const costRaw = an.ChiPhiThue || an.ChiPhi || an.GiaTriHD || an.TongChiPhi || '';
+
         list.push({
           unitName: donViMap[an.ID_DonVi] || an.ID_DonVi,
           provider: an.NCC_DichVu,
           daysLeft: diffDays,
-          dateStr: dateStr
+          dateStr: dateStr,
+          cost: formatCurrency(costRaw) // 🟢 Thêm trường giá trị thuê
         });
       }
     });
@@ -489,7 +504,7 @@ export default function DashboardPage() {
             {/* 🟢 VÙNG 1: WIDGETS TỔNG QUAN QUY MÔ (ĐÃ CẬP NHẬT GIAO DIỆN 1 HÀNG) */}
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
               <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-center hover:shadow-md transition-shadow">
-                <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5"><Building2 size={14}/>Hệ Thống Quản Trị</p>
+                <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5"><Building2 size={14}/> Thượng Tầng Quản Trị</p>
                 <div className="flex items-center justify-between px-2">
                   <div className="text-center">
                     <p className="text-2xl font-black text-[#05469B]">{vpdhUnits.length}</p>
@@ -730,12 +745,12 @@ export default function DashboardPage() {
             {/* 🟢 VÙNG 3: BỐ CỤC 3 CỘT MỚI DÀNH CHO CÁC BẢNG CẢNH BÁO */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               
-              {/* BẢNG 1: CẢNH BÁO THIẾT BỊ PCCC (Sử dụng Tooltip khi Hover) */}
+              {/* BẢNG 1: CẢNH BÁO THIẾT BỊ PCCC */}
               <div className="bg-white rounded-2xl border border-red-200 shadow-sm overflow-hidden flex flex-col">
                 <div className="bg-red-50 p-4 border-b border-red-100 flex items-center justify-between shrink-0">
                   <div className="flex items-center gap-2">
                     <AlertTriangle className="text-red-600 shrink-0" size={20}/>
-                    <h3 className="font-black text-red-800 text-sm uppercase tracking-wider">Cảnh báo PCCC sắp hết hạn</h3>
+                    <h3 className="font-black text-red-800 text-sm uppercase tracking-wider">Cảnh báo PCCC</h3>
                   </div>
                   <span className="bg-red-600 text-white text-xs font-black px-2 py-0.5 rounded-full">{pcccWarningsGrouped.length}</span>
                 </div>
@@ -828,7 +843,7 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              {/* BẢNG 3: HỢP ĐỒNG THUÊ DỊCH VỤ BẢO VỆ */}
+              {/* 🟢 BẢNG 3: HỢP ĐỒNG THUÊ DỊCH VỤ BẢO VỆ (ĐÃ CẬP NHẬT TOOLTIP CHI PHÍ) */}
               <div className="bg-white rounded-2xl border border-blue-200 shadow-sm overflow-hidden flex flex-col">
                 <div className="bg-blue-50 p-4 border-b border-blue-100 flex items-center justify-between shrink-0">
                   <div className="flex items-center gap-2">
@@ -855,7 +870,10 @@ export default function DashboardPage() {
                       <tbody className="divide-y divide-gray-100">
                         {anNinhStatsList.map((stat, idx) => {
                           const isWarning = stat.daysLeft !== null && stat.daysLeft <= 30;
-                          const tooltipText = `NCC: ${stat.provider}`;
+                          
+                          // 🟢 CẬP NHẬT HIỂN THỊ TOOLTIP CÓ KÈM CHI PHÍ
+                          const tooltipText = `NCC: ${stat.provider}\nChi phí: ${stat.cost}`;
+                          
                           return (
                             <tr key={idx} className={`transition-colors cursor-help ${isWarning ? 'hover:bg-red-50/30' : 'hover:bg-blue-50/30'}`} title={tooltipText}>
                               <td className="p-3 font-bold text-[#05469B] text-xs truncate max-w-[120px]" title={tooltipText}>{stat.unitName}</td>
