@@ -504,7 +504,7 @@ export default function DashboardPage() {
             {/* 🟢 VÙNG 1: WIDGETS TỔNG QUAN QUY MÔ (ĐÃ CẬP NHẬT GIAO DIỆN 1 HÀNG) */}
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
               <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-center hover:shadow-md transition-shadow">
-                <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5"><Building2 size={14}/> Thượng Tầng Quản Trị</p>
+                <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5"><Building2 size={14}/>Hệ thống Quản trị</p>
                 <div className="flex items-center justify-between px-2">
                   <div className="text-center">
                     <p className="text-2xl font-black text-[#05469B]">{vpdhUnits.length}</p>
@@ -617,131 +617,6 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* VÙNG 2: 3 BIỂU ĐỒ TRỰC QUAN */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              
-              {/* 1. BIỂU ĐỒ CƠ CẤU NHÂN SỰ */}
-              <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex flex-col h-[450px]">
-                <div className="mb-6 shrink-0">
-                  <h3 className="text-lg font-bold text-[#05469B] flex items-center gap-2"><Briefcase size={20}/> Cơ cấu Phân loại Nhân sự</h3>
-                  <p className="text-[11px] font-semibold text-gray-500 mt-1">Số lượng nhân sự theo từng nhóm nghiệp vụ</p>
-                </div>
-
-                <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-4">
-                  {staffChartData.data.length === 0 ? (
-                    <div className="h-full flex flex-col items-center justify-center text-gray-400">
-                      <Users size={40} className="mb-2 opacity-50"/>
-                      <p className="font-medium text-sm">Chưa có dữ liệu.</p>
-                    </div>
-                  ) : (
-                    staffChartData.data.map((item, idx) => {
-                      const widthPct = Math.max((item.count / staffChartData.maxCount) * 100, 2);
-                      return (
-                        <div key={idx} className="flex flex-col gap-1.5">
-                          <div className="flex justify-between items-end">
-                            <p className="text-xs font-bold text-gray-700 truncate pr-2">{item.name}</p>
-                            <span className="text-xs font-black text-[#05469B] shrink-0">{item.count}</span>
-                          </div>
-                          <div className="w-full h-2.5 bg-gray-100 rounded-full overflow-hidden">
-                            <div className="h-full bg-gradient-to-r from-blue-300 to-[#05469B] rounded-full transition-all duration-1000 ease-out" style={{ width: `${widthPct}%` }}></div>
-                          </div>
-                        </div>
-                      )
-                    })
-                  )}
-                </div>
-              </div>
-
-              {/* 2. BIỂU ĐỒ THỐNG KÊ THÔNG BÁO VĂN BẢN (CÓ BỘ LỌC NĂM) */}
-              <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex flex-col h-[450px]">
-                <div className="mb-6 shrink-0 flex justify-between items-start gap-2">
-                  <div>
-                    <h3 className="text-lg font-bold text-[#05469B] flex items-center gap-2"><BellRing size={20}/> Thông báo Ban hành</h3>
-                    <p className="text-[11px] font-semibold text-gray-500 mt-1">Top 10 Phòng/Bộ phận phát hành nhiều nhất</p>
-                  </div>
-                  <select 
-                    value={docYear} 
-                    onChange={(e) => setDocYear(Number(e.target.value))} 
-                    className="bg-blue-50 text-[#05469B] text-xs font-bold py-1.5 px-2 rounded-lg outline-none border border-blue-100 cursor-pointer shadow-sm"
-                  >
-                    {[currentYear + 1, currentYear, currentYear - 1, currentYear - 2].map(y => <option key={y} value={y}>Năm {y}</option>)}
-                  </select>
-                </div>
-
-                <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-4">
-                  {docChartData.data.length === 0 ? (
-                    <div className="h-full flex flex-col items-center justify-center text-gray-400">
-                      <FileText size={40} className="mb-2 opacity-50"/>
-                      <p className="font-medium text-sm">Chưa có dữ liệu năm {docYear}.</p>
-                    </div>
-                  ) : (
-                    docChartData.data.map((item, idx) => {
-                      const widthPct = Math.max((item.count / docChartData.maxCount) * 100, 2);
-                      return (
-                        <div key={idx} className="flex flex-col gap-1.5">
-                          <div className="flex justify-between items-end">
-                            <p className="text-xs font-bold text-gray-700 truncate pr-2">{item.name}</p>
-                            <span className="text-xs font-black text-[#05469B] shrink-0">{item.count}</span>
-                          </div>
-                          <div className="w-full h-2.5 bg-gray-100 rounded-full overflow-hidden">
-                            <div className="h-full bg-gradient-to-r from-blue-300 to-[#05469B] rounded-full transition-all duration-1000 ease-out" style={{ width: `${widthPct}%` }}></div>
-                          </div>
-                        </div>
-                      )
-                    })
-                  )}
-                </div>
-              </div>
-
-              {/* 3. BIỂU ĐỒ TÌNH TRẠNG TÀI SẢN CHI TIẾT THEO NHÓM */}
-              <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex flex-col h-[450px]">
-                <div className="mb-4 shrink-0">
-                  <h3 className="text-lg font-bold text-[#05469B] flex items-center gap-2"><Activity size={20}/> Tình trạng Tài sản</h3>
-                  <p className="text-[11px] font-semibold text-gray-500 mt-1">Trạng thái chi tiết theo từng nhóm thiết bị</p>
-                </div>
-
-                <div className="flex flex-wrap gap-x-3 gap-y-2 mb-4 text-[10px] font-bold text-gray-600 bg-gray-50 p-2 rounded-lg shrink-0 border border-gray-100">
-                  <div className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>Sử dụng</div>
-                  <div className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-blue-400"></span>Lưu kho</div>
-                  <div className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-orange-400"></span>Sửa chữa</div>
-                  <div className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-red-500"></span>Hỏng/TL</div>
-                </div>
-                
-                <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-5">
-                  {assetChartData.length === 0 ? (
-                    <div className="h-full flex flex-col items-center justify-center text-gray-400">
-                      <MonitorSmartphone size={40} className="mb-2 opacity-50"/>
-                      <p className="font-medium text-sm">Chưa có dữ liệu tài sản.</p>
-                    </div>
-                  ) : (
-                    assetChartData.map((item, idx) => (
-                      <div key={idx} className="flex flex-col gap-1.5">
-                        <div className="flex justify-between items-center text-sm">
-                          <span className="font-bold text-gray-700 truncate pr-2" title={item.name}>{item.name}</span>
-                          <span className="font-black text-[#05469B] shrink-0 text-xs bg-blue-50 px-2 py-0.5 rounded">Tổng: {item.total}</span>
-                        </div>
-                        
-                        <div className="flex h-2 w-full bg-gray-100 rounded-full overflow-hidden">
-                          {item.dangSuDung > 0 && <div className="bg-emerald-500 transition-all duration-1000" style={{ width: `${(item.dangSuDung/item.total)*100}%` }}></div>}
-                          {item.luuKho > 0 && <div className="bg-blue-400 transition-all duration-1000" style={{ width: `${(item.luuKho/item.total)*100}%` }}></div>}
-                          {item.suaChua > 0 && <div className="bg-orange-400 transition-all duration-1000" style={{ width: `${(item.suaChua/item.total)*100}%` }}></div>}
-                          {item.thanhLy > 0 && <div className="bg-red-500 transition-all duration-1000" style={{ width: `${(item.thanhLy/item.total)*100}%` }}></div>}
-                        </div>
-                        
-                        <div className="flex flex-wrap gap-x-2 gap-y-0.5 text-[10px] font-bold">
-                          {item.dangSuDung > 0 && <span className="text-emerald-600">ĐSD: {item.dangSuDung}</span>}
-                          {item.luuKho > 0 && <span className="text-blue-500">LK: {item.luuKho}</span>}
-                          {item.suaChua > 0 && <span className="text-orange-500">SC: {item.suaChua}</span>}
-                          {item.thanhLy > 0 && <span className="text-red-500">TL: {item.thanhLy}</span>}
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-
-            </div>
-
             {/* 🟢 VÙNG 3: BỐ CỤC 3 CỘT MỚI DÀNH CHO CÁC BẢNG CẢNH BÁO */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               
@@ -750,7 +625,7 @@ export default function DashboardPage() {
                 <div className="bg-red-50 p-4 border-b border-red-100 flex items-center justify-between shrink-0">
                   <div className="flex items-center gap-2">
                     <AlertTriangle className="text-red-600 shrink-0" size={20}/>
-                    <h3 className="font-black text-red-800 text-sm uppercase tracking-wider">Cảnh báo PCCC</h3>
+                    <h3 className="font-black text-red-800 text-sm uppercase tracking-wider">Theo dõi Nạp/Sạc TB PCCC</h3>
                   </div>
                   <span className="bg-red-600 text-white text-xs font-black px-2 py-0.5 rounded-full">{pcccWarningsGrouped.length}</span>
                 </div>
@@ -901,6 +776,131 @@ export default function DashboardPage() {
               </div>
 
             </div>
+
+           {/* VÙNG 2: 3 BIỂU ĐỒ TRỰC QUAN */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              
+              {/* 1. BIỂU ĐỒ CƠ CẤU NHÂN SỰ */}
+              <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex flex-col h-[450px]">
+                <div className="mb-6 shrink-0">
+                  <h3 className="text-lg font-bold text-[#05469B] flex items-center gap-2"><Briefcase size={20}/>Phân loại Nhân sự</h3>
+                  <p className="text-[11px] font-semibold text-gray-500 mt-1">Số lượng nhân sự theo từng nhóm nghiệp vụ</p>
+                </div>
+
+                <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-4">
+                  {staffChartData.data.length === 0 ? (
+                    <div className="h-full flex flex-col items-center justify-center text-gray-400">
+                      <Users size={40} className="mb-2 opacity-50"/>
+                      <p className="font-medium text-sm">Chưa có dữ liệu.</p>
+                    </div>
+                  ) : (
+                    staffChartData.data.map((item, idx) => {
+                      const widthPct = Math.max((item.count / staffChartData.maxCount) * 100, 2);
+                      return (
+                        <div key={idx} className="flex flex-col gap-1.5">
+                          <div className="flex justify-between items-end">
+                            <p className="text-xs font-bold text-gray-700 truncate pr-2">{item.name}</p>
+                            <span className="text-xs font-black text-[#05469B] shrink-0">{item.count}</span>
+                          </div>
+                          <div className="w-full h-2.5 bg-gray-100 rounded-full overflow-hidden">
+                            <div className="h-full bg-gradient-to-r from-blue-300 to-[#05469B] rounded-full transition-all duration-1000 ease-out" style={{ width: `${widthPct}%` }}></div>
+                          </div>
+                        </div>
+                      )
+                    })
+                  )}
+                </div>
+              </div>
+
+              {/* 2. BIỂU ĐỒ THỐNG KÊ THÔNG BÁO VĂN BẢN (CÓ BỘ LỌC NĂM) */}
+              <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex flex-col h-[450px]">
+                <div className="mb-6 shrink-0 flex justify-between items-start gap-2">
+                  <div>
+                    <h3 className="text-lg font-bold text-[#05469B] flex items-center gap-2"><BellRing size={20}/> Thông báo Ban hành</h3>
+                    <p className="text-[11px] font-semibold text-gray-500 mt-1">Top 10 Phòng/Bộ phận phát hành nhiều nhất</p>
+                  </div>
+                  <select 
+                    value={docYear} 
+                    onChange={(e) => setDocYear(Number(e.target.value))} 
+                    className="bg-blue-50 text-[#05469B] text-xs font-bold py-1.5 px-2 rounded-lg outline-none border border-blue-100 cursor-pointer shadow-sm"
+                  >
+                    {[currentYear + 1, currentYear, currentYear - 1, currentYear - 2].map(y => <option key={y} value={y}>Năm {y}</option>)}
+                  </select>
+                </div>
+
+                <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-4">
+                  {docChartData.data.length === 0 ? (
+                    <div className="h-full flex flex-col items-center justify-center text-gray-400">
+                      <FileText size={40} className="mb-2 opacity-50"/>
+                      <p className="font-medium text-sm">Chưa có dữ liệu năm {docYear}.</p>
+                    </div>
+                  ) : (
+                    docChartData.data.map((item, idx) => {
+                      const widthPct = Math.max((item.count / docChartData.maxCount) * 100, 2);
+                      return (
+                        <div key={idx} className="flex flex-col gap-1.5">
+                          <div className="flex justify-between items-end">
+                            <p className="text-xs font-bold text-gray-700 truncate pr-2">{item.name}</p>
+                            <span className="text-xs font-black text-[#05469B] shrink-0">{item.count}</span>
+                          </div>
+                          <div className="w-full h-2.5 bg-gray-100 rounded-full overflow-hidden">
+                            <div className="h-full bg-gradient-to-r from-blue-300 to-[#05469B] rounded-full transition-all duration-1000 ease-out" style={{ width: `${widthPct}%` }}></div>
+                          </div>
+                        </div>
+                      )
+                    })
+                  )}
+                </div>
+              </div>
+
+              {/* 3. BIỂU ĐỒ TÌNH TRẠNG TÀI SẢN CHI TIẾT THEO NHÓM */}
+              <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex flex-col h-[450px]">
+                <div className="mb-4 shrink-0">
+                  <h3 className="text-lg font-bold text-[#05469B] flex items-center gap-2"><Activity size={20}/> Tình trạng Tài sản</h3>
+                  <p className="text-[11px] font-semibold text-gray-500 mt-1">Trạng thái chi tiết theo từng nhóm thiết bị</p>
+                </div>
+
+                <div className="flex flex-wrap gap-x-3 gap-y-2 mb-4 text-[10px] font-bold text-gray-600 bg-gray-50 p-2 rounded-lg shrink-0 border border-gray-100">
+                  <div className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>Sử dụng</div>
+                  <div className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-blue-400"></span>Lưu kho</div>
+                  <div className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-orange-400"></span>Sửa chữa</div>
+                  <div className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-red-500"></span>Hỏng/TL</div>
+                </div>
+                
+                <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-5">
+                  {assetChartData.length === 0 ? (
+                    <div className="h-full flex flex-col items-center justify-center text-gray-400">
+                      <MonitorSmartphone size={40} className="mb-2 opacity-50"/>
+                      <p className="font-medium text-sm">Chưa có dữ liệu tài sản.</p>
+                    </div>
+                  ) : (
+                    assetChartData.map((item, idx) => (
+                      <div key={idx} className="flex flex-col gap-1.5">
+                        <div className="flex justify-between items-center text-sm">
+                          <span className="font-bold text-gray-700 truncate pr-2" title={item.name}>{item.name}</span>
+                          <span className="font-black text-[#05469B] shrink-0 text-xs bg-blue-50 px-2 py-0.5 rounded">Tổng: {item.total}</span>
+                        </div>
+                        
+                        <div className="flex h-2 w-full bg-gray-100 rounded-full overflow-hidden">
+                          {item.dangSuDung > 0 && <div className="bg-emerald-500 transition-all duration-1000" style={{ width: `${(item.dangSuDung/item.total)*100}%` }}></div>}
+                          {item.luuKho > 0 && <div className="bg-blue-400 transition-all duration-1000" style={{ width: `${(item.luuKho/item.total)*100}%` }}></div>}
+                          {item.suaChua > 0 && <div className="bg-orange-400 transition-all duration-1000" style={{ width: `${(item.suaChua/item.total)*100}%` }}></div>}
+                          {item.thanhLy > 0 && <div className="bg-red-500 transition-all duration-1000" style={{ width: `${(item.thanhLy/item.total)*100}%` }}></div>}
+                        </div>
+                        
+                        <div className="flex flex-wrap gap-x-2 gap-y-0.5 text-[10px] font-bold">
+                          {item.dangSuDung > 0 && <span className="text-emerald-600">ĐSD: {item.dangSuDung}</span>}
+                          {item.luuKho > 0 && <span className="text-blue-500">LK: {item.luuKho}</span>}
+                          {item.suaChua > 0 && <span className="text-orange-500">SC: {item.suaChua}</span>}
+                          {item.thanhLy > 0 && <span className="text-red-500">TL: {item.thanhLy}</span>}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+            </div> 
 
           </div>
         )}
