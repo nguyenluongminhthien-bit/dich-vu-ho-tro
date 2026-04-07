@@ -201,17 +201,35 @@ export default function EquipmentPage() {
     );
   };
 
-  const { suggestRAM, suggestSSD, suggestHDD, suggestHoTen, suggestViTri, suggestPhapNhan } = useMemo(() => {
+  const getAllSubIds = (unitId: string, allUnits: DonVi[]): string[] => {
+    const subs = allUnits.filter(u => u.CapQuanLy === unitId);
+    let ids = subs.map(u => u.ID_DonVi);
+    subs.forEach(s => { ids = [...ids, ...getAllSubIds(s.ID_DonVi, allUnits)]; });
+    return ids;
+  };
+
+  const { suggestRAM, suggestSSD, suggestHDD, suggestViTri, suggestPhapNhan } = useMemo(() => {
     const getUnique = (arr: any[], field: string) => Array.from(new Set(arr.map(item => item[field]).filter(Boolean))) as string[];
     return {
       suggestRAM: getUnique(tbData, 'RAM'),
       suggestSSD: getUnique(tbData, 'SSD'),
       suggestHDD: getUnique(tbData, 'HDD'),
       suggestViTri: getUnique(tbData, 'ViTriBoTri'),
-      suggestPhapNhan: getUnique(tbData, 'TaiSanThuoc'),
-      suggestHoTen: getUnique(nhansuData, 'HoTen')
+      suggestPhapNhan: getUnique(tbData, 'TaiSanThuoc')
     };
-  }, [tbData, nhansuData]);
+  }, [tbData]);
+
+  // 🟢 CẬP NHẬT: LỌC DANH SÁCH NHÂN SỰ THEO ĐƠN VỊ CỦA THIẾT BỊ ĐANG CHỌN
+  const suggestHoTen = useMemo(() => {
+    if (!selectedTbForNk) return [];
+    const unitId = selectedTbForNk.ID_DonVi;
+    // Lấy cả ID các đơn vị con (nếu có) để gợi ý cho chính xác
+    const validIds = [unitId, ...getAllSubIds(unitId, donViList)];
+    
+    // Lọc nhân sự thuộc đơn vị này
+    const filteredNs = nhansuData.filter(ns => validIds.includes(ns.ID_DonVi));
+    return Array.from(new Set(filteredNs.map(item => item.HoTen).filter(Boolean))) as string[];
+  }, [nhansuData, selectedTbForNk, donViList]);
 
   const getEquipmentDescription = (item: any) => {
     if (isITEquipment(item.NhomThietBi || '')) {
@@ -318,14 +336,31 @@ export default function EquipmentPage() {
     } catch (err: any) { setError(err.message); } finally { setSubmitting(false); }
   };
 
+  // 🟢 CẬP NHẬT: ƯU TIÊN TÌM KIẾM NHÂN SỰ CÙNG ĐƠN VỊ ĐỂ TỰ ĐỘNG ĐIỀN THÔNG TIN ĐÚNG NGƯỜI
   const handleNkHoTenChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const name = e.target.value;
-    const foundNs = nhansuData.find(ns => ns.HoTen === name);
+    
+    // Tìm các Đơn vị liên quan tới thiết bị này
+    const validIds = selectedTbForNk ? [selectedTbForNk.ID_DonVi, ...getAllSubIds(selectedTbForNk.ID_DonVi, donViList)] : [];
+    
+    // Ưu tiên 1: Tìm nhân sự có tên khớp VÀ thuộc cùng đơn vị quản lý thiết bị
+    let foundNs = nhansuData.find(ns => ns.HoTen === name && validIds.includes(ns.ID_DonVi));
+    
+    // Ưu tiên 2: Nếu không thấy, mới tìm rộng ra toàn hệ thống (đề phòng mượn người chi nhánh khác)
+    if (!foundNs) {
+      foundNs = nhansuData.find(ns => ns.HoTen === name);
+    }
+
     if (foundNs) {
       setNkFormData((prev: any) => ({ 
-        ...prev, HoTenNguoiDung_NguoiQL: name, MSNVNguoiDung_NguoiQL: foundNs.MaNV || '', BP_SuDung_QuanLy: donViMap[foundNs.ID_DonVi] || foundNs.ID_DonVi || '' 
+        ...prev, 
+        HoTenNguoiDung_NguoiQL: name, 
+        MSNVNguoiDung_NguoiQL: foundNs.MaNV || '', 
+        BP_SuDung_QuanLy: donViMap[foundNs.ID_DonVi] || foundNs.ID_DonVi || '' 
       }));
-    } else setNkFormData((prev: any) => ({ ...prev, HoTenNguoiDung_NguoiQL: name }));
+    } else {
+      setNkFormData((prev: any) => ({ ...prev, HoTenNguoiDung_NguoiQL: name }));
+    }
   };
 
   const confirmDelete = async () => {
