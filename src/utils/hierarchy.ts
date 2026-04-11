@@ -1,9 +1,9 @@
 import { DonVi } from '../types';
 
 // 1. Hàm tự động cấp Icon (Emoji) dùng cho các danh sách xổ xuống (Select)
-export const getUnitEmoji = (loaiHinh?: string) => {
+export const getUnitEmoji = (loai_hinh?: string) => {
   // Dùng .trim() để xóa khoảng trắng thừa từ Google Sheets
-  const lower = String(loaiHinh || '').toLowerCase().trim();
+  const lower = String(loai_hinh || '').toLowerCase().trim();
   if (lower.includes('tổng công ty')) return '🏢';
   if (lower.includes('công ty tỉnh')) return '🏪';
   if (lower.includes('quản trị')) return '🏪';
@@ -16,10 +16,10 @@ export const getUnitEmoji = (loaiHinh?: string) => {
 // 2. Thuật toán Đệ quy vẽ nhánh cây
 export const buildHierarchicalOptions = (units: DonVi[]) => {
   const result: { unit: DonVi; prefix: string }[] = [];
-  const unitIds = new Set(units.map(u => u.ID_DonVi));
+  const unitIds = new Set(units.map(u => u.id));
   
   // Tìm các đơn vị Cấp 0 (Root)
-  const roots = units.filter(u => !u.CapQuanLy || u.CapQuanLy === 'HO' || !unitIds.has(u.CapQuanLy));
+  const roots = units.filter(u => !u.cap_quan_ly || u.cap_quan_ly === 'HO' || !unitIds.has(u.cap_quan_ly));
 
   const BRANCH = '├──\xA0';
   const LAST_BRANCH = '└──\xA0';
@@ -32,7 +32,7 @@ export const buildHierarchicalOptions = (units: DonVi[]) => {
       const nodePrefix = prefixStr ? prefixStr + (isLast ? LAST_BRANCH : BRANCH) : '';
       result.push({ unit: node, prefix: nodePrefix });
       
-      const children = units.filter(u => u.CapQuanLy === node.ID_DonVi);
+      const children = units.filter(u => u.cap_quan_ly === node.id);
       if (children.length > 0) {
         const childPrefix = prefixStr ? prefixStr + (isLast ? EMPTY : VERTICAL) : '\xA0';
         buildTree(children, childPrefix);

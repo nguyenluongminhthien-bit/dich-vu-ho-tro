@@ -3,7 +3,7 @@ import {
   LayoutDashboard, 
   Building2, 
   Users, 
-  Flame, // <-- IMPORT ICON PCCC
+  Flame,
   Car, 
   MonitorSmartphone, 
   FileText, 
@@ -49,16 +49,16 @@ export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
 
       {/* THÔNG TIN USER */}
       <div className={`px-5 py-5 flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} border-b border-blue-800/50 transition-all`}>
-        <div className="w-10 h-10 rounded-full bg-white text-[#05408A] flex items-center justify-center font-black text-lg shrink-0 shadow-sm" title={user?.hoTen || 'Người dùng'}>
-          {user?.hoTen ? user.hoTen.charAt(0).toUpperCase() : 'U'}
+        <div className="w-10 h-10 rounded-full bg-white text-[#05408A] flex items-center justify-center font-black text-lg shrink-0 shadow-sm" title={user?.ho_ten || 'Người dùng'}>
+          {user?.ho_ten ? user.ho_ten.charAt(0).toUpperCase() : 'U'}
         </div>
         {!isCollapsed && (
           <div className="flex flex-col min-w-0 animate-in fade-in duration-300">
-            <span className="text-sm font-bold truncate text-white" title={user?.hoTen || 'Người dùng'}>
-              {user?.hoTen || 'Người dùng'}
+            <span className="text-sm font-bold truncate text-white" title={user?.ho_ten || 'Người dùng'}>
+              {user?.ho_ten || 'Người dùng'}
             </span>
             <span className="text-[9px] font-black mt-1 bg-teal-500/20 text-teal-300 px-2 py-0.5 rounded-full inline-block w-max border border-teal-500/30">
-              {user?.role === 'ADMIN' ? 'QUẢN TRỊ VIÊN' : 'NHÂN VIÊN'}
+              {user?.quyen === 'ADMIN' ? 'QUẢN TRỊ VIÊN' : 'NHÂN VIÊN'}
             </span>
           </div>
         )}
@@ -169,7 +169,7 @@ export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
         </div>
 
         {/* Nhóm 3: Hệ thống (Chỉ ADMIN) */}
-        {user?.role === 'ADMIN' && (
+        {user?.quyen === 'ADMIN' && (
           <div>
             {!isCollapsed && <p className="px-3 text-[10px] font-bold text-blue-300/80 uppercase tracking-widest mb-2 animate-in fade-in">Hệ thống</p>}
             <div className="space-y-1">

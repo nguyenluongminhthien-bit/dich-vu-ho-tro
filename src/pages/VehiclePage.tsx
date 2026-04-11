@@ -7,11 +7,11 @@ import {
 import { apiService } from '../services/api';
 import { DonVi, TS_Xe, CP_HoatDongXe } from '../types';
 import { useAuth } from '../contexts/AuthContext';
-import { buildHierarchicalOptions, getUnitEmoji } from '../utils/hierarchy'; // IMPORT TÍNH NĂNG VẼ CÂY
+import { buildHierarchicalOptions, getUnitEmoji } from '../utils/hierarchy'; 
 
-// --- HÀM TỰ ĐỘNG DÒ TÌM ID TỪ GOOGLE SHEETS DÙ SAI TÊN CỘT ---
-const getCostId = (cp: any) => cp.ID_ChiPhiXe || cp.iD_ChiPhiXe || cp.Id_ChiPhiXe || cp.ID_ChiPhi || cp.ID_CP || cp.id || '';
-const getCostCarId = (cp: any) => cp.ID_Xe || cp.iD_Xe || cp.Id_Xe || cp.ID_PhuongTien || cp.ID_Car || '';
+// --- HÀM TỰ ĐỘNG DÒ TÌM ID TỪ SUPABASE ---
+const getCostId = (cp: any) => cp.id || cp.id_chi_phi_xe || '';
+const getCostCarId = (cp: any) => cp.id_ts_xe || cp.id_phuong_tien || '';
 
 const formatCurrency = (val: string | number | undefined | null) => {
   if (!val) return '';
@@ -99,45 +99,45 @@ export default function VehiclePage() {
 
   const donViMap = useMemo(() => {
     const map: Record<string, string> = {};
-    donViList.forEach(dv => { map[dv.ID_DonVi] = dv.TenDonVi; });
+    donViList.forEach(dv => { map[dv.id] = dv.ten_don_vi; });
     return map;
   }, [donViList]);
 
   const allowedDonViIds = useMemo(() => {
     if (!user) return [];
-    if (user.idDonVi === 'ALL') return donViList.map(dv => dv.ID_DonVi);
-    const level1 = [user.idDonVi];
-    const level2 = donViList.filter(dv => level1.includes(dv.CapQuanLy)).map(dv => dv.ID_DonVi);
-    const level3 = donViList.filter(dv => level2.includes(dv.CapQuanLy)).map(dv => dv.ID_DonVi);
+    const userIdDonVi = user.id_don_vi || (user as any).idDonVi;
+    if (userIdDonVi === 'ALL' || String(user.quyen).toLowerCase() === 'admin') return donViList.map(dv => dv.id);
+    const level1 = [userIdDonVi];
+    const level2 = donViList.filter(dv => level1.includes(dv.cap_quan_ly)).map(dv => dv.id);
+    const level3 = donViList.filter(dv => level2.includes(dv.cap_quan_ly)).map(dv => dv.id);
     const allAllowed = [...level1, ...level2, ...level3];
-    return donViList.filter(dv => allAllowed.includes(dv.ID_DonVi)).map(dv => dv.ID_DonVi);
+    return donViList.filter(dv => allAllowed.includes(dv.id)).map(dv => dv.id);
   }, [user, donViList]);
 
-  // --- FIX TÌM KIẾM CÂY THƯ MỤC CỰC THÔNG MINH (KÉO RỄ - XỔ CÀNH) VÀ CHỐNG TRẮNG TRANG ---
   const filteredUnits = useMemo(() => {
-    let baseUnits = donViList.filter(item => allowedDonViIds.includes(item.ID_DonVi));
+    let baseUnits = donViList.filter(item => allowedDonViIds.includes(item.id));
     if (!unitSearchTerm) return baseUnits;
 
     const lower = unitSearchTerm.toLowerCase();
     const matchedIds = new Set<string>();
 
     baseUnits.forEach(u => {
-      if (String(u.TenDonVi || '').toLowerCase().includes(lower) || String(u.ID_DonVi || '').toLowerCase().includes(lower)) {
-        matchedIds.add(u.ID_DonVi);
-        let parentId = u.CapQuanLy;
+      if (String(u.ten_don_vi || '').toLowerCase().includes(lower) || String(u.id || '').toLowerCase().includes(lower)) {
+        matchedIds.add(u.id);
+        let parentId = u.cap_quan_ly;
         while (parentId && parentId !== 'HO') {
           matchedIds.add(parentId);
-          const parentUnit = baseUnits.find(p => p.ID_DonVi === parentId);
-          parentId = parentUnit ? parentUnit.CapQuanLy : null;
+          const parentUnit = baseUnits.find(p => p.id === parentId);
+          parentId = parentUnit ? parentUnit.cap_quan_ly : null;
         }
       }
     });
 
     const addChildren = (parentId: string) => {
       baseUnits.forEach(u => {
-        if (u.CapQuanLy === parentId && !matchedIds.has(u.ID_DonVi)) {
-          matchedIds.add(u.ID_DonVi);
-          addChildren(u.ID_DonVi);
+        if (u.cap_quan_ly === parentId && !matchedIds.has(u.id)) {
+          matchedIds.add(u.id);
+          addChildren(u.id);
         }
       });
     };
@@ -145,37 +145,44 @@ export default function VehiclePage() {
     const initialMatches = Array.from(matchedIds);
     initialMatches.forEach(id => addChildren(id));
 
-    return baseUnits.filter(item => matchedIds.has(item.ID_DonVi));
+    return baseUnits.filter(item => matchedIds.has(item.id));
   }, [donViList, unitSearchTerm, allowedDonViIds]);
 
-  const parentUnits = useMemo(() => filteredUnits.filter(item => item.CapQuanLy === 'HO' || !item.CapQuanLy), [filteredUnits]);
-  const getChildUnits = (parentId: string) => filteredUnits.filter(item => item.CapQuanLy === parentId);
+  const parentUnits = useMemo(() => filteredUnits.filter(item => item.cap_quan_ly === 'HO' || !item.cap_quan_ly), [filteredUnits]);
+  const getChildUnits = (parentId: string) => filteredUnits.filter(item => item.cap_quan_ly === parentId);
 
-  // --- FIX LỖI TÌM KIẾM THEO PHÂN LOẠI CỘT TRÁI (CHỐNG TRẮNG TRANG) ---
   const { vpdhUnits, ctttNamUnits, ctttBacUnits, otherUnits } = useMemo(() => {
-    const vpdh = parentUnits.filter(u => String(u.Phia || '').toLowerCase().includes('vpđh') || String(u.loaiHinh || '').toLowerCase().includes('tổng công ty') || String(u.loaiHinh || '').toLowerCase().includes('văn phòng'));
-    const ctttNam = parentUnits.filter(u => !vpdh.includes(u) && String(u.Phia || '').toLowerCase().includes('nam'));
-    const ctttBac = parentUnits.filter(u => !vpdh.includes(u) && !ctttNam.includes(u) && String(u.Phia || '').toLowerCase().includes('bắc'));
+    const vpdh = parentUnits
+      .filter(u => String(u.phia || '').toLowerCase().includes('vpđh') || String(u.loai_hinh || '').toLowerCase().includes('tổng công ty') || String(u.loai_hinh || '').toLowerCase().includes('văn phòng'))
+      .sort((a, b) => {
+        // Luôn ép THACO AUTO (Công ty mẹ) lên vị trí số 1
+        if (a.ten_don_vi === 'THACO AUTO') return -1;
+        if (b.ten_don_vi === 'THACO AUTO') return 1;
+        
+        // Các đơn vị VPĐH khác (như Phân Phối) tự động nằm bên dưới theo thứ tự gốc
+        return 0; 
+      });
+    const ctttNam = parentUnits.filter(u => !vpdh.includes(u) && String(u.phia || '').toLowerCase().includes('nam'));
+    const ctttBac = parentUnits.filter(u => !vpdh.includes(u) && !ctttNam.includes(u) && String(u.phia || '').toLowerCase().includes('bắc'));
     const others = parentUnits.filter(u => !vpdh.includes(u) && !ctttNam.includes(u) && !ctttBac.includes(u));
     return { vpdhUnits: vpdh, ctttNamUnits: ctttNam, ctttBacUnits: ctttBac, otherUnits: others };
   }, [parentUnits]);
 
   const toggleParent = (parentId: string) => setExpandedParents(prev => prev.includes(parentId) ? prev.filter(id => id !== parentId) : [...prev, parentId]);
 
-  // --- FIX LỖI TÌM KIẾM DANH SÁCH XE (CHỐNG TRẮNG TRANG) ---
   const filteredCars = useMemo(() => {
-    let result = xeData.filter(item => allowedDonViIds.includes(item.ID_DonVi));
+    let result = xeData.filter(item => allowedDonViIds.includes(item.id_don_vi));
     if (selectedUnitFilter) {
-      const childUnitIds = donViList.filter(item => item.CapQuanLy === selectedUnitFilter).map(c => c.ID_DonVi);
+      const childUnitIds = donViList.filter(item => item.cap_quan_ly === selectedUnitFilter).map(c => c.id);
       const validIds = [selectedUnitFilter, ...childUnitIds];
-      result = result.filter(item => validIds.includes(item.ID_DonVi));
+      result = result.filter(item => validIds.includes(item.id_don_vi));
     }
     if (carSearchTerm) {
       const lower = carSearchTerm.toLowerCase();
       result = result.filter(item => 
-        String(item.BienSo || '').toLowerCase().includes(lower) || 
-        String(item.HieuXe || '').toLowerCase().includes(lower) || 
-        String(item.LoaiXe || '').toLowerCase().includes(lower)
+        String(item.bien_so || '').toLowerCase().includes(lower) || 
+        String(item.hieu_xe || '').toLowerCase().includes(lower) || 
+        String(item.loai_xe || '').toLowerCase().includes(lower)
       );
     }
     return result;
@@ -183,51 +190,60 @@ export default function VehiclePage() {
 
   const selectedUnitName = useMemo(() => {
     if (!selectedUnitFilter) return 'Tất cả Đơn vị';
-    const unit = donViList.find(d => d.ID_DonVi === selectedUnitFilter);
-    return unit ? unit.TenDonVi : 'Đơn vị không xác định';
+    const unit = donViList.find(d => d.id === selectedUnitFilter);
+    return unit ? unit.ten_don_vi : 'Đơn vị không xác định';
   }, [selectedUnitFilter, donViList]);
 
   const openCarModal = (mode: 'create' | 'update', item?: TS_Xe) => {
     setModalMode(mode); setPlateError(false);
+    const defaultDonViId = user?.id_don_vi || (user as any)?.idDonVi;
     if (item) { setCarFormData({ ...item }); } 
     else {
       setCarFormData({
-        ID_Xe: '', ID_DonVi: selectedUnitFilter || '', Mucdichsudung: 'Xe công', MaTaiSan: '', donvichusohuu: '', NguyenGia: '', Chiphithue_khaohao: '', 
-        BienSo: '', LoaiPhuongTien: 'Ô tô du lịch', HieuXe: '', LoaiXe: '', PhienBan: '', MauXe: '', NamSX: '', NamDK: '', SoKhung: '', SoMay: '',
-        SoCho: '', LoaiNhienLieu: 'Xăng', DungTich: '', CongThucBanh: '', HinhThucSoHuu: 'Sở hữu', GPS: 'Có', Hientrang: 'Đang hoạt động', Ghichu: ''
+        id: '', id_don_vi: selectedUnitFilter || (defaultDonViId !== 'ALL' ? defaultDonViId : ''), muc_dich_su_dung: 'Xe công', ma_tai_san: '', don_vi_chu_so_huu: '', nguyen_gia: '', cp_thue_khau_hao: '', 
+        bien_so: '', loai_phuong_tien: 'Ô tô du lịch', hieu_xe: '', loai_xe: '', phien_ban: '', mau_xe: '', nam_sx: '', nam_dk: '', so_khung: '', so_may: '',
+        so_cho: '', loai_nhien_lieu: 'Xăng', dung_tich: '', cong_thuc_banh: '', hinh_thuc_so_huu: 'Sở hữu', gps: 'Có', hien_trang: 'Đang hoạt động', ghi_chu: ''
       });
     }
     setIsCarModalOpen(true); setError(null);
   };
 
+  // 1. CẬP NHẬT HÀM LƯU XE CHÍNH
   const handleCarSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!carFormData.ID_DonVi) return alert("Vui lòng chọn Đơn vị quản lý!");
-    if (!carFormData.HieuXe) return alert("Vui lòng chọn Hiệu xe!");
+    if (!carFormData.id_don_vi) return alert("Vui lòng chọn Đơn vị quản lý!");
+    if (!carFormData.hieu_xe) return alert("Vui lòng chọn Hiệu xe!");
+    
+    let finalData = { ...carFormData };
+
+    // 🟢 TIỀN XỬ LÝ: Tự sinh mã ID trước khi ném lên DB nếu là tạo mới
+    if (modalMode === 'create' && !finalData.id) {
+      finalData.id = `XE-${Date.now()}`;
+    }
+
     setSubmitting(true); setError(null);
     try {
-      const response = await apiService.save(carFormData, modalMode, "TS_Xe");
+      const response = await apiService.save(finalData, modalMode, "ts_xe");
       
-      const savedId = response?.newId || response?.id || carFormData.ID_Xe || `XE-${Date.now()}`;
-      const newCar = { ...carFormData, ID_Xe: savedId } as TS_Xe;
+      const savedId = response?.id || response?.newId || finalData.id;
+      const newCar = { ...finalData, id: savedId } as TS_Xe;
 
       if (modalMode === 'create') setXeData(prev => [newCar, ...prev]);
-      else setXeData(prev => prev.map(item => item.ID_Xe === savedId ? newCar : item));
+      else setXeData(prev => prev.map(item => item.id === savedId ? newCar : item));
       
       setIsCarModalOpen(false); 
-      apiService.getXe().then(res => { if(res) setXeData(res) });
     } catch (err: any) { setError(err.message || 'Lỗi lưu dữ liệu Xe.'); } 
     finally { setSubmitting(false); }
   };
 
   const handleInputCarChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    if (name === 'BienSo') {
+    if (name === 'bien_so') {
       if (/[\s\-\.]/.test(value)) { setPlateError(true); setTimeout(() => setPlateError(false), 4000); }
       const cleanPlate = value.toUpperCase().replace(/[\s\-\.]/g, '');
       setCarFormData(prev => ({ ...prev, [name]: cleanPlate })); return;
     }
-    if (name === 'NguyenGia' || name === 'Chiphithue_khaohao') {
+    if (name === 'nguyen_gia' || name === 'cp_thue_khau_hao') {
       setCarFormData(prev => ({ ...prev, [name]: value.replace(/\D/g, '') })); return;
     }
     setCarFormData(prev => ({ ...prev, [name]: value }));
@@ -236,49 +252,45 @@ export default function VehiclePage() {
   // --- XỬ LÝ CHI PHÍ VÀ MÁY TÍNH INLINE ---
   const carCosts = useMemo(() => {
     if (!selectedCarForCost) return [];
-    return chiPhiData.filter(cp => getCostCarId(cp) === selectedCarForCost.ID_Xe).sort((a, b) => b.ThangNam.localeCompare(a.ThangNam));
+    return chiPhiData.filter(cp => getCostCarId(cp) === selectedCarForCost.id).sort((a, b) => b.thang_nam.localeCompare(a.thang_nam));
   }, [chiPhiData, selectedCarForCost]);
 
   const viewHistoryCosts = useMemo(() => {
     if (!viewData) return [];
-    return chiPhiData.filter(cp => getCostCarId(cp) === viewData.ID_Xe).sort((a, b) => a.ThangNam.localeCompare(b.ThangNam));
+    return chiPhiData.filter(cp => getCostCarId(cp) === viewData.id).sort((a, b) => a.thang_nam.localeCompare(b.thang_nam));
   }, [chiPhiData, viewData]);
 
   const openCostModal = (car: TS_Xe) => {
     setSelectedCarForCost(car); setCostModalMode('create');
     setCostFormData({
-      ID_ChiPhiXe: '', ThangNam: new Date().toISOString().slice(0, 7), ID_Xe: car.ID_Xe, ID_DonVi: car.ID_DonVi, 
-      KmHienTai: '', SoLitNhienLieu: '', ChiPhiNhienLieu: '', Phicauduong_benbai: '', Phiruaxe: '', ChiPhiBaoDuong_SuaChua: '', ChiPhiThue_KhauHao: '', GhiChu: ''
+      id: '', thang_nam: new Date().toISOString().slice(0, 7), id_ts_xe: car.id, id_don_vi: car.id_don_vi, 
+      km_hien_tai: '', so_lit_nhien_lieu: '', cp_nhien_lieu: '', cp_cau_duong_ben_bai: '', cp_rua_xe: '', cp_bao_duong_sua_chua: '', cp_thue_khau_hao: '', ghi_chu: ''
     });
     setIsCostModalOpen(true);
   };
 
   const editCost = (cost: any) => {
     setCostModalMode('update');
-    setCostFormData({ ...cost, ID_ChiPhiXe: getCostId(cost), ID_Xe: getCostCarId(cost), ID_DonVi: cost.ID_DonVi || selectedCarForCost?.ID_DonVi || '' });
+    setCostFormData({ ...cost, id: getCostId(cost), id_ts_xe: getCostCarId(cost), id_don_vi: cost.id_don_vi || selectedCarForCost?.id_don_vi || '' });
   };
 
-  // HÀM BẮT SỰ KIỆN TÍNH TOÁN KHI GÕ (INLINE MATH)
   const handleInputCostChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     let finalValue = value;
     
-    if (name === 'KmHienTai') { 
+    if (name === 'km_hien_tai') { 
       finalValue = value.replace(/\D/g, ''); 
-    } else if (['ChiPhiNhienLieu', 'Phicauduong_benbai', 'Phiruaxe', 'ChiPhiBaoDuong_SuaChua', 'ChiPhiThue_KhauHao'].includes(name)) {
-      // Cho phép gõ số, khoảng trắng và các phép tính (Inline Math)
+    } else if (['cp_nhien_lieu', 'cp_cau_duong_ben_bai', 'cp_rua_xe', 'cp_bao_duong_sua_chua', 'cp_thue_khau_hao'].includes(name)) {
       finalValue = value.replace(/[^0-9+\-*/().\s]/g, '');
     }
     
     setCostFormData(prev => ({ ...prev, [name]: finalValue }));
   };
 
-  // KÍCH HOẠT TÍNH TOÁN KHI MẤT FOCUS (ONBLUR)
   const handleCostMathBlur = (name: string, value: string) => {
     setCostFormData(prev => ({ ...prev, [name]: safeEvalMath(value) }));
   };
 
-  // KÍCH HOẠT TÍNH TOÁN KHI NHẤN ENTER
   const handleCostMathKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, name: string) => {
     if (e.key === 'Enter') {
       e.preventDefault();
@@ -286,52 +298,50 @@ export default function VehiclePage() {
     }
   };
 
+  // 2. CẬP NHẬT HÀM LƯU CHI PHÍ XE
   const handleCostSave = async (e: React.FormEvent) => {
     e.preventDefault(); setSubmitting(true); setError(null);
     try {
       let finalData = { ...costFormData };
       
-      // Chạy tính toán chốt sổ một lần nữa đề phòng người dùng chưa Blur mà đã bấm Lưu
-      finalData.ChiPhiNhienLieu = safeEvalMath(finalData.ChiPhiNhienLieu);
-      finalData.Phicauduong_benbai = safeEvalMath(finalData.Phicauduong_benbai);
-      finalData.Phiruaxe = safeEvalMath(finalData.Phiruaxe);
-      finalData.ChiPhiBaoDuong_SuaChua = safeEvalMath(finalData.ChiPhiBaoDuong_SuaChua);
-      finalData.ChiPhiThue_KhauHao = safeEvalMath(finalData.ChiPhiThue_KhauHao);
+      // Xử lý tính toán công thức
+      finalData.cp_nhien_lieu = safeEvalMath(finalData.cp_nhien_lieu);
+      finalData.cp_cau_duong_ben_bai = safeEvalMath(finalData.cp_cau_duong_ben_bai);
+      finalData.cp_rua_xe = safeEvalMath(finalData.cp_rua_xe);
+      finalData.cp_bao_duong_sua_chua = safeEvalMath(finalData.cp_bao_duong_sua_chua);
+      finalData.cp_thue_khau_hao = safeEvalMath(finalData.cp_thue_khau_hao);
 
-      const currentId = getCostId(finalData);
-      if (currentId) {
-        finalData.ID_ChiPhiXe = currentId;
-        finalData.iD_ChiPhiXe = currentId;
-        finalData.Id_ChiPhiXe = currentId;
-        finalData.ID_ChiPhi = currentId;
+      // 🟢 TIỀN XỬ LÝ: Tự sinh mã ID trước khi ném lên DB nếu là tạo mới
+      if (costModalMode === 'create' && !finalData.id) {
+        finalData.id = `CP-${Date.now()}`;
       }
 
-      const response = await apiService.save(finalData, costModalMode, "CP_HoatDongXe");
+      const response = await apiService.save(finalData, costModalMode, "cp_hoat_dong_xe");
       
-      const savedId = response?.newId || response?.id || currentId || `CP-${Date.now()}`;
-      const savedCost = { ...finalData, ID_ChiPhiXe: savedId };
+      const savedId = response?.id || response?.newId || finalData.id;
+      const savedCost = { ...finalData, id: savedId };
 
       if (costModalMode === 'create') {
         setChiPhiData(prev => [savedCost, ...prev]);
       } else {
-        setChiPhiData(prev => prev.map(item => getCostId(item) === currentId ? savedCost : item));
+        setChiPhiData(prev => prev.map(item => getCostId(item) === finalData.id ? savedCost : item));
       }
       
+      // Reset form sau khi lưu
       setCostModalMode('create');
       setCostFormData({
-        ID_ChiPhiXe: '', ThangNam: costFormData.ThangNam, ID_Xe: selectedCarForCost?.ID_Xe || '', ID_DonVi: selectedCarForCost?.ID_DonVi || '', 
-        KmHienTai: '', SoLitNhienLieu: '', ChiPhiNhienLieu: '', Phicauduong_benbai: '', Phiruaxe: '', ChiPhiBaoDuong_SuaChua: '', ChiPhiThue_KhauHao: '', GhiChu: ''
+        id: '', thang_nam: costFormData.thang_nam, id_ts_xe: selectedCarForCost?.id || '', id_don_vi: selectedCarForCost?.id_don_vi || '', 
+        km_hien_tai: '', so_lit_nhien_lieu: '', cp_nhien_lieu: '', cp_cau_duong_ben_bai: '', cp_rua_xe: '', cp_bao_duong_sua_chua: '', cp_thue_khau_hao: '', ghi_chu: ''
       });
 
-      apiService.getChiPhiXe().then(res => { if(res) setChiPhiData(res) });
     } catch (err: any) { setError(err.message || 'Lỗi lưu dữ liệu Chi phí.'); } 
     finally { setSubmitting(false); }
   };
 
   const chartScale = useMemo(() => {
     if (viewHistoryCosts.length === 0) return { maxCP: 1, maxKm: 1 };
-    const costs = viewHistoryCosts.map(c => (Number(c.ChiPhiNhienLieu) || 0) + (Number(c.Phicauduong_benbai) || 0) + (Number(c.Phiruaxe) || 0) + (Number(c.ChiPhiBaoDuong_SuaChua) || 0) + (Number(c.ChiPhiThue_KhauHao) || 0));
-    const kms = viewHistoryCosts.map(c => Number(c.KmHienTai) || 0);
+    const costs = viewHistoryCosts.map(c => (Number(c.cp_nhien_lieu) || 0) + (Number(c.cp_cau_duong_ben_bai) || 0) + (Number(c.cp_rua_xe) || 0) + (Number(c.cp_bao_duong_sua_chua) || 0) + (Number(c.cp_thue_khau_hao) || 0));
+    const kms = viewHistoryCosts.map(c => Number(c.km_hien_tai) || 0);
     return { maxCP: Math.max(...costs, 1), maxKm: Math.max(...kms, 1) };
   }, [viewHistoryCosts]);
 
@@ -343,14 +353,14 @@ export default function VehiclePage() {
         if (costsToDelete.length > 0) {
           for (const cp of costsToDelete) {
             const cpId = getCostId(cp);
-            if (cpId) await apiService.delete(cpId, "CP_HoatDongXe");
+            if (cpId) await apiService.delete(cpId, "cp_hoat_dong_xe");
           }
         }
-        await apiService.delete(itemToDelete.id, "TS_Xe");
-        setXeData(prev => prev.filter(item => item.ID_Xe !== itemToDelete.id));
+        await apiService.delete(itemToDelete.id, "ts_xe");
+        setXeData(prev => prev.filter(item => item.id !== itemToDelete.id));
         setChiPhiData(prev => prev.filter(item => getCostCarId(item) !== itemToDelete.id));
       } else {
-        await apiService.delete(itemToDelete.id, "CP_HoatDongXe");
+        await apiService.delete(itemToDelete.id, "cp_hoat_dong_xe");
         setChiPhiData(prev => prev.filter(item => getCostId(item) !== itemToDelete.id));
       }
       setIsConfirmOpen(false); setItemToDelete(null); 
@@ -359,31 +369,31 @@ export default function VehiclePage() {
   };
 
   const getUnitFullName = (id: string) => {
-    const unit = donViList.find(u => u.ID_DonVi === id);
+    const unit = donViList.find(u => u.id === id);
     if (!unit) return '-';
-    if (unit.CapQuanLy && unit.CapQuanLy !== 'HO') {
-      const parent = donViList.find(u => u.ID_DonVi === unit.CapQuanLy);
-      if (parent) return `${parent.TenDonVi} - ${unit.TenDonVi}`;
+    if (unit.cap_quan_ly && unit.cap_quan_ly !== 'HO') {
+      const parent = donViList.find(u => u.id === unit.cap_quan_ly);
+      if (parent) return `${parent.ten_don_vi} - ${unit.ten_don_vi}`;
     }
-    return unit.TenDonVi;
+    return unit.ten_don_vi;
   };
 
   const renderUnitTree = (parent: DonVi, level: number = 1) => {
-    const children = getChildUnits(parent.ID_DonVi);
-    const isExpanded = expandedParents.includes(parent.ID_DonVi) || !!unitSearchTerm;
-    const isParentDimmed = parent.trangThai === 'Đại lý' || parent.trangThai === 'Đầu tư mới';
+    const children = getChildUnits(parent.id);
+    const isExpanded = expandedParents.includes(parent.id) || !!unitSearchTerm;
+    const isParentDimmed = parent.trang_thai === 'Đại lý' || parent.trang_thai === 'Đầu tư mới';
 
     return (
-      <div key={parent.ID_DonVi} className={level === 1 ? "mb-1" : "mt-1"}>
+      <div key={parent.id} className={level === 1 ? "mb-1" : "mt-1"}>
         <button 
-          onClick={() => { setSelectedUnitFilter(parent.ID_DonVi); if (children.length > 0) toggleParent(parent.ID_DonVi); }} 
-          className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold transition-colors ${selectedUnitFilter === parent.ID_DonVi ? 'bg-blue-50 text-[#05469B]' : 'text-gray-700 hover:bg-gray-50'} ${isParentDimmed ? 'opacity-50' : ''}`}
+          onClick={() => { setSelectedUnitFilter(parent.id); if (children.length > 0) toggleParent(parent.id); }} 
+          className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold transition-colors ${selectedUnitFilter === parent.id ? 'bg-blue-50 text-[#05469B]' : 'text-gray-700 hover:bg-gray-50'} ${isParentDimmed ? 'opacity-50' : ''}`}
         >
           {children.length > 0 ? (isExpanded ? <ChevronDown size={16} className="text-gray-400 shrink-0" /> : <ChevronRight size={16} className="text-gray-400 shrink-0" />) : <div className="w-4 shrink-0" />}
           
-          <span className="shrink-0">{getUnitEmoji(parent.loaiHinh)}</span>
+          <span className="shrink-0">{getUnitEmoji(parent.loai_hinh)}</span>
           
-          <span className="truncate text-left">{parent.TenDonVi}</span>
+          <span className="truncate text-left">{parent.ten_don_vi}</span>
         </button>
         {isExpanded && children.length > 0 && (
           <div className={`ml-${level === 1 ? '6' : '4'} mt-1 border-l-2 border-gray-100 pl-2 space-y-1`}>
@@ -397,7 +407,7 @@ export default function VehiclePage() {
   return (
     <div className="flex h-full bg-[#f4f7f9] overflow-hidden relative">
       {isListCollapsed && (
-        <button onClick={() => setIsListCollapsed(false)} className="absolute top-6 left-6 z-20 bg-white p-2.5 rounded-lg shadow-md border border-gray-200 text-[#05469B] hover:bg-blue-50 transition-all" title="M mở danh sách đơn vị"><PanelLeftOpen size={20} /></button>
+        <button onClick={() => setIsListCollapsed(false)} className="absolute top-6 left-6 z-20 bg-white p-2.5 rounded-lg shadow-md border border-gray-200 text-[#05469B] hover:bg-blue-50 transition-all lg:hidden" title="M mở danh sách đơn vị"><PanelLeftOpen size={20} /></button>
       )}
 
       {/* --- CỘT TRÁI (BỘ LỌC ĐƠN VỊ) --- */}
@@ -414,7 +424,7 @@ export default function VehiclePage() {
         </div>
 
         <div className="flex-1 overflow-y-auto p-2 min-w-[319px]">
-          <button onClick={() => setSelectedUnitFilter(null)} className={`w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-bold mb-4 transition-colors ${selectedUnitFilter === null ? 'bg-blue-50 text-[#05469B] border border-blue-100' : 'text-gray-700 hover:bg-gray-50'}`}>
+          <button onClick={() => { setSelectedUnitFilter(null); if(window.innerWidth < 1024) setIsListCollapsed(true); }} className={`w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-bold mb-4 transition-colors ${selectedUnitFilter === null ? 'bg-blue-50 text-[#05469B] border border-blue-100' : 'text-gray-700 hover:bg-gray-50'}`}>
             <Car size={18} className={selectedUnitFilter === null ? 'text-[#05469B]' : 'text-gray-400'} /> Tất cả Đội xe Toàn quốc
           </button>
           <hr className="border-gray-100 mb-4 mx-2"/>
@@ -477,15 +487,15 @@ export default function VehiclePage() {
                   </td></tr>
                 ) : (
                   filteredCars.map((item) => (
-                    <tr key={item.ID_Xe} className="hover:bg-blue-50/50 transition-colors group">
-                      <td className="p-4 font-black text-[#05469B] text-base whitespace-nowrap">🚙 {item.BienSo}</td>
-                      <td className="p-4 font-bold text-gray-800">{item.HieuXe} {item.LoaiXe} {item.PhienBan ? `- ${item.PhienBan}` : ''}</td>
-                      <td className="p-4 text-gray-600 font-medium">{item.LoaiPhuongTien}</td>
-                      <td className="p-4 text-indigo-600 font-semibold">{item.Mucdichsudung}</td>
-                      <td className="p-4 text-gray-700 font-bold">{getUnitFullName(item.ID_DonVi)}</td>
+                    <tr key={item.id} className="hover:bg-blue-50/50 transition-colors group">
+                      <td className="p-4 font-black text-[#05469B] text-base whitespace-nowrap">🚙 {item.bien_so}</td>
+                      <td className="p-4 font-bold text-gray-800">{item.hieu_xe} {item.loai_xe} {item.phien_ban ? `- ${item.phien_ban}` : ''}</td>
+                      <td className="p-4 text-gray-600 font-medium">{item.loai_phuong_tien}</td>
+                      <td className="p-4 text-indigo-600 font-semibold">{item.muc_dich_su_dung}</td>
+                      <td className="p-4 text-gray-700 font-bold">{getUnitFullName(item.id_don_vi)}</td>
                       <td className="p-4">
-                        <span className={`px-2.5 py-1 rounded-md text-[10px] font-bold whitespace-nowrap ${item.Hientrang === 'Đang hoạt động' ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' : 'bg-red-50 text-red-600 border border-red-200'}`}>
-                          {item.Hientrang === 'Đang hoạt động' ? '🟢' : '🔴'} {item.Hientrang}
+                        <span className={`px-2.5 py-1 rounded-md text-[10px] font-bold whitespace-nowrap ${item.hien_trang === 'Đang hoạt động' ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' : 'bg-red-50 text-red-600 border border-red-200'}`}>
+                          {item.hien_trang === 'Đang hoạt động' ? '🟢' : '🔴'} {item.hien_trang}
                         </span>
                       </td>
                       <td className="p-4 w-40">
@@ -503,7 +513,7 @@ export default function VehiclePage() {
                             <button onClick={() => openCarModal('update', item)} className="py-1.5 bg-white border border-blue-200 text-blue-600 hover:bg-blue-50 rounded flex items-center justify-center shadow-sm transition-colors" title="Sửa">
                               <Edit size={14} />
                             </button>
-                            <button onClick={() => { setItemToDelete({id: item.ID_Xe, type: 'xe'}); setIsConfirmOpen(true); }} className="py-1.5 bg-white border border-red-200 text-red-600 hover:bg-red-50 rounded flex items-center justify-center shadow-sm transition-colors" title="Xóa">
+                            <button onClick={() => { setItemToDelete({id: item.id, type: 'xe'}); setIsConfirmOpen(true); }} className="py-1.5 bg-white border border-red-200 text-red-600 hover:bg-red-50 rounded flex items-center justify-center shadow-sm transition-colors" title="Xóa">
                               <Trash2 size={14} />
                             </button>
                           </div>
@@ -534,7 +544,7 @@ export default function VehiclePage() {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
                   <div>
                     <label className="block text-xs font-bold text-gray-700 mb-1">Biển Số *</label>
-                    <input type="text" required name="BienSo" value={carFormData.BienSo || ''} onChange={handleInputCarChange} placeholder="VD: 51H12345" className={`w-full p-2.5 border rounded-lg outline-none font-bold focus:ring-2 focus:ring-[#05469B] ${plateError ? 'border-red-500 bg-red-50 text-red-700' : 'border-gray-200 bg-[#FFFFF0] text-[#05469B]'}`} />
+                    <input type="text" required name="bien_so" value={carFormData.bien_so || ''} onChange={handleInputCarChange} placeholder="VD: 51H12345" className={`w-full p-2.5 border rounded-lg outline-none font-bold focus:ring-2 focus:ring-[#05469B] ${plateError ? 'border-red-500 bg-red-50 text-red-700' : 'border-gray-200 bg-[#FFFFF0] text-[#05469B]'}`} />
                     {plateError && <p className="text-[10px] text-red-500 mt-1 font-bold animate-pulse">Lỗi: Gõ liền, không dấu cách/-/. !</p>}
                   </div>
                   
@@ -542,16 +552,16 @@ export default function VehiclePage() {
                     <label className="block text-xs font-bold text-gray-700 mb-1">Đơn vị quản lý *</label>
                     <select 
                       required 
-                      name="ID_DonVi" 
-                      value={carFormData.ID_DonVi || ''} 
+                      name="id_don_vi" 
+                      value={carFormData.id_don_vi || ''} 
                       onChange={handleInputCarChange} 
                       className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]"
                       style={{ fontFamily: 'monospace, sans-serif' }}
                     >
                       <option value="">-- Chọn đơn vị --</option>
-                      {buildHierarchicalOptions(donViList.filter(dv => allowedDonViIds.includes(dv.ID_DonVi))).map(({ unit, prefix }) => (
-                        <option key={unit.ID_DonVi} value={unit.ID_DonVi} className="font-normal text-gray-700">
-                          {prefix}{getUnitEmoji(unit.loaiHinh)} {unit.TenDonVi}
+                      {buildHierarchicalOptions(donViList.filter(dv => allowedDonViIds.includes(dv.id))).map(({ unit, prefix }) => (
+                        <option key={unit.id} value={unit.id} className="font-normal text-gray-700">
+                          {prefix}{getUnitEmoji(unit.loai_hinh)} {unit.ten_don_vi}
                         </option>
                       ))}
                     </select>
@@ -559,7 +569,7 @@ export default function VehiclePage() {
                   
                   <div>
                     <label className="block text-xs font-bold text-gray-700 mb-1">Hình thức Sở hữu</label>
-                    <select name="HinhThucSoHuu" value={carFormData.HinhThucSoHuu || 'Sở hữu'} onChange={handleInputCarChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]">
+                    <select name="hinh_thuc_so_huu" value={carFormData.hinh_thuc_so_huu || 'Sở hữu'} onChange={handleInputCarChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]">
                       <option value="Sở hữu">Sở hữu</option>
                       <option value="Quản lý sử dụng">Quản lý sử dụng</option>
                       <option value="Thuê">Thuê</option>
@@ -568,7 +578,7 @@ export default function VehiclePage() {
 
                   <div>
                     <label className="block text-xs font-bold text-gray-700 mb-1">Mục đích sử dụng</label>
-                    <select name="Mucdichsudung" value={carFormData.Mucdichsudung || 'Xe công'} onChange={handleInputCarChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] font-bold text-indigo-700 outline-none focus:ring-2 focus:ring-[#05469B]">
+                    <select name="muc_dich_su_dung" value={carFormData.muc_dich_su_dung || 'Xe công'} onChange={handleInputCarChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] font-bold text-indigo-700 outline-none focus:ring-2 focus:ring-[#05469B]">
                       <option value="Xe công">Xe công</option>
                       <option value="Xe lái thử">Xe lái thử</option>
                       <option value="Xe thay thế cho KH">Xe thay thế cho KH</option>
@@ -576,16 +586,16 @@ export default function VehiclePage() {
                     </select>
                   </div>
 
-                  <div><label className="block text-xs font-bold text-gray-700 mb-1">Mã Tài Sản (Kế toán)</label><input type="text" name="MaTaiSan" value={carFormData.MaTaiSan || ''} onChange={handleInputCarChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" /></div>
-                  <div className="md:col-span-2"><label className="block text-xs font-bold text-gray-700 mb-1">Đơn vị Đứng tên Cà vẹt (Chủ sở hữu)</label><input type="text" name="donvichusohuu" value={carFormData.donvichusohuu || ''} onChange={handleInputCarChange} placeholder="Tên công ty/cá nhân trên Giấy đăng ký xe" className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" /></div>
+                  <div><label className="block text-xs font-bold text-gray-700 mb-1">Mã Tài Sản (Kế toán)</label><input type="text" name="ma_tai_san" value={carFormData.ma_tai_san || ''} onChange={handleInputCarChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" /></div>
+                  <div className="md:col-span-2"><label className="block text-xs font-bold text-gray-700 mb-1">Đơn vị Đứng tên Cà vẹt (Chủ sở hữu)</label><input type="text" name="don_vi_chu_so_huu" value={carFormData.don_vi_chu_so_huu || ''} onChange={handleInputCarChange} placeholder="Tên công ty/cá nhân trên Giấy đăng ký xe" className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" /></div>
                   
                   <div className="md:col-span-2">
                     <label className="block text-xs font-bold text-gray-700 mb-1">Nguyên giá (VNĐ)</label>
-                    <input type="text" name="NguyenGia" value={formatCurrency(carFormData.NguyenGia)} onChange={handleInputCarChange} placeholder="Giá trị mua xe ban đầu..." className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" />
+                    <input type="text" name="nguyen_gia" value={formatCurrency(carFormData.nguyen_gia)} onChange={handleInputCarChange} placeholder="Giá trị mua xe ban đầu..." className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" />
                   </div>
                   <div className="md:col-span-2">
                     <label className="block text-xs font-bold text-gray-700 mb-1">Chi phí Thuê / Khấu hao tháng (VNĐ)</label>
-                    <input type="text" name="Chiphithue_khaohao" value={formatCurrency(carFormData.Chiphithue_khaohao)} onChange={handleInputCarChange} placeholder="Chi phí cố định hàng tháng..." className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" />
+                    <input type="text" name="cp_thue_khau_hao" value={formatCurrency(carFormData.cp_thue_khau_hao)} onChange={handleInputCarChange} placeholder="Chi phí cố định hàng tháng..." className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" />
                   </div>
                 </div>
               </div>
@@ -596,7 +606,7 @@ export default function VehiclePage() {
                   
                   <div>
                     <label className="block text-xs font-bold text-gray-700 mb-1">Loại phương tiện</label>
-                    <select name="LoaiPhuongTien" value={carFormData.LoaiPhuongTien || 'Ô tô du lịch'} onChange={handleInputCarChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]">
+                    <select name="loai_phuong_tien" value={carFormData.loai_phuong_tien || 'Ô tô du lịch'} onChange={handleInputCarChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]">
                       <option value="Ô tô du lịch">Ô tô du lịch</option>
                       <option value="Ô tô tải">Ô tô tải</option>
                       <option value="Xe máy">Xe máy</option>
@@ -606,34 +616,34 @@ export default function VehiclePage() {
 
                   <div>
                     <label className="block text-xs font-bold text-gray-700 mb-1">Hiệu xe (Hãng) *</label>
-                    <select required name="HieuXe" value={carFormData.HieuXe || ''} onChange={handleInputCarChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] font-bold text-gray-800 outline-none focus:ring-2 focus:ring-[#05469B]">
+                    <select required name="hieu_xe" value={carFormData.hieu_xe || ''} onChange={handleInputCarChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] font-bold text-gray-800 outline-none focus:ring-2 focus:ring-[#05469B]">
                       <option value="" className="font-normal text-gray-500">-- Chọn Hãng --</option>
                       {['KIA', 'MAZDA', 'PEUGEOT', 'BMW', 'BMW MOTORAD', 'JEEP', 'RAM'].map(h => <option key={h} value={h}>{h}</option>)}
                     </select>
                   </div>
-                  <div><label className="block text-xs font-bold text-gray-700 mb-1">Loại xe *</label><input type="text" required name="LoaiXe" value={carFormData.LoaiXe || ''} onChange={handleInputCarChange} placeholder="VD: K3, CX-5..." className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" /></div>
-                  <div><label className="block text-xs font-bold text-gray-700 mb-1">Phiên bản</label><input type="text" name="PhienBan" value={carFormData.PhienBan || ''} onChange={handleInputCarChange} placeholder="VD: 2.0 Premium..." className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" /></div>
+                  <div><label className="block text-xs font-bold text-gray-700 mb-1">Loại xe *</label><input type="text" required name="loai_xe" value={carFormData.loai_xe || ''} onChange={handleInputCarChange} placeholder="VD: K3, CX-5..." className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" /></div>
+                  <div><label className="block text-xs font-bold text-gray-700 mb-1">Phiên bản</label><input type="text" name="phien_ban" value={carFormData.phien_ban || ''} onChange={handleInputCarChange} placeholder="VD: 2.0 Premium..." className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" /></div>
                   
-                  <div><label className="block text-xs font-bold text-gray-700 mb-1">Năm SX</label><input type="text" name="NamSX" value={carFormData.NamSX || ''} onChange={handleInputCarChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" /></div>
-                  <div><label className="block text-xs font-bold text-gray-700 mb-1">Năm Đăng ký</label><input type="text" name="NamDK" value={carFormData.NamDK || ''} onChange={handleInputCarChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" /></div>
-                  <div><label className="block text-xs font-bold text-gray-700 mb-1">Màu xe</label><input type="text" name="MauXe" value={carFormData.MauXe || ''} onChange={handleInputCarChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" /></div>
-                  <div><label className="block text-xs font-bold text-gray-700 mb-1">Số chỗ ngồi</label><input type="number" name="SoCho" value={carFormData.SoCho || ''} onChange={handleInputCarChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" /></div>
+                  <div><label className="block text-xs font-bold text-gray-700 mb-1">Năm SX</label><input type="text" name="nam_sx" value={carFormData.nam_sx || ''} onChange={handleInputCarChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" /></div>
+                  <div><label className="block text-xs font-bold text-gray-700 mb-1">Năm Đăng ký</label><input type="text" name="nam_dk" value={carFormData.nam_dk || ''} onChange={handleInputCarChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" /></div>
+                  <div><label className="block text-xs font-bold text-gray-700 mb-1">Màu xe</label><input type="text" name="mau_xe" value={carFormData.mau_xe || ''} onChange={handleInputCarChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" /></div>
+                  <div><label className="block text-xs font-bold text-gray-700 mb-1">Số chỗ ngồi</label><input type="number" name="so_cho" value={carFormData.so_cho || ''} onChange={handleInputCarChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" /></div>
                   
-                  <div><label className="block text-xs font-bold text-gray-700 mb-1">Số Khung</label><input type="text" name="SoKhung" value={carFormData.SoKhung || ''} onChange={handleInputCarChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" /></div>
-                  <div><label className="block text-xs font-bold text-gray-700 mb-1">Số Máy</label><input type="text" name="SoMay" value={carFormData.SoMay || ''} onChange={handleInputCarChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" /></div>
+                  <div><label className="block text-xs font-bold text-gray-700 mb-1">Số Khung</label><input type="text" name="so_khung" value={carFormData.so_khung || ''} onChange={handleInputCarChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" /></div>
+                  <div><label className="block text-xs font-bold text-gray-700 mb-1">Số Máy</label><input type="text" name="so_may" value={carFormData.so_may || ''} onChange={handleInputCarChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" /></div>
                   
-                  <div><label className="block text-xs font-bold text-gray-700 mb-1">Loại Nhiên liệu</label><select name="LoaiNhienLieu" value={carFormData.LoaiNhienLieu || 'Xăng'} onChange={handleInputCarChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]"><option value="Xăng">Xăng</option><option value="Dầu Diesel">Dầu Diesel</option><option value="Điện">Điện</option><option value="Khác">Khác</option></select></div>
-                  <div><label className="block text-xs font-bold text-gray-700 mb-1">Dung tích</label><input type="text" name="DungTich" value={carFormData.DungTich || ''} onChange={handleInputCarChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" /></div>
+                  <div><label className="block text-xs font-bold text-gray-700 mb-1">Loại Nhiên liệu</label><select name="loai_nhien_lieu" value={carFormData.loai_nhien_lieu || 'Xăng'} onChange={handleInputCarChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]"><option value="Xăng">Xăng</option><option value="Dầu Diesel">Dầu Diesel</option><option value="Điện">Điện</option><option value="Khác">Khác</option></select></div>
+                  <div><label className="block text-xs font-bold text-gray-700 mb-1">Dung tích</label><input type="text" name="dung_tich" value={carFormData.dung_tich || ''} onChange={handleInputCarChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" /></div>
                   
-                  <div className="md:col-span-2"><label className="block text-xs font-bold text-gray-700 mb-1">Công thức bánh (Xe tải)</label><input type="text" name="CongThucBanh" value={carFormData.CongThucBanh || ''} onChange={handleInputCarChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" placeholder="VD: 4x2..." /></div>
+                  <div className="md:col-span-2"><label className="block text-xs font-bold text-gray-700 mb-1">Công thức bánh (Xe tải)</label><input type="text" name="cong_thuc_banh" value={carFormData.cong_thuc_banh || ''} onChange={handleInputCarChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" placeholder="VD: 4x2..." /></div>
                 </div>
               </div>
 
               <div className="bg-orange-50/40 p-5 rounded-xl border border-orange-100">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  <div><label className="block text-xs font-bold text-gray-700 mb-1">Định vị GPS</label><select name="GPS" value={carFormData.GPS || 'Có'} onChange={handleInputCarChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]"><option value="Có">Có</option><option value="Không">Không</option></select></div>
-                  <div><label className="block text-xs font-bold text-gray-700 mb-1">Hiện trạng</label><select name="Hientrang" value={carFormData.Hientrang || 'Đang hoạt động'} onChange={handleInputCarChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] font-bold text-[#05469B] outline-none focus:ring-2 focus:ring-[#05469B]"><option value="Đang hoạt động">Đang hoạt động</option><option value="Sửa chữa">Sửa chữa</option><option value="Ngừng hoạt động">Ngừng hoạt động</option><option value="Đã Thanh lý">Đã Thanh lý</option></select></div>
-                  <div className="md:col-span-2"><label className="block text-xs font-bold text-gray-700 mb-1">Ghi chú khác</label><textarea name="Ghichu" value={carFormData.Ghichu || ''} onChange={handleInputCarChange} rows={2} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] resize-none"></textarea></div>
+                  <div><label className="block text-xs font-bold text-gray-700 mb-1">Định vị GPS</label><select name="gps" value={carFormData.gps || 'Có'} onChange={handleInputCarChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]"><option value="Có">Có</option><option value="Không">Không</option></select></div>
+                  <div><label className="block text-xs font-bold text-gray-700 mb-1">Hiện trạng</label><select name="hien_trang" value={carFormData.hien_trang || 'Đang hoạt động'} onChange={handleInputCarChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] font-bold text-[#05469B] outline-none focus:ring-2 focus:ring-[#05469B]"><option value="Đang hoạt động">Đang hoạt động</option><option value="Sửa chữa">Sửa chữa</option><option value="Ngừng hoạt động">Ngừng hoạt động</option><option value="Đã Thanh lý">Đã Thanh lý</option></select></div>
+                  <div className="md:col-span-2"><label className="block text-xs font-bold text-gray-700 mb-1">Ghi chú khác</label><textarea name="ghi_chu" value={carFormData.ghi_chu || ''} onChange={handleInputCarChange} rows={2} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] resize-none"></textarea></div>
                 </div>
               </div>
 
@@ -663,33 +673,33 @@ export default function VehiclePage() {
                   <Car size={48} />
                 </div>
                 <div className="flex-1">
-                  <h2 className="text-3xl font-black text-gray-800 tracking-tight">{viewData.BienSo}</h2>
-                  <p className="text-xl font-bold text-[#05469B] mt-1">{viewData.HieuXe} {viewData.LoaiXe} {viewData.PhienBan ? `- ${viewData.PhienBan}` : ''}</p>
+                  <h2 className="text-3xl font-black text-gray-800 tracking-tight">{viewData.bien_so}</h2>
+                  <p className="text-xl font-bold text-[#05469B] mt-1">{viewData.hieu_xe} {viewData.loai_xe} {viewData.phien_ban ? `- ${viewData.phien_ban}` : ''}</p>
                   <div className="flex gap-2 mt-3">
-                    <span className="px-2.5 py-1 bg-gray-100 text-gray-700 rounded text-xs font-bold uppercase">{viewData.LoaiPhuongTien}</span>
-                    <span className="px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded text-xs font-bold">{viewData.Mucdichsudung}</span>
-                    <span className={`px-2.5 py-1 rounded text-xs font-bold ${viewData.Hientrang === 'Đang hoạt động' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
-                      {viewData.Hientrang}
+                    <span className="px-2.5 py-1 bg-gray-100 text-gray-700 rounded text-xs font-bold uppercase">{viewData.loai_phuong_tien}</span>
+                    <span className="px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded text-xs font-bold">{viewData.muc_dich_su_dung}</span>
+                    <span className={`px-2.5 py-1 rounded text-xs font-bold ${viewData.hien_trang === 'Đang hoạt động' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+                      {viewData.hien_trang}
                     </span>
                   </div>
                 </div>
                 <div className="text-right">
                   <p className="text-xs text-gray-500 font-bold uppercase mb-1">Đơn vị quản lý</p>
-                  <p className="text-lg font-black text-gray-800">{getUnitFullName(viewData.ID_DonVi)}</p>
+                  <p className="text-lg font-black text-gray-800">{getUnitFullName(viewData.id_don_vi)}</p>
                 </div>
               </div>
 
               {/* Data Grid */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-gray-50 p-5 rounded-xl border border-gray-200 shrink-0">
-                <div><p className="text-xs text-gray-500 font-bold mb-1">Chủ sở hữu</p><p className="font-semibold text-gray-800">{viewData.donvichusohuu || '-'}</p></div>
-                <div><p className="text-xs text-gray-500 font-bold mb-1">Số Khung</p><p className="font-semibold text-gray-800">{viewData.SoKhung || '-'}</p></div>
-                <div><p className="text-xs text-gray-500 font-bold mb-1">Số Máy</p><p className="font-semibold text-gray-800">{viewData.SoMay || '-'}</p></div>
-                <div><p className="text-xs text-gray-500 font-bold mb-1">Định vị GPS</p><p className="font-semibold text-gray-800">{viewData.GPS || '-'}</p></div>
+                <div><p className="text-xs text-gray-500 font-bold mb-1">Chủ sở hữu</p><p className="font-semibold text-gray-800">{viewData.don_vi_chu_so_huu || '-'}</p></div>
+                <div><p className="text-xs text-gray-500 font-bold mb-1">Số Khung</p><p className="font-semibold text-gray-800">{viewData.so_khung || '-'}</p></div>
+                <div><p className="text-xs text-gray-500 font-bold mb-1">Số Máy</p><p className="font-semibold text-gray-800">{viewData.so_may || '-'}</p></div>
+                <div><p className="text-xs text-gray-500 font-bold mb-1">Định vị GPS</p><p className="font-semibold text-gray-800">{viewData.gps || '-'}</p></div>
                 
-                <div><p className="text-xs text-gray-500 font-bold mb-1">Năm Sản Xuất</p><p className="font-semibold text-gray-800">{viewData.NamSX || '-'}</p></div>
-                <div><p className="text-xs text-gray-500 font-bold mb-1">Năm Đăng Ký</p><p className="font-semibold text-gray-800">{viewData.NamDK || '-'}</p></div>
-                <div><p className="text-xs text-gray-500 font-bold mb-1">Số Chỗ / Tải trọng</p><p className="font-semibold text-gray-800">{viewData.SoCho || '-'}</p></div>
-                <div><p className="text-xs text-gray-500 font-bold mb-1">Nhiên Liệu</p><p className="font-semibold text-gray-800">{viewData.LoaiNhienLieu || '-'}</p></div>
+                <div><p className="text-xs text-gray-500 font-bold mb-1">Năm Sản Xuất</p><p className="font-semibold text-gray-800">{viewData.nam_sx || '-'}</p></div>
+                <div><p className="text-xs text-gray-500 font-bold mb-1">Năm Đăng Ký</p><p className="font-semibold text-gray-800">{viewData.nam_dk || '-'}</p></div>
+                <div><p className="text-xs text-gray-500 font-bold mb-1">Số Chỗ / Tải trọng</p><p className="font-semibold text-gray-800">{viewData.so_cho || '-'}</p></div>
+                <div><p className="text-xs text-gray-500 font-bold mb-1">Nhiên Liệu</p><p className="font-semibold text-gray-800">{viewData.loai_nhien_lieu || '-'}</p></div>
               </div>
 
               {/* Chart Section */}
@@ -737,20 +747,20 @@ export default function VehiclePage() {
                       {/* SVG Line Chart cho Số Km */}
                       <svg className="absolute inset-0 w-full h-full pointer-events-none z-20 overflow-visible" viewBox="0 0 100 100" preserveAspectRatio="none">
                         <polyline 
-                          points={viewHistoryCosts.map((cost, idx) => `${(idx + 0.5) * (100 / viewHistoryCosts.length)},${100 - ((Number(cost.KmHienTai) || 0) / chartScale.maxKm * 100)}`).join(' ')} 
+                          points={viewHistoryCosts.map((cost, idx) => `${(idx + 0.5) * (100 / viewHistoryCosts.length)},${100 - ((Number(cost.km_hien_tai) || 0) / chartScale.maxKm * 100)}`).join(' ')} 
                           fill="none" stroke="#10b981" strokeWidth="2" strokeLinejoin="round" vectorEffect="non-scaling-stroke" strokeDasharray="4 4"
                         />
                       </svg>
 
                       {/* Cột Chi phí (Stacked Bar) */}
                       {viewHistoryCosts.map((cost, idx) => {
-                        const nl = Number(cost.ChiPhiNhienLieu) || 0;
-                        const cd = Number(cost.Phicauduong_benbai) || 0;
-                        const rx = Number(cost.Phiruaxe) || 0;
-                        const bd = Number(cost.ChiPhiBaoDuong_SuaChua) || 0;
-                        const kh = Number(cost.ChiPhiThue_KhauHao) || 0;
+                        const nl = Number(cost.cp_nhien_lieu) || 0;
+                        const cd = Number(cost.cp_cau_duong_ben_bai) || 0;
+                        const rx = Number(cost.cp_rua_xe) || 0;
+                        const bd = Number(cost.cp_bao_duong_sua_chua) || 0;
+                        const kh = Number(cost.cp_thue_khau_hao) || 0;
                         const totalCP = nl + cd + rx + bd + kh;
-                        const km = Number(cost.KmHienTai) || 0;
+                        const km = Number(cost.km_hien_tai) || 0;
 
                         const hNL = chartScale.maxCP > 0 ? (nl / chartScale.maxCP) * 100 : 0;
                         const hCD = chartScale.maxCP > 0 ? (cd / chartScale.maxCP) * 100 : 0;
@@ -779,7 +789,7 @@ export default function VehiclePage() {
                             
                             {/* Tooltip */}
                             <div className="absolute bottom-full mb-3 hidden group-hover:block bg-gray-900 text-white p-3 rounded-lg text-[10px] z-50 shadow-2xl whitespace-nowrap min-w-[160px] pointer-events-none">
-                              <p className="font-bold text-gray-300 border-b border-gray-700 pb-1 mb-1.5 uppercase">Tháng {formatMonthYear(cost.ThangNam)}</p>
+                              <p className="font-bold text-gray-300 border-b border-gray-700 pb-1 mb-1.5 uppercase">Tháng {formatMonthYear(cost.thang_nam)}</p>
                               
                               <div className="space-y-1 mb-2">
                                 {nl > 0 && <p className="flex justify-between gap-4"><span className="flex items-center gap-1.5"><span className="w-2 h-2 bg-blue-500 rounded-sm"></span>Nhiên liệu:</span> <span>{formatCurrency(nl)} đ</span></p>}
@@ -803,7 +813,7 @@ export default function VehiclePage() {
                       {viewHistoryCosts.map((cost, idx) => {
                         const costId = getCostId(cost) || `label-${idx}`;
                         return (
-                          <div key={costId} className="flex-1 text-center text-[9px] font-black text-gray-500">{formatMonthYear(cost.ThangNam)}</div>
+                          <div key={costId} className="flex-1 text-center text-[9px] font-black text-gray-500">{formatMonthYear(cost.thang_nam)}</div>
                         );
                       })}
                     </div>
@@ -827,15 +837,15 @@ export default function VehiclePage() {
                     </thead>
                     <tbody className="divide-y divide-gray-100">
                       {viewHistoryCosts.slice().reverse().map((cost, idx) => { 
-                        const total = (Number(cost.ChiPhiNhienLieu) || 0) + (Number(cost.Phicauduong_benbai) || 0) + (Number(cost.Phiruaxe) || 0) + (Number(cost.ChiPhiBaoDuong_SuaChua) || 0) + (Number(cost.ChiPhiThue_KhauHao) || 0);
+                        const total = (Number(cost.cp_nhien_lieu) || 0) + (Number(cost.cp_cau_duong_ben_bai) || 0) + (Number(cost.cp_rua_xe) || 0) + (Number(cost.cp_bao_duong_sua_chua) || 0) + (Number(cost.cp_thue_khau_hao) || 0);
                         const costId = getCostId(cost) || `table-${idx}`;
                         return (
                           <tr key={costId} className="hover:bg-blue-50/30">
-                            <td className="p-3 font-bold text-[#05469B] bg-white">{formatMonthYear(cost.ThangNam)}</td>
-                            <td className="p-3 font-medium text-emerald-600 bg-white">{formatCurrency(cost.KmHienTai)}</td>
-                            <td className="p-3 text-right bg-white">{formatCurrency(cost.ChiPhiNhienLieu)}</td>
-                            <td className="p-3 text-right bg-white">{formatCurrency(cost.Phicauduong_benbai)}</td>
-                            <td className="p-3 text-right bg-white">{formatCurrency(cost.ChiPhiBaoDuong_SuaChua)}</td>
+                            <td className="p-3 font-bold text-[#05469B] bg-white">{formatMonthYear(cost.thang_nam)}</td>
+                            <td className="p-3 font-medium text-emerald-600 bg-white">{formatCurrency(cost.km_hien_tai)}</td>
+                            <td className="p-3 text-right bg-white">{formatCurrency(cost.cp_nhien_lieu)}</td>
+                            <td className="p-3 text-right bg-white">{formatCurrency(cost.cp_cau_duong_ben_bai)}</td>
+                            <td className="p-3 text-right bg-white">{formatCurrency(cost.cp_bao_duong_sua_chua)}</td>
                             <td className="p-3 text-right font-black text-red-600 bg-white">{formatCurrency(total)}</td>
                           </tr>
                         );
@@ -848,7 +858,7 @@ export default function VehiclePage() {
             </div>
             
             <div className="p-4 sm:p-5 border-t border-gray-100 bg-gray-50 flex justify-end shrink-0 rounded-b-2xl">
-              <button onClick={() => setIsViewModalOpen(false)} className="px-6 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold rounded-xl transition-colors">Đóng</button>
+              <button onClick={() => setIsViewModalOpen(false)} className="w-full sm:w-auto px-6 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold rounded-xl transition-colors">Đóng</button>
             </div>
           </div>
         </div>
@@ -865,15 +875,15 @@ export default function VehiclePage() {
               <div className="flex-1 pr-4">
                 <h3 className="text-xl font-black flex items-center gap-2 mb-1.5"><Receipt size={20}/> Khai báo Chi phí</h3>
                 <p className="text-sm text-indigo-100 font-medium leading-relaxed">
-                  <span className="text-white font-bold text-base tracking-wider">{selectedCarForCost.BienSo}</span>
+                  <span className="text-white font-bold text-base tracking-wider">{selectedCarForCost.bien_so}</span>
                   <span className="mx-2 opacity-60">|</span>
-                  {selectedCarForCost.HieuXe} {selectedCarForCost.LoaiXe} {selectedCarForCost.PhienBan ? `- ${selectedCarForCost.PhienBan}` : ''}
+                  {selectedCarForCost.hieu_xe} {selectedCarForCost.loai_xe} {selectedCarForCost.phien_ban ? `- ${selectedCarForCost.phien_ban}` : ''}
                   <span className="mx-2 opacity-60">|</span>
-                  {selectedCarForCost.Mucdichsudung}
+                  {selectedCarForCost.muc_dich_su_dung}
                   <span className="mx-2 opacity-60">|</span>
-                  {getUnitFullName(selectedCarForCost.ID_DonVi)}
+                  {getUnitFullName(selectedCarForCost.id_don_vi)}
                   <span className="mx-2 opacity-60">|</span>
-                  <span className={`${selectedCarForCost.Hientrang === 'Đang hoạt động' ? 'text-emerald-300' : 'text-red-300'}`}>{selectedCarForCost.Hientrang}</span>
+                  <span className={`${selectedCarForCost.hien_trang === 'Đang hoạt động' ? 'text-emerald-300' : 'text-red-300'}`}>{selectedCarForCost.hien_trang}</span>
                 </p>
               </div>
               <button onClick={() => setIsCostModalOpen(false)} className="text-indigo-200 hover:text-white bg-indigo-700/50 hover:bg-indigo-700 p-2 rounded-full transition-colors mt-1 shrink-0"><X size={20}/></button>
@@ -884,27 +894,27 @@ export default function VehiclePage() {
                 <div className="flex justify-between items-center mb-4">
                   <h4 className="font-bold text-gray-800 text-sm uppercase tracking-wider flex items-center gap-1.5"><Calendar size={16} className="text-indigo-600"/> {costModalMode === 'create' ? 'Khai báo tháng mới' : 'Cập nhật tháng'}</h4>
                   {costModalMode === 'update' && (
-                    <button onClick={() => {setCostModalMode('create'); setCostFormData({ID_ChiPhiXe: '', ThangNam: new Date().toISOString().slice(0, 7), ID_Xe: selectedCarForCost.ID_Xe, ID_DonVi: selectedCarForCost.ID_DonVi, KmHienTai: '', SoLitNhienLieu: '', ChiPhiNhienLieu: '', Phicauduong_benbai: '', Phiruaxe: '', ChiPhiBaoDuong_SuaChua: '', ChiPhiThue_KhauHao: '', GhiChu: ''})}} className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1"><Plus size={14}/> Thêm mới</button>
+                    <button onClick={() => {setCostModalMode('create'); setCostFormData({id: '', thang_nam: new Date().toISOString().slice(0, 7), id_ts_xe: selectedCarForCost.id, id_don_vi: selectedCarForCost.id_don_vi, km_hien_tai: '', so_lit_nhien_lieu: '', cp_nhien_lieu: '', cp_cau_duong_ben_bai: '', cp_rua_xe: '', cp_bao_duong_sua_chua: '', cp_thue_khau_hao: '', ghi_chu: ''})}} className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1"><Plus size={14}/> Thêm mới</button>
                   )}
                 </div>
                 <form onSubmit={handleCostSave} className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
-                    <div className="col-span-2"><label className="block text-xs font-bold text-gray-600 mb-1">Tháng khai báo *</label><input type="month" required name="ThangNam" value={costFormData.ThangNam || ''} onChange={handleInputCostChange} className="w-full p-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-[#FFFFF0] text-indigo-900 font-bold" /></div>
+                    <div className="col-span-2"><label className="block text-xs font-bold text-gray-600 mb-1">Tháng khai báo *</label><input type="month" required name="thang_nam" value={costFormData.thang_nam || ''} onChange={handleInputCostChange} className="w-full p-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-[#FFFFF0] text-indigo-900 font-bold" /></div>
                     
-                    <div><label className="block text-xs font-bold text-gray-600 mb-1">Km hiện tại (Đồng hồ)</label><input type="text" name="KmHienTai" value={formatCurrency(costFormData.KmHienTai)} onChange={handleInputCostChange} className="w-full p-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-[#FFFFF0]" /></div>
+                    <div><label className="block text-xs font-bold text-gray-600 mb-1">Km hiện tại (Đồng hồ)</label><input type="text" name="km_hien_tai" value={formatCurrency(costFormData.km_hien_tai)} onChange={handleInputCostChange} className="w-full p-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-[#FFFFF0]" /></div>
                     
-                    <div><label className="block text-xs font-bold text-gray-600 mb-1">Số Lít nhiên liệu tiêu thụ</label><input type="number" name="SoLitNhienLieu" value={costFormData.SoLitNhienLieu || ''} onChange={handleInputCostChange} className="w-full p-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-[#FFFFF0]" /></div>
+                    <div><label className="block text-xs font-bold text-gray-600 mb-1">Số Lít nhiên liệu tiêu thụ</label><input type="number" name="so_lit_nhien_lieu" value={costFormData.so_lit_nhien_lieu || ''} onChange={handleInputCostChange} className="w-full p-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-[#FFFFF0]" /></div>
                     
                     {/* INLINE MATH: HỖ TRỢ TÍNH TOÁN NGAY TRONG Ô */}
                     <div>
                       <label className="block text-xs font-bold text-gray-600 mb-1">Chi phí Nhiên liệu (VNĐ) <span className="text-[9px] font-normal text-indigo-500">(Hỗ trợ +, -, *, /)</span></label>
                       <input 
                         type="text" 
-                        name="ChiPhiNhienLieu" 
-                        value={formatMathInput(costFormData.ChiPhiNhienLieu)} 
+                        name="cp_nhien_lieu" 
+                        value={formatMathInput(costFormData.cp_nhien_lieu)} 
                         onChange={handleInputCostChange} 
-                        onBlur={(e) => handleCostMathBlur('ChiPhiNhienLieu', e.target.value)}
-                        onKeyDown={(e) => handleCostMathKeyDown(e, 'ChiPhiNhienLieu')}
+                        onBlur={(e) => handleCostMathBlur('cp_nhien_lieu', e.target.value)}
+                        onKeyDown={(e) => handleCostMathKeyDown(e, 'cp_nhien_lieu')}
                         className="w-full p-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-[#FFFFF0]" 
                       />
                     </div>
@@ -913,11 +923,11 @@ export default function VehiclePage() {
                       <label className="block text-xs font-bold text-gray-600 mb-1">Phí cầu đường bến bãi (VNĐ) <span className="text-[9px] font-normal text-indigo-500">(Hỗ trợ +, -, *, /)</span></label>
                       <input 
                         type="text" 
-                        name="Phicauduong_benbai" 
-                        value={formatMathInput(costFormData.Phicauduong_benbai)} 
+                        name="cp_cau_duong_ben_bai" 
+                        value={formatMathInput(costFormData.cp_cau_duong_ben_bai)} 
                         onChange={handleInputCostChange} 
-                        onBlur={(e) => handleCostMathBlur('Phicauduong_benbai', e.target.value)}
-                        onKeyDown={(e) => handleCostMathKeyDown(e, 'Phicauduong_benbai')}
+                        onBlur={(e) => handleCostMathBlur('cp_cau_duong_ben_bai', e.target.value)}
+                        onKeyDown={(e) => handleCostMathKeyDown(e, 'cp_cau_duong_ben_bai')}
                         className="w-full p-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-[#FFFFF0]" 
                       />
                     </div>
@@ -925,11 +935,11 @@ export default function VehiclePage() {
                       <label className="block text-xs font-bold text-gray-600 mb-1">Phí rửa xe (VNĐ) <span className="text-[9px] font-normal text-indigo-500">(Hỗ trợ +, -, *, /)</span></label>
                       <input 
                         type="text" 
-                        name="Phiruaxe" 
-                        value={formatMathInput(costFormData.Phiruaxe)} 
+                        name="cp_rua_xe" 
+                        value={formatMathInput(costFormData.cp_rua_xe)} 
                         onChange={handleInputCostChange} 
-                        onBlur={(e) => handleCostMathBlur('Phiruaxe', e.target.value)}
-                        onKeyDown={(e) => handleCostMathKeyDown(e, 'Phiruaxe')}
+                        onBlur={(e) => handleCostMathBlur('cp_rua_xe', e.target.value)}
+                        onKeyDown={(e) => handleCostMathKeyDown(e, 'cp_rua_xe')}
                         className="w-full p-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-[#FFFFF0]" 
                       />
                     </div>
@@ -938,11 +948,11 @@ export default function VehiclePage() {
                       <label className="block text-xs font-bold text-gray-600 mb-1">CP Bảo dưỡng/Sửa chữa <span className="text-[9px] font-normal text-indigo-500">(Hỗ trợ +, -, *, /)</span></label>
                       <input 
                         type="text" 
-                        name="ChiPhiBaoDuong_SuaChua" 
-                        value={formatMathInput(costFormData.ChiPhiBaoDuong_SuaChua)} 
+                        name="cp_bao_duong_sua_chua" 
+                        value={formatMathInput(costFormData.cp_bao_duong_sua_chua)} 
                         onChange={handleInputCostChange} 
-                        onBlur={(e) => handleCostMathBlur('ChiPhiBaoDuong_SuaChua', e.target.value)}
-                        onKeyDown={(e) => handleCostMathKeyDown(e, 'ChiPhiBaoDuong_SuaChua')}
+                        onBlur={(e) => handleCostMathBlur('cp_bao_duong_sua_chua', e.target.value)}
+                        onKeyDown={(e) => handleCostMathKeyDown(e, 'cp_bao_duong_sua_chua')}
                         className="w-full p-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-[#FFFFF0]" 
                       />
                     </div>
@@ -950,16 +960,16 @@ export default function VehiclePage() {
                       <label className="block text-xs font-bold text-gray-600 mb-1">CP Thuê ngoài/Khấu hao <span className="text-[9px] font-normal text-indigo-500">(Hỗ trợ +, -, *, /)</span></label>
                       <input 
                         type="text" 
-                        name="ChiPhiThue_KhauHao" 
-                        value={formatMathInput(costFormData.ChiPhiThue_KhauHao)} 
+                        name="cp_thue_khau_hao" 
+                        value={formatMathInput(costFormData.cp_thue_khau_hao)} 
                         onChange={handleInputCostChange} 
-                        onBlur={(e) => handleCostMathBlur('ChiPhiThue_KhauHao', e.target.value)}
-                        onKeyDown={(e) => handleCostMathKeyDown(e, 'ChiPhiThue_KhauHao')}
+                        onBlur={(e) => handleCostMathBlur('cp_thue_khau_hao', e.target.value)}
+                        onKeyDown={(e) => handleCostMathKeyDown(e, 'cp_thue_khau_hao')}
                         className="w-full p-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-[#FFFFF0]" 
                       />
                     </div>
                     
-                    <div className="col-span-2"><label className="block text-xs font-bold text-gray-600 mb-1">Ghi chú (Nơi sửa chữa, lý do...)</label><textarea name="GhiChu" value={costFormData.GhiChu || ''} onChange={handleInputCostChange} rows={2} className="w-full p-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-[#FFFFF0] resize-none"></textarea></div>
+                    <div className="col-span-2"><label className="block text-xs font-bold text-gray-600 mb-1">Ghi chú (Nơi sửa chữa, lý do...)</label><textarea name="ghi_chu" value={costFormData.ghi_chu || ''} onChange={handleInputCostChange} rows={2} className="w-full p-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-[#FFFFF0] resize-none"></textarea></div>
                   </div>
                   <button type="submit" disabled={submitting} className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg flex justify-center items-center gap-2 transition-colors shadow-md">
                     {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} {costModalMode === 'create' ? 'Lưu Chi Phí' : 'Cập Nhật Thay Đổi'}
@@ -974,22 +984,22 @@ export default function VehiclePage() {
                     <div className="text-center py-6 text-gray-400 bg-white rounded-xl border border-dashed border-gray-300"><Info className="mx-auto w-6 h-6 mb-2 opacity-50"/><p className="text-sm font-medium">Chưa có dữ liệu chi phí nào</p></div>
                   ) : (
                     carCosts.map((cost, idx) => {
-                      const tongCP = (Number(cost.ChiPhiNhienLieu) || 0) + (Number(cost.Phicauduong_benbai) || 0) + (Number(cost.Phiruaxe) || 0) + (Number(cost.ChiPhiBaoDuong_SuaChua) || 0) + (Number(cost.ChiPhiThue_KhauHao) || 0);
+                      const tongCP = (Number(cost.cp_nhien_lieu) || 0) + (Number(cost.cp_cau_duong_ben_bai) || 0) + (Number(cost.cp_rua_xe) || 0) + (Number(cost.cp_bao_duong_sua_chua) || 0) + (Number(cost.cp_thue_khau_hao) || 0);
                       const costId = getCostId(cost) || `log-${idx}`;
                       return (
                         <div key={costId} className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm hover:border-indigo-300 transition-colors group">
                           <div className="flex justify-between items-start mb-2">
-                            <span className="font-black text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded text-sm">{formatMonthYear(cost.ThangNam)}</span>
+                            <span className="font-black text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded text-sm">{formatMonthYear(cost.thang_nam)}</span>
                             <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                               <button onClick={() => editCost(cost)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded"><Edit size={14}/></button>
                               <button onClick={() => {setItemToDelete({id: costId, type: 'chiphi'}); setIsConfirmOpen(true);}} className="p-1.5 text-red-600 hover:bg-red-50 rounded"><Trash2 size={14}/></button>
                             </div>
                           </div>
                           <div className="grid grid-cols-2 gap-2 text-xs mb-2">
-                            <div className="text-gray-500">Số Km: <span className="font-semibold text-gray-800">{formatCurrency(cost.KmHienTai)}</span></div>
-                            <div className="text-gray-500 text-right">Lít NL: <span className="font-semibold text-gray-800">{cost.SoLitNhienLieu} L</span></div>
-                            <div className="text-gray-500">Nhiên liệu: <span className="font-semibold text-gray-800">{formatCurrency(cost.ChiPhiNhienLieu)}</span></div>
-                            <div className="text-gray-500 text-right">Bảo dưỡng: <span className="font-semibold text-gray-800">{formatCurrency(cost.ChiPhiBaoDuong_SuaChua)}</span></div>
+                            <div className="text-gray-500">Số Km: <span className="font-semibold text-gray-800">{formatCurrency(cost.km_hien_tai)}</span></div>
+                            <div className="text-gray-500 text-right">Lít NL: <span className="font-semibold text-gray-800">{cost.so_lit_nhien_lieu} L</span></div>
+                            <div className="text-gray-500">Nhiên liệu: <span className="font-semibold text-gray-800">{formatCurrency(cost.cp_nhien_lieu)}</span></div>
+                            <div className="text-gray-500 text-right">Bảo dưỡng: <span className="font-semibold text-gray-800">{formatCurrency(cost.cp_bao_duong_sua_chua)}</span></div>
                           </div>
                           <div className="flex justify-between items-center pt-2 border-t border-gray-100 mt-2">
                             <span className="text-xs font-bold text-gray-400">TỔNG CHI PHÍ:</span>

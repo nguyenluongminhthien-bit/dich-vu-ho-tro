@@ -6,7 +6,7 @@ import { getUnitEmoji } from '../utils/hierarchy';
 import { 
   Building2, MapPin, ChevronDown, ChevronRight, PanelLeftClose, PanelLeftOpen,
   Search, Loader2, Filter, LayoutDashboard, Users, MonitorSmartphone,
-  Flame, AlertTriangle, Activity, Briefcase, BellRing, FileText, ShieldAlert, ShieldCheck, Video
+  Flame, AlertTriangle, Activity, Briefcase, BellRing, FileText, ShieldAlert, ShieldCheck, Video, Tag, Car
 } from 'lucide-react';
 
 // 🟢 1. BỘ XỬ LÝ NGÀY THÁNG BẤT TỬ
@@ -52,14 +52,11 @@ const extractDateAndAddDuration = (durationRaw: any, startDateRaw: any): Date | 
   return baseDate;
 };
 
-// 🟢 3. HÀM ĐỊNH DẠNG TIỀN TỆ (Thêm mới)
+// 🟢 3. HÀM ĐỊNH DẠNG TIỀN TỆ
 const formatCurrency = (val: any) => {
   if (!val) return 'Chưa cập nhật';
-  // Lọc lấy phần số
   const num = Number(String(val).replace(/[^0-9.-]+/g,""));
-  // Nếu không phải số hợp lệ thì trả về nguyên bản chữ
   if (isNaN(num) || num === 0) return String(val);
-  // Định dạng chuẩn Việt Nam
   return num.toLocaleString('vi-VN') + ' VNĐ';
 };
 
@@ -126,47 +123,47 @@ export default function DashboardPage() {
 
   const donViMap = useMemo(() => {
     const map: Record<string, string> = {};
-    donViList.forEach(dv => { map[dv.ID_DonVi] = dv.TenDonVi; });
+    donViList.forEach(dv => { map[dv.id] = dv.ten_don_vi; });
     return map;
   }, [donViList]);
 
   const getAllSubIds = (unitId: string, allUnits: DonVi[]): string[] => {
-    const subs = allUnits.filter(u => u.CapQuanLy === unitId);
-    let ids = subs.map(u => u.ID_DonVi);
-    subs.forEach(s => { ids = [...ids, ...getAllSubIds(s.ID_DonVi, allUnits)]; });
+    const subs = allUnits.filter(u => u.cap_quan_ly === unitId);
+    let ids = subs.map(u => u.id);
+    subs.forEach(s => { ids = [...ids, ...getAllSubIds(s.id, allUnits)]; });
     return ids;
   };
 
   const isCountableUnit = (dv: DonVi) => {
-    const status = String(dv.trangThai || '').toLowerCase();
+    const status = String(dv.trang_thai || '').toLowerCase();
     return !status.includes('đại lý') && !status.includes('dự án') && !status.includes('đầu tư mới');
   };
 
   const allowedDonViIds = useMemo(() => {
     if (!user) return [];
-    if (user.idDonVi === 'ALL') return donViList.map(dv => dv.ID_DonVi);
-    const level1 = [user.idDonVi];
-    const level2 = donViList.filter(dv => level1.includes(dv.CapQuanLy)).map(dv => dv.ID_DonVi);
-    const level3 = donViList.filter(dv => level2.includes(dv.CapQuanLy)).map(dv => dv.ID_DonVi);
+    if (user.id_don_vi === 'ALL') return donViList.map(dv => dv.id);
+    const level1 = [user.id_don_vi];
+    const level2 = donViList.filter(dv => level1.includes(dv.cap_quan_ly)).map(dv => dv.id);
+    const level3 = donViList.filter(dv => level2.includes(dv.cap_quan_ly)).map(dv => dv.id);
     return [...level1, ...level2, ...level3];
   }, [user, donViList]);
 
   const filteredUnits = useMemo(() => {
-    let baseUnits = donViList.filter(dv => allowedDonViIds.includes(dv.ID_DonVi));
+    let baseUnits = donViList.filter(dv => allowedDonViIds.includes(dv.id));
     if (!unitSearchTerm) return baseUnits;
 
     const lower = unitSearchTerm.toLowerCase();
     const matchedIds = new Set<string>();
 
     baseUnits.forEach(u => {
-      if (String(u.TenDonVi || '').toLowerCase().includes(lower) || String(u.ID_DonVi || '').toLowerCase().includes(lower)) {
-        matchedIds.add(u.ID_DonVi);
-        let parentId = u.CapQuanLy;
+      if (String(u.ten_don_vi || '').toLowerCase().includes(lower) || String(u.id || '').toLowerCase().includes(lower)) {
+        matchedIds.add(u.id);
+        let parentId = u.cap_quan_ly;
         let safeCounter = 0;
         while (parentId && parentId !== 'HO' && safeCounter < 10) {
           matchedIds.add(parentId);
-          const parentUnit = baseUnits.find(p => p.ID_DonVi === parentId);
-          parentId = parentUnit ? parentUnit.CapQuanLy : null;
+          const parentUnit = baseUnits.find(p => p.id === parentId);
+          parentId = parentUnit ? parentUnit.cap_quan_ly : null;
           safeCounter++;
         }
       }
@@ -174,43 +171,52 @@ export default function DashboardPage() {
 
     const addChildren = (parentId: string) => {
       baseUnits.forEach(u => {
-        if (u.CapQuanLy === parentId && !matchedIds.has(u.ID_DonVi)) {
-          matchedIds.add(u.ID_DonVi);
-          addChildren(u.ID_DonVi);
+        if (u.cap_quan_ly === parentId && !matchedIds.has(u.id)) {
+          matchedIds.add(u.id);
+          addChildren(u.id);
         }
       });
     };
     
     Array.from(matchedIds).forEach(id => addChildren(id));
-    return baseUnits.filter(item => matchedIds.has(item.ID_DonVi));
+    return baseUnits.filter(item => matchedIds.has(item.id));
   }, [donViList, unitSearchTerm, allowedDonViIds]);
   
-  const parentUnits = useMemo(() => filteredUnits.filter(item => item.CapQuanLy === 'HO' || !item.CapQuanLy), [filteredUnits]);
-  const getChildUnits = (parentId: string) => filteredUnits.filter(item => item.CapQuanLy === parentId);
+  const parentUnits = useMemo(() => filteredUnits.filter(item => item.cap_quan_ly === 'HO' || !item.cap_quan_ly), [filteredUnits]);
+  const getChildUnits = (parentId: string) => filteredUnits.filter(item => item.cap_quan_ly === parentId);
 
   const { vpdhUnits, ctttNamUnits, ctttBacUnits } = useMemo(() => {
-    const vpdh = parentUnits.filter(u => String(u.Phia || '').toLowerCase().includes('vpđh') || String(u.loaiHinh || '').toLowerCase().includes('tổng công ty') || String(u.loaiHinh || '').toLowerCase().includes('văn phòng'));
-    const ctttNam = parentUnits.filter(u => !vpdh.includes(u) && String(u.Phia || '').toLowerCase().includes('nam'));
-    const ctttBac = parentUnits.filter(u => !vpdh.includes(u) && !ctttNam.includes(u) && String(u.Phia || '').toLowerCase().includes('bắc'));
+    const vpdh = parentUnits
+      .filter(u => String(u.phia || '').toLowerCase().includes('vpđh') || String(u.loai_hinh || '').toLowerCase().includes('tổng công ty') || String(u.loai_hinh || '').toLowerCase().includes('văn phòng'))
+      .sort((a, b) => {
+        // Luôn ép THACO AUTO (Công ty mẹ) lên vị trí số 1
+        if (a.ten_don_vi === 'THACO AUTO') return -1;
+        if (b.ten_don_vi === 'THACO AUTO') return 1;
+        
+        // Các đơn vị VPĐH khác (như Phân Phối) tự động nằm bên dưới theo thứ tự gốc
+        return 0; 
+      });
+    const ctttNam = parentUnits.filter(u => !vpdh.includes(u) && String(u.phia || '').toLowerCase().includes('nam'));
+    const ctttBac = parentUnits.filter(u => !vpdh.includes(u) && !ctttNam.includes(u) && String(u.phia || '').toLowerCase().includes('bắc'));
     return { vpdhUnits: vpdh, ctttNamUnits: ctttNam, ctttBacUnits: ctttBac };
   }, [parentUnits]);
 
   const toggleParent = (parentId: string) => setExpandedParents(prev => prev.includes(parentId) ? prev.filter(id => id !== parentId) : [...prev, parentId]);
 
   const renderUnitTree = (parent: DonVi, level: number = 1) => {
-    const children = getChildUnits(parent.ID_DonVi);
-    const isExpanded = expandedParents.includes(parent.ID_DonVi) || !!unitSearchTerm;
+    const children = getChildUnits(parent.id);
+    const isExpanded = expandedParents.includes(parent.id) || !!unitSearchTerm;
     const isParentDimmed = !isCountableUnit(parent);
 
     return (
-      <div key={parent.ID_DonVi} className={level === 1 ? "mb-1" : "mt-1"}>
+      <div key={parent.id} className={level === 1 ? "mb-1" : "mt-1"}>
         <button 
-          onClick={() => { setSelectedUnitFilter(parent.ID_DonVi); if (children.length > 0) toggleParent(parent.ID_DonVi); }} 
-          className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold transition-colors ${selectedUnitFilter === parent.ID_DonVi ? 'bg-[#05469B] text-white shadow-md' : 'text-gray-700 hover:bg-gray-100'} ${isParentDimmed ? 'opacity-50' : ''}`}
+          onClick={() => { setSelectedUnitFilter(parent.id); if (children.length > 0) toggleParent(parent.id); }} 
+          className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold transition-colors ${selectedUnitFilter === parent.id ? 'bg-[#05469B] text-white shadow-md' : 'text-gray-700 hover:bg-gray-100'} ${isParentDimmed ? 'opacity-50' : ''}`}
         >
           {children.length > 0 ? (isExpanded ? <ChevronDown size={16} className="shrink-0" /> : <ChevronRight size={16} className="shrink-0" />) : <div className="w-4 shrink-0" />}
-          <span className="shrink-0">{getUnitEmoji(parent.loaiHinh)}</span>
-          <span className="truncate text-left">{parent.TenDonVi}</span>
+          <span className="shrink-0">{getUnitEmoji(parent.loai_hinh)}</span>
+          <span className="truncate text-left">{parent.ten_don_vi}</span>
         </button>
         {isExpanded && children.length > 0 && (
           <div className={`ml-${level === 1 ? '6' : '4'} mt-1 border-l-2 border-gray-100 pl-2 space-y-1`}>
@@ -223,18 +229,18 @@ export default function DashboardPage() {
 
   const selectedUnitName = useMemo(() => {
     if (!selectedUnitFilter) return 'Toàn bộ Hệ thống';
-    const unit = donViList.find(d => d.ID_DonVi === selectedUnitFilter);
-    return unit ? unit.TenDonVi : 'Toàn bộ Hệ thống';
+    const unit = donViList.find(d => d.id === selectedUnitFilter);
+    return unit ? unit.ten_don_vi : 'Toàn bộ Hệ thống';
   }, [selectedUnitFilter, donViList]);
 
   const currentSubordinateIds = useMemo(() => {
-    if (!selectedUnitFilter) return donViList.map(u => u.ID_DonVi);
+    if (!selectedUnitFilter) return donViList.map(u => u.id);
     return [selectedUnitFilter, ...getAllSubIds(selectedUnitFilter, donViList)];
   }, [selectedUnitFilter, donViList]);
 
   // 🟢 TÍNH TOÁN DỮ LIỆU NHÂN SỰ CHO WIDGET GỘP TRÊN CÙNG
   const { widgetStats, staffRolesStats } = useMemo(() => {
-    const totalUnits = donViList.filter(dv => currentSubordinateIds.includes(dv.ID_DonVi) && dv.ID_DonVi !== selectedUnitFilter && isCountableUnit(dv)).length || 0;
+    const totalUnits = donViList.filter(dv => currentSubordinateIds.includes(dv.id) && dv.id !== selectedUnitFilter && isCountableUnit(dv)).length || 0;
     
     let totalStaff = 0;
     let dvht = 0;
@@ -242,9 +248,9 @@ export default function DashboardPage() {
     let pvhc = 0;
 
     nsData.forEach(ns => {
-      if (currentSubordinateIds.includes(ns.ID_DonVi) && ns.TrangThai !== 'Đã nghỉ việc') {
+      if (currentSubordinateIds.includes(ns.id_don_vi) && ns.trang_thai !== 'Đã nghỉ việc') {
         totalStaff++;
-        const role = String(ns.PhanLoai || '').toUpperCase();
+        const role = String(ns.phan_loai || '').toUpperCase();
         if (role.includes('PT DVHT KD')) dvht++;
         if (role.includes('BV, ĐTKH') || role.includes('BẢO VỆ')) bv++;
         if (role.includes('PVHC')) pvhc++;
@@ -258,18 +264,18 @@ export default function DashboardPage() {
   }, [currentSubordinateIds, donViList, nsData, selectedUnitFilter]);
 
   const companyScaleStats = useMemo(() => {
-    const activeNam = ctttNamUnits.filter(u => currentSubordinateIds.includes(u.ID_DonVi));
-    const activeBac = ctttBacUnits.filter(u => currentSubordinateIds.includes(u.ID_DonVi));
+    const activeNam = ctttNamUnits.filter(u => currentSubordinateIds.includes(u.id));
+    const activeBac = ctttBacUnits.filter(u => currentSubordinateIds.includes(u.id));
 
     const processScale = (units: DonVi[]) => {
       return units.map(u => {
-        const subIds = getAllSubIds(u.ID_DonVi, donViList);
+        const subIds = getAllSubIds(u.id, donViList);
         const activeSubCount = subIds.filter(id => {
           if (!currentSubordinateIds.includes(id)) return false;
-          const dv = donViList.find(d => d.ID_DonVi === id);
+          const dv = donViList.find(d => d.id === id);
           return dv ? isCountableUnit(dv) : false;
         }).length;
-        return { id: u.ID_DonVi, name: u.TenDonVi, count: activeSubCount };
+        return { id: u.id, name: u.ten_don_vi, count: activeSubCount };
       }).sort((a, b) => b.count - a.count); 
     };
     return { nam: processScale(activeNam), bac: processScale(activeBac) };
@@ -285,14 +291,14 @@ export default function DashboardPage() {
     today.setHours(0,0,0,0);
 
     tsPcccData.forEach(eq => {
-      if (currentSubordinateIds.includes(eq.ID_DonVi)) {
-        const expDate = parseDateStrict(eq.NgayHetHan || eq.HanKiemDinh);
+      if (currentSubordinateIds.includes(eq.id_don_vi)) {
+        const expDate = parseDateStrict(eq.ngay_het_han || eq.han_kiem_dinh);
         if (expDate) {
           const diffTime = expDate.getTime() - today.getTime();
           const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
           
           if (diffDays <= 30) {
-            const unitName = donViMap[eq.ID_DonVi] || eq.ID_DonVi;
+            const unitName = donViMap[eq.id_don_vi] || eq.id_don_vi;
             const dateStr = expDate.toLocaleDateString('vi-VN');
             const key = `${unitName}_${dateStr}`;
             
@@ -305,7 +311,7 @@ export default function DashboardPage() {
               };
             }
             
-            const itemName = eq.LoaiThietBi || 'Thiết bị';
+            const itemName = eq.loai_thiet_bi || 'Thiết bị';
             groups[key].items[itemName] = (groups[key].items[itemName] || 0) + 1;
           }
         }
@@ -318,19 +324,19 @@ export default function DashboardPage() {
   const cameraStatsList = useMemo(() => {
     const list: any[] = [];
     anNinhData.forEach(an => {
-      if (currentSubordinateIds.includes(an.ID_DonVi)) {
+      if (currentSubordinateIds.includes(an.id_don_vi)) {
         // Lấy Tổng SL
-        const tongCam = parseInt(String(an.SLCAM || 0).replace(/\D/g,''), 10) || 0;
+        const tongCam = parseInt(String(an.sl_camera || 0).replace(/\D/g,''), 10) || 0;
         // Lấy SL Hư Hỏng
-        const camHu = parseInt(String(an.CAMHuHong || 0).replace(/\D/g,''), 10) || 0; 
+        const camHu = parseInt(String(an.camera_hu || 0).replace(/\D/g,''), 10) || 0; 
         // Lấy SL Đang Hoạt Động
-        const camHD = parseInt(String(an.CAMHD || 0).replace(/\D/g,''), 10) || (tongCam > 0 ? tongCam - camHu : 0);
+        const camHD = parseInt(String(an.camera_hoat_dong || 0).replace(/\D/g,''), 10) || (tongCam > 0 ? tongCam - camHu : 0);
         
-        const lyDoHu = an.LyDoHuCam || 'Chưa cập nhật lý do'; 
+        const lyDoHu = an.ly_do_camera_hu || 'Chưa cập nhật lý do';
         
         if (tongCam > 0 || camHu > 0 || camHD > 0) {
           list.push({
-            unitName: donViMap[an.ID_DonVi] || an.ID_DonVi,
+            unitName: donViMap[an.id_don_vi] || an.id_don_vi,
             tongCam,
             camHD,
             camHu,
@@ -350,17 +356,17 @@ export default function DashboardPage() {
     today.setHours(0,0,0,0);
 
     anNinhData.forEach(an => {
-      if (currentSubordinateIds.includes(an.ID_DonVi) && an.NCC_DichVu && String(an.NCC_DichVu).trim() !== '') {
+      if (currentSubordinateIds.includes(an.id_don_vi) && an.ncc_dich_vu && String(an.ncc_dich_vu).trim() !== '') {
         let expDate = null;
-        const directExpRaw = an.NgayHetHan || an.NgayHetHanHD || an.NgayKetThuc || an.NgayKT;
+        const directExpRaw = an.ngay_het_han || an.ngay_het_han_hd || an.ngay_ket_thuc || an.ngay_kt;
         
         if (directExpRaw) {
            expDate = parseDateStrict(directExpRaw);
         }
 
         if (!expDate) {
-           const durationRaw = an.HanHopDong || an.HanHD || an.ThoiHanHD || an.ThoiGianHD || an.Thoihan || an.ThoiGianLuu || an.ThoiHan || ''; 
-           const startRaw = an.NgayKyHD || an.Ngaycd || an.NgayKy || an.NgayBatDau || '';
+           const durationRaw = an.han_hop_dong || an.han_hd || an.thoi_han_hd || an.thoi_gian_hd || an.thoi_han || an.thoi_gian_luu || ''; 
+           const startRaw = an.ngay_ky_hd || an.ngay_cd || an.ngay_ky || an.ngay_bat_dau || '';
            expDate = extractDateAndAddDuration(durationRaw, startRaw);
         }
 
@@ -373,15 +379,15 @@ export default function DashboardPage() {
           dateStr = expDate.toLocaleDateString('vi-VN');
         }
 
-        // Bổ sung lấy giá trị Chi phí thuê (hỗ trợ đọc từ nhiều tên cột khác nhau nếu sheet đổi tên)
-        const costRaw = an.ChiPhiThue || an.ChiPhi || an.GiaTriHD || an.TongChiPhi || '';
+        // Bổ sung lấy giá trị Chi phí thuê
+        const costRaw = an.chi_phi_thue || an.chi_phi || an.gia_tri_hd || an.tong_chi_phi || '';
 
         list.push({
-          unitName: donViMap[an.ID_DonVi] || an.ID_DonVi,
-          provider: an.NCC_DichVu,
+          unitName: donViMap[an.id_don_vi] || an.id_don_vi,
+          provider: an.ncc_dich_vu,
           daysLeft: diffDays,
           dateStr: dateStr,
-          cost: formatCurrency(costRaw) // 🟢 Thêm trường giá trị thuê
+          cost: formatCurrency(costRaw) 
         });
       }
     });
@@ -395,8 +401,8 @@ export default function DashboardPage() {
   const staffChartData = useMemo(() => {
     const roleCounts: Record<string, number> = {};
     nsData.forEach(ns => {
-      if (currentSubordinateIds.includes(ns.ID_DonVi) && ns.TrangThai !== 'Đã nghỉ việc') {
-        const roleName = ns.PhanLoai || 'Chưa phân loại';
+      if (currentSubordinateIds.includes(ns.id_don_vi) && ns.trang_thai !== 'Đã nghỉ việc') {
+        const roleName = ns.phan_loai || 'Chưa phân loại';
         roleCounts[roleName] = (roleCounts[roleName] || 0) + 1;
       }
     });
@@ -413,10 +419,10 @@ export default function DashboardPage() {
     const deptDocCounts: Record<string, number> = {};
     
     vbData.forEach(vb => {
-      if (currentSubordinateIds.includes(vb.ID_DonVi) && String(vb.Phanloai || '').toLowerCase().includes('thông báo')) {
-        const d = parseDateStrict(vb.NgayBanHanh);
+      if (currentSubordinateIds.includes(vb.id_don_vi) && String(vb.phan_loai || '').toLowerCase().includes('thông báo')) {
+        const d = parseDateStrict(vb.ngay_ban_hanh);
         if (d && d.getFullYear() === docYear) {
-          const deptName = vb.BPlayso || 'Khác';
+          const deptName = vb.bo_phan_lay_so || 'Khác';
           deptDocCounts[deptName] = (deptDocCounts[deptName] || 0) + 1;
         }
       }
@@ -434,9 +440,9 @@ export default function DashboardPage() {
   const assetChartData = useMemo(() => {
     const groupStats: Record<string, { total: number, dangSuDung: number, luuKho: number, suaChua: number, thanhLy: number }> = {};
     
-    tbData.filter(tb => currentSubordinateIds.includes(tb.ID_DonVi)).forEach(tb => {
-      const groupName = tb.NhomThietBi || 'Chưa phân nhóm';
-      const tt = String(tb.TinhTrang || '').toLowerCase();
+    tbData.filter(tb => currentSubordinateIds.includes(tb.id_don_vi)).forEach(tb => {
+      const groupName = tb.nhom_thiet_bi || 'Chưa phân nhóm';
+      const tt = String(tb.tinh_trang || '').toLowerCase();
       
       if (!groupStats[groupName]) { groupStats[groupName] = { total: 0, dangSuDung: 0, luuKho: 0, suaChua: 0, thanhLy: 0 }; }
       groupStats[groupName].total++;
@@ -669,12 +675,12 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              {/* 🟢 BẢNG 2: HỆ THỐNG GIÁM SÁT CAMERA */}
+              {/* 🟢 BẢNG 2: HỆ THỐNG CAMERA GIÁM SÁT*/}
               <div className="bg-white rounded-2xl border border-indigo-200 shadow-sm overflow-hidden flex flex-col">
                 <div className="bg-indigo-50 p-4 border-b border-indigo-100 flex items-center justify-between shrink-0">
                   <div className="flex items-center gap-2">
                     <Video className="text-indigo-600 shrink-0" size={20}/>
-                    <h3 className="font-black text-indigo-800 text-sm uppercase tracking-wider">Hệ thống Giám sát</h3>
+                    <h3 className="font-black text-indigo-800 text-sm uppercase tracking-wider">Hệ thống Camera Giám sát</h3>
                   </div>
                   <span className="bg-indigo-600 text-white text-xs font-black px-2 py-0.5 rounded-full">{cameraStatsList.length}</span>
                 </div>
@@ -718,7 +724,7 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              {/* 🟢 BẢNG 3: HỢP ĐỒNG THUÊ DỊCH VỤ BẢO VỆ (ĐÃ CẬP NHẬT TOOLTIP CHI PHÍ) */}
+              {/* BẢNG 3: HỢP ĐỒNG THUÊ DỊCH VỤ BẢO VỆ */}
               <div className="bg-white rounded-2xl border border-blue-200 shadow-sm overflow-hidden flex flex-col">
                 <div className="bg-blue-50 p-4 border-b border-blue-100 flex items-center justify-between shrink-0">
                   <div className="flex items-center gap-2">
@@ -745,8 +751,6 @@ export default function DashboardPage() {
                       <tbody className="divide-y divide-gray-100">
                         {anNinhStatsList.map((stat, idx) => {
                           const isWarning = stat.daysLeft !== null && stat.daysLeft <= 30;
-                          
-                          // 🟢 CẬP NHẬT HIỂN THỊ TOOLTIP CÓ KÈM CHI PHÍ
                           const tooltipText = `NCC: ${stat.provider}\nChi phí: ${stat.cost}`;
                           
                           return (
@@ -775,9 +779,9 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-            </div>
+            </div> 
 
-           {/* VÙNG 2: 3 BIỂU ĐỒ TRỰC QUAN */}
+            {/* VÙNG 2: 3 BIỂU ĐỒ TRỰC QUAN */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               
               {/* 1. BIỂU ĐỒ CƠ CẤU NHÂN SỰ */}
@@ -812,7 +816,7 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              {/* 2. BIỂU ĐỒ THỐNG KÊ THÔNG BÁO VĂN BẢN (CÓ BỘ LỌC NĂM) */}
+              {/* 2. BIỂU ĐỒ THỐNG KÊ THÔNG BÁO VĂN BẢN */}
               <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex flex-col h-[450px]">
                 <div className="mb-6 shrink-0 flex justify-between items-start gap-2">
                   <div>

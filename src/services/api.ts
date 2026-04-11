@@ -1,152 +1,249 @@
 import { Personnel, DonVi, User, SysLog } from '../types';
+// ===============================================
+// 1. CẤU HÌNH KẾT NỐI SUPABASE
+// ===============================================
+const SUPABASE_URL = "https://eizpyrhqshkhcghkupjy.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVpenB5cmhxc2hraGNnaGt1cGp5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUzNzUyNTcsImV4cCI6MjA5MDk1MTI1N30.Whb7fJVbGMeCPN0M07BchRFvHtIiH5ZTSCeSu2l4RPc";
 
-const API_URL = "https://script.google.com/macros/s/AKfycbyTGotz2w-j6fg9Swk6U3oQeF277BdB5u-c0-kOEV6ZES4C0fCGnuRnXhTZxzKsTwfzNQ/exec";
+// Header chuẩn để nói chuyện với Supabase
+const HEADERS = {
+  "apikey": SUPABASE_ANON_KEY,
+  "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+  "Content-Type": "application/json",
+  "Prefer": "return=representation" // Yêu cầu trả về data sau khi Insert/Update
+};
 
-// 1. BỘ NHỚ ĐỆM TỐC ĐỘ CAO (Đã có từ trước)
 const apiCache: Record<string, { data: any, timestamp: number }> = {};
 const CACHE_DURATION = 5 * 60 * 1000;
 
-async function fetchWithCache(sheetName: string, forceRefresh = false) {
-  if (!forceRefresh && apiCache[sheetName] && (Date.now() - apiCache[sheetName].timestamp < CACHE_DURATION)) {
-    return apiCache[sheetName].data;
+// ===============================================
+// 2. HÀM LÕI TẢI DỮ LIỆU (GET)
+// ===============================================
+async function fetchWithCache(tableName: string, forceRefresh = false) {
+  if (!forceRefresh && apiCache[tableName] && (Date.now() - apiCache[tableName].timestamp < CACHE_DURATION)) {
+    return apiCache[tableName].data;
   }
-  const response = await fetch(`${API_URL}?action=read&sheetName=${sheetName}`);
-  if (!response.ok) throw new Error(`Lỗi tải dữ liệu ${sheetName}`);
-  const result = await response.json();
-  
-  if (result.status === 'error') {
-    throw new Error(`Lỗi từ Google Sheets: ${result.message}`);
-  }
-  
-  let finalData = [];
-  if (result.status === 'success') finalData = result.data;
-  else if (Array.isArray(result)) finalData = result;
-  else finalData = result.data || [];
 
-  apiCache[sheetName] = { data: finalData, timestamp: Date.now() };
+  // Gọi API dạng: https://.../rest/v1/dm_don_vi?select=*
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/${tableName}?select=*`, {
+    method: 'GET',
+    headers: HEADERS
+  });
+
+  if (!response.ok) throw new Error(`Lỗi tải dữ liệu bảng ${tableName}`);
+  const finalData = await response.json();
+  apiCache[tableName] = { data: finalData, timestamp: Date.now() };
   return finalData;
 }
 
-// 2. BIẾN TOÀN CỤC LƯU NGƯỜI DÙNG ĐỂ GHI LOG
 let currentUser: User | null = null;
-
 export const apiService = {
-  // Hàm này được AuthContext gọi để nạp thông tin người dùng đang đăng nhập
   setCurrentUser: (user: User | null) => { currentUser = user; },
 
-  // HÀM NGẦM TỰ ĐỘNG GHI NHẬT KÝ (CÓ KEEPALIVE CHỐNG LỖI KHI F5/ĐĂNG XUẤT)
-  writeLog: (hanhDong: string, chiTiet: string) => {
-    if (!currentUser) return;
-    const logData = {
-      ID_Log: `LOG_${Date.now()}`,
-      ThoiGian: new Date().toLocaleString('vi-VN'), // Lưu giờ Việt Nam
-      ID_User: currentUser.ID_User || currentUser.Username || 'System',
-      HanhDong: hanhDong,
-      ChiTiet: chiTiet
-    };
-    
-    // Gửi ngầm lên Sheet Sys_Logs bằng no-cors và keepalive để tránh bị trình duyệt chặn
-    fetch(API_URL, {
-      method: 'POST',
-      mode: 'no-cors', // Bỏ qua lằn ranh bảo mật CORS trình duyệt
-      keepalive: true, // QUAN TRỌNG: Sống sót qua cả lệnh reload trang
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify({ action: 'create', sheetName: 'Sys_Logs', rowData: logData })
-    }).catch(e => console.log("Hệ thống đã gửi log ngầm."));
-  },
+  // CẬP NHẬT HÀM GHI LOG VÀO ĐÂY
+  writeLog: async (hanhDong: string, chiTiet: string) => {
+    try {
+      if (!currentUser) return; // Nếu chưa đăng nhập thì không ghi log
+      // 1. Tạo gói dữ liệu chuẩn Supabase (snake_case)
+      const logData: any = {
+        id: `LOG${Date.now()}${Math.floor(Math.random() * 1000)}`,
+        thoi_gian: new Date().toISOString(), 
+        
+        // 💡 SỬA TẠI ĐÂY: Chỉ dùng ID của user, nếu không có thì để null (bỏ qua tên và email)
+        id_user: currentUser?.id || null, 
+        
+        hanh_dong: hanhDong,
+        chi_tiet: chiTiet
+      };
 
-  login: async (username: string, password: string): Promise<User> => {
-    const response = await fetch(API_URL, {
-      method: 'POST',
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify({ action: "login", username, password })
-    });
-    if (!response.ok) throw new Error('Lỗi mạng khi kết nối máy chủ');
-    const result = await response.json();
-    if (result.status === "error") throw new Error(result.message); 
-    return result.data as User;
-  },
-
-  // ===============================================
-  // CÁC HÀM TẢI DỮ LIỆU ĐÃ ĐƯỢC CHUẨN HÓA LẠI
-  // ===============================================
-  getPersonnel: async (): Promise<Personnel[]> => fetchWithCache('NS_DichVu'),
-  getDonVi: async (): Promise<DonVi[]> => fetchWithCache('DM_Donvi'),
-  getAnNinh: async (): Promise<any[]> => fetchWithCache('HS_AnNinh'),
-  getXe: async (): Promise<any[]> => fetchWithCache('TS_Xe'),
-  getChiPhiXe: async (): Promise<any[]> => fetchWithCache('CP_HoatDongXe'),
-  getPhapNhan: async (): Promise<any[]> => fetchWithCache('PhapNhan'),
-  getPhongHop: async (): Promise<any[]> => fetchWithCache('PhongHop'),
-  getVanBan: async (): Promise<any[]> => fetchWithCache('VB_TB'),
-  getQuyDinh: async (): Promise<any[]> => fetchWithCache('QD_QT'),
-  getThietBi: async (): Promise<any[]> => fetchWithCache('TS_ThietBi'),
-  getNhatKyThietBi: async (): Promise<any[]> => fetchWithCache('NK_ThietBi'),
-  
-  // Các hàm module mở rộng
-  getPVHC: async (): Promise<any[]> => fetchWithCache('HS_PVHC'),
-  getATVSLD: async (): Promise<any[]> => fetchWithCache('HS_ATVSLD'),
-  getPCTT: async (): Promise<any[]> => fetchWithCache('HS_PCTT'),
-
-  // 🟢 THÊM MỚI 2 HÀM LẤY DỮ LIỆU PHÒNG CHÁY CHỮA CHÁY
-  getPCCC: async (): Promise<any[]> => fetchWithCache('HS_PCCC'),
-  getTsPCCC: async (): Promise<any[]> => fetchWithCache('TS_PCCC'),
-  
-  getUsers: async (): Promise<User[]> => fetchWithCache('Config_Users'),
-  getLogs: async (): Promise<SysLog[]> => fetchWithCache('Sys_Logs'),
-
-  // 3. HÀM LƯU DỮ LIỆU (NÂNG CẤP ĐỂ LƯU ĐƯỢC MẢNG NHIỀU DÒNG THIẾT BỊ)
-  save: async (data: any, action: 'create' | 'update', sheetName: string) => {
-    // 🟢 XỬ LÝ NẾU LÀ MỘT MẢNG DỮ LIỆU (VD: Danh sách bình chữa cháy)
-    if (Array.isArray(data)) {
-      const results = [];
-      for (const row of data) {
-        // Tự động nhận diện: Có ID thiết bị thì update, chưa có thì tạo mới
-        const rowAction = row.ID_TBPCCC ? 'update' : 'create';
-        const response = await fetch(API_URL, {
-          method: 'POST', 
-          headers: { "Content-Type": "text/plain;charset=utf-8" },
-          body: JSON.stringify({ action: rowAction, rowData: row, sheetName })
-        });
-        if (!response.ok) throw new Error(`Lỗi lưu mảng ${sheetName}`);
-        results.push(await response.json());
+      // Xử lý an toàn Khóa ngoại: Nếu là Quản trị viên (ALL) thì gán null
+      if (currentUser?.id_don_vi && currentUser.id_don_vi !== 'ALL' && currentUser.id_don_vi !== 'UNKNOWN') {
+        logData.id_don_vi = currentUser.id_don_vi;
+      } else {
+        logData.id_don_vi = null; 
       }
-      delete apiCache[sheetName];
-      apiService.writeLog('CẬP NHẬT MẢNG', `Bảng: ${sheetName} | Lưu ${data.length} bản ghi`);
-      return results;
+
+      // 2. Bắn dữ liệu lên Supabase
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/sys_logs`, {
+        method: 'POST',
+        headers: {
+          ...HEADERS,
+          'Prefer': 'return=representation'
+        },
+        body: JSON.stringify(logData)
+      });
+
+      // 3. Nếu Supabase từ chối, in lỗi ra F12 để dễ bắt bệnh
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Lỗi Supabase khi ghi Log:", errorText);
+      }
+    } catch (error) {
+      console.error("Lỗi hệ thống khi ghi Log:", error);
+    }
+  },
+
+  // ĐĂNG NHẬP (Lấy từ bảng config_users)
+  login: async (username: string, password: string): Promise<User> => {
+    // Gọi chính xác cột user_name và password như trong ảnh của bạn
+    const url = `${SUPABASE_URL}/rest/v1/config_users?user_name=eq.${username}&password=eq.${password}&select=*`;
+    const response = await fetch(url, { method: 'GET', headers: HEADERS });
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("CHI TIẾT LỖI TỪ SUPABASE:", errorText);
+      throw new Error(`Lỗi cấu hình Database: ${errorText}`);
     }
 
-    // 🟢 XỬ LÝ LƯU 1 DÒNG DỮ LIỆU NHƯ BÌNH THƯỜNG
-    const response = await fetch(API_URL, {
-      method: 'POST', 
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify({ action, rowData: data, sheetName })
-    });
-    if (!response.ok) throw new Error(`Lỗi lưu ${sheetName}`);
-    
-    delete apiCache[sheetName]; 
-    
-    // Tự động ghi Log
-    const tenHanhDong = action === 'create' ? 'THÊM MỚI' : 'CẬP NHẬT';
-    const ID_TaiSan = data.ID_Xe || data.ID_NhanSu || data.ID_TTB || data.ID_VanBan || data.ID_DonVi || data.ID_User || data.ID_PCCC || 'Dữ liệu mới';
-    apiService.writeLog(tenHanhDong, `Bảng: ${sheetName} | ID Đối tượng: ${ID_TaiSan}`);
-
-    return response.json();
+    const users = await response.json();
+    if (users.length === 0) throw new Error("Sai tên đăng nhập hoặc mật khẩu");
+    return users[0] as User;
   },
 
-  // 4. HÀM XÓA DỮ LIỆU CÓ TÍCH HỢP AUTO-LOGGING
-  delete: async (id: string, sheetName: string) => {
-    const response = await fetch(API_URL, {
-      method: 'POST', 
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify({ action: "delete", id: String(id).trim(), sheetName })
+  // ===============================================
+  // 3. DANH SÁCH API LẤY DỮ LIỆU
+  // ===============================================
+  getPersonnel: async (): Promise<Personnel[]> => fetchWithCache('ns_dich_vu'),
+  getDonVi: async (): Promise<DonVi[]> => fetchWithCache('dm_don_vi'),
+  getAnNinh: async (): Promise<any[]> => fetchWithCache('hs_an_ninh'),
+  getXe: async (): Promise<any[]> => fetchWithCache('ts_xe'),
+  getChiPhiXe: async (): Promise<any[]> => fetchWithCache('cp_hoat_dong_xe'),
+  getPhapNhan: async (): Promise<any[]> => fetchWithCache('dm_phap_nhan'),
+  getPhongHop: async (): Promise<any[]> => fetchWithCache('dm_phong_hop'),
+  getQuyDinh: async (): Promise<any[]> => fetchWithCache('qd_qt'),
+  getThietBi: async (): Promise<any[]> => fetchWithCache('ts_thiet_bi'),
+  getNhatKyThietBi: async (): Promise<any[]> => fetchWithCache('nk_thiet_bi'),
+  getVanBan: async (): Promise<any[]> => fetchWithCache('vb_tb'),
+  getPVHC: async (): Promise<any[]> => fetchWithCache('hs_pvhc'),
+  getATVSLD: async (): Promise<any[]> => fetchWithCache('hs_an_toan_lao_dong'),
+  getPCTT: async (): Promise<any[]> => fetchWithCache('hs_pctt'),
+  getPCCC: async (): Promise<any[]> => fetchWithCache('hs_pccc'),
+  getTsPCCC: async (): Promise<any[]> => fetchWithCache('ts_pccc'),
+  getUsers: async (): Promise<User[]> => fetchWithCache('config_users'),
+  getLogs: async (): Promise<SysLog[]> => fetchWithCache('sys_logs'),
+
+  // ===============================================
+  // 4. HÀM LƯU / CẬP NHẬT DỮ LIỆU (POST / PATCH)
+  // ===============================================
+  save: async (data: any, action: 'create' | 'update', tableName: string) => {
+    // 💡 Tự động Đổi tên bảng cũ sang tên bảng Supabase (chuẩn snake_case)
+    const tableMap: Record<string, string> = {
+      'DM_Donvi': 'dm_don_vi',
+      'PhapNhan': 'dm_phap_nhan',
+      'PhongHop': 'dm_phong_hop',
+      'HS_AnNinh': 'hs_an_ninh',
+      'HS_PVHC': 'hs_pvhc',
+      'HS_PCCC': 'hs_pccc',
+      'TS_PCCC': 'ts_pccc',
+      'HS_ATVSLD': 'hs_an_toan_lao_dong',
+      'HS_PCTT': 'hs_pctt'
+    };
+    const realTableName = tableMap[tableName] || tableName.toLowerCase();
+
+    // Xử lý lưu nhiều dòng (Mảng)
+    if (Array.isArray(data)) {
+      // Làm sạch mảng (biến "" thành null)
+      const cleanArray = data.map(item => {
+        const cleaned = { ...item };
+        Object.keys(cleaned).forEach(k => { if (cleaned[k] === '') cleaned[k] = null; });
+        return cleaned;
+      });
+
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/${realTableName}`, {
+        method: 'POST', 
+        headers: HEADERS,
+        body: JSON.stringify(cleanArray)
+      });
+      if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(`Lỗi Supabase: ${errText}`);
+      }
+      delete apiCache[realTableName];
+      apiService.writeLog('CẬP NHẬT MẢNG', `Bảng: ${realTableName} | Lưu ${data.length} bản ghi`);
+      return response.json();
+    }
+
+    // 💡 Tự động Làm sạch dữ liệu Object (biến "" thành null để không bị lỗi cột Số)
+    const cleanedData = { ...data };
+    Object.keys(cleanedData).forEach(key => {
+      if (cleanedData[key] === '') cleanedData[key] = null;
+    });
+
+// 🟢 GIẢI PHÁP TỐI THƯỢNG: Tự động sinh ID nếu dữ liệu thêm mới bị thiếu ID
+    if (action === 'create' && !cleanedData.id) {
+      // Lấy 2 chữ cái đầu của tên bảng làm tiền tố (VD: ns_dich_vu -> NS, ts_xe -> TS)
+      const prefix = realTableName.substring(0, 2).toUpperCase();
+      cleanedData.id = `${prefix}${Date.now()}${Math.floor(Math.random() * 100)}`;
+    }
+
+    let url = `${SUPABASE_URL}/rest/v1/${realTableName}`;
+    let method = 'POST'; 
+
+    if (action === 'update') {
+      const recordId = cleanedData.id || cleanedData.ID || cleanedData.ID_Xe || cleanedData.ID_User; 
+      url = `${url}?id=eq.${recordId}`; 
+      method = 'PATCH'; 
+      // Xóa id khỏi body khi update để an toàn
+      delete cleanedData.id;
+    }
+
+    const response = await fetch(url, {
+      method: method, 
+      headers: HEADERS,
+      body: JSON.stringify(cleanedData)
     });
-    if (!response.ok) throw new Error(`Lỗi xóa ${sheetName}`);
     
-    delete apiCache[sheetName];
+    // Bắt lỗi chi tiết từ Supabase
+    if (!response.ok) {
+      const errorText = await response.text();
+      let errorMsg = errorText;
+      try {
+        const errJson = JSON.parse(errorText);
+        errorMsg = errJson.message || errJson.details || errorText;
+      } catch (e) {}
+      
+      console.error(`🔴 LỖI TỪ SUPABASE (Bảng ${realTableName}):`, errorMsg);
+      throw new Error(errorMsg); 
+    }
+    
+    delete apiCache[realTableName]; 
+    const tenHanhDong = action === 'create' ? 'THÊM MỚI' : 'CẬP NHẬT';
+    apiService.writeLog(tenHanhDong, `Bảng: ${realTableName}`);
 
-    // Tự động ghi log
-    apiService.writeLog('XÓA', `Bảng: ${sheetName} | ID Đối tượng: ${id}`);
+    // Fetch API của Supabase (khi có Prefer: return=representation) trả về Mảng
+    const resultData = await response.json();
+    return Array.isArray(resultData) ? resultData[0] : resultData;
+  },
 
-    return response.json();
+  // ===============================================
+  // 5. HÀM XÓA DỮ LIỆU (DELETE)
+  // ===============================================
+  delete: async (id: string, tableName: string) => {
+    // 💡 Tự động Đổi tên bảng cũ
+    const tableMap: Record<string, string> = {
+      'DM_Donvi': 'dm_don_vi',
+      'PhapNhan': 'dm_phap_nhan',
+      'PhongHop': 'dm_phong_hop',
+      'HS_AnNinh': 'hs_an_ninh',
+      'HS_PVHC': 'hs_pvhc',
+      'HS_PCCC': 'hs_pccc',
+      'TS_PCCC': 'ts_pccc',
+      'HS_ATVSLD': 'hs_an_toan_lao_dong',
+      'HS_PCTT': 'hs_pctt'
+    };
+    const realTableName = tableMap[tableName] || tableName.toLowerCase();
+
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/${realTableName}?id=eq.${id}`, {
+      method: 'DELETE', 
+      headers: HEADERS
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Lỗi xóa ${realTableName}: ${errorText}`);
+    }
+    
+    delete apiCache[realTableName];
+    apiService.writeLog('XÓA', `Bảng: ${realTableName} | ID Đối tượng: ${id}`);
+    return true;
   }
 };

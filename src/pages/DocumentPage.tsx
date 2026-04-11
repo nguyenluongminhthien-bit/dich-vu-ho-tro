@@ -6,7 +6,7 @@ import {
   Link as LinkIcon, Calendar, CheckCircle2, Bookmark, Eye, Lock, Zap, Clock, Send
 } from 'lucide-react';
 import { apiService } from '../services/api';
-import { DonVi, VanBan } from '../types';
+import { DonVi, VB_TB } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 
 // HÀM KIỂM TRA VĂN BẢN MẬT
@@ -78,96 +78,95 @@ export default function DocumentPage() {
 
   const donViMap = useMemo(() => {
     const map: Record<string, string> = {};
-    donViList.forEach(dv => { map[dv.ID_DonVi] = dv.TenDonVi; });
+    donViList.forEach(dv => { map[dv.id] = dv.ten_don_vi; });
     return map;
   }, [donViList]);
 
   // PHÂN QUYỀN HIỂN THỊ VĂN BẢN
   const visibleDocuments = useMemo(() => {
     if (!user) return [];
-    if (user.idDonVi === 'ALL') return vbData;
+    const userIdDonVi = user.id_don_vi || (user as any).idDonVi;
+
+    if (userIdDonVi === 'ALL' || String(user.quyen).toLowerCase() === 'admin') return vbData;
     
-    const level1 = [user.idDonVi];
-    const level2 = donViList.filter(dv => level1.includes(dv.CapQuanLy)).map(dv => dv.ID_DonVi);
-    const level3 = donViList.filter(dv => level2.includes(dv.CapQuanLy)).map(dv => dv.ID_DonVi);
+    const level1 = [userIdDonVi];
+    const level2 = donViList.filter(dv => level1.includes(dv.cap_quan_ly)).map(dv => dv.id);
+    const level3 = donViList.filter(dv => level2.includes(dv.cap_quan_ly)).map(dv => dv.id);
     const myUnits = [...level1, ...level2, ...level3];
     
     return vbData.filter(vb => {
-      return myUnits.includes(vb.ID_DonVi) || 
-             myUnits.includes(vb.Phamviapdung) || 
-             vb.Phamviapdung === 'Toàn hệ thống';
+      return myUnits.includes(vb.id_don_vi) || 
+             myUnits.includes(vb.pham_vi_ap_dung) || 
+             vb.pham_vi_ap_dung === 'Toàn hệ thống';
     });
   }, [vbData, user, donViList]);
 
   // --- DANH SÁCH ĐEN (BLACKLIST) ---
-  // Điền tên những người đã nghỉ việc, hoặc các chức vụ cũ không muốn gợi ý nữa vào đây
   const EXCLUDED_SUGGESTIONS = [
     'Phạm Đăng Châu',
     'Đàm Đình Thông',
     'Nguyễn Thiện Mỹ',
-    // 'Thêm tên người khác vào đây...',
   ];
 
   // TẠO DANH SÁCH GỢI Ý TỪ LỊCH SỬ NHẬP LIỆU (ĐÃ LỌC BLACKLIST)
   const { suggestNguoiky, suggestChucvu, suggestNguoilayso, suggestBPlayso, suggestNghiepvu, suggestDonViXuLy } = useMemo(() => {
     const getUnique = (field: string) => {
-      // 1. Lấy tất cả dữ liệu, loại bỏ ô trống
       const allValues = vbData.map(item => item[field]).filter(Boolean);
-      // 2. Lọc trùng lặp
       const uniqueValues = Array.from(new Set(allValues)) as string[];
-      // 3. Loại bỏ các tên/chữ nằm trong danh sách đen
       return uniqueValues.filter(val => !EXCLUDED_SUGGESTIONS.includes(val.trim()));
     };
 
     return {
-      suggestNguoiky: getUnique('Nguoiky'),
-      suggestChucvu: getUnique('Chucvu'),
-      suggestNguoilayso: getUnique('Nguoilayso'),
-      suggestBPlayso: getUnique('BPlayso'),
-      suggestNghiepvu: getUnique('Nghiepvu'),
-      suggestDonViXuLy: getUnique('DonVi_NguoiXuLy')
+      suggestNguoiky: getUnique('nguoi_ky'),
+      suggestChucvu: getUnique('chuc_vu'),
+      suggestNguoilayso: getUnique('nguoi_lay_so'),
+      suggestBPlayso: getUnique('bo_phan_lay_so'),
+      suggestNghiepvu: getUnique('nghiep_vu'),
+      suggestDonViXuLy: getUnique('bo_phan_xu_ly')
     };
   }, [vbData]);
 
   // LỌC VÀ TẠO CÂY ĐƠN VỊ BÊN TRÁI
   const allowedDonViIds = useMemo(() => {
     if (!user) return [];
-    if (user.idDonVi === 'ALL') return donViList.map(dv => dv.ID_DonVi);
+    const userIdDonVi = user.id_don_vi || (user as any).idDonVi;
+
+    if (userIdDonVi === 'ALL' || String(user.quyen).toLowerCase() === 'admin') return donViList.map(dv => dv.id);
     
-    const level1 = [user.idDonVi];
-    const level2 = donViList.filter(dv => level1.includes(dv.CapQuanLy)).map(dv => dv.ID_DonVi);
-    const level3 = donViList.filter(dv => level2.includes(dv.CapQuanLy)).map(dv => dv.ID_DonVi);
+    const level1 = [userIdDonVi];
+    const level2 = donViList.filter(dv => level1.includes(dv.cap_quan_ly)).map(dv => dv.id);
+    const level3 = donViList.filter(dv => level2.includes(dv.cap_quan_ly)).map(dv => dv.id);
     const allAllowed = [...level1, ...level2, ...level3];
     
-    return donViList.filter(dv => allAllowed.includes(dv.ID_DonVi)).map(dv => dv.ID_DonVi);
+    return donViList.filter(dv => allAllowed.includes(dv.id)).map(dv => dv.id);
   }, [user, donViList]);
 
   // FIX TÌM KIẾM CÂY THƯ MỤC CỰC THÔNG MINH
   const filteredUnits = useMemo(() => {
-    let baseUnits = donViList.filter(dv => allowedDonViIds.includes(dv.ID_DonVi));
+    let baseUnits = donViList.filter(dv => allowedDonViIds.includes(dv.id));
     if (!unitSearchTerm) return baseUnits;
 
     const lower = unitSearchTerm.toLowerCase();
     const matchedIds = new Set<string>();
 
     baseUnits.forEach(u => {
-      if (String(u.TenDonVi || '').toLowerCase().includes(lower) || String(u.ID_DonVi || '').toLowerCase().includes(lower)) {
-        matchedIds.add(u.ID_DonVi);
+      if (String(u.ten_don_vi || '').toLowerCase().includes(lower) || String(u.id || '').toLowerCase().includes(lower)) {
+        matchedIds.add(u.id);
         
-        let parentId = u.CapQuanLy;
+        let parentId = u.cap_quan_ly;
         while (parentId && parentId !== 'HO') {
           matchedIds.add(parentId);
-          const parentUnit = baseUnits.find(p => p.ID_DonVi === parentId);
-          parentId = parentUnit ? parentUnit.CapQuanLy : null;
+          const parentUnit = baseUnits.find(p => p.id === parentId);
+          parentId = parentUnit ? parentUnit.cap_quan_ly : null;
         }
       }
     });
 
     const addChildren = (parentId: string) => {
       baseUnits.forEach(u => {
-        if (u.CapQuanLy === parentId && !matchedIds.has(u.ID_DonVi)) {
-          matchedIds.add(u.ID_DonVi);
-          addChildren(u.ID_DonVi);
+        if (u.cap_quan_ly === parentId && !matchedIds.has(u.id)) {
+          matchedIds.add(u.id);
+          addChildren(u.id);
         }
       });
     };
@@ -175,16 +174,25 @@ export default function DocumentPage() {
     const initialMatches = Array.from(matchedIds);
     initialMatches.forEach(id => addChildren(id));
 
-    return baseUnits.filter(item => matchedIds.has(item.ID_DonVi));
+    return baseUnits.filter(item => matchedIds.has(item.id));
   }, [donViList, unitSearchTerm, allowedDonViIds]);
 
-  const parentUnits = useMemo(() => filteredUnits.filter(item => item.CapQuanLy === 'HO' || !item.CapQuanLy), [filteredUnits]);
-  const getChildUnits = (parentId: string) => filteredUnits.filter(item => item.CapQuanLy === parentId);
+  const parentUnits = useMemo(() => filteredUnits.filter(item => item.cap_quan_ly === 'HO' || !item.cap_quan_ly), [filteredUnits]);
+  const getChildUnits = (parentId: string) => filteredUnits.filter(item => item.cap_quan_ly === parentId);
 
   const { vpdhUnits, ctttNamUnits, ctttBacUnits, otherUnits } = useMemo(() => {
-    const vpdh = parentUnits.filter(u => String(u.Phia || '').toLowerCase().includes('vpđh') || String(u.loaiHinh || '').toLowerCase().includes('tổng công ty') || String(u.loaiHinh || '').toLowerCase().includes('văn phòng'));
-    const ctttNam = parentUnits.filter(u => !vpdh.includes(u) && String(u.Phia || '').toLowerCase().includes('nam'));
-    const ctttBac = parentUnits.filter(u => !vpdh.includes(u) && !ctttNam.includes(u) && String(u.Phia || '').toLowerCase().includes('bắc'));
+    const vpdh = parentUnits
+      .filter(u => String(u.phia || '').toLowerCase().includes('vpđh') || String(u.loai_hinh || '').toLowerCase().includes('tổng công ty') || String(u.loai_hinh || '').toLowerCase().includes('văn phòng'))
+      .sort((a, b) => {
+        // Luôn ép THACO AUTO (Công ty mẹ) lên vị trí số 1
+        if (a.ten_don_vi === 'THACO AUTO') return -1;
+        if (b.ten_don_vi === 'THACO AUTO') return 1;
+        
+        // Các đơn vị VPĐH khác (như Phân Phối) tự động nằm bên dưới theo thứ tự gốc
+        return 0; 
+      });
+    const ctttNam = parentUnits.filter(u => !vpdh.includes(u) && String(u.phia || '').toLowerCase().includes('nam'));
+    const ctttBac = parentUnits.filter(u => !vpdh.includes(u) && !ctttNam.includes(u) && String(u.phia || '').toLowerCase().includes('bắc'));
     const others = parentUnits.filter(u => !vpdh.includes(u) && !ctttNam.includes(u) && !ctttBac.includes(u));
     return { vpdhUnits: vpdh, ctttNamUnits: ctttNam, ctttBacUnits: ctttBac, otherUnits: others };
   }, [parentUnits]);
@@ -196,8 +204,8 @@ export default function DocumentPage() {
   const availableYears = useMemo(() => {
     const years = new Set(
       visibleDocuments.map(item => {
-        if (!item.NgayBanHanh) return null;
-        return new Date(item.NgayBanHanh).getFullYear().toString();
+        if (!item.ngay_ban_hanh) return null;
+        return new Date(item.ngay_ban_hanh).getFullYear().toString();
       }).filter(Boolean) as string[]
     );
     return Array.from(years).sort((a, b) => Number(b) - Number(a));
@@ -207,29 +215,29 @@ export default function DocumentPage() {
   const filteredDocs = useMemo(() => {
     let result = [...visibleDocuments];
     
-    if (selectedUnitFilter) result = result.filter(item => item.ID_DonVi === selectedUnitFilter || item.Phamviapdung === selectedUnitFilter);
-    if (selectedPhanLoai) result = result.filter(item => item.Phanloai === selectedPhanLoai);
+    if (selectedUnitFilter) result = result.filter(item => item.id_don_vi === selectedUnitFilter || item.pham_vi_ap_dung === selectedUnitFilter);
+    if (selectedPhanLoai) result = result.filter(item => item.phan_loai === selectedPhanLoai);
     if (selectedYear !== 'all') {
-      result = result.filter(item => item.NgayBanHanh && new Date(item.NgayBanHanh).getFullYear().toString() === selectedYear);
+      result = result.filter(item => item.ngay_ban_hanh && new Date(item.ngay_ban_hanh).getFullYear().toString() === selectedYear);
     }
     if (searchTerm) {
       const lower = searchTerm.toLowerCase();
       result = result.filter(item => 
-        String(item.Sohieu || '').toLowerCase().includes(lower) || 
-        String(item.TieuDe || '').toLowerCase().includes(lower) ||
-        String(item.Nghiepvu || '').toLowerCase().includes(lower)
+        String(item.so_hieu || '').toLowerCase().includes(lower) || 
+        String(item.tieu_de || '').toLowerCase().includes(lower) ||
+        String(item.nghiep_vu || '').toLowerCase().includes(lower)
       );
     }
 
     result.sort((a, b) => {
       // 1. Theo Ngày ban hành
-      const dateA = a.NgayBanHanh ? new Date(a.NgayBanHanh).getTime() : 0;
-      const dateB = b.NgayBanHanh ? new Date(b.NgayBanHanh).getTime() : 0;
+      const dateA = a.ngay_ban_hanh ? new Date(a.ngay_ban_hanh).getTime() : 0;
+      const dateB = b.ngay_ban_hanh ? new Date(b.ngay_ban_hanh).getTime() : 0;
       if (dateB !== dateA) return dateB - dateA;
 
       // 2. Theo Số hiệu (Nếu cùng ngày)
-      const numA = parseInt(String(a.Sohieu || '').match(/^\d+/)?.[0] || '0', 10);
-      const numB = parseInt(String(b.Sohieu || '').match(/^\d+/)?.[0] || '0', 10);
+      const numA = parseInt(String(a.so_hieu || '').match(/^\d+/)?.[0] || '0', 10);
+      const numB = parseInt(String(b.so_hieu || '').match(/^\d+/)?.[0] || '0', 10);
       return numB - numA;
     });
 
@@ -238,29 +246,31 @@ export default function DocumentPage() {
 
   const selectedUnitName = useMemo(() => {
     if (!selectedUnitFilter) return 'Toàn hệ thống';
-    const unit = donViList.find(d => d.ID_DonVi === selectedUnitFilter);
-    return unit ? unit.TenDonVi : 'Đơn vị không xác định';
+    const unit = donViList.find(d => d.id === selectedUnitFilter);
+    return unit ? unit.ten_don_vi : 'Đơn vị không xác định';
   }, [selectedUnitFilter, donViList]);
 
   // HÀM MỞ MODAL & KHỞI TẠO STATE
   const openModal = (mode: 'create' | 'update', item?: any) => {
     setModalMode(mode);
+    const defaultDonViId = user?.id_don_vi || (user as any)?.idDonVi;
+
     if (item) { 
       setFormData({ 
         ...item, 
-        NgayBanHanh: item.NgayBanHanh ? item.NgayBanHanh.split('T')[0] : '', 
-        NgayNhan: item.NgayNhan ? item.NgayNhan.split('T')[0] : '', 
-        HanXuLy: item.HanXuLy ? item.HanXuLy.split('T')[0] : '', 
-        Mat: isMatDocument(item.Mat) 
+        ngay_ban_hanh: item.ngay_ban_hanh ? item.ngay_ban_hanh.split('T')[0] : '', 
+        ngay_nhan: item.ngay_nhan ? item.ngay_nhan.split('T')[0] : '', 
+        han_xu_ly: item.han_xu_ly ? item.han_xu_ly.split('T')[0] : '', 
+        mat: isMatDocument(item.mat) 
       }); 
     } else {
       setFormData({
-        ID_VanBan: '', ID_DonVi: selectedUnitFilter || (user?.idDonVi !== 'ALL' ? user?.idDonVi : ''), 
-        Phanloai: 'Thông báo', MucDoKhan: 'Bình thường', Sohieu: '', NgayBanHanh: new Date().toISOString().split('T')[0], 
-        TieuDe: '', Noidung: '', Link_FileDinhKem: '', NoiGui_Nhan: '', SoDen: '', NgayNhan: '', 
-        DonVi_NguoiXuLy: '', HanXuLy: '', TrangThaiXuLy: 'Chờ xử lý',
-        Nguoiky: '', Chucvu: '', Nguoilayso: '', BPlayso: '', Phamviapdung: 'Toàn hệ thống', 
-        Hieuluc: 'Còn hiệu lực', Nghiepvu: '', VBthaythe: '', Mat: false
+        id: '', id_don_vi: selectedUnitFilter || (defaultDonViId !== 'ALL' ? defaultDonViId : ''), 
+        phan_loai: 'Thông báo', muc_do_khan: 'Bình thường', so_hieu: '', ngay_ban_hanh: new Date().toISOString().split('T')[0], 
+        tieu_de: '', noi_dung: '', link_vb: '', noi_goi_nhan: '', so_den: '', ngay_nhan: '', 
+        bo_phan_xu_ly: '', han_xu_ly: '', trang_thai_xu_ly: 'Chờ xử lý',
+        nguoi_ky: '', chuc_vu: '', nguoi_lay_so: '', bo_phan_lay_so: '', pham_vi_ap_dung: 'Toàn hệ thống', 
+        hieu_luc: 'Còn hiệu lực', nghiep_vu: '', van_ban_thay_the: '', mat: false
       });
     }
     setIsModalOpen(true); setError(null);
@@ -268,29 +278,46 @@ export default function DocumentPage() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.ID_DonVi) return alert("Vui lòng chọn Đơn vị ban hành/lưu trữ!");
-    if (formData.Hieuluc === 'Thay thế VB khác' && !formData.VBthaythe) return alert("Vui lòng dán Link văn bản bị thay thế!");
+    if (!formData.id_don_vi) return alert("Vui lòng chọn Đơn vị ban hành/lưu trữ!");
+    if (formData.hieu_luc === 'Thay thế VB khác' && !formData.van_ban_thay_the) return alert("Vui lòng dán Link văn bản bị thay thế!");
     
-    // Tự động clear các trường không thuộc về phân loại đó
     let finalData = { ...formData };
-    if (finalData.Phanloai !== 'Công văn đến') {
-      finalData.SoDen = '';
-      finalData.NgayNhan = '';
+    
+    // Tự động clear các trường không thuộc về phân loại
+    if (finalData.phan_loai !== 'Công văn đến') {
+      finalData.so_den = null;
+      finalData.ngay_nhan = null;
     }
-    if (finalData.Phanloai !== 'Công văn đến' && finalData.Phanloai !== 'Tờ trình') {
-      finalData.DonVi_NguoiXuLy = '';
-      finalData.HanXuLy = '';
-      finalData.TrangThaiXuLy = '';
+    if (finalData.phan_loai !== 'Công văn đến' && finalData.phan_loai !== 'Tờ trình') {
+      finalData.bo_phan_xu_ly = null;
+      finalData.han_xu_ly = null;
+      finalData.trang_thai_xu_ly = null;
+    }
+
+    // 🟢 TIỀN XỬ LÝ SIÊU CỨNG: Ép rỗng thành NULL cho mọi cột
+    Object.keys(finalData).forEach(key => {
+      if (finalData[key] === '' || finalData[key] === ' ') {
+        finalData[key] = null;
+      }
+    });
+
+    // 🟢 ÉP KIỂU BOOLEAN
+    finalData.mat = !!finalData.mat; 
+
+    // Tự sinh ID cho trường hợp tạo mới nếu rỗng
+    if (modalMode === 'create' && !finalData.id) {
+      finalData.id = `VB-${Date.now()}`;
     }
 
     setSubmitting(true); setError(null);
     try {
-      const response = await apiService.save(finalData, modalMode, "VB_TB");
+      const response = await apiService.save(finalData, modalMode, "vb_tb");
+      
       if (modalMode === 'create') {
-        const newItem = { ...finalData, ID_VanBan: response.newId || `VB-${Date.now()}` };
-        setVbData(prev => [newItem, ...prev]); 
+        finalData.id = response.id || response.newId || finalData.id;
+        setVbData(prev => [finalData, ...prev]); 
       } else {
-        setVbData(prev => prev.map(item => item.ID_VanBan === finalData.ID_VanBan ? finalData : item));
+        setVbData(prev => prev.map(item => item.id === finalData.id ? finalData : item));
       }
       setIsModalOpen(false); 
     } catch (err: any) { 
@@ -302,8 +329,8 @@ export default function DocumentPage() {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    if (name === 'Hieuluc' && value !== 'Thay thế VB khác') {
-      setFormData((prev: any) => ({ ...prev, [name]: value, VBthaythe: '' }));
+    if (name === 'hieu_luc' && value !== 'Thay thế VB khác') {
+      setFormData((prev: any) => ({ ...prev, [name]: value, van_ban_thay_the: '' }));
     } else {
       setFormData((prev: any) => ({ ...prev, [name]: value }));
     }
@@ -313,8 +340,8 @@ export default function DocumentPage() {
     if (!itemToDelete) return; 
     setSubmitting(true);
     try {
-      await apiService.delete(itemToDelete, "VB_TB");
-      setVbData(prev => prev.filter(item => item.ID_VanBan !== itemToDelete));
+      await apiService.delete(itemToDelete, "vb_tb");
+      setVbData(prev => prev.filter(item => item.id !== itemToDelete));
       setIsConfirmOpen(false); setItemToDelete(null); 
     } catch (err: any) { 
       setError(err.message || 'Lỗi xóa dữ liệu.'); 
@@ -324,19 +351,19 @@ export default function DocumentPage() {
   };
 
   const renderUnitTree = (parent: DonVi, level: number = 1) => {
-    const children = getChildUnits(parent.ID_DonVi);
-    const isExpanded = expandedParents.includes(parent.ID_DonVi) || !!unitSearchTerm;
-    const isParentDimmed = parent.trangThai === 'Đại lý' || parent.trangThai === 'Đầu tư mới';
+    const children = getChildUnits(parent.id);
+    const isExpanded = expandedParents.includes(parent.id) || !!unitSearchTerm;
+    const isParentDimmed = parent.trang_thai === 'Đại lý' || parent.trang_thai === 'Đầu tư mới';
 
     return (
-      <div key={parent.ID_DonVi} className={level === 1 ? "mb-1" : "mt-1"}>
+      <div key={parent.id} className={level === 1 ? "mb-1" : "mt-1"}>
         <button 
-          onClick={() => { setSelectedUnitFilter(parent.ID_DonVi); if (children.length > 0) toggleParent(parent.ID_DonVi); }} 
-          className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold transition-colors ${selectedUnitFilter === parent.ID_DonVi ? 'bg-blue-50 text-[#05469B]' : 'text-gray-700 hover:bg-gray-50'} ${isParentDimmed ? 'opacity-50' : ''}`}
+          onClick={() => { setSelectedUnitFilter(parent.id); if (children.length > 0) toggleParent(parent.id); }} 
+          className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold transition-colors ${selectedUnitFilter === parent.id ? 'bg-blue-50 text-[#05469B]' : 'text-gray-700 hover:bg-gray-50'} ${isParentDimmed ? 'opacity-50' : ''}`}
         >
           {children.length > 0 ? (isExpanded ? <ChevronDown size={16} className="text-gray-400 shrink-0" /> : <ChevronRight size={16} className="text-gray-400 shrink-0" />) : <div className="w-4 shrink-0" />}
-          <span className="shrink-0">{getUnitEmoji(parent.loaiHinh)}</span>
-          <span className="truncate text-left">{parent.TenDonVi}</span>
+          <span className="shrink-0">{getUnitEmoji(parent.loai_hinh)}</span>
+          <span className="truncate text-left">{parent.ten_don_vi}</span>
         </button>
         
         {isExpanded && children.length > 0 && (
@@ -451,57 +478,57 @@ export default function DocumentPage() {
                   <tr><td colSpan={7} className="p-16 text-center text-gray-500"><FileText size={48} className="mx-auto text-gray-300 mb-4" /><p className="text-lg font-medium">Không tìm thấy văn bản phù hợp.</p></td></tr>
                 ) : (
                   filteredDocs.map((item) => (
-                    <tr key={item.ID_VanBan} className="hover:bg-blue-50/50 transition-colors group">
+                    <tr key={item.id} className="hover:bg-blue-50/50 transition-colors group">
                       <td className="p-4">
                         <div className="flex items-center flex-wrap gap-1.5">
-                          <span className="font-black text-[#05469B] bg-blue-50 px-2 py-1 rounded text-sm whitespace-nowrap border border-blue-100">{item.Sohieu}</span>
-                          {item.MucDoKhan === 'Hỏa tốc' && <span className="text-[9px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-black border border-red-200 uppercase">HỎA TỐC</span>}
-                          {item.MucDoKhan === 'Khẩn' && <span className="text-[9px] bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded font-black border border-orange-200 uppercase">KHẨN</span>}
+                          <span className="font-black text-[#05469B] bg-blue-50 px-2 py-1 rounded text-sm whitespace-nowrap border border-blue-100">{item.so_hieu}</span>
+                          {item.muc_do_khan === 'Hỏa tốc' && <span className="text-[9px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-black border border-red-200 uppercase">HỎA TỐC</span>}
+                          {item.muc_do_khan === 'Khẩn' && <span className="text-[9px] bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded font-black border border-orange-200 uppercase">KHẨN</span>}
                         </div>
-                        <div className="mt-2 text-[10px] font-semibold text-gray-500 bg-gray-100 px-2 py-0.5 rounded inline-block uppercase">{item.Phanloai}</div>
+                        <div className="mt-2 text-[10px] font-semibold text-gray-500 bg-gray-100 px-2 py-0.5 rounded inline-block uppercase">{item.phan_loai}</div>
                       </td>
-                      <td className="p-4 text-sm font-medium text-gray-700 flex items-center gap-1.5 mt-2"><Calendar size={14} className="text-gray-400"/> {item.NgayBanHanh ? new Date(item.NgayBanHanh).toLocaleDateString('vi-VN') : '-'}</td>
+                      <td className="p-4 text-sm font-medium text-gray-700 flex items-center gap-1.5 mt-2"><Calendar size={14} className="text-gray-400"/> {item.ngay_ban_hanh ? new Date(item.ngay_ban_hanh).toLocaleDateString('vi-VN') : '-'}</td>
                       <td className="p-4">
                         <div className="flex items-start gap-2 mb-1">
-                          {isMatDocument(item.Mat) && (
+                          {isMatDocument(item.mat) && (
                             <span className="flex items-center gap-1 bg-red-100 text-red-700 text-[10px] font-black px-1.5 py-0.5 rounded border border-red-200 shrink-0 mt-0.5" title="Văn bản Mật">
                               <Lock size={10} /> MẬT
                             </span>
                           )}
-                          <p className={`font-bold text-base ${isMatDocument(item.Mat) ? 'text-red-700' : 'text-gray-800'}`}>{item.TieuDe}</p>
+                          <p className={`font-bold text-base ${isMatDocument(item.mat) ? 'text-red-700' : 'text-gray-800'}`}>{item.tieu_de}</p>
                         </div>
-                        <p className="text-xs text-gray-500 line-clamp-2 mb-2">{item.Noidung}</p>
-                        {item.Link_FileDinhKem && (
-                          <a href={item.Link_FileDinhKem} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-bold text-blue-600 hover:underline hover:text-blue-800 bg-blue-50 px-2 py-1 rounded border border-blue-100">
+                        <p className="text-xs text-gray-500 line-clamp-2 mb-2">{item.noi_dung}</p>
+                        {item.link_vb && (
+                          <a href={item.link_vb} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-bold text-blue-600 hover:underline hover:text-blue-800 bg-blue-50 px-2 py-1 rounded border border-blue-100">
                             <LinkIcon size={12}/> File đính kèm
                           </a>
                         )}
-                        {item.Hieuluc === 'Thay thế VB khác' && item.VBthaythe && (
-                           <a href={item.VBthaythe} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-bold text-red-600 hover:underline bg-red-50 px-2 py-1 rounded border border-red-100 ml-2 mt-1">
+                        {item.hieu_luc === 'Thay thế VB khác' && item.van_ban_thay_the && (
+                           <a href={item.van_ban_thay_the} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-bold text-red-600 hover:underline bg-red-50 px-2 py-1 rounded border border-red-100 ml-2 mt-1">
                              <LinkIcon size={12}/> Đã thay thế VB cũ
                            </a>
                         )}
                       </td>
                       <td className="p-4 text-sm">
-                        <span className="font-semibold text-gray-700">{item.Phamviapdung === 'Toàn hệ thống' ? '🌍 Toàn hệ thống' : donViMap[item.Phamviapdung] || item.Phamviapdung}</span>
-                        <p className="text-[10px] text-gray-400 mt-1 uppercase">Từ: {donViMap[item.ID_DonVi] || item.ID_DonVi}</p>
+                        <span className="font-semibold text-gray-700">{item.pham_vi_ap_dung === 'Toàn hệ thống' ? '🌍 Toàn hệ thống' : donViMap[item.pham_vi_ap_dung] || item.pham_vi_ap_dung}</span>
+                        <p className="text-[10px] text-gray-400 mt-1 uppercase">Từ: {donViMap[item.id_don_vi] || item.id_don_vi}</p>
                       </td>
                       <td className="p-4 text-sm">
-                        {item.Nghiepvu ? <span className="px-2 py-1 bg-indigo-50 text-indigo-700 rounded text-xs font-bold border border-indigo-100">{item.Nghiepvu}</span> : <span className="text-gray-400 italic text-xs">Chưa PL</span>}
+                        {item.nghiep_vu ? <span className="px-2 py-1 bg-indigo-50 text-indigo-700 rounded text-xs font-bold border border-indigo-100">{item.nghiep_vu}</span> : <span className="text-gray-400 italic text-xs">Chưa PL</span>}
                       </td>
                       <td className="p-4">
                         <span className={`px-2.5 py-1.5 rounded-md text-xs font-bold flex items-center justify-center gap-1 text-center
-                          ${item.Hieuluc === 'Còn hiệu lực' ? 'bg-green-50 text-green-700 border border-green-200' : 
-                            item.Hieuluc === 'Hết hiệu lực' ? 'bg-gray-100 text-gray-600 border border-gray-300' : 'bg-orange-50 text-orange-700 border border-orange-200'}`}>
-                          {item.Hieuluc === 'Còn hiệu lực' && <CheckCircle2 size={12}/>}
-                          {item.Hieuluc}
+                          ${item.hieu_luc === 'Còn hiệu lực' ? 'bg-green-50 text-green-700 border border-green-200' : 
+                            item.hieu_luc === 'Hết hiệu lực' ? 'bg-gray-100 text-gray-600 border border-gray-300' : 'bg-orange-50 text-orange-700 border border-orange-200'}`}>
+                          {item.hieu_luc === 'Còn hiệu lực' && <CheckCircle2 size={12}/>}
+                          {item.hieu_luc}
                         </span>
                       </td>
                       <td className="p-4">
                         <div className="flex flex-col items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity w-full max-w-[100px] mx-auto">
                           <button onClick={() => { setViewData(item); setIsViewModalOpen(true); }} className="w-full py-1.5 bg-white border border-emerald-200 text-emerald-600 hover:bg-emerald-50 rounded text-[11px] font-bold transition-colors flex items-center justify-center gap-1.5 shadow-sm"><Eye size={13} /> Xem</button>
                           <button onClick={() => openModal('update', item)} className="w-full py-1.5 bg-white border border-blue-200 text-blue-600 hover:bg-blue-50 rounded text-[11px] font-bold transition-colors flex items-center justify-center gap-1.5 shadow-sm"><Edit size={13} /> Sửa</button>
-                          <button onClick={() => { setItemToDelete(item.ID_VanBan); setIsConfirmOpen(true); }} className="w-full py-1.5 bg-white border border-red-200 text-red-600 hover:bg-red-50 rounded text-[11px] font-bold transition-colors flex items-center justify-center gap-1.5 shadow-sm"><Trash2 size={13} /> Xóa</button>
+                          <button onClick={() => { setItemToDelete(item.id); setIsConfirmOpen(true); }} className="w-full py-1.5 bg-white border border-red-200 text-red-600 hover:bg-red-50 rounded text-[11px] font-bold transition-colors flex items-center justify-center gap-1.5 shadow-sm"><Trash2 size={13} /> Xóa</button>
                         </div>
                       </td>
                     </tr>
@@ -534,20 +561,20 @@ export default function DocumentPage() {
               
               {/* KHỐI 1: THÔNG TIN HÀNH CHÍNH (CỐ ĐỊNH) */}
               <div className="bg-blue-50/40 p-5 rounded-xl border border-blue-100">
-                <h4 className="font-bold text-[#05469B] mb-4 flex items-center gap-2"><div className="w-2 h-6 bg-[#05469B] rounded-full"></div> 1. Thông tin Hành chính</h4>
+                <h4 className="font-bold text-[#05469B] mb-4 flex items-center gap-2"><div className="w-2 h-6 bg-[#05469B] rounded-full"></div> 1. Thông outline Hành chính</h4>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
                   <div className="md:col-span-2">
                     <label className="block text-xs font-bold text-gray-700 mb-1">Đơn vị ban hành (Lưu trữ) *</label>
-                    <select required name="ID_DonVi" value={formData.ID_DonVi || ''} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-bold text-[#05469B]">
+                    <select required name="id_don_vi" value={formData.id_don_vi || ''} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-bold text-[#05469B]">
                       <option value="">-- Chọn đơn vị --</option>
-                      {buildHierarchicalOptions(donViList.filter(dv => allowedDonViIds.includes(dv.ID_DonVi))).map(({ unit, prefix }) => (
-                        <option key={unit.ID_DonVi} value={unit.ID_DonVi} className="font-normal text-gray-700">{prefix}{getUnitEmoji(unit.loaiHinh)} {unit.TenDonVi}</option>
+                      {buildHierarchicalOptions(donViList.filter(dv => allowedDonViIds.includes(dv.id))).map(({ unit, prefix }) => (
+                        <option key={unit.id} value={unit.id} className="font-normal text-gray-700">{prefix}{getUnitEmoji(unit.loai_hinh)} {unit.ten_don_vi}</option>
                       ))}
                     </select>
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-gray-700 mb-1">Phân loại *</label>
-                    <select required name="Phanloai" value={formData.Phanloai || 'Thông báo'} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-bold text-gray-800">
+                    <select required name="phan_loai" value={formData.phan_loai || 'Thông báo'} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-bold text-gray-800">
                       <option value="Thông báo">Thông báo</option>
                       <option value="Quyết định">Quyết định</option>
                       <option value="Tờ trình">Tờ trình</option>
@@ -557,21 +584,21 @@ export default function DocumentPage() {
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-red-600 mb-1">Độ khẩn *</label>
-                    <select name="MucDoKhan" value={formData.MucDoKhan || 'Bình thường'} onChange={handleInputChange} className={`w-full p-2.5 border rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-red-500 font-bold ${formData.MucDoKhan === 'Hỏa tốc' ? 'text-red-700 border-red-300' : formData.MucDoKhan === 'Khẩn' ? 'text-orange-600 border-orange-300' : 'text-gray-700 border-gray-200'}`}>
+                    <select name="muc_do_khan" value={formData.muc_do_khan || 'Bình thường'} onChange={handleInputChange} className={`w-full p-2.5 border rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-red-500 font-bold ${formData.muc_do_khan === 'Hỏa tốc' ? 'text-red-700 border-red-300' : formData.muc_do_khan === 'Khẩn' ? 'text-orange-600 border-orange-300' : 'text-gray-700 border-gray-200'}`}>
                       <option value="Bình thường">Bình thường</option><option value="Khẩn">Khẩn</option><option value="Hỏa tốc">Hỏa tốc</option>
                     </select>
                   </div>
 
-                  <div><label className="block text-xs font-bold text-gray-700 mb-1">Số hiệu *</label><input type="text" required name="Sohieu" value={formData.Sohieu || ''} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-black text-gray-800 tracking-wider" placeholder="VD: 123/TB-THaco..." /></div>
-                  <div><label className="block text-xs font-bold text-gray-700 mb-1">Ngày ban hành *</label><input type="date" required name="NgayBanHanh" value={formData.NgayBanHanh || ''} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-bold" /></div>
+                  <div><label className="block text-xs font-bold text-gray-700 mb-1">Số hiệu *</label><input type="text" required name="so_hieu" value={formData.so_hieu || ''} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-black text-gray-800 tracking-wider" placeholder="VD: 123/TB-THaco..." /></div>
+                  <div><label className="block text-xs font-bold text-gray-700 mb-1">Ngày ban hành *</label><input type="date" required name="ngay_ban_hanh" value={formData.ngay_ban_hanh || ''} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-bold" /></div>
                   
                   <div className="md:col-span-2">
                     <label className="block text-xs font-bold text-gray-700 mb-1">Phạm vi áp dụng (Hiển thị cho) *</label>
-                    <select required name="Phamviapdung" value={formData.Phamviapdung || 'Toàn hệ thống'} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-bold text-[#05469B]">
+                    <select required name="pham_vi_ap_dung" value={formData.pham_vi_ap_dung || 'Toàn hệ thống'} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-bold text-[#05469B]">
                       <option value="Toàn hệ thống">🌍 Áp dụng Toàn hệ thống</option>
                       <optgroup label="Hoặc Chỉ định Đơn vị cụ thể:">
                         {buildHierarchicalOptions(donViList).map(({ unit, prefix }) => (
-                          <option key={unit.ID_DonVi} value={unit.ID_DonVi} className="font-normal text-gray-700">{prefix}{getUnitEmoji(unit.loaiHinh)} {unit.TenDonVi}</option>
+                          <option key={unit.id} value={unit.id} className="font-normal text-gray-700">{prefix}{getUnitEmoji(unit.loai_hinh)} {unit.ten_don_vi}</option>
                         ))}
                       </optgroup>
                     </select>
@@ -579,7 +606,7 @@ export default function DocumentPage() {
 
                   <div className="col-span-2 md:col-span-4 mt-1">
                     <label className="inline-flex items-center p-3 border border-red-200 rounded-lg bg-red-50 cursor-pointer hover:bg-red-100 transition-colors shadow-sm w-max">
-                      <input type="checkbox" name="Mat" checked={!!formData.Mat} onChange={(e) => setFormData((prev: any) => ({ ...prev, Mat: e.target.checked }))} className="w-4 h-4 text-red-600 rounded border-red-300 mr-2.5 focus:ring-red-500" />
+                      <input type="checkbox" name="mat" checked={!!formData.mat} onChange={(e) => setFormData((prev: any) => ({ ...prev, mat: e.target.checked }))} className="w-4 h-4 text-red-600 rounded border-red-300 mr-2.5 focus:ring-red-500" />
                       <Lock size={16} className="text-red-600 mr-1.5" />
                       <span className="text-sm font-bold text-red-700">Đánh dấu là Văn bản MẬT (Cảnh báo thị giác)</span>
                     </label>
@@ -588,23 +615,23 @@ export default function DocumentPage() {
               </div>
 
               {/* KHỐI 2: THÔNG TIN LUÂN CHUYỂN (ĐỘNG) */}
-              {formData.Phanloai !== 'Thông báo' && (
+              {formData.phan_loai !== 'Thông báo' && (
                 <div className="bg-indigo-50/40 p-5 rounded-xl border border-indigo-100 animate-in fade-in zoom-in duration-200">
                   <h4 className="font-bold text-indigo-800 mb-4 flex items-center gap-2"><div className="w-2 h-6 bg-indigo-500 rounded-full"></div> 2. Thông tin Luân chuyển</h4>
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
-                    <div className={formData.Phanloai === 'Công văn đến' ? 'md:col-span-2' : 'md:col-span-4'}>
-                      <label className="block text-xs font-bold text-indigo-800 mb-1 uppercase">{getNoiGuiNhanLabel(formData.Phanloai)} *</label>
-                      <input type="text" required name="NoiGui_Nhan" value={formData.NoiGui_Nhan || ''} onChange={handleInputChange} className="w-full p-2.5 border border-indigo-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Tên cơ quan, đơn vị, cá nhân..." />
+                    <div className={formData.phan_loai === 'Công văn đến' ? 'md:col-span-2' : 'md:col-span-4'}>
+                      <label className="block text-xs font-bold text-indigo-800 mb-1 uppercase">{getNoiGuiNhanLabel(formData.phan_loai)} *</label>
+                      <input type="text" required name="noi_goi_nhan" value={formData.noi_goi_nhan || ''} onChange={handleInputChange} className="w-full p-2.5 border border-indigo-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Tên cơ quan, đơn vị, cá nhân..." />
                     </div>
-                    {formData.Phanloai === 'Công văn đến' && (
+                    {formData.phan_loai === 'Công văn đến' && (
                       <>
                         <div>
                           <label className="block text-xs font-bold text-indigo-800 mb-1 uppercase">Số đến nội bộ *</label>
-                          <input type="text" required name="SoDen" value={formData.SoDen || ''} onChange={handleInputChange} className="w-full p-2.5 border border-indigo-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-indigo-500 font-bold" placeholder="VD: 01/Đ..." />
+                          <input type="text" required name="so_den" value={formData.so_den || ''} onChange={handleInputChange} className="w-full p-2.5 border border-indigo-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-indigo-500 font-bold" placeholder="VD: 01/Đ..." />
                         </div>
                         <div>
                           <label className="block text-xs font-bold text-indigo-800 mb-1 uppercase">Ngày nhận *</label>
-                          <input type="date" required name="NgayNhan" value={formData.NgayNhan || ''} onChange={handleInputChange} className="w-full p-2.5 border border-indigo-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-indigo-500" />
+                          <input type="date" required name="ngay_nhan" value={formData.ngay_nhan || ''} onChange={handleInputChange} className="w-full p-2.5 border border-indigo-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-indigo-500" />
                         </div>
                       </>
                     )}
@@ -618,17 +645,17 @@ export default function DocumentPage() {
                 <div className="space-y-4">
                   <div>
                     <label className="block text-xs font-bold text-gray-700 mb-1">Tiêu đề *</label>
-                    <input type="text" required name="TieuDe" value={formData.TieuDe || ''} onChange={handleInputChange} className="w-full p-3 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-bold text-lg" placeholder="Nhập tiêu đề văn bản..." />
+                    <input type="text" required name="tieu_de" value={formData.tieu_de || ''} onChange={handleInputChange} className="w-full p-3 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-bold text-lg" placeholder="Nhập tiêu đề văn bản..." />
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-gray-700 mb-1">Trích yếu nội dung</label>
-                    <textarea name="Noidung" value={formData.Noidung || ''} onChange={handleInputChange} rows={3} className="w-full p-3 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] resize-none" placeholder="Tóm tắt ngắn gọn nội dung..."></textarea>
+                    <textarea name="noi_dung" value={formData.noi_dung || ''} onChange={handleInputChange} rows={3} className="w-full p-3 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] resize-none" placeholder="Tóm tắt ngắn gọn nội dung..."></textarea>
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-gray-700 mb-1">Link File đính kèm (PDF / Drive)</label>
                     <div className="relative">
                       <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-                      <input type="url" name="Link_FileDinhKem" value={formData.Link_FileDinhKem || ''} onChange={handleInputChange} className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] text-blue-600 font-medium" placeholder="Dán link Google Drive hoặc file PDF vào đây..." />
+                      <input type="url" name="link_vb" value={formData.link_vb || ''} onChange={handleInputChange} className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] text-blue-600 font-medium" placeholder="Dán link Google Drive hoặc file PDF vào đây..." />
                     </div>
                   </div>
                 </div>
@@ -640,19 +667,19 @@ export default function DocumentPage() {
                 
                 <div className="space-y-6">
                   {/* Khu vực Xử lý (Chỉ hiện khi là Tờ trình hoặc CV Đến) */}
-                  {(formData.Phanloai === 'Công văn đến' || formData.Phanloai === 'Tờ trình') && (
+                  {(formData.phan_loai === 'Công văn đến' || formData.phan_loai === 'Tờ trình') && (
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-5 pb-6 border-b border-orange-200 animate-in fade-in zoom-in">
                       <div>
                         <label className="block text-xs font-bold text-red-700 mb-1 flex items-center gap-1"><Zap size={14}/> Đơn vị / Người xử lý</label>
-                        <input list="suggest-donvixuly" name="DonVi_NguoiXuLy" value={formData.DonVi_NguoiXuLy || ''} onChange={handleInputChange} className="w-full p-2.5 border border-red-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-red-500" placeholder="Giao cho..." />
+                        <input list="suggest-donvixuly" name="bo_phan_xu_ly" value={formData.bo_phan_xu_ly || ''} onChange={handleInputChange} className="w-full p-2.5 border border-red-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-red-500" placeholder="Giao cho..." />
                       </div>
                       <div>
                         <label className="block text-xs font-bold text-red-700 mb-1 flex items-center gap-1"><Clock size={14}/> Hạn xử lý (Deadline)</label>
-                        <input type="date" name="HanXuLy" value={formData.HanXuLy || ''} onChange={handleInputChange} className="w-full p-2.5 border border-red-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-red-500" />
+                        <input type="date" name="han_xu_ly" value={formData.han_xu_ly || ''} onChange={handleInputChange} className="w-full p-2.5 border border-red-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-red-500" />
                       </div>
                       <div>
                         <label className="block text-xs font-bold text-orange-700 mb-1 flex items-center gap-1"><Send size={14}/> Trạng thái Xử lý</label>
-                        <select name="TrangThaiXuLy" value={formData.TrangThaiXuLy || 'Chờ xử lý'} onChange={handleInputChange} className="w-full p-2.5 border border-orange-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-orange-500 font-bold text-orange-800">
+                        <select name="trang_thai_xu_ly" value={formData.trang_thai_xu_ly || 'Chờ xử lý'} onChange={handleInputChange} className="w-full p-2.5 border border-orange-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-orange-500 font-bold text-orange-800">
                           <option value="Chờ xử lý">Chờ xử lý</option>
                           <option value="Đang xử lý">Đang xử lý</option>
                           <option value="Đã hoàn thành">Đã hoàn thành</option>
@@ -663,30 +690,30 @@ export default function DocumentPage() {
 
                   {/* Khu vực Phụ trợ */}
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <div><label className="block text-xs font-bold text-gray-700 mb-1">Người ký</label><input list="suggest-nguoiky" type="text" name="Nguoiky" value={formData.Nguoiky || ''} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-[#05469B]" placeholder="Họ tên người ký..." /></div>
-                    <div><label className="block text-xs font-bold text-gray-700 mb-1">Chức vụ người ký</label><input list="suggest-chucvu" type="text" name="Chucvu" value={formData.Chucvu || ''} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-[#05469B]" placeholder="VD: Giám đốc..." /></div>
-                    <div><label className="block text-xs font-bold text-gray-700 mb-1">Người lấy số</label><input list="suggest-nguoilayso" type="text" name="Nguoilayso" value={formData.Nguoilayso || ''} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-[#05469B]" placeholder="Nhân viên..." /></div>
-                    <div><label className="block text-xs font-bold text-gray-700 mb-1">Bộ phận lấy số</label><input list="suggest-bplayso" type="text" name="BPlayso" value={formData.BPlayso || ''} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-[#05469B]" placeholder="Phòng HCNS..." /></div>
+                    <div><label className="block text-xs font-bold text-gray-700 mb-1">Người ký</label><input list="suggest-nguoiky" type="text" name="nguoi_ky" value={formData.nguoi_ky || ''} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-[#05469B]" placeholder="Họ tên người ký..." /></div>
+                    <div><label className="block text-xs font-bold text-gray-700 mb-1">Chức vụ người ký</label><input list="suggest-chucvu" type="text" name="chuc_vu" value={formData.chuc_vu || ''} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-[#05469B]" placeholder="VD: Giám đốc..." /></div>
+                    <div><label className="block text-xs font-bold text-gray-700 mb-1">Người lấy số</label><input list="suggest-nguoilayso" type="text" name="nguoi_lay_so" value={formData.nguoi_lay_so || ''} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-[#05469B]" placeholder="Nhân viên..." /></div>
+                    <div><label className="block text-xs font-bold text-gray-700 mb-1">Bộ phận lấy số</label><input list="suggest-bplayso" type="text" name="bo_phan_lay_so" value={formData.bo_phan_lay_so || ''} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-[#05469B]" placeholder="Phòng HCNS..." /></div>
 
                     <div className="md:col-span-2">
                       <label className="block text-xs font-bold text-gray-700 mb-1">Phân loại Nghiệp vụ</label>
-                      <input list="suggest-nghiepvu" type="text" name="Nghiepvu" value={formData.Nghiepvu || ''} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-[#05469B]" placeholder="Kinh doanh, Nhân sự, Dịch vụ..." />
+                      <input list="suggest-nghiepvu" type="text" name="nghiep_vu" value={formData.nghiep_vu || ''} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-[#05469B]" placeholder="Kinh doanh, Nhân sự, Dịch vụ..." />
                     </div>
                     <div className="md:col-span-2">
                       <label className="block text-xs font-bold text-gray-700 mb-1">Tình trạng Hiệu lực *</label>
-                      <select required name="Hieuluc" value={formData.Hieuluc || 'Còn hiệu lực'} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-[#05469B] font-bold text-[#05469B]">
+                      <select required name="hieu_luc" value={formData.hieu_luc || 'Còn hiệu lực'} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-[#05469B] font-bold text-[#05469B]">
                         <option value="Còn hiệu lực">Còn hiệu lực</option>
                         <option value="Hết hiệu lực">Hết hiệu lực</option>
                         <option value="Thay thế VB khác">Thay thế VB khác</option>
                       </select>
                     </div>
 
-                    {formData.Hieuluc === 'Thay thế VB khác' && (
+                    {formData.hieu_luc === 'Thay thế VB khác' && (
                       <div className="col-span-1 md:col-span-4 bg-orange-50 p-3 rounded-lg border border-orange-300 mt-2 animate-in fade-in zoom-in duration-200">
                         <label className="block text-xs font-bold text-orange-800 mb-1">Link Văn bản bị thay thế (Dán link vào đây) *</label>
                         <div className="relative">
                           <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-orange-500" size={16} />
-                          <input type="url" required name="VBthaythe" value={formData.VBthaythe || ''} onChange={handleInputChange} className="w-full pl-9 pr-4 py-2.5 border border-orange-300 rounded-lg bg-white outline-none focus:ring-2 focus:ring-orange-500 text-blue-600 text-sm font-medium" placeholder="Dán link Google Drive của văn bản cũ..." />
+                          <input type="url" required name="van_ban_thay_the" value={formData.van_ban_thay_the || ''} onChange={handleInputChange} className="w-full pl-9 pr-4 py-2.5 border border-orange-300 rounded-lg bg-white outline-none focus:ring-2 focus:ring-orange-500 text-blue-600 text-sm font-medium" placeholder="Dán link Google Drive của văn bản cũ..." />
                         </div>
                       </div>
                     )}
@@ -714,7 +741,7 @@ export default function DocumentPage() {
             
             <div className="p-6 overflow-y-auto">
               
-              {isMatDocument(viewData.Mat) && (
+              {isMatDocument(viewData.mat) && (
                 <div className="mb-5 p-3.5 bg-red-50 border border-red-200 rounded-xl flex items-center gap-3 shadow-sm">
                   <div className="w-10 h-10 rounded-full bg-red-100 text-red-600 flex items-center justify-center shrink-0"><Lock size={20} /></div>
                   <div>
@@ -726,37 +753,37 @@ export default function DocumentPage() {
 
               <div className="mb-6">
                 <div className="flex flex-wrap items-center gap-3 mb-2">
-                  <span className="bg-blue-100 text-[#05469B] font-black px-3 py-1 rounded text-lg border border-blue-200">{viewData.Sohieu}</span>
-                  <span className="bg-gray-100 text-gray-600 font-bold px-2 py-1 rounded text-xs uppercase">{viewData.Phanloai}</span>
+                  <span className="bg-blue-100 text-[#05469B] font-black px-3 py-1 rounded text-lg border border-blue-200">{viewData.so_hieu}</span>
+                  <span className="bg-gray-100 text-gray-600 font-bold px-2 py-1 rounded text-xs uppercase">{viewData.phan_loai}</span>
                   
-                  {viewData.MucDoKhan && viewData.MucDoKhan !== 'Bình thường' && (
-                    <span className={`px-2.5 py-1 rounded text-xs font-black border uppercase ${viewData.MucDoKhan === 'Hỏa tốc' ? 'bg-red-100 text-red-700 border-red-300 animate-pulse' : 'bg-orange-100 text-orange-700 border-orange-300'}`}>
-                      {viewData.MucDoKhan}
+                  {viewData.muc_do_khan && viewData.muc_do_khan !== 'Bình thường' && (
+                    <span className={`px-2.5 py-1 rounded text-xs font-black border uppercase ${viewData.muc_do_khan === 'Hỏa tốc' ? 'bg-red-100 text-red-700 border-red-300 animate-pulse' : 'bg-orange-100 text-orange-700 border-orange-300'}`}>
+                      {viewData.muc_do_khan}
                     </span>
                   )}
                   
-                  <span className={`px-2 py-1 rounded text-xs font-bold ${viewData.Hieuluc === 'Còn hiệu lực' ? 'bg-green-100 text-green-700' : viewData.Hieuluc === 'Hết hiệu lực' ? 'bg-gray-200 text-gray-700' : 'bg-orange-100 text-orange-700'}`}>
-                    {viewData.Hieuluc}
+                  <span className={`px-2 py-1 rounded text-xs font-bold ${viewData.hieu_luc === 'Còn hiệu lực' ? 'bg-green-100 text-green-700' : viewData.hieu_luc === 'Hết hiệu lực' ? 'bg-gray-200 text-gray-700' : 'bg-orange-100 text-orange-700'}`}>
+                    {viewData.hieu_luc}
                   </span>
                 </div>
-                <h2 className={`text-2xl font-black leading-tight mt-3 ${isMatDocument(viewData.Mat) ? 'text-red-700' : 'text-gray-800'}`}>{viewData.TieuDe}</h2>
-                <p className="text-sm text-gray-500 mt-2 flex items-center gap-2"><Calendar size={14}/> Ban hành: <span className="font-bold text-gray-700">{viewData.NgayBanHanh ? new Date(viewData.NgayBanHanh).toLocaleDateString('vi-VN') : '-'}</span></p>
+                <h2 className={`text-2xl font-black leading-tight mt-3 ${isMatDocument(viewData.mat) ? 'text-red-700' : 'text-gray-800'}`}>{viewData.tieu_de}</h2>
+                <p className="text-sm text-gray-500 mt-2 flex items-center gap-2"><Calendar size={14}/> Ban hành: <span className="font-bold text-gray-700">{viewData.ngay_ban_hanh ? new Date(viewData.ngay_ban_hanh).toLocaleDateString('vi-VN') : '-'}</span></p>
               </div>
 
               <div className="bg-gray-50 p-4 rounded-xl border border-gray-100 mb-6 text-sm text-gray-700 whitespace-pre-wrap leading-relaxed shadow-inner">
-                {viewData.Noidung || <span className="italic text-gray-400">Không có trích yếu nội dung.</span>}
+                {viewData.noi_dung || <span className="italic text-gray-400">Không có trích yếu nội dung.</span>}
               </div>
 
-              {(viewData.Phanloai === 'Công văn đến' || viewData.Phanloai === 'Tờ trình') && (
+              {(viewData.phan_loai === 'Công văn đến' || viewData.phan_loai === 'Tờ trình') && (
                 <div className="mb-6 p-4 rounded-xl border border-orange-200 bg-orange-50/50 shadow-sm">
                   <h4 className="text-sm font-bold text-orange-800 mb-3 flex items-center gap-2"><Clock size={16}/> Theo dõi Xử lý</h4>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div><p className="text-xs text-gray-500 font-bold mb-1 uppercase">Đơn vị / Người xử lý</p><p className="font-semibold text-gray-800">{viewData.DonVi_NguoiXuLy || 'Chưa giao việc'}</p></div>
-                    <div><p className="text-xs text-gray-500 font-bold mb-1 uppercase">Hạn xử lý</p><p className="font-semibold text-red-600">{viewData.HanXuLy ? new Date(viewData.HanXuLy).toLocaleDateString('vi-VN') : '-'}</p></div>
+                    <div><p className="text-xs text-gray-500 font-bold mb-1 uppercase">Đơn vị / Người xử lý</p><p className="font-semibold text-gray-800">{viewData.bo_phan_xu_ly || 'Chưa giao việc'}</p></div>
+                    <div><p className="text-xs text-gray-500 font-bold mb-1 uppercase">Hạn xử lý</p><p className="font-semibold text-red-600">{viewData.han_xu_ly ? new Date(viewData.han_xu_ly).toLocaleDateString('vi-VN') : '-'}</p></div>
                     <div>
                       <p className="text-xs text-gray-500 font-bold mb-1 uppercase">Trạng thái</p>
-                      <p className={`font-bold ${viewData.TrangThaiXuLy === 'Đã hoàn thành' ? 'text-green-600' : viewData.TrangThaiXuLy === 'Đang xử lý' ? 'text-blue-600' : 'text-orange-600'}`}>
-                        {viewData.TrangThaiXuLy || 'Chờ xử lý'}
+                      <p className={`font-bold ${viewData.trang_thai_xu_ly === 'Đã hoàn thành' ? 'text-green-600' : viewData.trang_thai_xu_ly === 'Đang xử lý' ? 'text-blue-600' : 'text-orange-600'}`}>
+                        {viewData.trang_thai_xu_ly || 'Chờ xử lý'}
                       </p>
                     </div>
                   </div>
@@ -764,39 +791,39 @@ export default function DocumentPage() {
               )}
 
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 bg-blue-50/30 p-4 rounded-xl border border-blue-100">
-                <div className="col-span-2"><p className="text-xs text-gray-500 uppercase font-bold mb-1">Nơi ban hành (Lưu trữ)</p><p className="font-semibold text-[#05469B]">{donViMap[viewData.ID_DonVi] || viewData.ID_DonVi}</p></div>
-                <div className="col-span-2"><p className="text-xs text-gray-500 uppercase font-bold mb-1">Phạm vi áp dụng</p><p className="font-semibold text-[#05469B]">{viewData.Phamviapdung === 'Toàn hệ thống' ? '🌍 Toàn hệ thống' : donViMap[viewData.Phamviapdung] || viewData.Phamviapdung}</p></div>
+                <div className="col-span-2"><p className="text-xs text-gray-500 uppercase font-bold mb-1">Nơi ban hành (Lưu trữ)</p><p className="font-semibold text-[#05469B]">{donViMap[viewData.id_don_vi] || viewData.id_don_vi}</p></div>
+                <div className="col-span-2"><p className="text-xs text-gray-500 uppercase font-bold mb-1">Phạm vi áp dụng</p><p className="font-semibold text-[#05469B]">{viewData.pham_vi_ap_dung === 'Toàn hệ thống' ? '🌍 Toàn hệ thống' : donViMap[viewData.pham_vi_ap_dung] || viewData.pham_vi_ap_dung}</p></div>
                 
-                {viewData.Phanloai !== 'Thông báo' && (
+                {viewData.phan_loai !== 'Thông báo' && (
                   <div className="col-span-2 md:col-span-4 border-t border-blue-100/50 pt-3 mt-1 grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="col-span-1 md:col-span-2">
-                        <p className="text-xs text-gray-500 uppercase font-bold mb-1">{getNoiGuiNhanLabel(viewData.Phanloai)}</p>
-                        <p className="font-semibold text-gray-800">{viewData.NoiGui_Nhan || '-'}</p>
+                        <p className="text-xs text-gray-500 uppercase font-bold mb-1">{getNoiGuiNhanLabel(viewData.phan_loai)}</p>
+                        <p className="font-semibold text-gray-800">{viewData.noi_goi_nhan || '-'}</p>
                     </div>
-                    {viewData.Phanloai === 'Công văn đến' && (
+                    {viewData.phan_loai === 'Công văn đến' && (
                       <>
-                        <div><p className="text-xs text-gray-500 uppercase font-bold mb-1">Số đến nội bộ</p><p className="font-black text-[#05469B]">{viewData.SoDen || '-'}</p></div>
-                        <div><p className="text-xs text-gray-500 uppercase font-bold mb-1">Ngày nhận CV</p><p className="font-semibold text-gray-800">{viewData.NgayNhan ? new Date(viewData.NgayNhan).toLocaleDateString('vi-VN') : '-'}</p></div>
+                        <div><p className="text-xs text-gray-500 uppercase font-bold mb-1">Số đến nội bộ</p><p className="font-black text-[#05469B]">{viewData.so_den || '-'}</p></div>
+                        <div><p className="text-xs text-gray-500 uppercase font-bold mb-1">Ngày nhận CV</p><p className="font-semibold text-gray-800">{viewData.ngay_nhan ? new Date(viewData.ngay_nhan).toLocaleDateString('vi-VN') : '-'}</p></div>
                       </>
                     )}
                   </div>
                 )}
 
                 <div className="col-span-2 md:col-span-4 border-t border-blue-100/50 pt-3 mt-1 grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div><p className="text-xs text-gray-500 uppercase font-bold mb-1">Người ký</p><p className="font-semibold text-gray-800">{viewData.Nguoiky || '-'} <span className="text-gray-500 font-normal">({viewData.Chucvu || '-'})</span></p></div>
-                  <div><p className="text-xs text-gray-500 uppercase font-bold mb-1">Người lấy số</p><p className="font-semibold text-gray-800">{viewData.Nguoilayso || '-'} <span className="text-gray-500 font-normal">({viewData.BPlayso || '-'})</span></p></div>
-                  <div className="col-span-2"><p className="text-xs text-gray-500 uppercase font-bold mb-1">Phân loại Nghiệp vụ</p><p className="font-semibold text-gray-800">{viewData.Nghiepvu || '-'}</p></div>
+                  <div><p className="text-xs text-gray-500 uppercase font-bold mb-1">Người ký</p><p className="font-semibold text-gray-800">{viewData.nguoi_ky || '-'} <span className="text-gray-500 font-normal">({viewData.chuc_vu || '-'})</span></p></div>
+                  <div><p className="text-xs text-gray-500 uppercase font-bold mb-1">Người lấy số</p><p className="font-semibold text-gray-800">{viewData.nguoi_lay_so || '-'} <span className="text-gray-500 font-normal">({viewData.bo_phan_lay_so || '-'})</span></p></div>
+                  <div className="col-span-2"><p className="text-xs text-gray-500 uppercase font-bold mb-1">Phân loại Nghiệp vụ</p><p className="font-semibold text-gray-800">{viewData.nghiep_vu || '-'}</p></div>
                 </div>
               </div>
 
               <div className="flex flex-col gap-3">
-                {viewData.Link_FileDinhKem && (
-                  <a href={viewData.Link_FileDinhKem} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-2 py-3 bg-[#05469B] hover:bg-[#04367a] text-white rounded-xl font-bold transition-colors shadow-md">
+                {viewData.link_vb && (
+                  <a href={viewData.link_vb} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-2 py-3 bg-[#05469B] hover:bg-[#04367a] text-white rounded-xl font-bold transition-colors shadow-md">
                     <LinkIcon size={18}/> Mở File Đính Kèm
                   </a>
                 )}
-                {viewData.Hieuluc === 'Thay thế VB khác' && viewData.VBthaythe && (
-                  <a href={viewData.VBthaythe} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-2 py-3 bg-white border-2 border-orange-500 text-orange-600 hover:bg-orange-50 rounded-xl font-bold transition-colors">
+                {viewData.hieu_luc === 'Thay thế VB khác' && viewData.van_ban_thay_the && (
+                  <a href={viewData.van_ban_thay_the} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-2 py-3 bg-white border-2 border-orange-500 text-orange-600 hover:bg-orange-50 rounded-xl font-bold transition-colors">
                     <LinkIcon size={18}/> Mở Văn Bản bị thay thế
                   </a>
                 )}

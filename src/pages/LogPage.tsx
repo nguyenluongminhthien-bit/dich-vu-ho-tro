@@ -14,57 +14,16 @@ export default function LogPage() {
       try {
         const rawLogs = await apiService.getLogs();
         
-        // 🚀 BỘ QUÉT DỮ LIỆU NHẬT KÝ THÔNG MINH
-        const cleanLogs = rawLogs.map((item: any, index: number) => {
-          if (!item) return null;
-          
-          if (Array.isArray(item)) {
-            return {
-              ID_Log: String(item[0] || `LOG_${index}`).trim(),
-              ThoiGian: String(item[1] || '').trim(),
-              ID_User: String(item[2] || '').trim(),
-              HanhDong: String(item[3] || '').trim(),
-              ChiTiet: String(item[4] || '').trim()
-            };
-          }
-          
-          const getValue = (keys: string[]) => {
-            for (let k of Object.keys(item)) {
-              const cleanK = k.toLowerCase().replace(/[^a-z0-9]/g, '');
-              if (keys.includes(cleanK)) return item[k];
-            }
-            return '';
-          };
-
-          return {
-            ID_Log: String(item.ID_Log || getValue(['idlog', 'malog']) || `LOG_${index}`).trim(),
-            ThoiGian: String(item.ThoiGian || getValue(['thoigian', 'time', 'date']) || '').replace(/undefined/gi, '').trim(),
-            ID_User: String(item.ID_User || getValue(['iduser', 'user', 'taikhoan']) || '').replace(/undefined/gi, '').trim() || 'Hệ thống',
-            HanhDong: String(item.HanhDong || getValue(['hanhdong', 'action', 'thaotac']) || '').replace(/undefined/gi, '').trim() || 'KHÔNG RÕ',
-            ChiTiet: String(item.ChiTiet || getValue(['chitiet', 'detail', 'noidung']) || '').replace(/undefined/gi, '').trim()
-          };
-        }).filter((l: any) => l !== null && !l.ID_Log.toLowerCase().includes('id_log') && !l.ThoiGian.toLowerCase().includes('thoigian'));
-
-        // Hàm parse Date an toàn (Hỗ trợ định dạng ngày Việt Nam DD/MM/YYYY)
+        // Hàm parse Date an toàn (Hỗ trợ nhiều định dạng từ DB)
         const parseSafeDate = (dateStr: string) => {
           if (!dateStr) return 0;
           const d = new Date(dateStr).getTime();
           if (!isNaN(d)) return d;
-          
-          const parts = dateStr.trim().split(/[\sT]+/);
-          const datePart = parts[0];
-          const timePart = parts[1] || '00:00:00';
-          
-          if (datePart && datePart.includes('/')) {
-            const [day, month, year] = datePart.split('/');
-            const [hr, min, sec] = timePart.split(':');
-            return new Date(Number(year), Number(month) - 1, Number(day), Number(hr || 0), Number(min || 0), Number(sec || 0)).getTime();
-          }
-          return 0;
+          return 0; // Fallback nếu lỗi
         };
 
-        // Sắp xếp: Thời gian mới nhất lên đầu. Reverse trước để những log thêm sau cùng (ở cuối sheet) sẽ lên đầu
-        const sortedData = cleanLogs.reverse().sort((a, b) => parseSafeDate(b.ThoiGian) - parseSafeDate(a.ThoiGian));
+        // Dữ liệu từ Supabase đã chuẩn, chỉ cần sắp xếp lại: Thời gian mới nhất lên đầu.
+        const sortedData = rawLogs.sort((a, b) => parseSafeDate(b.thoi_gian) - parseSafeDate(a.thoi_gian));
         setLogs(sortedData);
       } catch (err: any) {
         setError(err.message || 'Lỗi tải dữ liệu nhật ký.');
@@ -79,9 +38,9 @@ export default function LogPage() {
     if (!searchTerm) return logs;
     const lower = searchTerm.toLowerCase();
     return logs.filter(log => 
-      log.ID_User?.toLowerCase().includes(lower) || 
-      log.HanhDong?.toLowerCase().includes(lower) ||
-      log.ChiTiet?.toLowerCase().includes(lower)
+      log.id_user?.toLowerCase().includes(lower) || 
+      log.hanh_dong?.toLowerCase().includes(lower) ||
+      log.chi_tiet?.toLowerCase().includes(lower)
     );
   }, [logs, searchTerm]);
 
@@ -93,6 +52,21 @@ export default function LogPage() {
     if (act?.includes('ĐĂNG NHẬP')) return 'bg-purple-50 text-purple-700 border-purple-200';
     if (act?.includes('ĐĂNG XUẤT')) return 'bg-gray-100 text-gray-600 border-gray-300';
     return 'bg-gray-50 text-gray-700 border-gray-200';
+  };
+
+  // Hàm helper để parse chuỗi thời gian hiển thị thân thiện (Cắt riêng Ngày và Giờ)
+  const formatLogTime = (isoString: string) => {
+    if (!isoString) return { dateStr: '', timeStr: '' };
+    try {
+      const d = new Date(isoString);
+      if (isNaN(d.getTime())) return { dateStr: '', timeStr: isoString };
+      return {
+        dateStr: d.toLocaleDateString('vi-VN'),
+        timeStr: d.toLocaleTimeString('vi-VN', { hour12: false })
+      };
+    } catch {
+      return { dateStr: '', timeStr: isoString };
+    }
   };
 
   return (
@@ -126,23 +100,21 @@ export default function LogPage() {
               : filteredLogs.length === 0 ? (<tr><td colSpan={4} className="p-12 text-center text-gray-400"><ClipboardList size={40} className="mx-auto mb-3 opacity-50"/> Không có nhật ký nào.</td></tr>) 
               : filteredLogs.map((log, idx) => {
                 
-                const timeParts = log.ThoiGian ? log.ThoiGian.split(' ') : [];
-                const timeStr = timeParts.length > 1 ? timeParts[1] : log.ThoiGian;
-                const dateStr = timeParts.length > 1 ? timeParts[0] : '';
+                const { dateStr, timeStr } = formatLogTime(log.thoi_gian);
 
                 return (
-                  <tr key={log.ID_Log || idx} className="hover:bg-blue-50/30 transition-colors">
+                  <tr key={log.id || idx} className="hover:bg-blue-50/30 transition-colors">
                     <td className="p-4">
                       <span className="font-bold text-gray-700 text-sm block">{timeStr || '---'}</span>
                       {dateStr && <span className="text-xs text-gray-400 font-medium flex items-center gap-1 mt-0.5"><Calendar size={10}/> {dateStr}</span>}
                     </td>
-                    <td className="p-4 font-bold text-[#05469B] text-sm">{log.ID_User}</td>
+                    <td className="p-4 font-bold text-[#05469B] text-sm">{log.id_user}</td>
                     <td className="p-4">
-                      <span className={`px-2 py-1 border rounded text-[10px] font-black tracking-wider uppercase ${getActionColor(log.HanhDong)}`}>
-                        {log.HanhDong}
+                      <span className={`px-2 py-1 border rounded text-[10px] font-black tracking-wider uppercase ${getActionColor(log.hanh_dong)}`}>
+                        {log.hanh_dong}
                       </span>
                     </td>
-                    <td className="p-4 text-sm font-medium text-gray-700 whitespace-pre-wrap leading-relaxed">{log.ChiTiet || '---'}</td>
+                    <td className="p-4 text-sm font-medium text-gray-700 whitespace-pre-wrap leading-relaxed">{log.chi_tiet || '---'}</td>
                   </tr>
                 );
               })}

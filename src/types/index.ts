@@ -1,338 +1,345 @@
 export interface User {
-  username: string;
-  role: 'ADMIN' | 'USER';
-  idDonVi: string;
-  hoTen: string;
+  id: string; // Khóa chính (thay cho ID_User)
+  user_name: string; 
+  password?: string;
+  ho_ten: string;
+  id_don_vi: string;
+  quyen: string; // Đã đổi theo chuẩn Supabase (thay cho NhomQuyen)
+  [key: string]: any;
 }
 
-// Cập nhật lại User cho khớp với Sheet Config_Users
-export interface User {
-  ID_User: string;
-  Username: string;
-  Password?: string;
-  HoTen: string;
-  ID_DonVi: string;
-  NhomQuyen: string; 
-}
-
-// Thêm cấu trúc cho Nhật ký hệ thống
 export interface SysLog {
-  ID_Log: string;
-  ThoiGian: string;
-  ID_User: string;
-  HanhDong: string;
-  ChiTiet: string;
+  id: string;
+  thoi_gian: string;
+  id_user: string;
+  hanh_dong: string;
+  chi_tiet: string;
+  id_don_vi: string;
+  [key: string]: any;
 }
-
-// ... Giữ nguyên các interface khác (DonVi, Personnel...) ở dưới
 
 export interface DonVi {
-  ID_DonVi: string;
-  TenDonVi: string;
-  CapQuanLy: string;
-  DiaChi: string;
-  DienTich: string | number;
-  SoTang: string | number;
-  SoHam: string | number;
-  SoPhongCho: string | number;
-  SoCong: string | number;
-  LuotKhachBQ: string | number;
-  TongNhanSu: string | number;
-  loaiHinh: string;
-  trangThai: string;
-  Phia:string;
-  ID_GiamDoc?: string;
-  ID_PTKDXe?: string;
-  ID_PTKDDVPT?: string;
-  ID_DVHT1?: string;
-  ID_DVHT2?: string;
-  ID_HCNS?: string;
+  id: string; // Khóa chính (thay cho ID_DonVi)
+  ten_don_vi: string;
+  cap_quan_ly: string;
+  dia_chi: string;
+  dien_tich: string | number;
+  so_tang: string | number;
+  so_ham: string | number;
+  so_phong_cho: string | number;
+  so_cong: string | number;
+  luot_khach_bq: string | number;
+  tong_nhan_su: string | number;
+  loai_hinh: string;
+  trang_thai: string;
+  phia: string;
+  id_giam_doc?: string;
+  id_ptkd_xe?: string;
+  id_ptkd_dvpt?: string;
+  id_pt_dvht1?: string;
+  id_pt_dvht2?: string;
+  id_pt_nhan_su?: string;
+  kinh_doanh?: string;
   [key: string]: any;
 }
 
 export interface Personnel {
-  ID_NhanSu: string;
-  MaNV: string;
-  HoTen: string;
-  ChucVu: string;
-  SDT: string;
-  Email: string;
-  GioiTinh: string;
-  NamSinh: string;
-  NgayNhanViec: string;
-  ID_DonVi: string;
-  PhanLoai: string;
-  TrinhDo: string;
-  Tuoi?: string | number;       // Cột mới thêm
-  ThamNien?: string;            // Cột mới thêm
-  ThuNhap: string | number;
-  MoTaNgoaiHinh: string;
-  GhiChu: string;
-  CC_ATVSLD: boolean;
-  CC_ANBV: boolean;
-  CC_PCCC: boolean;
-  CC_CHCN: boolean;
-  CC_SoCapCuu: boolean;
-  CC_CPR: boolean;
-  CC_VoThuat: boolean;
-  CC_GPLX: boolean;
-  CC_ATTP: boolean;
-  CC_PhaChe: boolean;
-  CC_NgoaiNgu: boolean;
-  CC_TinHoc: boolean;
+  id: string; // Khóa chính (thay cho ID_NhanSu)
+  ma_so_nhan_vien: string;
+  ho_ten: string;
+  chuc_vu: string;
+  sdt_cong_ty: string;
+  sdt_ca_nhan: string;
+  email: string;
+  gioi_tinh: string;
+  nam_sinh: string;
+  ngay_nhan_viec: string;
+  id_don_vi: string;
+  phan_loai: string;
+  trinh_do_hoc_van: string;
+  tuoi?: string | number;
+  tham_nien?: string;
+  thu_nhap: string | number;
+  mo_ta_ngoai_hinh: string;
+  ghi_chu: string;
+  cc_atvsld: boolean;
+  cc_anbv: boolean;
+  cc_pccc: boolean;
+  cc_cnch: boolean;
+  cc_so_cap_cuu: boolean;
+  cc_cpr: boolean;
+  cc_vo_thuat: boolean;
+  giay_phep_lai_xe: string;
+  cc_attp: boolean;
+  cc_pha_che: boolean;
+  cc_ngoai_ngu: boolean;
+  cc_tin_hoc: boolean;
+  trang_thai: string;
+  ngay_nghi_viec: string;
   [key: string]: any;
 }
 
 export interface AnNinh {
-  ID_AnNinh: string;
-  ID_DonVi: string;
-  SoBaoVeNoiBo: string | number;
-  SoBaoVeDichvu: string | number;
-  VitrBVDV: string;
-  NCC_DichVu: string;
-  ChiPhiThue: string | number;
-  TongANBV: string | number;
-  DinhbienANBV: string | number;
-  Ngaycd: string | number;
-  Ngaytuantra: string | number;
-  Demcd: string | number;
-  Demtruantra: string | number;
-  SLCAM: string | number;
-  ThoiGianLuu: string;
-  ViTriGiamSat: string;
-  TinhHinhKhuVuc: string;
-  TiepGiapTruoc: string;
-  TiepGiapSau: string;
-  TiepGiapTrai: string;
-  TiepGiapPhai: string;
-  Link_PhuongAnAN: string;
+  id: string; // Khóa chính (thay cho ID_AnNinh)
+  id_don_vi: string;
+  bv_noi_bo: string | number;
+  bv_dich_vu: string | number;
+  vi_tri_bv_dv: string;
+  ncc_dich_vu: string;
+  chi_phi_thue: string | number;
+  tong_bv: string | number;
+  dinh_bien_bv: string | number;
+  ngay_co_dinh: string | number;
+  ngay_tuan_tra: string | number;
+  dem_co_dinh: string | number;
+  dem_tuan_tra: string | number;
+  bo_tri_nghi: string | number;
+  sl_camera: string | number;
+  thoi_gian_luu: string;
+  vi_tri_giam_sat: string;
+  tinh_hinh_khu_vuc: string;
+  tiep_giap_truoc: string;
+  tiep_giap_sau: string;
+  tiep_giap_trai: string;
+  tiep_giap_phai: string;
+  link_pa_anbv: string;
+  bo_tri_nghi_ca?: string;
+  camera_hoat_dong?: string | number;
+  camera_hu?: string | number;
+  ly_do_camera_hu?: string;
+  vi_tri_he_thong_camera?: string;
+  vi_tri_gs_camera?: string;
   [key: string]: any;
 }
 
 export interface TS_Xe {
-  ID_Xe: string;
-  ID_DonVi: string;
-  Mucdichsudung: string;
-  MaTaiSan: string;
-  donvichusohuu: string;
-  NguyenGia: string | number;
-  Chiphithue_khaohao: string | number;
-  BienSo: string;
-  LoaiPhuongTien: string;
-  HieuXe: string;
-  LoaiXe: string;
-  PhienBan: string;
-  MauXe: string;
-  NamSX: string | number;
-  NamDK: string | number;
-  SoKhung: string;
-  SoMay: string;
-  SoCho: string | number;
-  LoaiNhienLieu: string;
-  DungTich: string;
-  CongThucBanh: string;
-  HinhThucSoHuu: string;
-  GPS: string;
-  Hientrang: string;
-  Ghichu: string;
+  id: string; // Khóa chính (thay cho id_ts_xe)
+  id_don_vi: string;
+  muc_dich_su_dung: string;
+  ma_tai_san: string;
+  don_vi_so_huu: string;
+  nguyen_gia: string | number;
+  khau_hao_thue: string | number;
+  bien_so: string;
+  loai_phuong_tien: string;
+  hieu_xe: string;
+  loai_xe: string;
+  phien_ban: string;
+  mau_xe: string;
+  nam_sx: string | number;
+  nam_dk: string | number;
+  so_khung: string;
+  so_may: string;
+  so_cho: string | number;
+  nhien_lieu: string;
+  dung_tich: string;
+  cong_thuc_banh: string;
+  hinh_thuc_so_huu: string;
+  gps: string;
+  hien_trang: string;
+  ghi_chu: string;
   [key: string]: any;
 }
 
-// Tìm đến interface CP_HoatDongXe trong src/types/index.ts và thay thế:
 export interface CP_HoatDongXe {
-  ID_ChiPhiXe: string;
-  ID_DonVi: string; // <-- THÊM DÒNG NÀY VÀO ĐÂY
-  ThangNam: string; 
-  ID_Xe: string;
-  KmHienTai: string | number;
-  SoLitNhienLieu: string | number;
-  ChiPhiNhienLieu: string | number;
-  Phicauduong_benbai: string | number; // Cột mới
-  Phiruaxe: string | number;           // Cột mới
-  ChiPhiBaoDuong_SuaChua: string | number;
-  ChiPhiThue_KhauHao: string | number;
-  GhiChu: string;
+  id: string; // Khóa chính (thay cho ID_ChiPhiXe)
+  id_don_vi: string;
+  thang_nam: string;
+  id_ts_xe: string;
+  km_hien_tai: string | number;
+  so_lit_nhien_lieu: string | number;
+  cp_nhien_lieu: string | number;
+  cp_cau_duong_ben_bai: string | number;
+  cp_rua_xe: string | number;
+  cp_bao_duong_sua_chua: string | number;
+  cp_thue_khau_hao: string | number;
+  ghi_chu: string;
   [key: string]: any;
 }
 
 export interface PhapNhan {
-  Id_Phapnhan: string;
-  ID_DonVi: string;
-  TenCongty: string;
-  MST: string;
-  Diachi: string;
-  GPDK: string;
-  Mail: string;
+  id: string; // Khóa chính (thay cho Id_Phapnhan)
+  id_don_vi: string;
+  ten_cong_ty: string;
+  ma_so_thue: string;
+  dia_chi: string;
+  gpkd: string;
+  mail: string; // Hoặc email tùy db của bạn
   [key: string]: any;
 }
 
 export interface PhongHop {
-  ID_Phonghop: string; // Lưu ý ở Sheet bạn nên đặt chuẩn là ID_Phonghop nhé
-  ID_DonVi: string;
-  Tenphonghop: string;
-  Vitri: string;
-  Succhua: string;
-  TBtrinhchieu: string;
-  TBHopOnline: boolean;
-  Bangviet: boolean;
-  Butviet: string;
-  Butchi: string;
-  TBchuyenslide: boolean;
-  Layout: string;
-  Ghichu: string;
+  id: string; // Khóa chính (thay cho ID_Phonghop)
+  id_don_vi: string;
+  ten_phong_hop: string;
+  vi_tri: string;
+  suc_chua: string;
+  tb_trinh_chieu: string;
+  tb_hop_online: boolean;
+  bang_viet: boolean;
+  but_viet: string;
+  but_chi: string;
+  tb_chuyen_slide: boolean;
+  layout: string;
+  ghi_chu: string;
   [key: string]: any;
 }
 
 export interface VB_TB {
-  ID_VanBan: string;
-  ID_DonVi: string;
-  Phanloai: string;
-  Sohieu: string;
-  NgayBanHanh: string;
-  TieuDe: string;
-  Noidung: string;
-  Nguoiky: string;
-  Chucvu: string;
-  Nguoilayso: string;
-  BPlayso: string;
-  Phamviapdung: string;
-  Hieuluc: string;
-  Nghiepvu: string;
-  Link_FileDinhKem: string;
-  VBthaythe: string;
-  Mat: boolean | string;
-
-  // 👇 BỔ SUNG 7 CỘT MỚI VÀO ĐÂY 👇
-  NoiGui_Nhan?: string;
-  SoDen?: string;
-  NgayNhan?: string;
-  DonVi_NguoiXuLy?: string;
-  HanXuLy?: string;
-  TrangThaiXuLy?: string;
-  MucDoKhan?: string;
+  id: string; // Khóa chính (thay cho ID_VanBan)
+  id_don_vi: string;
+  phan_loai: string;
+  so_hieu: string;
+  ngay_ban_hanh: string;
+  tieu_de: string;
+  noi_dung: string;
+  nguoi_ky: string;
+  chuc_vu: string;
+  nguoi_lay_so: string;
+  bo_phan_lay_so: string;
+  pham_vi_ap_dung: string;
+  hieu_luc: string;
+  nghiep_vu: string;
+  link_vb: string;
+  vb_thay_the: string;
+  mat: boolean | string;
+  noi_goi_nhan?: string;
+  so_den?: string;
+  ngay_nhan?: string;
+  bo_phan_xu_ly?: string;
+  han_xu_ly?: string;
+  trang_thai_xu_ly?: string;
+  muc_do_khan?: string;
   [key: string]: any;
 }
 
 export interface ThietBi {
-  ID_TTB: string;
-  ID_DonVi: string;
-  MaTaiSan: string;
-  TenThietBi: string;
-  NhomThietBi: string;
-  MoTaDacDiem: string;
-  NhaCungCap: string;
-  NgayMua: string;
-  GiaMua: string;
-  HanBaoHanh: string;
-  TinhTrang: string;
-  Link_HinhAnh: string;
-  Link_Hoso: string;
-  SoSeri: string;
-  CPU: string;
-  RAM: string;
-  SSD: string;
-  HDD: string;
-  VGA: string;
-  ManHinh: string;
-  PhuKien: string;
+  id: string; // Khóa chính (thay cho ID_TTB)
+  id_don_vi: string;
+  ma_tai_san: string;
+  ten_thiet_bi: string;
+  nhom_thiet_bi: string;
+  mo_ta_dac_diem: string;
+  nha_cung_cap: string;
+  ngay_mua: string;
+  gia_mua: string;
+  han_bao_hanh: string;
+  tinh_trang: string;
+  link_hinh_anh: string;
+  link_ho_so: string;
+  so_seri: string;
+  cpu: string;
+  ram: string;
+  ssd: string;
+  hdd: string;
+  vga: string;
+  man_hinh: string;
+  phu_kien: string;
+  don_vi_tinh: string;
+  quy_cach_chat_lieu: string;
+  thoi_gian_khau_hao: string;
+  tai_san_thuoc: string;
   [key: string]: any;
 }
 
 export interface NhatKyThietBi {
-  ID_NKTTB: string;
-  ID_TTB: string;
-  ID_DonVi: string;
-  NgayGhiNhan: string;
-  LoaiNhatKy: string;
-  ChiPhi: string; // <-- THÊM DÒNG NÀY VÀO ĐÂY
-  MSNVNguoiDung_NguoiQL: string;
-  HoTenNguoiDung_NguoiQL: string;
-  BP_SuDung_QuanLy: string;
-  GhiChu_SuaChua_Nangcap: string;
-  GhiChu_NhatKySuDung: string;
+  id: string; // Khóa chính (thay cho ID_NKTTB)
+  id_ts_thiet_bi: string; // Sửa theo đúng khóa ngoại Supabase
+  id_don_vi: string;
+  ngay_ghi_nhan: string;
+  loai_nhat_ky: string;
+  chi_phi: string;
+  msnv_nguoi_dung: string;
+  ho_ten_nguoi_dung: string;
+  bp_quan_ly_su_dung: string;
+  ghi_chu_sua_chua_nang_cap: string;
+  tinh_trang_ghi_nhan_thiet_bi: string;
+  chi_phi: string | number;
+  tinh_trang_ghi_nhan_thiet_bi: string;
   [key: string]: any;
 }
 
 export interface ATVSLD {
-  ID_ATVSLD: string;
-  ID_DonVi: string;
-  NguoiPhuTrach: string;
-  SL_MangLuoiATVSV: string | number;
-  Link_HoSoQuyDinh: string;
-  NgayHuanLuyenGanNhat: string;
-  TyLeHoanThanhHL: string;
-  NgayKhamSKGanNhat: string;
-  NgayKhamBenhNgheNghiep: string;
-  SL_ThietBiNghiemNgat: string | number;
-  SL_ThietBiQuaHanKD: string | number;
-  NgayQuanTracMoiTruong: string;
-  TyLeCapPhatBHLD: string;
-  NgayTuKiemTraGanNhat: string;
-  CacLoiHienTruong: string;
-  SoTaiNanTrongNam: string | number;
-  Link_BienBanChecklist: string;
-  GhiChu: string;
+  id: string; // Khóa chính (thay cho ID_ATVSLD)
+  id_don_vi: string;
+  nguoi_phu_trach: string;
+  so_luong_mang_luoi: string | number;
+  link_ho_so_quy_dinh: string;
+  ngay_huan_luyen_gan_nhat: string;
+  ty_le_hoan_thanh_hl: string;
+  ngay_ksk: string;
+  nngay_kham_bnn: string;
+  so_luong_thiet_bi_nghiem_ngat: string | number;
+  so_luong_thiet_bi_qua_han_kt: string | number;
+  ngay_quan_trac_mt: string;
+  ty_le_cap_bhld: string;
+  ngay_tu_kiem_tra: string;
+  cac_loi_hien_truong: string;
+  so_tai_nan_trong_nam: string | number;
+  link_bien_ban_kiem_tra: string;
+  ghi_chu: string;
   [key: string]: any;
 }
 
 export interface HS_PCCC {
-  ID_PCCC: string;
-  ID_DonVi: string;
-  GiayPhepPCCC: string;
-  BaoHiemChayNo: string;
-  NgayHetHanBH: string;
-  HoTenDoiTruong_PCCC: string;
-  SDT: string;
-  ChucVu: string;
-  TongSoThanhVien: string | number;
-  SLHuyDongBanNgay: string | number;
-  SLHuyDongBanDem: string | number;
-  NgayDienTap: string;
-  LinkPhuongAn_PCCC: string;
-  TongSoThanhVien: string | number;
-  SDT_PCCC: string;
-  SDTUB: string;
-  SDTPCCC_CATT: string;
-  SDT_CAX: string;
-  SDT_DienLuc: string;
-  SDT_CapThoatNuoc: string;
-  STD_YTe: string;
-  HT_BaoChayTuDong: string;
-  HT_ChuaChayTuDongNuoc: string;
-  HT_ChuaChayNuoc: string;
-  DungCuPCCC: string;
+  id: string; // Khóa chính (thay cho ID_PCCC)
+  id_don_vi: string;
+  giay_phep_pccc: string;
+  bao_hiem_chay_no: string;
+  ngay_het_han_bh: string;
+  ho_ten_doi_truong: string;
+  sdt_doi_truong: string;
+  chuc_vu: string;
+  tong_sl_thanh_vien: string | number;
+  sl_huy_dong_ban_ngay: string | number;
+  sl_huy_dong_ban_dem: string | number;
+  ngay_dien_tap: string;
+  link_phuong_an_pccc: string;
+  sdt_pccc: string;
+  sdt_ub: string;
+  sdt_ca_pccc_catt: string;
+  sdt_cax: string;
+  sdt_dien_luc: string;
+  sdt_cap_thoat_nuoc: string;
+  sdt_yte: string;
+  ht_bao_chay_tu_dong: string;
+  ht_chua_chay_tu_dong_nuoc: string;
+  ht_chua_chay_nuoc: string;
+  dung_cu_pccc: string;
+  khu_vuc_rui_ro_cao?: string;
+  loi_ton_tai_chua_khac_phuc?: string;
+  ghi_chu?: string;
   [key: string]: any;
-}
 }
 
 export interface TS_PCCC {
-  ID_TBPCCC: string;
-  ID_DonVi: string;
-  NhomHeThong: string;
-  LoaiThietBi: string;
-  SoLuong: number | string;
-  DonViTinh: string;
-  ViTriBoTri: string;
-  NgayBomsac: string;
-  NgayHetHan: string;
-  TinhTrang: string;
+  id: string; // Khóa chính (thay cho ID_TBPCCC)
+  id_don_vi: string;
+  nhom_he_thong: string;
+  loai_thiet_bi: string;
+  so_luong: number | string;
+  don_vi_tinh: string;
+  vi_tri_bo_tri: string;
+  ngay_bom_sac: string;
+  ngay_het_han: string;
+  tinh_trang: string;
   [key: string]: any;
 }
 
 export interface PCTT {
-  ID_PCTT: string;
-  ID_DonVi: string;
-  DoiTruongPCTT: string;
-  SoNhanSuDoi: string | number;
-  Link_PhuongAnPCTT: string;
-  ViTriDiDoi: string;
-  NgayKiemTraPCTT: string;
-  TinhTrangHaTang: string;
-  TinhTrangBaoHiem: string;
-  NgayCapNhatTaiSan: string;
-  SoVuThienTai: string | number;
-  Link_HoSoBoiThuong: string;
-  TinhTrangKhacPhuc: string;
-  GhiChu: string;
+  id: string; // Khóa chính (thay cho ID_PCTT)
+  id_don_vi: string;
+  doi_truong_pctt: string;
+  sl_nhan_su_doi: string | number;
+  link_pa_pctt: string;
+  vi_tri_di_doi: string;
+  ngay_kiem_tra_pctt: string;
+  tinh_trang_ha_tang: string;
+  tinh_trang_bao_hiem: string;
+  ngay_cap_nhat_tai_san: string;
+  so_vu_thien_tai: string | number;
+  link_ho_so_boi_thuong: string;
+  tinh_trang_khac_phuc: string;
+  ghi_chu: string;
   [key: string]: any;
 }

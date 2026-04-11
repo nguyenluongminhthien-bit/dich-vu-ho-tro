@@ -2,9 +2,9 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Search, Plus, Edit, Trash2, X, AlertCircle, Loader2, Save, 
   Users, ShieldCheck, Flame, LifeBuoy, Heart, Activity, 
-  Dumbbell, Car, Utensils, Coffee, Languages, Monitor, Copy, Eye, User as UserIcon, 
+  Dumbbell, Car, Utensils, Coffee, Languages, Monitor, Copy, Eye, EyeOff, User as UserIcon, 
   Building2, Phone, Mail, Info, MapPin, ChevronDown, ChevronRight, PanelLeftClose, PanelLeftOpen, CheckCheck, Briefcase,
-  LogOut, AlertTriangle
+  LogOut, AlertTriangle, Image as ImageIcon, RotateCcw
 } from 'lucide-react';
 import { apiService } from '../services/api';
 import { Personnel, DonVi, ThietBi } from '../types';
@@ -20,13 +20,24 @@ const formatPhoneNumber = (val: string | number | undefined | null) => {
   return `${cleaned.slice(0, 4)} ${cleaned.slice(4, 7)} ${cleaned.slice(7, 11)}`;
 };
 
+// HÀM BÓC TÁCH LINK GOOGLE DRIVE THÀNH LINK ẢNH TRỰC TIẾP
+const getDirectImageLink = (url: string) => {
+  if (!url) return '';
+  const match = url.match(/[-\w]{25,}/);
+  if (match && match[0]) {
+    return `https://drive.google.com/thumbnail?id=${match[0]}&sz=w800`;
+  }
+  return url; 
+};
+
+// ĐÃ KHỚP 100% ID CHỨNG CHỈ VỚI BẢNG SUPABASE
 const CERTIFICATES = [
-  { id: 'CC_ATVSLD', label: 'ATVSLĐ', icon: ShieldCheck }, { id: 'CC_ANBV', label: 'ANBV', icon: ShieldCheck },
-  { id: 'CC_PCCC', label: 'PCCC', icon: Flame }, { id: 'CC_CHCN', label: 'CHCN', icon: LifeBuoy },
-  { id: 'CC_SoCapCuu', label: 'Sơ cấp cứu', icon: Heart }, { id: 'CC_CPR', label: 'CPR', icon: Activity },
-  { id: 'CC_VoThuat', label: 'Võ thuật', icon: Dumbbell }, { id: 'CC_GPLX', label: 'GPLX', icon: Car },
-  { id: 'CC_ATTP', label: 'ATTP', icon: Utensils }, { id: 'CC_PhaChe', label: 'Pha chế', icon: Coffee },
-  { id: 'CC_NgoaiNgu', label: 'Ngoại ngữ', icon: Languages }, { id: 'CC_TinHoc', label: 'Tin học', icon: Monitor }
+  { id: 'cc_atvsld', label: 'ATVSLĐ', icon: ShieldCheck }, { id: 'cc_anbv', label: 'ANBV', icon: ShieldCheck },
+  { id: 'cc_pccc', label: 'PCCC', icon: Flame }, { id: 'cc_cnch', label: 'CHCN', icon: LifeBuoy },
+  { id: 'cc_so_cap_cuu', label: 'Sơ cấp cứu', icon: Heart }, { id: 'cc_cpr', label: 'CPR', icon: Activity },
+  { id: 'cc_vo_thuat', label: 'Võ thuật', icon: Dumbbell }, { id: 'giay_phep_lai_xe', label: 'GPLX', icon: Car },
+  { id: 'cc_attp', label: 'ATTP', icon: Utensils }, { id: 'cc_pha_che', label: 'Pha chế', icon: Coffee },
+  { id: 'cc_ngoai_ngu', label: 'Ngoại ngữ', icon: Languages }, { id: 'cc_tin_hoc', label: 'Tin học', icon: Monitor }
 ];
 
 const formatCurrency = (val: string | number | undefined | null) => {
@@ -36,7 +47,7 @@ const formatCurrency = (val: string | number | undefined | null) => {
 
 export default function PersonnelPage() {
   const { user } = useAuth();
-  const [data, setData] = useState<Personnel[]>([]);
+  const [data, setData] = useState<any[]>([]);
   const [donViList, setDonViList] = useState<DonVi[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -54,15 +65,21 @@ export default function PersonnelPage() {
   
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [viewData, setViewData] = useState<any | null>(null);
+  const [showNgachLuong, setShowNgachLuong] = useState(false);
 
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<string | null>(null);
 
   const [isOffboardOpen, setIsOffboardOpen] = useState(false);
-  const [personnelToOffboard, setPersonnelToOffboard] = useState<Personnel | null>(null);
+  const [personnelToOffboard, setPersonnelToOffboard] = useState<any | null>(null);
   const [unreturnedAssets, setUnreturnedAssets] = useState<any[]>([]);
   const [forceOffboard, setForceOffboard] = useState(false);
   const [checkingAssets, setCheckingAssets] = useState(false);
+
+  // --- STATE CHO TÍNH NĂNG VÀO LÀM LẠI ---
+  const [isRehireModalOpen, setIsRehireModalOpen] = useState(false);
+  const [personnelToRehire, setPersonnelToRehire] = useState<any | null>(null);
+  const [rehireDate, setRehireDate] = useState(new Date().toISOString().split('T')[0]);
 
   const [copiedRole, setCopiedRole] = useState<string | null>(null);
 
@@ -75,7 +92,7 @@ export default function PersonnelPage() {
   ];
 
   const handleGPLXChange = (value: string, isChecked: boolean) => {
-    let currentArr = formData.GPLX ? formData.GPLX.split(',').map((s: string) => s.trim()).filter(Boolean) : [];
+    let currentArr = formData.giay_phep_lai_xe ? formData.giay_phep_lai_xe.split(',').map((s: string) => s.trim()).filter(Boolean) : [];
     if (value === 'Không có') {
       currentArr = isChecked ? ['Không có'] : [];
     } else {
@@ -83,12 +100,12 @@ export default function PersonnelPage() {
       if (isChecked) { if (!currentArr.includes(value)) currentArr.push(value); } 
       else { currentArr = currentArr.filter((item: string) => item !== value); }
     }
-    setFormData({ ...formData, GPLX: currentArr.join(', ') });
+    setFormData({ ...formData, giay_phep_lai_xe: currentArr.join(', ') });
   };
 
   const currentGPLXList = useMemo(() => {
-    return formData.GPLX ? formData.GPLX.split(',').map((s: string) => s.trim()) : [];
-  }, [formData.GPLX]);
+    return formData.giay_phep_lai_xe ? formData.giay_phep_lai_xe.split(',').map((s: string) => s.trim()) : [];
+  }, [formData.giay_phep_lai_xe]);
 
   const loadData = async () => {
     setLoading(true); setError(null);
@@ -103,20 +120,21 @@ export default function PersonnelPage() {
 
   const donViMap = useMemo(() => {
     const map: Record<string, string> = {};
-    donViList.forEach(dv => { map[dv.ID_DonVi] = dv.TenDonVi; });
+    donViList.forEach(dv => { map[dv.id] = dv.ten_don_vi; });
     return map;
   }, [donViList]);
 
   const allowedDonViIds = useMemo(() => {
     if (!user) return [];
-    if (user.idDonVi === 'ALL') return donViList.map(dv => dv.ID_DonVi);
+    const userIdDonVi = user.id_don_vi || (user as any).idDonVi;
+    if (userIdDonVi === 'ALL' || String(user.quyen).toLowerCase() === 'admin') return donViList.map(dv => dv.id);
     
-    const level1 = [user.idDonVi];
-    const level2 = donViList.filter(dv => level1.includes(dv.CapQuanLy)).map(dv => dv.ID_DonVi);
-    const level3 = donViList.filter(dv => level2.includes(dv.CapQuanLy)).map(dv => dv.ID_DonVi);
+    const level1 = [userIdDonVi];
+    const level2 = donViList.filter(dv => level1.includes(dv.cap_quan_ly)).map(dv => dv.id);
+    const level3 = donViList.filter(dv => level2.includes(dv.cap_quan_ly)).map(dv => dv.id);
     const allAllowed = [...level1, ...level2, ...level3];
     
-    return donViList.filter(dv => allAllowed.includes(dv.ID_DonVi)).map(dv => dv.ID_DonVi);
+    return donViList.filter(dv => allAllowed.includes(dv.id)).map(dv => dv.id);
   }, [user, donViList]);
 
   const calculateSeniority = (startDate: string, trangThai: string, endDate: string) => {
@@ -132,30 +150,30 @@ export default function PersonnelPage() {
   };
 
   const filteredUnits = useMemo(() => {
-    let baseUnits = donViList.filter(dv => allowedDonViIds.includes(dv.ID_DonVi));
+    let baseUnits = donViList.filter(dv => allowedDonViIds.includes(dv.id));
     if (!unitSearchTerm) return baseUnits;
 
     const lower = unitSearchTerm.toLowerCase();
     const matchedIds = new Set<string>();
 
     baseUnits.forEach(u => {
-      if (String(u.TenDonVi || '').toLowerCase().includes(lower) || String(u.ID_DonVi || '').toLowerCase().includes(lower)) {
-        matchedIds.add(u.ID_DonVi);
+      if (String(u.ten_don_vi || '').toLowerCase().includes(lower) || String(u.id || '').toLowerCase().includes(lower)) {
+        matchedIds.add(u.id);
         
-        let parentId = u.CapQuanLy;
+        let parentId = u.cap_quan_ly;
         while (parentId && parentId !== 'HO') {
           matchedIds.add(parentId);
-          const parentUnit = baseUnits.find(p => p.ID_DonVi === parentId);
-          parentId = parentUnit ? parentUnit.CapQuanLy : null;
+          const parentUnit = baseUnits.find(p => p.id === parentId);
+          parentId = parentUnit ? parentUnit.cap_quan_ly : null;
         }
       }
     });
 
     const addChildren = (parentId: string) => {
       baseUnits.forEach(u => {
-        if (u.CapQuanLy === parentId && !matchedIds.has(u.ID_DonVi)) {
-          matchedIds.add(u.ID_DonVi);
-          addChildren(u.ID_DonVi);
+        if (u.cap_quan_ly === parentId && !matchedIds.has(u.id)) {
+          matchedIds.add(u.id);
+          addChildren(u.id);
         }
       });
     };
@@ -163,16 +181,22 @@ export default function PersonnelPage() {
     const initialMatches = Array.from(matchedIds);
     initialMatches.forEach(id => addChildren(id));
 
-    return baseUnits.filter(item => matchedIds.has(item.ID_DonVi));
+    return baseUnits.filter(item => matchedIds.has(item.id));
   }, [donViList, unitSearchTerm, allowedDonViIds]);
 
-  const parentUnits = useMemo(() => filteredUnits.filter(item => item.CapQuanLy === 'HO' || !item.CapQuanLy), [filteredUnits]);
-  const getChildUnits = (parentId: string) => filteredUnits.filter(item => item.CapQuanLy === parentId);
+  const parentUnits = useMemo(() => filteredUnits.filter(item => item.cap_quan_ly === 'HO' || !item.cap_quan_ly), [filteredUnits]);
+  const getChildUnits = (parentId: string) => filteredUnits.filter(item => item.cap_quan_ly === parentId);
 
   const { vpdhUnits, ctttNamUnits, ctttBacUnits, otherUnits } = useMemo(() => {
-    const vpdh = parentUnits.filter(u => String(u.Phia || '').toLowerCase().includes('vpđh') || String(u.loaiHinh || '').toLowerCase().includes('tổng công ty') || String(u.loaiHinh || '').toLowerCase().includes('văn phòng'));
-    const ctttNam = parentUnits.filter(u => !vpdh.includes(u) && String(u.Phia || '').toLowerCase().includes('nam'));
-    const ctttBac = parentUnits.filter(u => !vpdh.includes(u) && !ctttNam.includes(u) && String(u.Phia || '').toLowerCase().includes('bắc'));
+    const vpdh = parentUnits
+      .filter(u => String(u.phia || '').toLowerCase().includes('vpđh') || String(u.loai_hinh || '').toLowerCase().includes('tổng công ty') || String(u.loai_hinh || '').toLowerCase().includes('văn phòng'))
+      .sort((a, b) => {
+        if (a.ten_don_vi === 'THACO AUTO') return -1;
+        if (b.ten_don_vi === 'THACO AUTO') return 1;
+        return 0; 
+      });
+    const ctttNam = parentUnits.filter(u => !vpdh.includes(u) && String(u.phia || '').toLowerCase().includes('nam'));
+    const ctttBac = parentUnits.filter(u => !vpdh.includes(u) && !ctttNam.includes(u) && String(u.phia || '').toLowerCase().includes('bắc'));
     const others = parentUnits.filter(u => !vpdh.includes(u) && !ctttNam.includes(u) && !ctttBac.includes(u));
     return { vpdhUnits: vpdh, ctttNamUnits: ctttNam, ctttBacUnits: ctttBac, otherUnits: others };
   }, [parentUnits]);
@@ -182,9 +206,9 @@ export default function PersonnelPage() {
   };
 
   const getAllSubordinateIds = (unitId: string, allUnits: DonVi[]): string[] => {
-    const subordinates = allUnits.filter(u => u.CapQuanLy === unitId);
-    let ids = subordinates.map(u => u.ID_DonVi);
-    subordinates.forEach(sub => { ids = [...ids, ...getAllSubordinateIds(sub.ID_DonVi, allUnits)]; });
+    const subordinates = allUnits.filter(u => u.cap_quan_ly === unitId);
+    let ids = subordinates.map(u => u.id);
+    subordinates.forEach(sub => { ids = [...ids, ...getAllSubordinateIds(sub.id, allUnits)]; });
     return ids;
   };
 
@@ -195,25 +219,25 @@ export default function PersonnelPage() {
   }, [selectedUnitFilter, donViList]);
 
   const filteredPersonnel = useMemo(() => {
-    let result = data.filter(item => allowedDonViIds.includes(item.ID_DonVi));
+    let result = data.filter(item => allowedDonViIds.includes(item.id_don_vi));
     
     if (selectedUnitFilter) {
-      result = result.filter(item => selectedUnitSubordinates.includes(item.ID_DonVi));
+      result = result.filter(item => selectedUnitSubordinates.includes(item.id_don_vi));
     }
 
     if (personnelSearchTerm) {
       const lower = personnelSearchTerm.toLowerCase();
       result = result.filter(item => 
-        String(item.MaNV || '').toLowerCase().includes(lower) || 
-        String(item.HoTen || '').toLowerCase().includes(lower) || 
-        String(donViMap[item.ID_DonVi || ''] || '').toLowerCase().includes(lower) ||
-        String(item.ChucVu || '').toLowerCase().includes(lower) 
+        String(item.ma_so_nhan_vien || '').toLowerCase().includes(lower) || 
+        String(item.ho_ten || '').toLowerCase().includes(lower) || 
+        String(donViMap[item.id_don_vi || ''] || '').toLowerCase().includes(lower) ||
+        String(item.chuc_vu || '').toLowerCase().includes(lower) 
       );
     }
 
     return result.sort((a, b) => {
-      if (a.TrangThai === 'Đã nghỉ việc' && b.TrangThai !== 'Đã nghỉ việc') return 1;
-      if (a.TrangThai !== 'Đã nghỉ việc' && b.TrangThai === 'Đã nghỉ việc') return -1;
+      if (a.trang_thai === 'Đã nghỉ việc' && b.trang_thai !== 'Đã nghỉ việc') return 1;
+      if (a.trang_thai !== 'Đã nghỉ việc' && b.trang_thai === 'Đã nghỉ việc') return -1;
       return 0;
     });
 
@@ -221,18 +245,18 @@ export default function PersonnelPage() {
 
   const selectedUnitName = useMemo(() => {
     if (!selectedUnitFilter) return 'Tất cả Đơn vị';
-    const unit = donViList.find(d => d.ID_DonVi === selectedUnitFilter);
-    return unit ? unit.TenDonVi : 'Đơn vị không xác định';
+    const unit = donViList.find(d => d.id === selectedUnitFilter);
+    return unit ? unit.ten_don_vi : 'Đơn vị không xác định';
   }, [selectedUnitFilter, donViList]);
 
   const handleCopyMail = (roleType: 'LD' | 'DVHT' | 'NS') => {
     let emails: string[] = [];
     filteredPersonnel.forEach(p => {
-      if (!p.Email || p.TrangThai === 'Đã nghỉ việc') return;
-      const chucVu = String(p.ChucVu || '').toLowerCase();
-      if (roleType === 'LD' && chucVu.includes('tổng giám đốc')) { emails.push(p.Email); } 
-      else if (roleType === 'DVHT' && (chucVu.includes('dvht') || chucVu.includes('dịch vụ hỗ trợ'))) { emails.push(p.Email); } 
-      else if (roleType === 'NS' && chucVu.includes('nhân sự')) { emails.push(p.Email); }
+      if (!p.email || p.trang_thai === 'Đã nghỉ việc') return;
+      const chucVu = String(p.chuc_vu || '').toLowerCase();
+      if (roleType === 'LD' && chucVu.includes('tổng giám đốc')) { emails.push(p.email); } 
+      else if (roleType === 'DVHT' && (chucVu.includes('dvht') || chucVu.includes('dịch vụ hỗ trợ'))) { emails.push(p.email); } 
+      else if (roleType === 'NS' && chucVu.includes('nhân sự')) { emails.push(p.email); }
     });
 
     if (emails.length === 0) {
@@ -247,40 +271,51 @@ export default function PersonnelPage() {
 
   const openModal = (mode: 'create' | 'update', item?: any) => {
     setModalMode(mode);
+    const defaultDonViId = user?.id_don_vi || (user as any)?.idDonVi;
+
     if (item) { 
       setFormData({ 
         ...item, 
-        SDT: formatPhoneNumber(item.SDT),
-        SDTCanhan: formatPhoneNumber(item.SDTCanhan) 
+        nam_sinh: item.nam_sinh ? item.nam_sinh.split('T')[0] : '', 
+        ngay_nhan_vien: item.ngay_nhan_vien ? item.ngay_nhan_vien.split('T')[0] : '', 
+        ngay_nghi_viec: item.ngay_nghi_viec ? item.ngay_nghi_viec.split('T')[0] : '', 
+        ngay_vao_lam_lai: item.ngay_vao_lam_lai ? item.ngay_vao_lam_lai.split('T')[0] : '',
+        sdt_cong_ty: formatPhoneNumber(item.sdt_cong_ty),
+        sdt_ca_nhan: formatPhoneNumber(item.sdt_ca_nhan) 
       }); 
     } 
     else {
       setFormData({
-        MaNV: '', HoTen: '', ChucVu: '', SDT: '', SDTCanhan: '', Email: '', GioiTinh: 'Nam', NamSinh: '', NgayNhanViec: '', 
-        ID_DonVi: selectedUnitFilter || '', PhanLoai: 'Lãnh đạo', TrinhDoHocVan: '', ThuNhap: '', MoTaNgoaiHinh: '', GhiChu: '', GPLX: '',
-        CC_ATVSLD: false, CC_ANBV: false, CC_PCCC: false, CC_CHCN: false, CC_SoCapCuu: false, CC_CPR: false, 
-        CC_VoThuat: false, CC_GPLX: false, CC_ATTP: false, CC_PhaChe: false, CC_NgoaiNgu: false, CC_TinHoc: false,
-        TrangThai: 'Đang làm việc'
+        ma_so_nhan_vien: '', ho_ten: '', chuc_vu: '', sdt_cong_ty: '', sdt_ca_nhan: '', email: '', gioi_tinh: 'Nam', nam_sinh: '', ngay_nhan_vien: '', 
+        id_don_vi: selectedUnitFilter || (defaultDonViId !== 'ALL' ? defaultDonViId : ''), phan_loai: 'Lãnh đạo', trinh_do_hoc_van: '', thu_nhap: '', ngach_luong: '', mo_to_ngoai_hinh: '', ghi_chu: '', giay_phep_lai_xe: '',
+        hinh_anh: '',
+        cc_atvsld: false, cc_anbv: false, cc_pccc: false, cc_cnch: false, cc_so_cap_cuu: false, cc_cpr: false, 
+        cc_vo_thuat: false, cc_attp: false, cc_pha_che: false, cc_ngoai_ngu: false, cc_tin_hoc: false,
+        trang_thai: 'Đang làm việc'
       });
     }
     setIsModalOpen(true); setError(null);
   };
 
-  const handleView = (item: Personnel) => { setViewData(item); setIsViewModalOpen(true); };
+  const handleView = (item: any) => { 
+    setViewData(item); 
+    setShowNgachLuong(false); 
+    setIsViewModalOpen(true); 
+  };
 
   const handleDuplicate = (item: any) => {
     setModalMode('create');
-    setFormData({ ...item, ID_NhanSu: '', ChucVu: item.ChucVu ? `${item.ChucVu} (Kiêm nhiệm)` : 'Kiêm nhiệm', TrangThai: 'Đang làm việc', NgayNghiViec: '' });
+    setFormData({ ...item, id: '', chuc_vu: item.chuc_vu ? `${item.chuc_vu} (Kiêm nhiệm)` : 'Kiêm nhiệm', trang_thai: 'Đang làm việc', ngay_nghi_viec: '' });
     setIsModalOpen(true); setError(null);
   };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.ID_DonVi) return alert("Vui lòng chọn Đơn vị công tác!");
+    if (!formData.id_don_vi) return alert("Vui lòng chọn Đơn vị công tác!");
     
     let calculatedTuoi = '';
-    if (formData.NamSinh) {
-      const birthDate = new Date(formData.NamSinh); const today = new Date();
+    if (formData.nam_sinh) {
+      const birthDate = new Date(formData.nam_sinh); const today = new Date();
       let age = today.getFullYear() - birthDate.getFullYear();
       const m = today.getMonth() - birthDate.getMonth();
       if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) { age--; }
@@ -289,19 +324,24 @@ export default function PersonnelPage() {
 
     const finalDataToSave = { 
       ...formData, 
-      Tuoi: calculatedTuoi, 
-      ThamNien: calculateSeniority(formData.NgayNhanViec || '', formData.TrangThai || 'Đang làm việc', formData.NgayNghiViec || ''),
-      TrangThai: formData.TrangThai || 'Đang làm việc'
+      tuoi: calculatedTuoi, 
+      tham_nien: calculateSeniority(formData.ngay_nhan_vien || '', formData.trang_thai || 'Đang làm việc', formData.ngay_nghi_viec || ''),
+      trang_thai: formData.trang_thai || 'Đang làm việc'
     };
+
+    if(!finalDataToSave.nam_sinh) finalDataToSave.nam_sinh = null;
+    if(!finalDataToSave.ngay_nhan_vien) finalDataToSave.ngay_nhan_vien = null;
+    if(!finalDataToSave.ngay_nghi_viec) finalDataToSave.ngay_nghi_viec = null;
+    if(!finalDataToSave.ngay_vao_lam_lai) finalDataToSave.ngay_vao_lam_lai = null;
 
     setSubmitting(true); setError(null);
     try {
-      const response = await apiService.save(finalDataToSave, modalMode, "NS_DichVu");
+      const response = await apiService.save(finalDataToSave, modalMode, "ns_dich_vu");
       if (modalMode === 'create') {
-        finalDataToSave.ID_NhanSu = response.newId; 
-        setData(prev => [...prev, finalDataToSave as Personnel]); 
+        finalDataToSave.id = response.id || response.newId || `NS-${Date.now()}`; 
+        setData(prev => [...prev, finalDataToSave]); 
       } else {
-        setData(prev => prev.map(item => item.ID_NhanSu === finalDataToSave.ID_NhanSu ? finalDataToSave as Personnel : item));
+        setData(prev => prev.map(item => item.id === finalDataToSave.id ? finalDataToSave : item));
       }
       setIsModalOpen(false); 
     } catch (err: any) { setError(err.message || 'Lỗi lưu dữ liệu.'); } 
@@ -311,14 +351,37 @@ export default function PersonnelPage() {
   const confirmDelete = async () => {
     if (!itemToDelete) return; setSubmitting(true); setError(null);
     try {
-      await apiService.delete(itemToDelete, "NS_DichVu");
-      setData(prev => prev.filter(item => item.ID_NhanSu !== itemToDelete));
+      await apiService.delete(itemToDelete, "ns_dich_vu");
+      setData(prev => prev.filter(item => item.id !== itemToDelete));
       setIsConfirmOpen(false); setItemToDelete(null); 
     } catch (err: any) { setError(err.message || 'Lỗi xóa dữ liệu.'); } 
     finally { setSubmitting(false); }
   };
 
-  const handleOffboardClick = async (item: Personnel) => {
+  // --- XỬ LÝ HÀM VÀO LÀM LẠI ---
+  const handleConfirmRehire = async () => {
+    if (!personnelToRehire) return;
+    setSubmitting(true);
+    try {
+      const rehireData = {
+        ...personnelToRehire,
+        trang_thai: 'Đang làm việc',
+        ngay_vao_lam_lai: rehireDate,
+        ngay_nghi_viec: null, 
+      };
+      
+      await apiService.save(rehireData, "update", "ns_dich_vu");
+      setData(prev => prev.map(item => item.id === personnelToRehire.id ? rehireData : item));
+      setIsRehireModalOpen(false);
+      setPersonnelToRehire(null);
+    } catch (err: any) {
+      alert("Lỗi khi thực hiện: " + err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleOffboardClick = async (item: any) => {
     setPersonnelToOffboard(item);
     setCheckingAssets(true);
     setForceOffboard(false);
@@ -332,12 +395,12 @@ export default function PersonnelPage() {
 
       const latestLogsMap: Record<string, any> = {};
       nhatKyList.forEach(log => {
-        const ttbId = log.ID_TTB;
+        const ttbId = log.id_ts_thiet_bi;
         if (!latestLogsMap[ttbId]) {
           latestLogsMap[ttbId] = log;
         } else {
-          const currentLogDate = new Date(log.NgayGhiNhan).getTime();
-          const savedLogDate = new Date(latestLogsMap[ttbId].NgayGhiNhan).getTime();
+          const currentLogDate = new Date(log.ngay_ghi_nhan).getTime();
+          const savedLogDate = new Date(latestLogsMap[ttbId].ngay_ghi_nhan).getTime();
           if (currentLogDate > savedLogDate) {
             latestLogsMap[ttbId] = log;
           }
@@ -346,15 +409,15 @@ export default function PersonnelPage() {
 
       const foundAssets: any[] = [];
       Object.values(latestLogsMap).forEach(log => {
-        if (log.MSNVNguoiDung_NguoiQL === item.MaNV && log.LoaiNhatKy !== 'Báo hỏng') {
-          const assetInfo = thietBiList.find(tb => tb.ID_TTB === log.ID_TTB);
+        if (log.msnv_nguoi_dung === item.ma_so_nhan_vien && log.loai_nhat_ky !== 'Báo hỏng') {
+          const assetInfo = thietBiList.find(tb => tb.id === log.id_ts_thiet_bi);
           if (assetInfo) {
             foundAssets.push({
-              id: assetInfo.MaTaiSan || assetInfo.ID_TTB,
-              name: assetInfo.TenThietBi,
-              group: assetInfo.NhomThietBi,
-              sn: assetInfo.SoSeri || '-',
-              date: new Date(log.NgayGhiNhan).toLocaleDateString('vi-VN')
+              id: assetInfo.ma_tai_san || assetInfo.id,
+              name: assetInfo.ten_thiet_bi,
+              group: assetInfo.nhom_thiet_bi,
+              sn: assetInfo.so_seri || '-',
+              date: new Date(log.ngay_ghi_nhan).toLocaleDateString('vi-VN')
             });
           }
         }
@@ -382,13 +445,13 @@ export default function PersonnelPage() {
     try {
       const offboardData = {
         ...personnelToOffboard,
-        TrangThai: 'Đã nghỉ việc',
-        NgayNghiViec: new Date().toISOString().split('T')[0]
+        trang_thai: 'Đã nghỉ việc',
+        ngay_nghi_viec: new Date().toISOString().split('T')[0]
       };
       
-      await apiService.save(offboardData, "update", "NS_DichVu");
+      await apiService.save(offboardData, "update", "ns_dich_vu");
       
-      setData(prev => prev.map(item => item.ID_NhanSu === personnelToOffboard.ID_NhanSu ? offboardData : item));
+      setData(prev => prev.map(item => item.id === personnelToOffboard.id ? offboardData : item));
       setIsOffboardOpen(false);
       setPersonnelToOffboard(null);
     } catch (err: any) {
@@ -401,24 +464,24 @@ export default function PersonnelPage() {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, type } = e.target;
     let value: string | boolean = type === 'checkbox' ? (e.target as HTMLInputElement).checked : e.target.value;
-    if (name === 'ThuNhap') { value = (value as string).replace(/\D/g, ''); }
+    if (name === 'thu_nhap') { value = (value as string).replace(/\D/g, ''); }
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
   const renderUnitTree = (parent: DonVi, level: number = 1) => {
-    const children = getChildUnits(parent.ID_DonVi);
-    const isExpanded = expandedParents.includes(parent.ID_DonVi) || !!unitSearchTerm;
-    const isParentDimmed = parent.trangThai === 'Đại lý' || parent.trangThai === 'Đầu tư mới';
+    const children = getChildUnits(parent.id);
+    const isExpanded = expandedParents.includes(parent.id) || !!unitSearchTerm;
+    const isParentDimmed = parent.trang_thai === 'Đại lý' || parent.trang_thai === 'Đầu tư mới';
 
     return (
-      <div key={parent.ID_DonVi} className={level === 1 ? "mb-1" : "mt-1"}>
+      <div key={parent.id} className={level === 1 ? "mb-1" : "mt-1"}>
         <button 
-          onClick={() => { setSelectedUnitFilter(parent.ID_DonVi); if (children.length > 0) toggleParent(parent.ID_DonVi); }} 
-          className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold transition-colors ${selectedUnitFilter === parent.ID_DonVi ? 'bg-blue-50 text-[#05469B]' : 'text-gray-700 hover:bg-gray-50'} ${isParentDimmed ? 'opacity-50' : ''}`}
+          onClick={() => { setSelectedUnitFilter(parent.id); if (children.length > 0) toggleParent(parent.id); }} 
+          className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold transition-colors ${selectedUnitFilter === parent.id ? 'bg-blue-50 text-[#05469B]' : 'text-gray-700 hover:bg-gray-50'} ${isParentDimmed ? 'opacity-50' : ''}`}
         >
           {children.length > 0 ? (isExpanded ? <ChevronDown size={16} className="text-gray-400 shrink-0" /> : <ChevronRight size={16} className="text-gray-400 shrink-0" />) : <div className="w-4 shrink-0" />}
-          <span className="shrink-0">{getUnitEmoji(parent.loaiHinh)}</span>
-          <span className="truncate text-left">{parent.TenDonVi}</span>
+          <span className="shrink-0">{getUnitEmoji(parent.loai_hinh)}</span>
+          <span className="truncate text-left">{parent.ten_don_vi}</span>
         </button>
         
         {isExpanded && children.length > 0 && (
@@ -512,7 +575,6 @@ export default function PersonnelPage() {
                   <th className="p-4 whitespace-nowrap">Họ Tên / Trạng thái</th>
                   <th className="p-4 whitespace-nowrap">Đơn Vị</th>
                   <th className="p-4 whitespace-nowrap">Chức vụ</th>
-                  {/* 🟢 ĐÃ FIX: Sửa tên cột SĐT */}
                   <th className="p-4 w-36 whitespace-nowrap">Điện thoại</th>
                   <th className="p-4 w-32 whitespace-nowrap">Thâm niên</th>
                   <th className="p-4 text-center w-48 whitespace-nowrap">Thao tác</th>
@@ -528,49 +590,62 @@ export default function PersonnelPage() {
                   </td></tr>
                 ) : (
                   filteredPersonnel.map((item: any) => (
-                    <tr key={item.ID_NhanSu} className={`hover:bg-blue-50/50 transition-colors group ${item.TrangThai === 'Đã nghỉ việc' ? 'opacity-60 bg-gray-50' : ''}`}>
-                      <td className="p-4 font-semibold text-gray-800 whitespace-nowrap">{item.MaNV}</td>
-                      <td className="p-4 whitespace-nowrap">
-                        <p className="font-bold text-[#05469B]">{item.HoTen}</p>
-                        {item.TrangThai === 'Đã nghỉ việc' && <span className="text-[10px] font-bold text-red-600 bg-red-100 px-1.5 py-0.5 rounded uppercase mt-0.5 inline-block">Đã nghỉ việc</span>}
+                    <tr key={item.id} className={`hover:bg-blue-50/50 transition-colors group ${item.trang_thai === 'Đã nghỉ việc' ? 'opacity-60 bg-gray-50' : ''}`}>
+                      <td className="p-4 font-semibold text-gray-800 whitespace-nowrap">{item.ma_so_nhan_vien}</td>
+                      <td className="p-4 whitespace-nowrap flex items-center gap-3">
+                        {/* Ảnh thu nhỏ trên bảng danh sách */}
+                        <div className="w-8 h-8 rounded-full overflow-hidden bg-gray-100 border border-gray-200 flex items-center justify-center shrink-0">
+                          {item.hinh_anh ? (
+                            <img src={getDirectImageLink(item.hinh_anh)} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            <UserIcon size={14} className="text-gray-400" />
+                          )}
+                        </div>
+                        <div>
+                          <p className="font-bold text-[#05469B]">{item.ho_ten}</p>
+                          {item.trang_thai === 'Đã nghỉ việc' && <span className="text-[10px] font-bold text-red-600 bg-red-100 px-1.5 py-0.5 rounded uppercase mt-0.5 inline-block">Đã nghỉ việc</span>}
+                        </div>
                       </td>
-                      <td className="p-4 text-sm font-medium text-gray-700 whitespace-nowrap">{donViMap[item.ID_DonVi] || item.ID_DonVi || '-'}</td>
-                      <td className="p-4 text-sm text-gray-600 whitespace-nowrap">{item.ChucVu}</td>
+                      <td className="p-4 text-sm font-medium text-gray-700 whitespace-nowrap">{donViMap[item.id_don_vi] || item.id_don_vi || '-'}</td>
+                      <td className="p-4 text-sm text-gray-600 whitespace-nowrap">{item.chuc_vu}</td>
                       
-                      {/* 🟢 ĐÃ FIX: CHUYỂN SỐ ĐIỆN THOẠI THÀNH LINK BẤM GỌI (tel:) VÀ CHIA MÀU SẮC */}
                       <td className="p-4 whitespace-nowrap">
                         <div className="flex flex-col gap-1.5">
-                          {item.SDT && (
-                            <a href={`tel:${String(item.SDT).replace(/\D/g, '')}`} className="text-sm font-bold text-[#05469B] hover:underline flex items-center gap-1.5 w-fit" title="Gọi SĐT Công ty">
-                              <Phone size={13} className="text-blue-400" /> {formatPhoneNumber(item.SDT)}
+                          {item.sdt_cong_ty && (
+                            <a href={`tel:${String(item.sdt_cong_ty).replace(/\D/g, '')}`} className="text-sm font-bold text-[#05469B] hover:underline flex items-center gap-1.5 w-fit" title="Gọi SĐT Công ty">
+                              <Phone size={13} className="text-blue-400" /> {formatPhoneNumber(item.sdt_cong_ty)}
                             </a>
                           )}
-                          {item.SDTCanhan && (
-                            <a href={`tel:${String(item.SDTCanhan).replace(/\D/g, '')}`} className="text-sm font-bold text-emerald-500 hover:underline flex items-center gap-1.5 w-fit" title="Gọi SĐT Cá nhân">
-                              <Phone size={13} className="text-emerald-400" /> {formatPhoneNumber(item.SDTCanhan)}
+                          {item.sdt_ca_nhan && (
+                            <a href={`tel:${String(item.sdt_ca_nhan).replace(/\D/g, '')}`} className="text-sm font-bold text-emerald-500 hover:underline flex items-center gap-1.5 w-fit" title="Gọi SĐT Cá nhân">
+                              <Phone size={13} className="text-emerald-400" /> {formatPhoneNumber(item.sdt_ca_nhan)}
                             </a>
                           )}
-                          {!item.SDT && !item.SDTCanhan && <span className="text-sm text-gray-400 font-medium">---</span>}
+                          {!item.sdt_cong_ty && !item.sdt_ca_nhan && <span className="text-sm text-gray-400 font-medium">---</span>}
                         </div>
                       </td>
 
                       <td className="p-4 text-sm font-medium text-emerald-600 whitespace-nowrap">
-                        <span className={`rounded-md inline-block px-2 py-1 border ${item.TrangThai === 'Đã nghỉ việc' ? 'bg-gray-100 text-gray-500 border-gray-200' : 'bg-emerald-50/50 border-emerald-100'}`}>
-                          {calculateSeniority(item.NgayNhanViec, item.TrangThai || 'Đang làm việc', item.NgayNghiViec || '')}
+                        <span className={`rounded-md inline-block px-2 py-1 border ${item.trang_thai === 'Đã nghỉ việc' ? 'bg-gray-100 text-gray-500 border-gray-200' : 'bg-emerald-50/50 border-emerald-100'}`}>
+                          {calculateSeniority(item.ngay_nhan_vien, item.trang_thai || 'Đang làm việc', item.ngay_nghi_viec || '')}
                         </span>
                       </td>
                       <td className="p-4">
                         <div className="flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button onClick={() => handleView(item)} className="p-2 text-indigo-600 hover:bg-indigo-100 rounded-md transition-colors" title="Xem chi tiết"><Eye className="w-4 h-4" /></button>
-                          {item.TrangThai !== 'Đã nghỉ việc' && (
+                          {item.trang_thai !== 'Đã nghỉ việc' && (
                             <>
                               <button onClick={() => handleDuplicate(item)} className="p-2 text-emerald-600 hover:bg-emerald-100 rounded-md transition-colors" title="Nhân bản (Tạo hồ sơ kiêm nhiệm)"><Copy className="w-4 h-4" /></button>
                               <button onClick={() => openModal('update', item)} className="p-2 text-blue-600 hover:bg-blue-100 rounded-md transition-colors" title="Sửa"><Edit className="w-4 h-4" /></button>
                               <button onClick={() => handleOffboardClick(item)} className="p-2 text-orange-600 hover:bg-orange-100 rounded-md transition-colors border border-transparent hover:border-orange-200" title="Chốt nghỉ việc (Thu hồi tài sản)"><LogOut className="w-4 h-4" /></button>
                             </>
                           )}
-                          {item.TrangThai === 'Đã nghỉ việc' && (
-                            <button onClick={() => { setItemToDelete(item.ID_NhanSu); setIsConfirmOpen(true); }} className="p-2 text-red-600 hover:bg-red-100 rounded-md transition-colors" title="Xóa vĩnh viễn"><Trash2 className="w-4 h-4" /></button>
+                          {item.trang_thai === 'Đã nghỉ việc' && (
+                            <>
+                              {/* NÚT VÀO LÀM LẠI */}
+                              <button onClick={() => { setPersonnelToRehire(item); setIsRehireModalOpen(true); }} className="p-2 text-emerald-600 hover:bg-emerald-100 rounded-md transition-colors" title="Vào làm lại"><RotateCcw className="w-4 h-4" /></button>
+                              <button onClick={() => { setItemToDelete(item.id); setIsConfirmOpen(true); }} className="p-2 text-red-600 hover:bg-red-100 rounded-md transition-colors" title="Xóa vĩnh viễn"><Trash2 className="w-4 h-4" /></button>
+                            </>
                           )}
                         </div>
                       </td>
@@ -592,22 +667,20 @@ export default function PersonnelPage() {
                 <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center shrink-0 border border-white/40"><LogOut size={24}/></div>
                 <div>
                   <h3 className="text-xl font-black mb-1">Xác nhận Nghỉ việc</h3>
-                  <p className="text-orange-100 text-sm font-medium">{personnelToOffboard.HoTen} - {personnelToOffboard.MaNV}</p>
+                  <p className="text-orange-100 text-sm font-medium">{personnelToOffboard.ho_ten} - {personnelToOffboard.ma_so_nhan_vien}</p>
                 </div>
               </div>
               <button onClick={() => setIsOffboardOpen(false)} className="text-orange-100 hover:text-white p-1 rounded-full"><X size={24}/></button>
             </div>
 
             <div className="p-6 overflow-y-auto custom-scrollbar">
-              
-              {/* 🟢 CẢNH BÁO THU HỒI SIM CÔNG TY (NẾU CÓ) */}
-              {personnelToOffboard.SDT && (
+              {personnelToOffboard.sdt_cong_ty && (
                 <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-xl flex gap-3 mb-4">
                   <Phone className="text-yellow-600 shrink-0 w-6 h-6"/>
                   <div>
                     <h4 className="font-black text-yellow-800 mb-1">CẢNH BÁO: Thu hồi SIM Công ty!</h4>
                     <p className="text-sm text-yellow-700 font-medium">
-                      Nhân sự này đang được cấp số điện thoại: <span className="font-black text-yellow-900">{formatPhoneNumber(personnelToOffboard.SDT)}</span>. 
+                      Nhân sự này đang được cấp số điện thoại: <span className="font-black text-yellow-900">{formatPhoneNumber(personnelToOffboard.sdt_cong_ty)}</span>. 
                       Vui lòng yêu cầu bàn giao lại SIM công ty trước khi hoàn tất thủ tục nghỉ việc.
                     </p>
                   </div>
@@ -687,7 +760,7 @@ export default function PersonnelPage() {
         </div>
       )}
 
-      {/* 🟢 VIEW MODAL */}
+      {/* 🟢 VIEW MODAL (HIỂN THỊ CHI TIẾT) */}
       {isViewModalOpen && viewData && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl flex flex-col max-h-[90vh] animate-in fade-in zoom-in duration-200">
@@ -697,51 +770,86 @@ export default function PersonnelPage() {
             </div>
             
             <div className="p-4 sm:p-6 overflow-y-auto space-y-6 custom-scrollbar">
+              
               <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 sm:gap-6 border-b border-gray-100 pb-6 text-center sm:text-left relative">
-                
-                {viewData.TrangThai === 'Đã nghỉ việc' && (
+                {viewData.trang_thai === 'Đã nghỉ việc' && (
                   <div className="absolute top-0 right-0 bg-red-100 text-red-700 font-black px-3 py-1 rounded border border-red-200 flex items-center gap-1"><LogOut size={16}/> ĐÃ NGHỈ VIỆC</div>
                 )}
 
-                <div className="w-24 h-24 rounded-full bg-blue-100 text-[#05469B] flex items-center justify-center text-4xl font-black shrink-0 border-4 border-white shadow-md">
-                  {viewData.HoTen?.charAt(0).toUpperCase() || 'U'}
+                <div className="w-24 h-24 sm:w-28 sm:h-32 rounded-2xl bg-blue-100 text-[#05469B] flex items-center justify-center text-4xl font-black shrink-0 border-4 border-white shadow-md overflow-hidden relative">
+                  {viewData.hinh_anh ? (
+                    <img 
+                      src={getDirectImageLink(viewData.hinh_anh)} 
+                      alt={viewData.ho_ten} 
+                      className="w-full h-full object-cover"
+                      onError={(e) => { (e.target as HTMLImageElement).src = 'https://via.placeholder.com/150?text=Lỗi+Ảnh'; }}
+                    />
+                  ) : (
+                    viewData.ho_ten?.charAt(0).toUpperCase() || 'U'
+                  )}
                 </div>
+
                 <div className="flex-1 mt-2 sm:mt-0">
                   <div className="flex flex-col sm:flex-row items-center sm:items-baseline gap-2 sm:gap-3 mb-1">
-                    <h2 className="text-2xl font-black text-gray-800">{viewData.HoTen}</h2>
-                    <span className="px-2.5 py-0.5 bg-gray-100 border border-gray-200 rounded text-xs font-bold text-gray-600">ID: {viewData.MaNV}</span>
+                    <h2 className="text-2xl font-black text-gray-800">{viewData.ho_ten}</h2>
+                    <span className="px-2.5 py-0.5 bg-gray-100 border border-gray-200 rounded text-xs font-bold text-gray-600">ID: {viewData.ma_so_nhan_vien}</span>
                   </div>
-                  <p className="text-lg font-bold text-[#05469B] mb-3">{viewData.ChucVu}</p>
+                  <p className="text-lg font-bold text-[#05469B] mb-3">{viewData.chuc_vu}</p>
                   
-                  {/* 🟢 HIỂN THỊ CẢ 2 SỐ ĐIỆN THOẠI TRONG MODAL */}
                   <div className="flex flex-col sm:flex-row flex-wrap justify-center sm:justify-start gap-3 sm:gap-4 text-sm text-gray-600 font-medium">
-                    {viewData.SDT && (
-                      <a href={`tel:${String(viewData.SDT).replace(/\D/g, '')}`} className="flex items-center justify-center sm:justify-start gap-1.5 bg-blue-50 px-2 py-1 rounded text-blue-800 border border-blue-100 hover:bg-blue-100 transition-colors">
-                        <Phone size={16} className="text-blue-500"/> SĐT Cty: <span className="font-bold">{formatPhoneNumber(viewData.SDT)}</span>
+                    {viewData.sdt_cong_ty && (
+                      <a href={`tel:${String(viewData.sdt_cong_ty).replace(/\D/g, '')}`} className="flex items-center justify-center sm:justify-start gap-1.5 bg-blue-50 px-2 py-1 rounded text-blue-800 border border-blue-100 hover:bg-blue-100 transition-colors">
+                        <Phone size={16} className="text-blue-500"/> SĐT Cty: <span className="font-bold">{formatPhoneNumber(viewData.sdt_cong_ty)}</span>
                       </a>
                     )}
-                    {viewData.SDTCanhan && (
-                      <a href={`tel:${String(viewData.SDTCanhan).replace(/\D/g, '')}`} className="flex items-center justify-center sm:justify-start gap-1.5 bg-emerald-50 px-2 py-1 rounded text-emerald-800 border border-emerald-200 hover:bg-emerald-100 transition-colors">
-                        <Phone size={16} className="text-emerald-500"/> SĐT Cá nhân: <span className="font-bold">{formatPhoneNumber(viewData.SDTCanhan)}</span>
+                    {viewData.sdt_ca_nhan && (
+                      <a href={`tel:${String(viewData.sdt_ca_nhan).replace(/\D/g, '')}`} className="flex items-center justify-center sm:justify-start gap-1.5 bg-emerald-50 px-2 py-1 rounded text-emerald-800 border border-emerald-200 hover:bg-emerald-100 transition-colors">
+                        <Phone size={16} className="text-emerald-500"/> SĐT Cá nhân: <span className="font-bold">{formatPhoneNumber(viewData.sdt_ca_nhan)}</span>
                       </a>
                     )}
-                    <span className="flex items-center justify-center sm:justify-start gap-1.5 mt-1 sm:mt-0"><Mail size={16} className="text-gray-400"/> {viewData.Email || 'Chưa có Email'}</span>
+                    <span className="flex items-center justify-center sm:justify-start gap-1.5 mt-1 sm:mt-0"><Mail size={16} className="text-gray-400"/> {viewData.email || 'Chưa có Email'}</span>
                   </div>
                 </div>
               </div>
 
               <div>
                 <h4 className="font-bold text-gray-800 mb-3 uppercase tracking-wider text-sm flex items-center gap-2"><Building2 size={18} className="text-[#05469B]"/> Thông tin Công tác</h4>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-gray-50 p-4 rounded-xl border border-gray-200">
-                  <div><p className="text-xs text-gray-500 uppercase font-bold mb-1">Đơn vị</p><p className="font-semibold text-gray-800 break-words">{donViMap[viewData.ID_DonVi] || viewData.ID_DonVi || '---'}</p></div>
-                  <div><p className="text-xs text-gray-500 uppercase font-bold mb-1">Phân loại</p><p className="font-semibold text-gray-800">{viewData.PhanLoai || '---'}</p></div>
-                  <div><p className="text-xs text-gray-500 uppercase font-bold mb-1">Ngày nhận việc</p><p className="font-semibold text-gray-800">{viewData.NgayNhanViec ? new Date(viewData.NgayNhanViec).toLocaleDateString('vi-VN') : '---'}</p></div>
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4 bg-gray-50 p-4 rounded-xl border border-gray-200">
+                  <div><p className="text-xs text-gray-500 uppercase font-bold mb-1">Đơn vị</p><p className="font-semibold text-gray-800 break-words">{donViMap[viewData.id_don_vi] || viewData.id_don_vi || '---'}</p></div>
+                  <div><p className="text-xs text-gray-500 uppercase font-bold mb-1">Phân loại</p><p className="font-semibold text-gray-800">{viewData.phan_loai || '---'}</p></div>
+                  <div><p className="text-xs text-gray-500 uppercase font-bold mb-1">Ngày nhận việc</p><p className="font-semibold text-gray-800">{viewData.ngay_nhan_vien ? new Date(viewData.ngay_nhan_vien).toLocaleDateString('vi-VN') : '---'}</p></div>
                   
-                  {viewData.TrangThai === 'Đã nghỉ việc' ? (
-                    <div><p className="text-xs text-red-500 uppercase font-bold mb-1">Ngày nghỉ việc</p><p className="font-semibold text-red-600">{viewData.NgayNghiViec ? new Date(viewData.NgayNghiViec).toLocaleDateString('vi-VN') : '---'}</p></div>
+                  {viewData.trang_thai === 'Đã nghỉ việc' ? (
+                    <div><p className="text-xs text-red-500 uppercase font-bold mb-1">Ngày nghỉ việc</p><p className="font-semibold text-red-600">{viewData.ngay_nghi_viec ? new Date(viewData.ngay_nghi_viec).toLocaleDateString('vi-VN') : '---'}</p></div>
                   ) : (
-                    <div><p className="text-xs text-gray-500 uppercase font-bold mb-1">Thâm niên</p><p className="font-semibold text-emerald-600">{calculateSeniority(viewData.NgayNhanViec, viewData.TrangThai || 'Đang làm việc', viewData.NgayNghiViec || '')}</p></div>
+                    <div><p className="text-xs text-gray-500 uppercase font-bold mb-1">Thâm niên</p><p className="font-semibold text-emerald-600">{calculateSeniority(viewData.ngay_nhan_vien, viewData.trang_thai || 'Đang làm việc', viewData.ngay_nghi_viec || '')}</p></div>
                   )}
+
+                  {/* THÊM MỚI: NGẠCH LƯƠNG CÓ CON MẮT */}
+                  <div>
+                    <p className="text-xs text-gray-500 uppercase font-bold mb-1">Ngạch lương</p>
+                    <div className="flex items-center gap-1.5">
+                      <p className={`font-semibold ${showNgachLuong ? 'text-[#05469B]' : 'text-gray-400 tracking-widest mt-1'}`}>
+                        {showNgachLuong ? (viewData.ngach_luong || '---') : '••••••'}
+                      </p>
+                      {(viewData.ngach_luong && viewData.ngach_luong.trim() !== '') && (
+                        <button onClick={() => setShowNgachLuong(!showNgachLuong)} className="text-gray-400 hover:text-[#05469B] transition-colors" title={showNgachLuong ? "Ẩn ngạch lương" : "Hiện ngạch lương"}>
+                          {showNgachLuong ? <EyeOff size={14} /> : <Eye size={14} />}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* HIỂN THỊ NGÀY VÀO LÀM LẠI NẾU CÓ */}
+                  {viewData.ngay_vao_lam_lai && (
+                    <div className="col-span-2 md:col-span-1">
+                      <p className="text-xs text-blue-500 uppercase font-bold mb-1">Vào làm lại</p>
+                      <p className="font-semibold text-blue-600">
+                        {new Date(viewData.ngay_vao_lam_lai).toLocaleDateString('vi-VN')}
+                      </p>
+                    </div>
+                  )}
+
                 </div>
               </div>
 
@@ -749,23 +857,23 @@ export default function PersonnelPage() {
                 <div>
                   <h4 className="font-bold text-gray-800 mb-3 uppercase tracking-wider text-sm flex items-center gap-2"><UserIcon size={18} className="text-orange-500"/> Cá nhân & Ngoại hình</h4>
                   <div className="bg-orange-50/50 p-4 rounded-xl border border-orange-100 space-y-3">
-                    <div className="flex flex-col sm:flex-row sm:justify-between border-b border-orange-100 pb-2 gap-1 sm:gap-4"><span className="text-gray-500 text-sm sm:w-20 shrink-0">Giới tính:</span><span className="font-semibold text-gray-800 text-sm sm:text-right">{viewData.GioiTinh || '---'}</span></div>
+                    <div className="flex flex-col sm:flex-row sm:justify-between border-b border-orange-100 pb-2 gap-1 sm:gap-4"><span className="text-gray-500 text-sm sm:w-20 shrink-0">Giới tính:</span><span className="font-semibold text-gray-800 text-sm sm:text-right">{viewData.gioi_tinh || '---'}</span></div>
                     <div className="flex flex-col sm:flex-row sm:justify-between border-b border-orange-100 pb-2 gap-1 sm:gap-4">
                       <span className="text-gray-500 text-sm sm:w-20 shrink-0">Năm sinh:</span>
                       <span className="font-semibold text-gray-800 text-sm sm:text-right">
-                        {viewData.NamSinh ? new Date(viewData.NamSinh).toLocaleDateString('vi-VN') : '---'} 
-                        {viewData.Tuoi && <span className="ml-2 text-orange-600 font-bold">({viewData.Tuoi} tuổi)</span>}
+                        {viewData.nam_sinh ? new Date(viewData.nam_sinh).toLocaleDateString('vi-VN') : '---'} 
+                        {viewData.tuoi && <span className="ml-2 text-orange-600 font-bold">({viewData.tuoi} tuổi)</span>}
                       </span>
                     </div>
-                    <div className="flex flex-col sm:flex-row sm:justify-between border-b border-orange-100 pb-2 gap-1 sm:gap-4"><span className="text-gray-500 text-sm sm:w-20 shrink-0">Trình độ:</span><span className="font-semibold text-gray-800 text-sm sm:text-right">{viewData.TrinhDoHocVan || '---'}</span></div>
-                    <div className="flex flex-col sm:flex-row sm:justify-between border-b border-orange-100 pb-2 gap-1 sm:gap-4"><span className="text-gray-500 text-sm sm:w-20 shrink-0">Thu nhập:</span><span className="font-semibold text-gray-800 text-sm sm:text-right">{formatCurrency(viewData.ThuNhap) || '---'} VNĐ</span></div>
-                    <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-4"><span className="text-gray-500 text-sm sm:w-20 shrink-0">Ngoại hình:</span><span className="font-semibold text-gray-800 text-sm sm:text-right whitespace-pre-wrap flex-1">{viewData.MoTaNgoaiHinh || '---'}</span></div>
+                    <div className="flex flex-col sm:flex-row sm:justify-between border-b border-orange-100 pb-2 gap-1 sm:gap-4"><span className="text-gray-500 text-sm sm:w-20 shrink-0">Trình độ:</span><span className="font-semibold text-gray-800 text-sm sm:text-right">{viewData.trinh_do_hoc_van || '---'}</span></div>
+                    <div className="flex flex-col sm:flex-row sm:justify-between border-b border-orange-100 pb-2 gap-1 sm:gap-4"><span className="text-gray-500 text-sm sm:w-20 shrink-0">Thu nhập:</span><span className="font-semibold text-gray-800 text-sm sm:text-right">{formatCurrency(viewData.thu_nhap) || '---'} VNĐ</span></div>
+                    <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-4"><span className="text-gray-500 text-sm sm:w-20 shrink-0">Ngoại hình:</span><span className="font-semibold text-gray-800 text-sm sm:text-right whitespace-pre-wrap flex-1">{viewData.mo_to_ngoai_hinh || '---'}</span></div>
                   </div>
                 </div>
                 <div className="flex flex-col">
                   <h4 className="font-bold text-gray-800 mb-3 uppercase tracking-wider text-sm flex items-center gap-2"><Info size={18} className="text-blue-500"/> Ghi chú khác</h4>
                   <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100 flex-1">
-                    <p className="text-sm font-semibold text-gray-800 whitespace-pre-wrap">{viewData.GhiChu || 'Không có ghi chú.'}</p>
+                    <p className="text-sm font-semibold text-gray-800 whitespace-pre-wrap">{viewData.ghi_chu || 'Không có ghi chú.'}</p>
                   </div>
                 </div>
               </div>
@@ -773,21 +881,19 @@ export default function PersonnelPage() {
               <div>
                 <h4 className="font-bold text-gray-800 mb-3 uppercase tracking-wider text-sm flex items-center gap-2"><ShieldCheck size={18} className="text-emerald-500"/> Chứng chỉ / Kỹ năng</h4>
                 <div className="flex flex-col gap-3">
-                  
-                  {viewData.GPLX && viewData.GPLX !== 'Không có' && (
+                  {viewData.giay_phep_lai_xe && viewData.giay_phep_lai_xe !== 'Không có' && (
                     <div className="flex flex-wrap gap-2 items-center">
                       <span className="text-sm font-bold text-gray-600 mr-1 shrink-0">Bằng lái xe:</span>
-                      {viewData.GPLX.split(',').map((bang: string, idx: number) => (
+                      {viewData.giay_phep_lai_xe.split(',').map((bang: string, idx: number) => (
                         <span key={idx} className="px-2.5 py-1 bg-blue-100 text-[#05469B] font-black rounded-md text-xs border border-blue-200">
                           Hạng {bang.trim()}
                         </span>
                       ))}
                     </div>
                   )}
-
                   <div className="flex flex-wrap gap-2 mt-2">
-                    {CERTIFICATES.filter(cert => viewData[cert.id as keyof Personnel]).length > 0 ? (
-                      CERTIFICATES.filter(cert => viewData[cert.id as keyof Personnel]).map(cert => {
+                    {CERTIFICATES.filter(cert => viewData[cert.id]).length > 0 ? (
+                      CERTIFICATES.filter(cert => viewData[cert.id]).map(cert => {
                         const Icon = cert.icon;
                         return (
                           <div key={cert.id} className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg text-sm font-bold shadow-sm">
@@ -810,6 +916,7 @@ export default function PersonnelPage() {
         </div>
       )}
 
+      {/* 🟢 MODAL THÊM MỚI / CHỈNH SỬA */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl flex flex-col max-h-[90vh] animate-in fade-in zoom-in duration-200">
@@ -824,20 +931,36 @@ export default function PersonnelPage() {
                 <h4 className="font-bold text-[#05469B] mb-4 flex items-center gap-2"><div className="w-2 h-6 bg-[#05469B] rounded-full"></div> Thông tin cá nhân</h4>
                 
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <div><label className="block text-xs font-bold text-gray-700 mb-1">Mã NV *</label><input type="text" required name="MaNV" value={formData.MaNV || ''} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" /></div>
-                  <div className="md:col-span-2"><label className="block text-xs font-bold text-gray-700 mb-1">Họ và Tên *</label><input type="text" required name="HoTen" value={formData.HoTen || ''} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" /></div>
-                  <div><label className="block text-xs font-bold text-gray-700 mb-1">Giới tính</label><select name="GioiTinh" value={formData.GioiTinh || 'Nam'} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]"><option value="Nam">Nam</option><option value="Nữ">Nữ</option></select></div>
+                  <div><label className="block text-xs font-bold text-gray-700 mb-1">Mã NV *</label><input type="text" required name="ma_so_nhan_vien" value={formData.ma_so_nhan_vien || ''} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" /></div>
+                  <div className="md:col-span-2"><label className="block text-xs font-bold text-gray-700 mb-1">Họ và Tên *</label><input type="text" required name="ho_ten" value={formData.ho_ten || ''} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" /></div>
+                  <div><label className="block text-xs font-bold text-gray-700 mb-1">Giới tính</label><select name="gioi_tinh" value={formData.gioi_tinh || 'Nam'} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]"><option value="Nam">Nam</option><option value="Nữ">Nữ</option></select></div>
                   
-                  <div><label className="block text-xs font-bold text-gray-700 mb-1">Năm sinh</label><input type="date" name="NamSinh" value={formData.NamSinh ? formData.NamSinh.split('T')[0] : ''} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" /></div>
+                  <div><label className="block text-xs font-bold text-gray-700 mb-1">Năm sinh</label><input type="date" name="nam_sinh" value={formData.nam_sinh ? formData.nam_sinh.split('T')[0] : ''} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" /></div>
                   <div>
                     <label className="block text-xs font-bold text-[#05469B] mb-1">SĐT Công ty (Sim cấp)</label>
-                    <input type="tel" name="SDT" value={formData.SDT || ''} onChange={(e) => setFormData({...formData, SDT: formatPhoneNumber(e.target.value)})} maxLength={13} className="w-full p-2.5 border border-blue-300 rounded-lg bg-blue-50 outline-none focus:ring-2 focus:ring-[#05469B] font-bold tracking-wide text-[#05469B]" placeholder="09xx xxx xxx" />
+                    <input type="tel" name="sdt_cong_ty" value={formData.sdt_cong_ty || ''} onChange={(e) => setFormData({...formData, sdt_cong_ty: formatPhoneNumber(e.target.value)})} maxLength={13} className="w-full p-2.5 border border-blue-300 rounded-lg bg-blue-50 outline-none focus:ring-2 focus:ring-[#05469B] font-bold tracking-wide text-[#05469B]" placeholder="09xx xxx xxx" />
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-gray-700 mb-1">SĐT Cá nhân</label>
-                    <input type="tel" name="SDTCanhan" value={formData.SDTCanhan || ''} onChange={(e) => setFormData({...formData, SDTCanhan: formatPhoneNumber(e.target.value)})} maxLength={13} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-bold tracking-wide" placeholder="09xx xxx xxx" />
+                    <input type="tel" name="sdt_ca_nhan" value={formData.sdt_ca_nhan || ''} onChange={(e) => setFormData({...formData, sdt_ca_nhan: formatPhoneNumber(e.target.value)})} maxLength={13} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-bold tracking-wide" placeholder="09xx xxx xxx" />
                   </div>
-                  <div className="md:col-span-1"><label className="block text-xs font-bold text-gray-700 mb-1">Email</label><input type="email" name="Email" value={formData.Email || ''} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" /></div>
+                  <div className="md:col-span-1"><label className="block text-xs font-bold text-gray-700 mb-1">Email</label><input type="email" name="email" value={formData.email || ''} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" /></div>
+                  
+                  <div className="md:col-span-4">
+                    <label className="block text-xs font-bold text-gray-700 mb-1">Link Ảnh Đại Diện (Google Drive)</label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        name="hinh_anh"
+                        value={formData.hinh_anh || ''}
+                        onChange={handleInputChange}
+                        className="w-full p-2.5 pl-10 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]"
+                        placeholder="Dán link chia sẻ ảnh từ Google Drive vào đây..."
+                      />
+                      <ImageIcon className="absolute left-3 top-2.5 text-gray-400" size={18} />
+                    </div>
+                    {formData.hinh_anh && <p className="text-[10px] text-emerald-600 font-bold mt-1">✓ Đã nhận diện đường dẫn ảnh</p>}
+                  </div>
                 </div>
               </div>
 
@@ -848,24 +971,24 @@ export default function PersonnelPage() {
                     <label className="block text-xs font-bold text-gray-700 mb-1">Đơn vị công tác *</label>
                     <select 
                       required 
-                      name="ID_DonVi" 
-                      value={formData.ID_DonVi || ''} 
+                      name="id_don_vi" 
+                      value={formData.id_don_vi || ''} 
                       onChange={handleInputChange} 
                       className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] text-sm"
                       style={{ fontFamily: 'monospace, sans-serif' }}
                     >
                       <option value="">-- Chọn đơn vị --</option>
-                      {buildHierarchicalOptions(donViList.filter(dv => allowedDonViIds.includes(dv.ID_DonVi))).map(({ unit, prefix }) => (
-                        <option key={unit.ID_DonVi} value={unit.ID_DonVi} className="font-normal text-gray-700">
-                          {prefix}{getUnitEmoji(unit.loaiHinh)} {unit.TenDonVi}
+                      {buildHierarchicalOptions(donViList.filter(dv => allowedDonViIds.includes(dv.id))).map(({ unit, prefix }) => (
+                        <option key={unit.id} value={unit.id} className="font-normal text-gray-700">
+                          {prefix}{getUnitEmoji(unit.loai_hinh)} {unit.ten_don_vi}
                         </option>
                       ))}
                     </select>
                   </div>
-                  <div><label className="block text-xs font-bold text-gray-700 mb-1">Chức vụ *</label><input type="text" required name="ChucVu" value={formData.ChucVu || ''} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" /></div>
+                  <div><label className="block text-xs font-bold text-gray-700 mb-1">Chức vụ *</label><input type="text" required name="chuc_vu" value={formData.chuc_vu || ''} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" /></div>
                   <div>
                     <label className="block text-xs font-bold text-gray-700 mb-1">Phân loại</label>
-                    <select name="PhanLoai" value={formData.PhanLoai || 'Lãnh đạo'} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]">
+                    <select name="phan_loai" value={formData.phan_loai || 'Lãnh đạo'} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]">
                       <option value="Lãnh đạo">Lãnh đạo</option>
                       <option value="PT DVHT KD">PT DVHT KD</option>
                       <option value="PT DVHC">PT DVHC</option>
@@ -875,18 +998,18 @@ export default function PersonnelPage() {
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-gray-700 mb-1">Trạng thái làm việc</label>
-                    <select name="TrangThai" value={formData.TrangThai || 'Đang làm việc'} onChange={handleInputChange} className={`w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-bold ${formData.TrangThai === 'Đã nghỉ việc' ? 'text-red-600' : 'text-emerald-600'}`}>
+                    <select name="trang_thai" value={formData.trang_thai || 'Đang làm việc'} onChange={handleInputChange} className={`w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-bold ${formData.trang_thai === 'Đã nghỉ việc' ? 'text-red-600' : 'text-emerald-600'}`}>
                       <option value="Đang làm việc">Đang làm việc</option>
                       <option value="Đã nghỉ việc">Đã nghỉ việc</option>
                     </select>
                   </div>
-                  <div><label className="block text-xs font-bold text-gray-700 mb-1">Ngày nhận việc</label><input type="date" name="NgayNhanViec" value={formData.NgayNhanViec ? formData.NgayNhanViec.split('T')[0] : ''} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" /></div>
-                  {formData.TrangThai === 'Đã nghỉ việc' && (
-                    <div><label className="block text-xs font-bold text-red-600 mb-1">Ngày nghỉ việc</label><input type="date" name="NgayNghiViec" value={formData.NgayNghiViec ? formData.NgayNghiViec.split('T')[0] : ''} onChange={handleInputChange} className="w-full p-2.5 border border-red-200 rounded-lg bg-red-50 outline-none focus:ring-2 focus:ring-red-500 font-bold" /></div>
+                  <div><label className="block text-xs font-bold text-gray-700 mb-1">Ngày nhận việc</label><input type="date" name="ngay_nhan_vien" value={formData.ngay_nhan_vien ? formData.ngay_nhan_vien.split('T')[0] : ''} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" /></div>
+                  {formData.trang_thai === 'Đã nghỉ việc' && (
+                    <div><label className="block text-xs font-bold text-red-600 mb-1">Ngày nghỉ việc</label><input type="date" name="ngay_nghi_viec" value={formData.ngay_nghi_viec ? formData.ngay_nghi_viec.split('T')[0] : ''} onChange={handleInputChange} className="w-full p-2.5 border border-red-200 rounded-lg bg-red-50 outline-none focus:ring-2 focus:ring-red-500 font-bold" /></div>
                   )}
                   <div>
                     <label className="block text-xs font-bold text-gray-700 mb-1">Trình độ học vấn</label>
-                    <select name="TrinhDoHocVan" value={formData.TrinhDoHocVan || ''} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]">
+                    <select name="trinh_do_hoc_van" value={formData.trinh_do_hoc_van || ''} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]">
                       <option value="">-- Chọn trình độ --</option>
                       <option value="Tiểu học">Tiểu học</option>
                       <option value="Trung học cơ sở">Trung học cơ sở</option>
@@ -900,7 +1023,10 @@ export default function PersonnelPage() {
                       <option value="Thạc sĩ/Tiến sĩ">Thạc sĩ/Tiến sĩ</option>
                     </select>
                   </div>
-                  <div className="md:col-span-2"><label className="block text-xs font-bold text-gray-700 mb-1">Mức thu nhập (VNĐ)</label><input type="text" name="ThuNhap" value={formatCurrency(formData.ThuNhap)} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" /></div>
+                  
+                  {/* Ô NHẬP MỨC THU NHẬP VÀ NGẠCH LƯƠNG CHIA ĐÔI */}
+                  <div className="md:col-span-1"><label className="block text-xs font-bold text-gray-700 mb-1">Mức thu nhập (VNĐ)</label><input type="text" name="thu_nhap" value={formatCurrency(formData.thu_nhap)} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" /></div>
+                  <div className="md:col-span-1"><label className="block text-xs font-bold text-gray-700 mb-1">Ngạch lương</label><input type="text" name="ngach_luong" value={formData.ngach_luong || ''} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" placeholder="VD: Bậc 1" /></div>
                 </div>
               </div>
 
@@ -944,7 +1070,7 @@ export default function PersonnelPage() {
                     const Icon = cert.icon;
                     return (
                       <label key={cert.id} className="flex items-center p-2.5 border border-emerald-200 rounded-lg bg-[#FFFFF0] cursor-pointer hover:border-emerald-500 transition-colors shadow-sm">
-                        <input type="checkbox" name={cert.id} checked={formData[cert.id as keyof Personnel] as boolean || false} onChange={handleInputChange} className="w-4 h-4 text-emerald-600 rounded border-gray-300 mr-2 focus:ring-emerald-500" />
+                        <input type="checkbox" name={cert.id} checked={formData[cert.id] as boolean || false} onChange={handleInputChange} className="w-4 h-4 text-emerald-600 rounded border-gray-300 mr-2 focus:ring-emerald-500" />
                         <Icon size={16} className="text-gray-500 mr-1.5 shrink-0" />
                         <span className="text-[11px] sm:text-xs font-bold text-gray-700 leading-tight">{cert.label}</span>
                       </label>
@@ -958,11 +1084,11 @@ export default function PersonnelPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-bold text-gray-700 mb-1">Mô tả ngoại hình</label>
-                    <textarea name="MoTaNgoaiHinh" value={formData.MoTaNgoaiHinh || ''} onChange={handleInputChange} rows={3} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] resize-none"></textarea>
+                    <textarea name="mo_to_ngoai_hinh" value={formData.mo_to_ngoai_hinh || ''} onChange={handleInputChange} rows={3} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] resize-none"></textarea>
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-gray-700 mb-1">Ghi chú khác</label>
-                    <textarea name="GhiChu" value={formData.GhiChu || ''} onChange={handleInputChange} rows={3} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] resize-none"></textarea>
+                    <textarea name="ghi_chu" value={formData.ghi_chu || ''} onChange={handleInputChange} rows={3} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] resize-none"></textarea>
                   </div>
                 </div>
               </div>
@@ -972,6 +1098,37 @@ export default function PersonnelPage() {
                 <button type="submit" disabled={submitting} className="w-full sm:w-auto px-8 py-3 text-white bg-[#05469B] hover:bg-[#04367a] rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg transition-colors">{submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />} Lưu Dữ Liệu</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* 🟢 MODAL XÁC NHẬN VÀO LÀM LẠI */}
+      {isRehireModalOpen && personnelToRehire && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 animate-in zoom-in duration-200">
+            <h3 className="text-xl font-black text-[#05469B] mb-4 flex items-center gap-2">
+              <RotateCcw size={24}/> Vào làm lại
+            </h3>
+            <p className="text-sm text-gray-600 mb-6">
+              Bạn đang thực hiện thủ tục cho nhân sự <span className="font-bold text-gray-800">{personnelToRehire.ho_ten}</span> quay trở lại làm việc.
+            </p>
+            
+            <div className="mb-6">
+              <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Ngày vào làm lại chính thức</label>
+              <input 
+                type="date" 
+                value={rehireDate}
+                onChange={(e) => setRehireDate(e.target.value)}
+                className="w-full p-3 bg-blue-50 border border-blue-200 rounded-xl outline-none focus:ring-2 focus:ring-[#05469B] font-bold text-[#05469B]"
+              />
+            </div>
+
+            <div className="flex gap-3">
+              <button onClick={() => setIsRehireModalOpen(false)} className="flex-1 py-3 bg-gray-100 text-gray-700 font-bold rounded-xl hover:bg-gray-200 transition-colors">Hủy</button>
+              <button onClick={handleConfirmRehire} disabled={submitting} className="flex-1 py-3 bg-[#05469B] hover:bg-[#04367a] transition-colors text-white font-bold rounded-xl flex items-center justify-center gap-2 shadow-lg">
+                {submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <CheckCheck size={20}/>} Xác nhận
+              </button>
+            </div>
           </div>
         </div>
       )}
