@@ -33,7 +33,6 @@ export default function LoginPage() {
         localStorage.setItem('thaco_remember_me', 'true');
       } else {
         localStorage.removeItem('thaco_saved_username');
-        localStorage.removeItem('thaco_saved_password');
         localStorage.setItem('thaco_remember_me', 'false');
       }
     } catch (err: any) {
