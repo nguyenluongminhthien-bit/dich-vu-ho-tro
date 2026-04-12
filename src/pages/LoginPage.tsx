@@ -30,7 +30,6 @@ export default function LoginPage() {
       await login(username, password);
       if (rememberMe) {
         localStorage.setItem('thaco_saved_username', username);
-        localStorage.setItem('thaco_saved_password', password);
         localStorage.setItem('thaco_remember_me', 'true');
       } else {
         localStorage.removeItem('thaco_saved_username');
