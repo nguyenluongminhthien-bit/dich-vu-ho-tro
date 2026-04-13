@@ -16,8 +16,8 @@ const resolveTable = (name: string) => TABLE_MAP[name] || name.toLowerCase();
 // ===============================================
 // 1. CẤU HÌNH KẾT NỐI SUPABASE
 // ===============================================
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+const SUPABASE_URL = 'https://eizpyrhqshkhcghkupjy.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVpenB5cmhxc2hraGNnaGt1cGp5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUzNzUyNTcsImV4cCI6MjA5MDk1MTI1N30.Whb7fJVbGMeCPN0M07BchRFvHtIiH5ZTSCeSu2l4RPc';
 
 // Header chuẩn để nói chuyện với Supabase
 const HEADERS = {
