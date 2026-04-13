@@ -16,6 +16,7 @@ import { apiService } from '../services/api';
 import { DonVi, Personnel, AnNinh, PhapNhan, PhongHop, TS_Xe, ThietBi } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { buildHierarchicalOptions, getUnitEmoji } from '../utils/hierarchy'; 
+import { formatCurrency } from '../utils/formatters';
 
 // 🟢 [HÀM TIỆN ÍCH CHUNG]
 const safeGet = (obj: any, key: string) => {
@@ -50,11 +51,6 @@ const formatToVN = (isoStr: string) => {
     return `${parts[2]}/${parts[1]}/${parts[0]}`;
   }
   return isoStr; 
-};
-
-const formatCurrency = (val: string | number | undefined | null) => {
-  if (!val) return '';
-  return val.toString().replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, " ");
 };
 
 const formatPhoneNumber = (val: string | number | undefined | null) => {

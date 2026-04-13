@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Search, Plus, Edit, Trash2, X, AlertCircle, Loader2, Save, 
-  BookOpen, Link as LinkIcon, Calendar, Eye, Bookmark, Briefcase, Filter, Info
+  BookOpen, Link as LinkIcon, Calendar, Eye, Bookmark, Briefcase, Filter, Info, CheckCircle2
 } from 'lucide-react';
 import { apiService } from '../services/api';
 import { QuyDinhQuyTrinh, VB_TB } from '../types'; // Cập nhật import chuẩn
@@ -10,6 +10,7 @@ import { useAuth } from '../contexts/AuthContext';
 // Mở rộng interface để thêm cờ đánh dấu tài liệu mượn từ bảng Văn bản
 interface PolicyItem extends QuyDinhQuyTrinh {
   isFromVB?: boolean;
+  hieu_luc?: string; // Thêm trường hiệu lực
 }
 
 export default function PolicyPage() {
@@ -44,7 +45,7 @@ export default function PolicyPage() {
       // Fetch đồng thời cả Quy định (qd_qt) và Văn bản (vb_tb)
       const [qdResult, vbResult] = await Promise.all([
         apiService.getQuyDinh().catch(() => [] as QuyDinhQuyTrinh[]),
-        apiService.getVanBan().catch(() => [] as VB_TB[]) // Đã sửa tên interface VB_TB
+        apiService.getVanBan().catch(() => [] as VB_TB[]) 
       ]);
 
       // 1. Dữ liệu gốc của Quy định
@@ -65,13 +66,14 @@ export default function PolicyPage() {
           noi_dung: item.noi_dung,
           nghiep_vu: item.nghiep_vu,
           link_file: item.link_file_dinh_kem,
+          hieu_luc: item.hieu_luc || 'Còn hiệu lực', // Lấy hiệu lực từ VB nếu có
           isFromVB: true // Đánh dấu là mượn từ VB
         }));
 
       // 3. Gộp 2 mảng lại
       const combinedData = [...mappedQd, ...mappedVb];
       
-      // Có thể sort theo ngày ban hành mới nhất
+      // Sort theo ngày ban hành mới nhất
       combinedData.sort((a, b) => new Date(b.ngay_ban_hanh || 0).getTime() - new Date(a.ngay_ban_hanh || 0).getTime());
 
       setQdData(combinedData);
@@ -124,7 +126,8 @@ export default function PolicyPage() {
       setFormData({
         id: '', phan_loai: 'Quy trình', so_hieu: '', 
         ngay_ban_hanh: new Date().toISOString().split('T')[0], 
-        tieu_de: '', noi_dung: '', nghiep_vu: selectedNghiepvu || '', link_file: ''
+        tieu_de: '', noi_dung: '', nghiep_vu: selectedNghiepvu || '', link_file: '',
+        hieu_luc: 'Còn hiệu lực' // Mặc định khi tạo mới
       });
     }
     setIsModalOpen(true); setError(null);
@@ -250,17 +253,20 @@ export default function PolicyPage() {
                   <th className="p-4 w-32">Ngày BH</th>
                   <th className="p-4">Tiêu đề & Trích yếu</th>
                   <th className="p-4 w-40">Nghiệp vụ</th>
+                  <th className="p-4 w-32 text-center">Hiệu lực</th>
                   <th className="p-4 text-center w-36">Thao tác</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
                 {loading ? (
-                  <tr><td colSpan={5} className="p-12 text-center text-gray-500"><Loader2 className="w-8 h-8 animate-spin mx-auto mb-3 text-[#05469B]" />Đang tải dữ liệu...</td></tr>
+                  <tr><td colSpan={6} className="p-12 text-center text-gray-500"><Loader2 className="w-8 h-8 animate-spin mx-auto mb-3 text-[#05469B]" />Đang tải dữ liệu...</td></tr>
                 ) : filteredDocs.length === 0 ? (
-                  <tr><td colSpan={5} className="p-16 text-center text-gray-500"><BookOpen size={48} className="mx-auto text-gray-300 mb-4" /><p className="text-lg font-medium">Không tìm thấy tài liệu phù hợp.</p></td></tr>
+                  <tr><td colSpan={6} className="p-16 text-center text-gray-500"><BookOpen size={48} className="mx-auto text-gray-300 mb-4" /><p className="text-lg font-medium">Không tìm thấy tài liệu phù hợp.</p></td></tr>
                 ) : (
                   filteredDocs.map((item) => (
                     <tr key={item.id} className="hover:bg-blue-50/50 transition-colors group">
+                      
+                      {/* CỘT 1: SỐ HIỆU / PHÂN LOẠI */}
                       <td className="p-4">
                         <span className="font-black text-[#05469B] bg-blue-50 px-2 py-1 rounded text-sm whitespace-nowrap border border-blue-100">{item.so_hieu}</span>
                         <div className="mt-2 flex flex-col items-start gap-1">
@@ -271,7 +277,13 @@ export default function PolicyPage() {
                           )}
                         </div>
                       </td>
-                      <td className="p-4 text-sm font-medium text-gray-700 flex items-center gap-1.5 mt-3"><Calendar size={14} className="text-gray-400"/> {item.ngay_ban_hanh ? new Date(item.ngay_ban_hanh).toLocaleDateString('vi-VN') : '-'}</td>
+
+                      {/* CỘT 2: NGÀY BAN HÀNH */}
+                      <td className="p-4 text-sm font-medium text-gray-700 flex flex-col gap-1.5 mt-3">
+                        <span className="flex items-center gap-1.5"><Calendar size={14} className="text-gray-400"/> {item.ngay_ban_hanh ? new Date(item.ngay_ban_hanh).toLocaleDateString('vi-VN') : '-'}</span>
+                      </td>
+
+                      {/* CỘT 3: TIÊU ĐỀ & TRÍCH YẾU */}
                       <td className="p-4">
                         <p className="font-bold text-gray-800 text-base mb-1">{item.tieu_de}</p>
                         <p className="text-xs text-gray-500 line-clamp-2 mb-2">{item.noi_dung}</p>
@@ -281,9 +293,25 @@ export default function PolicyPage() {
                           </a>
                         )}
                       </td>
+
+                      {/* CỘT 4: NGHIỆP VỤ */}
                       <td className="p-4">
                         <span className="px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-md text-xs font-bold border border-indigo-100">{item.nghiep_vu}</span>
                       </td>
+
+                      {/* 🟢 CỘT 5: HIỆU LỰC (Đã chuyển xuống đây) */}
+                      <td className="p-4 text-center">
+                        <span className={`text-[10px] font-bold px-2.5 py-1 rounded-md uppercase border inline-flex items-center justify-center gap-1 w-full max-w-[120px] mx-auto ${
+                          item.hieu_luc === 'Hết hiệu lực' ? 'bg-red-50 text-red-600 border-red-200' : 
+                          item.hieu_luc === 'Sắp có hiệu lực' ? 'bg-orange-50 text-orange-600 border-orange-200' : 
+                          'bg-green-50 text-green-600 border-green-200'
+                        }`}>
+                          <CheckCircle2 size={12} className="shrink-0" />
+                          <span className="truncate">{item.hieu_luc || 'Còn hiệu lực'}</span>
+                        </span>
+                      </td>
+
+                      {/* CỘT 6: THAO TÁC */}
                       <td className="p-4">
                         <div className="flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity w-full max-w-[100px] mx-auto">
                           <button onClick={() => { setViewData(item); setIsViewModalOpen(true); }} className="w-full py-1.5 bg-white border border-emerald-200 text-emerald-600 hover:bg-emerald-50 rounded text-xs font-bold transition-colors flex items-center justify-center gap-1.5 shadow-sm">
@@ -332,7 +360,7 @@ export default function PolicyPage() {
               {/* KHỐI 1: THÔNG TIN HÀNH CHÍNH */}
               <div className="bg-blue-50/40 p-5 rounded-xl border border-blue-100">
                 <h4 className="font-bold text-[#05469B] mb-4 flex items-center gap-2"><div className="w-2 h-6 bg-[#05469B] rounded-full"></div> Phân loại & Hệ thống</h4>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
+                <div className="grid grid-cols-1 md:grid-cols-5 gap-5">
                   <div className="md:col-span-2">
                     <label className="block text-xs font-bold text-gray-700 mb-1">Nghiệp vụ áp dụng *</label>
                     <input list="suggest-nghiepvu" type="text" required name="nghiep_vu" value={formData.nghiep_vu || ''} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-bold text-indigo-700" placeholder="Kinh doanh, Kế toán, Nhân sự..." />
@@ -341,7 +369,24 @@ export default function PolicyPage() {
                     <label className="block text-xs font-bold text-gray-700 mb-1">Phân loại tài liệu *</label>
                     <input list="suggest-phanloai" type="text" required name="phan_loai" value={formData.phan_loai || ''} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" placeholder="Quy định, Quy trình..." />
                   </div>
-                  <div><label className="block text-xs font-bold text-gray-700 mb-1">Ngày ban hành *</label><input type="date" required name="ngay_ban_hanh" value={formData.ngay_ban_hanh || ''} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-bold" /></div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">Ngày ban hành *</label>
+                    <input type="date" required name="ngay_ban_hanh" value={formData.ngay_ban_hanh || ''} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-bold" />
+                  </div>
+                  {/* Ô CHỌN HIỆU LỰC TÀI LIỆU */}
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">Hiệu lực</label>
+                    <select 
+                      name="hieu_luc" 
+                      value={formData.hieu_luc || 'Còn hiệu lực'} 
+                      onChange={handleInputChange} 
+                      className={`w-full p-2.5 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-[#05469B] font-bold ${formData.hieu_luc === 'Hết hiệu lực' ? 'text-red-600 bg-red-50' : formData.hieu_luc === 'Sắp có hiệu lực' ? 'text-orange-600 bg-orange-50' : 'text-green-600 bg-green-50'}`}
+                    >
+                      <option value="Còn hiệu lực">Còn hiệu lực</option>
+                      <option value="Sắp có hiệu lực">Sắp có hiệu lực</option>
+                      <option value="Hết hiệu lực">Hết hiệu lực</option>
+                    </select>
+                  </div>
                 </div>
               </div>
 
@@ -400,10 +445,19 @@ export default function PolicyPage() {
               )}
 
               <div className="mb-6">
-                <div className="flex items-center gap-3 mb-2">
+                <div className="flex items-center gap-3 mb-2 flex-wrap">
                   <span className="bg-blue-100 text-[#05469B] font-black px-3 py-1 rounded text-lg border border-blue-200">{viewData.so_hieu}</span>
                   <span className="bg-emerald-100 text-emerald-700 font-bold px-2 py-1 rounded text-xs uppercase border border-emerald-200">{viewData.phan_loai}</span>
                   <span className="bg-indigo-100 text-indigo-700 font-bold px-2 py-1 rounded text-xs uppercase border border-indigo-200 flex items-center gap-1"><Briefcase size={12}/> {viewData.nghiep_vu}</span>
+                  
+                  {/* HIỂN THỊ TRẠNG THÁI HIỆU LỰC */}
+                  <span className={`font-bold px-2 py-1 rounded text-xs uppercase border flex items-center gap-1 ${
+                    viewData.hieu_luc === 'Hết hiệu lực' ? 'bg-red-100 text-red-700 border-red-200' :
+                    viewData.hieu_luc === 'Sắp có hiệu lực' ? 'bg-orange-100 text-orange-700 border-orange-200' :
+                    'bg-green-100 text-green-700 border-green-200'
+                  }`}>
+                    <CheckCircle2 size={12}/> {viewData.hieu_luc || 'Còn hiệu lực'}
+                  </span>
                 </div>
                 <h2 className="text-2xl font-black text-gray-800 leading-tight mt-3">{viewData.tieu_de}</h2>
                 <p className="text-sm text-gray-500 mt-2 flex items-center gap-2"><Calendar size={14}/> Ban hành: <span className="font-bold text-gray-700">{viewData.ngay_ban_hanh ? new Date(viewData.ngay_ban_hanh).toLocaleDateString('vi-VN') : '-'}</span></p>

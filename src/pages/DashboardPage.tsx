@@ -3,31 +3,12 @@ import { useAuth } from '../contexts/AuthContext';
 import { apiService } from '../services/api';
 import { DonVi, Personnel, ThietBi } from '../types';
 import { getUnitEmoji } from '../utils/hierarchy';
+import { formatCurrency, parseDateStrict } from '../utils/formatters';
 import { 
   Building2, MapPin, ChevronDown, ChevronRight, PanelLeftClose, PanelLeftOpen,
   Search, Loader2, Filter, LayoutDashboard, Users, MonitorSmartphone,
   Flame, AlertTriangle, Activity, Briefcase, BellRing, FileText, ShieldAlert, ShieldCheck, Video, Tag, Car
 } from 'lucide-react';
-
-// 🟢 1. BỘ XỬ LÝ NGÀY THÁNG BẤT TỬ
-const parseDateStrict = (val: any): Date | null => {
-  if (!val || val === 0 || val === '0') return null;
-  const d = new Date(val);
-  if (!isNaN(d.getTime()) && d.getFullYear() > 2000) return d;
-
-  const s = String(val).trim().toLowerCase();
-  const mVN = s.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
-  if (mVN) {
-    const d2 = new Date(parseInt(mVN[3], 10), parseInt(mVN[2], 10) - 1, parseInt(mVN[1], 10));
-    if (!isNaN(d2.getTime())) return d2;
-  }
-  
-  const numMatch = s.match(/\b(\d{5})\b/);
-  if (numMatch && Number(numMatch[1]) > 30000) {
-    return new Date((Number(numMatch[1]) - 25569) * 86400 * 1000);
-  }
-  return null;
-};
 
 // 🟢 2. THUẬT TOÁN TỰ ĐỘNG CỘNG THÁNG VÀO NGÀY BẮT ĐẦU
 const extractDateAndAddDuration = (durationRaw: any, startDateRaw: any): Date | null => {
@@ -50,14 +31,6 @@ const extractDateAndAddDuration = (durationRaw: any, startDateRaw: any): Date | 
     baseDate.setMonth(baseDate.getMonth() + monthsToAdd);
   }
   return baseDate;
-};
-
-// 🟢 3. HÀM ĐỊNH DẠNG TIỀN TỆ
-const formatCurrency = (val: any) => {
-  if (!val) return 'Chưa cập nhật';
-  const num = Number(String(val).replace(/[^0-9.-]+/g,""));
-  if (isNaN(num) || num === 0) return String(val);
-  return num.toLocaleString('vi-VN') + ' VNĐ';
 };
 
 export default function DashboardPage() {

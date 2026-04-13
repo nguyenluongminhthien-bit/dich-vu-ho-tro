@@ -59,9 +59,11 @@ export default function PersonnelPage() {
   const [selectedUnitFilter, setSelectedUnitFilter] = useState<string | null>(null);
   const [expandedParents, setExpandedParents] = useState<string[]>([]);
 
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [modalMode, setModalMode] = useState<'create' | 'update'>('create');
-  const [formData, setFormData] = useState<any>({});
+  const [modal, setModal] = useState<{
+    isOpen: boolean;
+    mode: 'create' | 'update';
+    formData: any;
+  }>({ isOpen: false, mode: 'create', formData: {} });
   
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [viewData, setViewData] = useState<any | null>(null);
@@ -82,6 +84,7 @@ export default function PersonnelPage() {
   const [rehireDate, setRehireDate] = useState(new Date().toISOString().split('T')[0]);
 
   const [copiedRole, setCopiedRole] = useState<string | null>(null);
+  const formData = modal.formData;
 
   const gplxGroups = [
     { title: 'Tùy chọn chung', options: [{ label: 'Không có', value: 'Không có' }] },
@@ -100,7 +103,7 @@ export default function PersonnelPage() {
       if (isChecked) { if (!currentArr.includes(value)) currentArr.push(value); } 
       else { currentArr = currentArr.filter((item: string) => item !== value); }
     }
-    setFormData({ ...formData, giay_phep_lai_xe: currentArr.join(', ') });
+    setModal(prev => ({ ...prev, formData: { ...prev.formData, giay_phep_lai_xe: currentArr.join(', ') } }));
   };
 
   const currentGPLXList = useMemo(() => {
@@ -269,32 +272,9 @@ export default function PersonnelPage() {
     });
   };
 
-  const openModal = (mode: 'create' | 'update', item?: any) => {
-    setModalMode(mode);
-    const defaultDonViId = user?.id_don_vi || (user as any)?.idDonVi;
-
-    if (item) { 
-      setFormData({ 
-        ...item, 
-        nam_sinh: item.nam_sinh ? item.nam_sinh.split('T')[0] : '', 
-        ngay_nhan_vien: item.ngay_nhan_vien ? item.ngay_nhan_vien.split('T')[0] : '', 
-        ngay_nghi_viec: item.ngay_nghi_viec ? item.ngay_nghi_viec.split('T')[0] : '', 
-        ngay_vao_lam_lai: item.ngay_vao_lam_lai ? item.ngay_vao_lam_lai.split('T')[0] : '',
-        sdt_cong_ty: formatPhoneNumber(item.sdt_cong_ty),
-        sdt_ca_nhan: formatPhoneNumber(item.sdt_ca_nhan) 
-      }); 
-    } 
-    else {
-      setFormData({
-        ma_so_nhan_vien: '', ho_ten: '', chuc_vu: '', sdt_cong_ty: '', sdt_ca_nhan: '', email: '', gioi_tinh: 'Nam', nam_sinh: '', ngay_nhan_vien: '', 
-        id_don_vi: selectedUnitFilter || (defaultDonViId !== 'ALL' ? defaultDonViId : ''), phan_loai: 'Lãnh đạo', trinh_do_hoc_van: '', thu_nhap: '', ngach_luong: '', mo_to_ngoai_hinh: '', ghi_chu: '', giay_phep_lai_xe: '',
-        hinh_anh: '',
-        cc_atvsld: false, cc_anbv: false, cc_pccc: false, cc_cnch: false, cc_so_cap_cuu: false, cc_cpr: false, 
-        cc_vo_thuat: false, cc_attp: false, cc_pha_che: false, cc_ngoai_ngu: false, cc_tin_hoc: false,
-        trang_thai: 'Đang làm việc'
-      });
-    }
-    setIsModalOpen(true); setError(null);
+    const openModal = (mode: 'create' | 'update', item?: any) => {
+    setModal({ isOpen: true, mode, formData: item ? { ...item } : {} });
+    setError(null);
   };
 
   const handleView = (item: any) => { 
@@ -303,10 +283,9 @@ export default function PersonnelPage() {
     setIsViewModalOpen(true); 
   };
 
-  const handleDuplicate = (item: any) => {
-    setModalMode('create');
-    setFormData({ ...item, id: '', chuc_vu: item.chuc_vu ? `${item.chuc_vu} (Kiêm nhiệm)` : 'Kiêm nhiệm', trang_thai: 'Đang làm việc', ngay_nghi_viec: '' });
-    setIsModalOpen(true); setError(null);
+    const handleDuplicate = (item: any) => {
+    setModal({ isOpen: true, mode: 'create', formData: { ...item, id: '', chuc_vu: item.chuc_vu ? `${item.chuc_vu} (Kiêm nhiệm)` : 'Kiêm nhiệm', trang_thai: 'Đang làm việc', ngay_nghi_viec: '' } });
+    setError(null);
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -336,14 +315,14 @@ export default function PersonnelPage() {
 
     setSubmitting(true); setError(null);
     try {
-      const response = await apiService.save(finalDataToSave, modalMode, "ns_dich_vu");
-      if (modalMode === 'create') {
+      const response = await apiService.save(finalDataToSave, modal.mode, "ns_dich_vu");
+      if (modal.mode === 'create') {
         finalDataToSave.id = response.id || response.newId || `NS-${Date.now()}`; 
         setData(prev => [...prev, finalDataToSave]); 
       } else {
         setData(prev => prev.map(item => item.id === finalDataToSave.id ? finalDataToSave : item));
       }
-      setIsModalOpen(false); 
+      setModal(prev => ({ ...prev, isOpen: false }));  
     } catch (err: any) { setError(err.message || 'Lỗi lưu dữ liệu.'); } 
     finally { setSubmitting(false); }
   };
@@ -465,7 +444,7 @@ export default function PersonnelPage() {
     const { name, type } = e.target;
     let value: string | boolean = type === 'checkbox' ? (e.target as HTMLInputElement).checked : e.target.value;
     if (name === 'thu_nhap') { value = (value as string).replace(/\D/g, ''); }
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setModal(prev => ({ ...prev, formData: { ...prev.formData, [name]: value } }));
   };
 
   const renderUnitTree = (parent: DonVi, level: number = 1) => {
@@ -917,12 +896,12 @@ export default function PersonnelPage() {
       )}
 
       {/* 🟢 MODAL THÊM MỚI / CHỈNH SỬA */}
-      {isModalOpen && (
+      {modal.isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl flex flex-col max-h-[90vh] animate-in fade-in zoom-in duration-200">
             <div className="flex justify-between items-center p-4 sm:p-5 border-b border-gray-100 bg-gray-50 rounded-t-2xl shrink-0">
-              <h3 className="text-xl font-bold text-[#05469B]">{modalMode === 'create' ? 'Thêm Hồ sơ' : 'Cập nhật Hồ sơ'}</h3>
-              <button onClick={() => setIsModalOpen(false)} disabled={submitting} className="text-gray-400 hover:text-red-500 rounded-full p-1.5 bg-white shadow-sm transition-colors"><X className="w-6 h-6" /></button>
+              <h3 className="text-xl font-bold text-[#05469B]">{modal.mode === 'create' ? 'Thêm Hồ sơ' : 'Cập nhật Hồ sơ'}</h3>
+              <button onClick={() => setModal(prev => ({ ...prev, isOpen: false }))} disabled={submitting} className="text-gray-400 hover:text-red-500 rounded-full p-1.5 bg-white shadow-sm transition-colors"><X className="w-6 h-6" /></button>
             </div>
             
             <form onSubmit={handleSave} className="p-4 sm:p-6 overflow-y-auto space-y-6 custom-scrollbar">
@@ -938,11 +917,11 @@ export default function PersonnelPage() {
                   <div><label className="block text-xs font-bold text-gray-700 mb-1">Năm sinh</label><input type="date" name="nam_sinh" value={formData.nam_sinh ? formData.nam_sinh.split('T')[0] : ''} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" /></div>
                   <div>
                     <label className="block text-xs font-bold text-[#05469B] mb-1">SĐT Công ty (Sim cấp)</label>
-                    <input type="tel" name="sdt_cong_ty" value={formData.sdt_cong_ty || ''} onChange={(e) => setFormData({...formData, sdt_cong_ty: formatPhoneNumber(e.target.value)})} maxLength={13} className="w-full p-2.5 border border-blue-300 rounded-lg bg-blue-50 outline-none focus:ring-2 focus:ring-[#05469B] font-bold tracking-wide text-[#05469B]" placeholder="09xx xxx xxx" />
+                    <input type="tel" name="sdt_cong_ty" value={formData.sdt_cong_ty || ''} onChange={(e) => setModal(prev => ({ ...prev, formData: {...prev.formData, sdt_cong_ty: formatPhoneNumber(e.target.value)} }))} maxLength={13} className="w-full p-2.5 border border-blue-300 rounded-lg bg-blue-50 outline-none focus:ring-2 focus:ring-[#05469B] font-bold tracking-wide text-[#05469B]" placeholder="09xx xxx xxx" />
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-gray-700 mb-1">SĐT Cá nhân</label>
-                    <input type="tel" name="sdt_ca_nhan" value={formData.sdt_ca_nhan || ''} onChange={(e) => setFormData({...formData, sdt_ca_nhan: formatPhoneNumber(e.target.value)})} maxLength={13} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-bold tracking-wide" placeholder="09xx xxx xxx" />
+                    <input type="tel" name="sdt_ca_nhan" value={formData.sdt_ca_nhan || ''} onChange={(e) => setModal(prev => ({ ...prev, formData: {...prev.formData, sdt_ca_nhan: formatPhoneNumber(e.target.value)} }))} maxLength={13} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-bold tracking-wide" placeholder="09xx xxx xxx" />
                   </div>
                   <div className="md:col-span-1"><label className="block text-xs font-bold text-gray-700 mb-1">Email</label><input type="email" name="email" value={formData.email || ''} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" /></div>
                   
@@ -1094,7 +1073,7 @@ export default function PersonnelPage() {
               </div>
 
               <div className="pt-4 sm:pt-5 border-t border-gray-100 flex justify-end gap-3 mt-6 sm:mt-8">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="w-full sm:w-auto px-8 py-3 bg-gray-100 text-gray-700 hover:bg-gray-200 rounded-xl font-bold transition-colors">Hủy</button>
+                <button type="button" onClick={() => setModal(prev => ({ ...prev, isOpen: false }))} className="w-full sm:w-auto px-8 py-3 bg-gray-100 text-gray-700 hover:bg-gray-200 rounded-xl font-bold transition-colors">Hủy</button>
                 <button type="submit" disabled={submitting} className="w-full sm:w-auto px-8 py-3 text-white bg-[#05469B] hover:bg-[#04367a] rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg transition-colors">{submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />} Lưu Dữ Liệu</button>
               </div>
             </form>

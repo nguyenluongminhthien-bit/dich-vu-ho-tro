@@ -248,7 +248,6 @@ export interface NhatKyThietBi {
   id_don_vi: string;
   ngay_ghi_nhan: string;
   loai_nhat_ky: string;
-  chi_phi: string;
   msnv_nguoi_dung: string;
   ho_ten_nguoi_dung: string;
   bp_quan_ly_su_dung: string;

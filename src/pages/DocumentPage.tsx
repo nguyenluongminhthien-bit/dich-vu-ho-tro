@@ -106,7 +106,6 @@ export default function DocumentPage() {
     'Phạm Đăng Châu',
     'Đàm Đình Thông',
     'Nguyễn Thiện Mỹ',
-    'Nguyễn Thiện M���',
   ];
 
   // TẠO DANH SÁCH GỢI Ý TỪ LỊCH SỬ NHẬP LIỆU (ĐÃ LỌC BLACKLIST)

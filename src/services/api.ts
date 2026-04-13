@@ -1,9 +1,23 @@
 import { Personnel, DonVi, User, SysLog } from '../types';
+
+const TABLE_MAP: Record<string, string> = {
+  'DM_Donvi': 'dm_don_vi',
+  'PhapNhan': 'dm_phap_nhan',
+  'PhongHop': 'dm_phong_hop',
+  'HS_AnNinh': 'hs_an_ninh',
+  'HS_PVHC': 'hs_pvhc',
+  'HS_PCCC': 'hs_pccc',
+  'TS_PCCC': 'ts_pccc',
+  'HS_ATVSLD': 'hs_an_toan_lao_dong',
+  'HS_PCTT': 'hs_pctt'
+};
+const resolveTable = (name: string) => TABLE_MAP[name] || name.toLowerCase();
+
 // ===============================================
 // 1. CẤU HÌNH KẾT NỐI SUPABASE
 // ===============================================
-const SUPABASE_URL = "https://eizpyrhqshkhcghkupjy.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVpenB5cmhxc2hraGNnaGt1cGp5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUzNzUyNTcsImV4cCI6MjA5MDk1MTI1N30.Whb7fJVbGMeCPN0M07BchRFvHtIiH5ZTSCeSu2l4RPc";
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
 
 // Header chuẩn để nói chuyện với Supabase
 const HEADERS = {
@@ -126,18 +140,7 @@ export const apiService = {
   // ===============================================
   save: async (data: any, action: 'create' | 'update', tableName: string) => {
     // 💡 Tự động Đổi tên bảng cũ sang tên bảng Supabase (chuẩn snake_case)
-    const tableMap: Record<string, string> = {
-      'DM_Donvi': 'dm_don_vi',
-      'PhapNhan': 'dm_phap_nhan',
-      'PhongHop': 'dm_phong_hop',
-      'HS_AnNinh': 'hs_an_ninh',
-      'HS_PVHC': 'hs_pvhc',
-      'HS_PCCC': 'hs_pccc',
-      'TS_PCCC': 'ts_pccc',
-      'HS_ATVSLD': 'hs_an_toan_lao_dong',
-      'HS_PCTT': 'hs_pctt'
-    };
-    const realTableName = tableMap[tableName] || tableName.toLowerCase();
+      const realTableName = resolveTable(tableName);
 
     // Xử lý lưu nhiều dòng (Mảng)
     if (Array.isArray(data)) {
@@ -219,18 +222,7 @@ export const apiService = {
   // ===============================================
   delete: async (id: string, tableName: string) => {
     // 💡 Tự động Đổi tên bảng cũ
-    const tableMap: Record<string, string> = {
-      'DM_Donvi': 'dm_don_vi',
-      'PhapNhan': 'dm_phap_nhan',
-      'PhongHop': 'dm_phong_hop',
-      'HS_AnNinh': 'hs_an_ninh',
-      'HS_PVHC': 'hs_pvhc',
-      'HS_PCCC': 'hs_pccc',
-      'TS_PCCC': 'ts_pccc',
-      'HS_ATVSLD': 'hs_an_toan_lao_dong',
-      'HS_PCTT': 'hs_pctt'
-    };
-    const realTableName = tableMap[tableName] || tableName.toLowerCase();
+      const realTableName = resolveTable(tableName);
 
     const response = await fetch(`${SUPABASE_URL}/rest/v1/${realTableName}?id=eq.${id}`, {
       method: 'DELETE', 

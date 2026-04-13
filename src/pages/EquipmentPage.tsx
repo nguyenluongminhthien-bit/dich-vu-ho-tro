@@ -9,11 +9,7 @@ import { apiService } from '../services/api';
 import { DonVi, ThietBi, NhatKyThietBi, Personnel } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { buildHierarchicalOptions, getUnitEmoji } from '../utils/hierarchy'; 
-
-const formatCurrency = (val: string | number | undefined | null) => {
-  if (!val) return '';
-  return val.toString().replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, " ");
-};
+import { formatCurrency } from '../utils/formatters';
 
 // --- DANH SÁCH NHÓM TÀI SẢN CHUẨN ---
 const ASSET_GROUPS = [
