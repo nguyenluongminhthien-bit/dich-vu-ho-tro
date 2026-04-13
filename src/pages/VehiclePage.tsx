@@ -68,21 +68,33 @@ export default function VehiclePage() {
   const [selectedUnitFilter, setSelectedUnitFilter] = useState<string | null>(null);
   const [expandedParents, setExpandedParents] = useState<string[]>([]);
 
-  const [isCarModalOpen, setIsCarModalOpen] = useState(false);
-  const [modalMode, setModalMode] = useState<'create' | 'update'>('create');
-  const [carFormData, setCarFormData] = useState<Partial<TS_Xe>>({});
   const [plateError, setPlateError] = useState(false);
-
-  const [isCostModalOpen, setIsCostModalOpen] = useState(false);
   const [selectedCarForCost, setSelectedCarForCost] = useState<TS_Xe | null>(null);
-  const [costFormData, setCostFormData] = useState<any>({});
-  const [costModalMode, setCostModalMode] = useState<'create' | 'update'>('create');
+
+  const [carModal, setCarModal] = useState<{
+    isOpen: boolean; mode: 'create' | 'update'; formData: Partial<TS_Xe>;
+  }>({ isOpen: false, mode: 'create', formData: {} });
+
+  const [costModal, setCostModal] = useState<{
+    isOpen: boolean; mode: 'create' | 'update'; formData: any;
+  }>({ isOpen: false, mode: 'create', formData: {} });
 
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [viewData, setViewData] = useState<TS_Xe | null>(null);
 
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<{id: string, type: 'xe' | 'chiphi'} | null>(null);
+
+    // Shorthand — giữ tên cũ để không cần đổi hàng trăm chỗ
+  const isCarModalOpen  = carModal.isOpen;
+  const modalMode       = carModal.mode;
+  const carFormData     = carModal.formData;
+  const setCarFormData  = (d: any) => setCarModal(p => ({ ...p, formData: typeof d === 'function' ? d(p.formData) : d }));
+
+  const isCostModalOpen  = costModal.isOpen;
+  const costModalMode    = costModal.mode;
+  const costFormData     = costModal.formData;
+  const setCostFormData  = (d: any) => setCostModal(p => ({ ...p, formData: typeof d === 'function' ? d(p.formData) : d }));
 
   const loadData = async () => {
     setLoading(true); setError(null);
@@ -195,7 +207,7 @@ export default function VehiclePage() {
   }, [selectedUnitFilter, donViList]);
 
   const openCarModal = (mode: 'create' | 'update', item?: TS_Xe) => {
-    setModalMode(mode); setPlateError(false);
+    setCarModal(prev => ({ ...prev, mode })); setPlateError(false);
     const defaultDonViId = user?.id_don_vi || (user as any)?.idDonVi;
     if (item) { setCarFormData({ ...item }); } 
     else {
@@ -205,7 +217,7 @@ export default function VehiclePage() {
         so_cho: '', loai_nhien_lieu: 'Xăng', dung_tich: '', cong_thuc_banh: '', hinh_thuc_so_huu: 'Sở hữu', gps: 'Có', hien_trang: 'Đang hoạt động', ghi_chu: ''
       });
     }
-    setIsCarModalOpen(true); setError(null);
+    setCarModal(prev => ({ ...prev, isOpen: true })); setError(null);
   };
 
   // 1. CẬP NHẬT HÀM LƯU XE CHÍNH
@@ -231,7 +243,7 @@ export default function VehiclePage() {
       if (modalMode === 'create') setXeData(prev => [newCar, ...prev]);
       else setXeData(prev => prev.map(item => item.id === savedId ? newCar : item));
       
-      setIsCarModalOpen(false); 
+      setCarModal(prev => ({ ...prev, isOpen: false })); 
     } catch (err: any) { setError(err.message || 'Lỗi lưu dữ liệu Xe.'); } 
     finally { setSubmitting(false); }
   };
@@ -261,16 +273,16 @@ export default function VehiclePage() {
   }, [chiPhiData, viewData]);
 
   const openCostModal = (car: TS_Xe) => {
-    setSelectedCarForCost(car); setCostModalMode('create');
+    setSelectedCarForCost(car); setCostModal(prev => ({ ...prev, mode: 'create' }));
     setCostFormData({
       id: '', thang_nam: new Date().toISOString().slice(0, 7), id_ts_xe: car.id, id_don_vi: car.id_don_vi, 
       km_hien_tai: '', so_lit_nhien_lieu: '', cp_nhien_lieu: '', cp_cau_duong_ben_bai: '', cp_rua_xe: '', cp_bao_duong_sua_chua: '', cp_thue_khau_hao: '', ghi_chu: ''
     });
-    setIsCostModalOpen(true);
+    setCostModal(prev => ({ ...prev, isOpen: true }));
   };
 
   const editCost = (cost: any) => {
-    setCostModalMode('update');
+    setCostModal(prev => ({ ...prev, mode: 'update' }));
     setCostFormData({ ...cost, id: getCostId(cost), id_ts_xe: getCostCarId(cost), id_don_vi: cost.id_don_vi || selectedCarForCost?.id_don_vi || '' });
   };
 
@@ -328,7 +340,7 @@ export default function VehiclePage() {
       }
       
       // Reset form sau khi lưu
-      setCostModalMode('create');
+      setCostModal(prev => ({ ...prev, mode: 'create' }));
       setCostFormData({
         id: '', thang_nam: costFormData.thang_nam, id_ts_xe: selectedCarForCost?.id || '', id_don_vi: selectedCarForCost?.id_don_vi || '', 
         km_hien_tai: '', so_lit_nhien_lieu: '', cp_nhien_lieu: '', cp_cau_duong_ben_bai: '', cp_rua_xe: '', cp_bao_duong_sua_chua: '', cp_thue_khau_hao: '', ghi_chu: ''
@@ -534,7 +546,7 @@ export default function VehiclePage() {
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl flex flex-col max-h-[90vh] animate-in fade-in zoom-in duration-200">
             <div className="flex justify-between p-5 border-b border-gray-100 bg-gray-50 rounded-t-2xl shrink-0">
               <h3 className="text-xl font-bold text-[#05469B] flex items-center gap-2"><Car size={24}/> {modalMode === 'create' ? 'Thêm Xe Mới' : 'Cập nhật Thông tin Xe'}</h3>
-              <button onClick={() => setIsCarModalOpen(false)} disabled={submitting} className="text-gray-400 hover:text-red-500 rounded-full p-1.5 bg-white shadow-sm transition-colors"><X className="w-6 h-6" /></button>
+              <button onClick={() => setCarModal(prev => ({ ...prev, isOpen: false }))} disabled={submitting} className="text-gray-400 hover:text-red-500 rounded-full p-1.5 bg-white shadow-sm transition-colors"><X className="w-6 h-6" /></button>
             </div>
             
             <form onSubmit={handleCarSave} className="p-6 overflow-y-auto space-y-6 flex-1 min-h-0">
@@ -648,7 +660,7 @@ export default function VehiclePage() {
               </div>
 
               <div className="pt-5 border-t border-gray-100 flex justify-end gap-3 mt-8 shrink-0">
-                <button type="button" onClick={() => setIsCarModalOpen(false)} className="px-8 py-3 bg-gray-100 text-gray-700 hover:bg-gray-200 rounded-xl font-bold transition-colors">Hủy</button>
+                <button type="button" onClick={() => setCarModal(prev => ({ ...prev, isOpen: false }))} className="px-8 py-3 bg-gray-100 text-gray-700 hover:bg-gray-200 rounded-xl font-bold transition-colors">Hủy</button>
                 <button type="submit" disabled={submitting} className="px-8 py-3 text-white bg-[#05469B] hover:bg-[#04367a] rounded-xl font-bold flex items-center gap-2 shadow-lg transition-colors">{submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />} Lưu Hồ Sơ Xe</button>
               </div>
             </form>
@@ -867,7 +879,7 @@ export default function VehiclePage() {
       {/* --- MODAL CHI PHÍ HOẠT ĐỘNG --- */}
       {isCostModalOpen && selectedCarForCost && (
         <div className="fixed inset-0 z-50 flex items-center justify-end bg-black/60 backdrop-blur-sm">
-          <div className="absolute inset-0" onClick={() => setIsCostModalOpen(false)}></div>
+          <div className="absolute inset-0" onClick={() => setCostModal(prev => ({ ...prev, isOpen: false }))}></div>
           <div className="bg-white shadow-2xl w-full max-w-md md:max-w-xl h-full flex flex-col animate-in slide-in-from-right duration-300 relative z-10">
             
             {/* HEADER CHI TIẾT */}
@@ -886,7 +898,7 @@ export default function VehiclePage() {
                   <span className={`${selectedCarForCost.hien_trang === 'Đang hoạt động' ? 'text-emerald-300' : 'text-red-300'}`}>{selectedCarForCost.hien_trang}</span>
                 </p>
               </div>
-              <button onClick={() => setIsCostModalOpen(false)} className="text-indigo-200 hover:text-white bg-indigo-700/50 hover:bg-indigo-700 p-2 rounded-full transition-colors mt-1 shrink-0"><X size={20}/></button>
+              <button onClick={() => setCostModal(prev => ({ ...prev, isOpen: false }))} className="text-indigo-200 hover:text-white bg-indigo-700/50 hover:bg-indigo-700 p-2 rounded-full transition-colors mt-1 shrink-0"><X size={20}/></button>
             </div>
 
             <div className="flex-1 overflow-y-auto bg-gray-50 flex flex-col min-h-0">
@@ -894,7 +906,7 @@ export default function VehiclePage() {
                 <div className="flex justify-between items-center mb-4">
                   <h4 className="font-bold text-gray-800 text-sm uppercase tracking-wider flex items-center gap-1.5"><Calendar size={16} className="text-indigo-600"/> {costModalMode === 'create' ? 'Khai báo tháng mới' : 'Cập nhật tháng'}</h4>
                   {costModalMode === 'update' && (
-                    <button onClick={() => {setCostModalMode('create'); setCostFormData({id: '', thang_nam: new Date().toISOString().slice(0, 7), id_ts_xe: selectedCarForCost.id, id_don_vi: selectedCarForCost.id_don_vi, km_hien_tai: '', so_lit_nhien_lieu: '', cp_nhien_lieu: '', cp_cau_duong_ben_bai: '', cp_rua_xe: '', cp_bao_duong_sua_chua: '', cp_thue_khau_hao: '', ghi_chu: ''})}} className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1"><Plus size={14}/> Thêm mới</button>
+                    <button onClick={() => {setCostModal(prev => ({ ...prev, mode: 'create' })); setCostFormData({id: '', thang_nam: new Date().toISOString().slice(0, 7), id_ts_xe: selectedCarForCost.id, id_don_vi: selectedCarForCost.id_don_vi, km_hien_tai: '', so_lit_nhien_lieu: '', cp_nhien_lieu: '', cp_cau_duong_ben_bai: '', cp_rua_xe: '', cp_bao_duong_sua_chua: '', cp_thue_khau_hao: '', ghi_chu: ''})}} className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1"><Plus size={14}/> Thêm mới</button>
                   )}
                 </div>
                 <form onSubmit={handleCostSave} className="space-y-4">
