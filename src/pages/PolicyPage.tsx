@@ -4,13 +4,12 @@ import {
   BookOpen, Link as LinkIcon, Calendar, Eye, Bookmark, Briefcase, Filter, Info, CheckCircle2
 } from 'lucide-react';
 import { apiService } from '../services/api';
-import { QuyDinhQuyTrinh, VB_TB } from '../types'; // Cập nhật import chuẩn
+import { QuyDinhQuyTrinh, VB_TB } from '../types'; 
 import { useAuth } from '../contexts/AuthContext';
 
-// Mở rộng interface để thêm cờ đánh dấu tài liệu mượn từ bảng Văn bản
 interface PolicyItem extends QuyDinhQuyTrinh {
   isFromVB?: boolean;
-  hieu_luc?: string; // Thêm trường hiệu lực
+  hieu_luc?: string; 
 }
 
 export default function PolicyPage() {
@@ -42,38 +41,32 @@ export default function PolicyPage() {
   const loadData = async () => {
     setLoading(true); setError(null);
     try {
-      // Fetch đồng thời cả Quy định (qd_qt) và Văn bản (vb_tb)
       const [qdResult, vbResult] = await Promise.all([
         apiService.getQuyDinh().catch(() => [] as QuyDinhQuyTrinh[]),
         apiService.getVanBan().catch(() => [] as VB_TB[]) 
       ]);
 
-      // 1. Dữ liệu gốc của Quy định
       const mappedQd: PolicyItem[] = (qdResult || []).map((item: any) => ({
         ...item,
         isFromVB: false
       }));
 
-      // 2. Lọc & Chuyển đổi dữ liệu từ Văn bản (Chỉ lấy VB có điền Nghiệp vụ)
       const mappedVb: PolicyItem[] = (vbResult || [])
         .filter((item: any) => item.nghiep_vu && item.nghiep_vu.trim() !== '')
         .map((item: any) => ({
-          id: item.id, // Dùng chung ID cho List Key
+          id: item.id, 
           phan_loai: item.phan_loai,
           so_hieu: item.so_hieu,
           ngay_ban_hanh: item.ngay_ban_hanh,
           tieu_de: item.tieu_de,
           noi_dung: item.noi_dung,
           nghiep_vu: item.nghiep_vu,
-          link_file: item.link_file_dinh_kem,
-          hieu_luc: item.hieu_luc || 'Còn hiệu lực', // Lấy hiệu lực từ VB nếu có
-          isFromVB: true // Đánh dấu là mượn từ VB
+          link_vb: item.link_vb_dinh_kem,
+          hieu_luc: item.hieu_luc || 'Còn hiệu lực', 
+          isFromVB: true 
         }));
 
-      // 3. Gộp 2 mảng lại
       const combinedData = [...mappedQd, ...mappedVb];
-      
-      // Sort theo ngày ban hành mới nhất
       combinedData.sort((a, b) => new Date(b.ngay_ban_hanh || 0).getTime() - new Date(a.ngay_ban_hanh || 0).getTime());
 
       setQdData(combinedData);
@@ -86,19 +79,16 @@ export default function PolicyPage() {
 
   useEffect(() => { loadData(); }, []);
 
-  // TỰ ĐỘNG LẤY DANH SÁCH NGHIỆP VỤ ĐỂ LÀM MENU BÊN TRÁI
   const uniqueNghiepvu = useMemo(() => {
     const list = qdData.map(item => item.nghiep_vu).filter(Boolean);
     return Array.from(new Set(list)).sort();
   }, [qdData]);
 
-  // GỢI Ý CHO PHÂN LOẠI (AUTOCOMPLETE)
   const uniquePhanloai = useMemo(() => {
     const list = qdData.map(item => item.phan_loai).filter(Boolean);
     return Array.from(new Set(list)).sort();
   }, [qdData]);
 
-  // LỌC DỮ LIỆU BẢNG
   const filteredDocs = useMemo(() => {
     let result = qdData;
     
@@ -126,8 +116,8 @@ export default function PolicyPage() {
       setFormData({
         id: '', phan_loai: 'Quy trình', so_hieu: '', 
         ngay_ban_hanh: new Date().toISOString().split('T')[0], 
-        tieu_de: '', noi_dung: '', nghiep_vu: selectedNghiepvu || '', link_file: '',
-        hieu_luc: 'Còn hiệu lực' // Mặc định khi tạo mới
+        tieu_de: '', noi_dung: '', nghiep_vu: selectedNghiepvu || '', link_vb: '',
+        hieu_luc: 'Còn hiệu lực'
       });
     }
     setIsModalOpen(true); setError(null);
@@ -139,12 +129,16 @@ export default function PolicyPage() {
     
     setSubmitting(true); setError(null);
     try {
-      const response = await apiService.save(formData, modalMode, "qd_qt");
+      // 🟢 XÓA TRƯỜNG DỮ LIỆU FRONTEND TRƯỚC KHI GỬI LÊN SUPABASE
+      const dataToSave = { ...formData };
+      delete dataToSave.isFromVB; 
+
+      const response = await apiService.save(dataToSave, modalMode, "qd_qt");
       if (modalMode === 'create') {
-        const newItem = { ...formData, id: response.id || response.newId || `QD-${Date.now()}`, isFromVB: false } as PolicyItem;
+        const newItem = { ...dataToSave, id: response.id || response.newId || `QD-${Date.now()}`, isFromVB: false } as PolicyItem;
         setQdData(prev => [newItem, ...prev]); 
       } else {
-        setQdData(prev => prev.map(item => item.id === formData.id ? { ...formData, isFromVB: false } as PolicyItem : item));
+        setQdData(prev => prev.map(item => item.id === dataToSave.id ? { ...dataToSave, isFromVB: false } as PolicyItem : item));
       }
       setIsModalOpen(false); 
     } catch (err: any) { 
@@ -173,21 +167,18 @@ export default function PolicyPage() {
     }
   };
 
-  // Hàm xử lý cảnh báo khi click Sửa/Xóa vào tài liệu từ Văn Bản
   const handleBlockedAction = (action: 'Sửa' | 'Xóa') => {
     alert(`Đây là tài liệu được đồng bộ từ mục "Văn bản - Thông báo".\n\nVui lòng sang mục Văn bản để ${action} tài liệu này!`);
   };
 
   return (
     <div className="flex h-full bg-[#f4f7f9] overflow-hidden relative">
-      {/* NÚT MỞ RỘNG CỘT TRÁI NẾU BỊ ẨN */}
       {isListCollapsed && (
         <button onClick={() => setIsListCollapsed(false)} className="absolute top-6 left-6 z-20 bg-white p-2.5 rounded-lg shadow-md border border-gray-200 text-[#05469B] hover:bg-blue-50 transition-all">
           <Filter size={20} />
         </button>
       )}
 
-      {/* CỘT TRÁI: NHÓM THEO NGHIỆP VỤ */}
       <div className={`${isListCollapsed ? 'w-0 opacity-0' : 'w-72 opacity-100'} transition-all duration-300 ease-in-out bg-white border-r border-gray-200 flex flex-col h-full shadow-sm z-10 shrink-0 overflow-hidden`}>
         <div className="p-4 border-b border-gray-100">
           <div className="flex justify-between items-center mb-2">
@@ -215,7 +206,6 @@ export default function PolicyPage() {
                     <Briefcase size={16} className={`shrink-0 ${selectedNghiepvu === nv ? 'text-[#05469B]' : 'text-gray-400'}`} />
                     <span className="truncate">{nv}</span>
                   </div>
-                  {/* Hiển thị số lượng bên cạnh */}
                   <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${selectedNghiepvu === nv ? 'bg-[#05469B] text-white' : 'bg-gray-100 text-gray-500'}`}>
                     {qdData.filter(d => d.nghiep_vu === nv).length}
                   </span>
@@ -226,7 +216,6 @@ export default function PolicyPage() {
         </div>
       </div>
 
-      {/* CỘT PHẢI: BẢNG DỮ LIỆU */}
       <div className="flex-1 overflow-y-auto p-4 sm:p-6 relative transition-all duration-300">
         <div className={`flex flex-col sm:flex-row justify-between items-center mb-6 gap-4 transition-all duration-300 ${isListCollapsed ? 'pl-10' : ''}`}>
           <div>
@@ -266,40 +255,34 @@ export default function PolicyPage() {
                   filteredDocs.map((item) => (
                     <tr key={item.id} className="hover:bg-blue-50/50 transition-colors group">
                       
-                      {/* CỘT 1: SỐ HIỆU / PHÂN LOẠI */}
                       <td className="p-4">
                         <span className="font-black text-[#05469B] bg-blue-50 px-2 py-1 rounded text-sm whitespace-nowrap border border-blue-100">{item.so_hieu}</span>
                         <div className="mt-2 flex flex-col items-start gap-1">
                           <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded uppercase border border-emerald-100">{item.phan_loai}</span>
-                          {/* HIỂN THỊ LABEL NẾU ĐỒNG BỘ TỪ VĂN BẢN */}
                           {item.isFromVB && (
                             <span className="text-[9px] font-bold text-orange-600 flex items-center gap-1 mt-0.5"><LinkIcon size={10}/> Từ Văn bản</span>
                           )}
                         </div>
                       </td>
 
-                      {/* CỘT 2: NGÀY BAN HÀNH */}
                       <td className="p-4 text-sm font-medium text-gray-700 flex flex-col gap-1.5 mt-3">
                         <span className="flex items-center gap-1.5"><Calendar size={14} className="text-gray-400"/> {item.ngay_ban_hanh ? new Date(item.ngay_ban_hanh).toLocaleDateString('vi-VN') : '-'}</span>
                       </td>
 
-                      {/* CỘT 3: TIÊU ĐỀ & TRÍCH YẾU */}
                       <td className="p-4">
                         <p className="font-bold text-gray-800 text-base mb-1">{item.tieu_de}</p>
                         <p className="text-xs text-gray-500 line-clamp-2 mb-2">{item.noi_dung}</p>
-                        {item.link_file && (
-                          <a href={item.link_file} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-bold text-blue-600 hover:underline hover:text-blue-800 bg-blue-50 px-2 py-1 rounded border border-blue-100">
+                        {item.link_vb && (
+                          <a href={item.link_vb} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-bold text-blue-600 hover:underline hover:text-blue-800 bg-blue-50 px-2 py-1 rounded border border-blue-100">
                             <LinkIcon size={12}/> Mở tài liệu
                           </a>
                         )}
                       </td>
 
-                      {/* CỘT 4: NGHIỆP VỤ */}
                       <td className="p-4">
                         <span className="px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-md text-xs font-bold border border-indigo-100">{item.nghiep_vu}</span>
                       </td>
 
-                      {/* 🟢 CỘT 5: HIỆU LỰC (Đã chuyển xuống đây) */}
                       <td className="p-4 text-center">
                         <span className={`text-[10px] font-bold px-2.5 py-1 rounded-md uppercase border inline-flex items-center justify-center gap-1 w-full max-w-[120px] mx-auto ${
                           item.hieu_luc === 'Hết hiệu lực' ? 'bg-red-50 text-red-600 border-red-200' : 
@@ -311,7 +294,6 @@ export default function PolicyPage() {
                         </span>
                       </td>
 
-                      {/* CỘT 6: THAO TÁC */}
                       <td className="p-4">
                         <div className="flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity w-full max-w-[100px] mx-auto">
                           <button onClick={() => { setViewData(item); setIsViewModalOpen(true); }} className="w-full py-1.5 bg-white border border-emerald-200 text-emerald-600 hover:bg-emerald-50 rounded text-xs font-bold transition-colors flex items-center justify-center gap-1.5 shadow-sm">
@@ -342,11 +324,9 @@ export default function PolicyPage() {
         </div>
       </div>
 
-      {/* --- DATALISTS (GỢI Ý TỰ ĐỘNG) --- */}
       <datalist id="suggest-nghiepvu">{uniqueNghiepvu.map(v => <option key={v} value={v} />)}</datalist>
       <datalist id="suggest-phanloai">{uniquePhanloai.map(v => <option key={v} value={v} />)}</datalist>
 
-      {/* MODAL THÊM / SỬA */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl flex flex-col max-h-[90vh] animate-in fade-in zoom-in duration-200">
@@ -357,7 +337,6 @@ export default function PolicyPage() {
             
             <form onSubmit={handleSave} className="p-6 overflow-y-auto space-y-6">
               
-              {/* KHỐI 1: THÔNG TIN HÀNH CHÍNH */}
               <div className="bg-blue-50/40 p-5 rounded-xl border border-blue-100">
                 <h4 className="font-bold text-[#05469B] mb-4 flex items-center gap-2"><div className="w-2 h-6 bg-[#05469B] rounded-full"></div> Phân loại & Hệ thống</h4>
                 <div className="grid grid-cols-1 md:grid-cols-5 gap-5">
@@ -373,7 +352,6 @@ export default function PolicyPage() {
                     <label className="block text-xs font-bold text-gray-700 mb-1">Ngày ban hành *</label>
                     <input type="date" required name="ngay_ban_hanh" value={formData.ngay_ban_hanh || ''} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-bold" />
                   </div>
-                  {/* Ô CHỌN HIỆU LỰC TÀI LIỆU */}
                   <div>
                     <label className="block text-xs font-bold text-gray-700 mb-1">Hiệu lực</label>
                     <select 
@@ -390,7 +368,6 @@ export default function PolicyPage() {
                 </div>
               </div>
 
-              {/* KHỐI 2: NỘI DUNG */}
               <div className="bg-gray-50 p-5 rounded-xl border border-gray-200">
                 <h4 className="font-bold text-gray-800 mb-4 flex items-center gap-2"><div className="w-2 h-6 bg-gray-400 rounded-full"></div> Nội dung Tài liệu</h4>
                 <div className="space-y-4">
@@ -412,7 +389,7 @@ export default function PolicyPage() {
                     <label className="block text-xs font-bold text-gray-700 mb-1">Link File đính kèm (PDF / Drive) *</label>
                     <div className="relative">
                       <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-                      <input type="url" required name="link_file" value={formData.link_file || ''} onChange={handleInputChange} className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] text-blue-600 font-medium" placeholder="Dán link văn bản gốc vào đây..." />
+                      <input type="url" required name="link_vb" value={formData.link_vb || ''} onChange={handleInputChange} className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] text-blue-600 font-medium" placeholder="Dán link văn bản gốc vào đây..." />
                     </div>
                   </div>
                 </div>
@@ -427,7 +404,6 @@ export default function PolicyPage() {
         </div>
       )}
 
-      {/* MODAL XEM CHI TIẾT (VIEW ONLY) */}
       {isViewModalOpen && viewData && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl flex flex-col max-h-[90vh] animate-in fade-in zoom-in duration-200">
@@ -436,7 +412,6 @@ export default function PolicyPage() {
               <button onClick={() => setIsViewModalOpen(false)} className="text-blue-200 hover:text-white rounded-full p-1 transition-colors"><X className="w-6 h-6" /></button>
             </div>
             <div className="p-6 overflow-y-auto">
-              {/* LABEL BÁO TÀI LIỆU ĐỒNG BỘ */}
               {viewData.isFromVB && (
                 <div className="mb-4 bg-orange-50 border border-orange-200 p-3 rounded-lg flex items-start gap-2">
                   <Info size={16} className="text-orange-500 mt-0.5 shrink-0" />
@@ -450,7 +425,6 @@ export default function PolicyPage() {
                   <span className="bg-emerald-100 text-emerald-700 font-bold px-2 py-1 rounded text-xs uppercase border border-emerald-200">{viewData.phan_loai}</span>
                   <span className="bg-indigo-100 text-indigo-700 font-bold px-2 py-1 rounded text-xs uppercase border border-indigo-200 flex items-center gap-1"><Briefcase size={12}/> {viewData.nghiep_vu}</span>
                   
-                  {/* HIỂN THỊ TRẠNG THÁI HIỆU LỰC */}
                   <span className={`font-bold px-2 py-1 rounded text-xs uppercase border flex items-center gap-1 ${
                     viewData.hieu_luc === 'Hết hiệu lực' ? 'bg-red-100 text-red-700 border-red-200' :
                     viewData.hieu_luc === 'Sắp có hiệu lực' ? 'bg-orange-100 text-orange-700 border-orange-200' :
@@ -468,8 +442,8 @@ export default function PolicyPage() {
               </div>
 
               <div className="flex flex-col gap-3">
-                {viewData.link_file ? (
-                  <a href={viewData.link_file} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-2 py-3 bg-[#05469B] hover:bg-[#04367a] text-white rounded-xl font-bold transition-colors shadow-md">
+                {viewData.link_vb ? (
+                  <a href={viewData.link_vb} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-2 py-3 bg-[#05469B] hover:bg-[#04367a] text-white rounded-xl font-bold transition-colors shadow-md">
                     <LinkIcon size={18}/> Đọc Tài Liệu Gốc
                   </a>
                 ) : (
@@ -483,7 +457,6 @@ export default function PolicyPage() {
         </div>
       )}
 
-      {/* XÁC NHẬN XÓA */}
       {isConfirmOpen && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-sm text-center animate-in zoom-in duration-200">
