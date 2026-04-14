@@ -273,7 +273,19 @@ export default function PersonnelPage() {
   };
 
     const openModal = (mode: 'create' | 'update', item?: any) => {
-    setModal({ isOpen: true, mode, formData: item ? { ...item } : {} });
+    if (item) {
+      // Chỉnh sửa: Nạp dữ liệu cũ
+      setModal({ isOpen: true, mode, formData: { ...item } });
+    } else {
+      // Thêm mới: TỰ ĐỘNG GÁN ĐƠN VỊ HIỆN TẠI (Nếu đang chọn trong Menu)
+      setModal({ 
+        isOpen: true, 
+        mode, 
+        formData: { 
+          id_don_vi: selectedUnitFilter || '' // ĐIỂM CẬP NHẬT Ở ĐÂY
+        } 
+      });
+    }
     setError(null);
   };
 
