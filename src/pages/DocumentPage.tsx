@@ -1,5 +1,5 @@
 import { buildHierarchicalOptions, getUnitEmoji } from '../utils/hierarchy';
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Search, Plus, Edit, Trash2, X, AlertCircle, Loader2, Save, 
   FileText, Building2, MapPin, ChevronDown, ChevronRight, PanelLeftClose, PanelLeftOpen,
@@ -25,6 +25,66 @@ const getNoiGuiNhanLabel = (phanLoai: string) => {
     case 'Thông báo': return 'Nơi nhận Thông báo';
     default: return 'Nơi nhận / Gửi';
   }
+};
+
+// COMPONENT AUTOCOMPLETE TÙY CHỈNH (HỖ TRỢ NÚT XÓA)
+const CustomAutocomplete = ({ name, value, onChange, placeholder, suggestions, onRemove, className }: any) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const filtered = suggestions.filter((s: string) => s.toLowerCase().includes((value || '').toLowerCase()));
+
+  return (
+    <div className="relative w-full" ref={wrapperRef}>
+      <input
+        type="text"
+        name={name}
+        value={value || ''}
+        onChange={(e) => { onChange(e); setIsOpen(true); }}
+        onFocus={() => setIsOpen(true)}
+        placeholder={placeholder}
+        className={className}
+        autoComplete="off"
+      />
+      {isOpen && filtered.length > 0 && (
+        <ul className="absolute z-50 w-full bg-white border border-gray-200 rounded-lg shadow-xl mt-1 max-h-48 overflow-y-auto custom-scrollbar">
+          {filtered.map((item: string) => (
+            <li
+              key={item}
+              className="px-3 py-2.5 hover:bg-blue-50 cursor-pointer flex justify-between items-center group text-sm text-gray-700 border-b border-gray-50 last:border-0"
+              onClick={() => {
+                onChange({ target: { name, value: item } });
+                setIsOpen(false);
+              }}
+            >
+              <span className="truncate pr-2">{item}</span>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onRemove(item);
+                }}
+                className="text-gray-300 hover:text-red-500 hover:bg-red-50 p-1.5 rounded-md opacity-0 group-hover:opacity-100 transition-all shrink-0"
+                title="Xóa khỏi danh sách gợi ý"
+              >
+                <X size={14} />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
 };
 
 export default function DocumentPage() {
@@ -57,6 +117,24 @@ export default function DocumentPage() {
   // Delete Confirm
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<string | null>(null);
+
+  // --- STATE LƯU TRỮ DANH SÁCH BỊ XÓA GỢI Ý ---
+  const [blacklist, setBlacklist] = useState<string[]>(() => {
+    const saved = localStorage.getItem('doc_suggestions_blacklist');
+    return saved ? JSON.parse(saved) : [
+      'Phạm Đăng Châu',
+      'Đàm Đình Thông',
+      'Nguyễn Thiện Mỹ'
+    ];
+  });
+
+  const handleRemoveSuggestion = (item: string) => {
+    if (window.confirm(`Bạn có chắc muốn ẩn "${item}" khỏi danh sách gợi ý vĩnh viễn?`)) {
+      const next = [...blacklist, item];
+      setBlacklist(next);
+      localStorage.setItem('doc_suggestions_blacklist', JSON.stringify(next));
+    }
+  };
 
   const loadData = async () => {
     setLoading(true); setError(null);
@@ -101,19 +179,12 @@ export default function DocumentPage() {
     });
   }, [vbData, user, donViList]);
 
-  // --- DANH SÁCH ĐEN (BLACKLIST) ---
-  const EXCLUDED_SUGGESTIONS = [
-    'Phạm Đăng Châu',
-    'Đàm Đình Thông',
-    'Nguyễn Thiện Mỹ',
-  ];
-
-  // TẠO DANH SÁCH GỢI Ý TỪ LỊCH SỬ NHẬP LIỆU (ĐÃ LỌC BLACKLIST)
+  // TẠO DANH SÁCH GỢI Ý TỪ LỊCH SỬ NHẬP LIỆU (ĐÃ LỌC BLACKLIST ĐỂ XÓA)
   const { suggestNguoiky, suggestChucvu, suggestNguoilayso, suggestBPlayso, suggestNghiepvu, suggestDonViXuLy } = useMemo(() => {
     const getUnique = (field: string) => {
       const allValues = vbData.map(item => item[field]).filter(Boolean);
       const uniqueValues = Array.from(new Set(allValues)) as string[];
-      return uniqueValues.filter(val => !EXCLUDED_SUGGESTIONS.includes(val.trim()));
+      return uniqueValues.filter(val => !blacklist.includes(val.trim()));
     };
 
     return {
@@ -124,7 +195,7 @@ export default function DocumentPage() {
       suggestNghiepvu: getUnique('nghiep_vu'),
       suggestDonViXuLy: getUnique('bo_phan_xu_ly')
     };
-  }, [vbData]);
+  }, [vbData, blacklist]);
 
   // LỌC VÀ TẠO CÂY ĐƠN VỊ BÊN TRÁI
   const allowedDonViIds = useMemo(() => {
@@ -265,15 +336,11 @@ export default function DocumentPage() {
       }); 
     } else {
       setFormData({
-        id: '', 
-        // 🟢 CẬP NHẬT: Tự động mồi sẵn Đơn vị ban hành theo bộ lọc bên trái
-        id_don_vi: selectedUnitFilter || (defaultDonViId !== 'ALL' ? defaultDonViId : ''), 
+        id: '', id_don_vi: selectedUnitFilter || (defaultDonViId !== 'ALL' ? defaultDonViId : ''), 
         phan_loai: 'Thông báo', muc_do_khan: 'Bình thường', so_hieu: '', ngay_ban_hanh: new Date().toISOString().split('T')[0], 
         tieu_de: '', noi_dung: '', link_vb: '', noi_goi_nhan: '', so_den: '', ngay_nhan: '', 
         bo_phan_xu_ly: '', han_xu_ly: '', trang_thai_xu_ly: 'Chờ xử lý',
-        nguoi_ky: '', chuc_vu: '', nguoi_lay_so: '', bo_phan_lay_so: '', 
-        // 🟢 CẬP NHẬT: Tự động mồi sẵn Phạm vi áp dụng theo bộ lọc bên trái
-        pham_vi_ap_dung: selectedUnitFilter || 'Toàn hệ thống', 
+        nguoi_ky: '', chuc_vu: '', nguoi_lay_so: '', bo_phan_lay_so: '', pham_vi_ap_dung: selectedUnitFilter || 'Toàn hệ thống', 
         hieu_luc: 'Còn hiệu lực', nghiep_vu: '', van_ban_thay_the: '', mat: false
       });
     }
@@ -544,14 +611,6 @@ export default function DocumentPage() {
         </div>
       </div>
 
-      {/* --- DATALISTS --- */}
-      <datalist id="suggest-nguoiky">{suggestNguoiky.map(v => <option key={v} value={v} />)}</datalist>
-      <datalist id="suggest-chucvu">{suggestChucvu.map(v => <option key={v} value={v} />)}</datalist>
-      <datalist id="suggest-nguoilayso">{suggestNguoilayso.map(v => <option key={v} value={v} />)}</datalist>
-      <datalist id="suggest-bplayso">{suggestBPlayso.map(v => <option key={v} value={v} />)}</datalist>
-      <datalist id="suggest-nghiepvu">{suggestNghiepvu.map(v => <option key={v} value={v} />)}</datalist>
-      <datalist id="suggest-donvixuly">{suggestDonViXuLy.map(v => <option key={v} value={v} />)}</datalist>
-
       {/* MODAL THÊM / SỬA VĂN BẢN (FORM ĐỘNG) */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
@@ -565,7 +624,7 @@ export default function DocumentPage() {
               
               {/* KHỐI 1: THÔNG TIN HÀNH CHÍNH (CỐ ĐỊNH) */}
               <div className="bg-blue-50/40 p-5 rounded-xl border border-blue-100">
-                <h4 className="font-bold text-[#05469B] mb-4 flex items-center gap-2"><div className="w-2 h-6 bg-[#05469B] rounded-full"></div> 1. Thông outline Hành chính</h4>
+                <h4 className="font-bold text-[#05469B] mb-4 flex items-center gap-2"><div className="w-2 h-6 bg-[#05469B] rounded-full"></div> 1. Thông tin Hành chính</h4>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
                   <div className="md:col-span-2">
                     <label className="block text-xs font-bold text-gray-700 mb-1">Đơn vị ban hành (Lưu trữ) *</label>
@@ -670,12 +729,12 @@ export default function DocumentPage() {
                 <h4 className="font-bold text-orange-800 mb-4 flex items-center gap-2"><div className="w-2 h-6 bg-orange-500 rounded-full"></div> 4. Theo dõi Xử lý & Thông tin Phụ trợ</h4>
                 
                 <div className="space-y-6">
-                  {/* Khu vực Xử lý (Chỉ hiện khi là Tờ trình hoặc CV Đến) */}
+                  {/* Khu vực Xử lý */}
                   {(formData.phan_loai === 'Công văn đến' || formData.phan_loai === 'Tờ trình') && (
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-5 pb-6 border-b border-orange-200 animate-in fade-in zoom-in">
                       <div>
                         <label className="block text-xs font-bold text-red-700 mb-1 flex items-center gap-1"><Zap size={14}/> Đơn vị / Người xử lý</label>
-                        <input list="suggest-donvixuly" name="bo_phan_xu_ly" value={formData.bo_phan_xu_ly || ''} onChange={handleInputChange} className="w-full p-2.5 border border-red-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-red-500" placeholder="Giao cho..." />
+                        <CustomAutocomplete name="bo_phan_xu_ly" value={formData.bo_phan_xu_ly} onChange={handleInputChange} placeholder="Giao cho..." suggestions={suggestDonViXuLy} onRemove={handleRemoveSuggestion} className="w-full p-2.5 border border-red-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-red-500" />
                       </div>
                       <div>
                         <label className="block text-xs font-bold text-red-700 mb-1 flex items-center gap-1"><Clock size={14}/> Hạn xử lý (Deadline)</label>
@@ -692,16 +751,28 @@ export default function DocumentPage() {
                     </div>
                   )}
 
-                  {/* Khu vực Phụ trợ */}
+                  {/* Khu vực Phụ trợ (ĐÃ THAY BẰNG CUSTOM AUTOCOMPLETE) */}
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <div><label className="block text-xs font-bold text-gray-700 mb-1">Người ký</label><input list="suggest-nguoiky" type="text" name="nguoi_ky" value={formData.nguoi_ky || ''} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-[#05469B]" placeholder="Họ tên người ký..." /></div>
-                    <div><label className="block text-xs font-bold text-gray-700 mb-1">Chức vụ người ký</label><input list="suggest-chucvu" type="text" name="chuc_vu" value={formData.chuc_vu || ''} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-[#05469B]" placeholder="VD: Giám đốc..." /></div>
-                    <div><label className="block text-xs font-bold text-gray-700 mb-1">Người lấy số</label><input list="suggest-nguoilayso" type="text" name="nguoi_lay_so" value={formData.nguoi_lay_so || ''} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-[#05469B]" placeholder="Nhân viên..." /></div>
-                    <div><label className="block text-xs font-bold text-gray-700 mb-1">Bộ phận lấy số</label><input list="suggest-bplayso" type="text" name="bo_phan_lay_so" value={formData.bo_phan_lay_so || ''} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-[#05469B]" placeholder="Phòng HCNS..." /></div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 mb-1">Người ký</label>
+                      <CustomAutocomplete name="nguoi_ky" value={formData.nguoi_ky} onChange={handleInputChange} placeholder="Họ tên người ký..." suggestions={suggestNguoiky} onRemove={handleRemoveSuggestion} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-[#05469B]" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 mb-1">Chức vụ người ký</label>
+                      <CustomAutocomplete name="chuc_vu" value={formData.chuc_vu} onChange={handleInputChange} placeholder="VD: Giám đốc..." suggestions={suggestChucvu} onRemove={handleRemoveSuggestion} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-[#05469B]" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 mb-1">Người lấy số</label>
+                      <CustomAutocomplete name="nguoi_lay_so" value={formData.nguoi_lay_so} onChange={handleInputChange} placeholder="Nhân viên..." suggestions={suggestNguoilayso} onRemove={handleRemoveSuggestion} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-[#05469B]" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 mb-1">Bộ phận lấy số</label>
+                      <CustomAutocomplete name="bo_phan_lay_so" value={formData.bo_phan_lay_so} onChange={handleInputChange} placeholder="Phòng HCNS..." suggestions={suggestBPlayso} onRemove={handleRemoveSuggestion} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-[#05469B]" />
+                    </div>
 
                     <div className="md:col-span-2">
                       <label className="block text-xs font-bold text-gray-700 mb-1">Phân loại Nghiệp vụ</label>
-                      <input list="suggest-nghiepvu" type="text" name="nghiep_vu" value={formData.nghiep_vu || ''} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-[#05469B]" placeholder="Kinh doanh, Nhân sự, Dịch vụ..." />
+                      <CustomAutocomplete name="nghiep_vu" value={formData.nghiep_vu} onChange={handleInputChange} placeholder="Kinh doanh, Nhân sự, Dịch vụ..." suggestions={suggestNghiepvu} onRemove={handleRemoveSuggestion} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-[#05469B]" />
                     </div>
                     <div className="md:col-span-2">
                       <label className="block text-xs font-bold text-gray-700 mb-1">Tình trạng Hiệu lực *</label>
