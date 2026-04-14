@@ -965,11 +965,11 @@ export default function PersonnelPage() {
                       name="id_don_vi" 
                       value={formData.id_don_vi || ''} 
                       onChange={handleInputChange} 
-                      // 🟢 CẬP NHẬT ĐỊNH DẠNG TẠI DÒNG DƯỚI ĐÂY (Thêm font-bold và text-[#05469B], bỏ style monospace)
-                      className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-bold text-[#05469B]"
+                      className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] text-sm"
+                      style={{ fontFamily: 'monospace, sans-serif' }}
                     >
                       <option value="">-- Chọn đơn vị --</option>
-                      {buildHierarchicalOptions(donViList.filter(dv => allowedDonViIdsAndNames.includes(dv.id))).map(({ unit, prefix }) => (
+                      {buildHierarchicalOptions(donViList.filter(dv => allowedDonViIds.includes(dv.id))).map(({ unit, prefix }) => (
                         <option key={unit.id} value={unit.id} className="font-normal text-gray-700">
                           {prefix}{getUnitEmoji(unit.loai_hinh)} {unit.ten_don_vi}
                         </option>
