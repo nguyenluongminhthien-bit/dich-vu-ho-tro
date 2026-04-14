@@ -265,11 +265,15 @@ export default function DocumentPage() {
       }); 
     } else {
       setFormData({
-        id: '', id_don_vi: selectedUnitFilter || (defaultDonViId !== 'ALL' ? defaultDonViId : ''), 
+        id: '', 
+        // 🟢 CẬP NHẬT: Tự động mồi sẵn Đơn vị ban hành theo bộ lọc bên trái
+        id_don_vi: selectedUnitFilter || (defaultDonViId !== 'ALL' ? defaultDonViId : ''), 
         phan_loai: 'Thông báo', muc_do_khan: 'Bình thường', so_hieu: '', ngay_ban_hanh: new Date().toISOString().split('T')[0], 
         tieu_de: '', noi_dung: '', link_vb: '', noi_goi_nhan: '', so_den: '', ngay_nhan: '', 
         bo_phan_xu_ly: '', han_xu_ly: '', trang_thai_xu_ly: 'Chờ xử lý',
-        nguoi_ky: '', chuc_vu: '', nguoi_lay_so: '', bo_phan_lay_so: '', pham_vi_ap_dung: 'Toàn hệ thống', 
+        nguoi_ky: '', chuc_vu: '', nguoi_lay_so: '', bo_phan_lay_so: '', 
+        // 🟢 CẬP NHẬT: Tự động mồi sẵn Phạm vi áp dụng theo bộ lọc bên trái
+        pham_vi_ap_dung: selectedUnitFilter || 'Toàn hệ thống', 
         hieu_luc: 'Còn hiệu lực', nghiep_vu: '', van_ban_thay_the: '', mat: false
       });
     }
