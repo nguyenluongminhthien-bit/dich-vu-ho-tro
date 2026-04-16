@@ -4,11 +4,14 @@ import { apiService } from '../services/api';
 import { DonVi, Personnel, ThietBi } from '../types';
 import { getUnitEmoji } from '../utils/hierarchy';
 import { formatCurrency, parseDateStrict } from '../utils/formatters';
+
 import { 
   Building2, MapPin, ChevronDown, ChevronRight, PanelLeftClose, PanelLeftOpen,
   Search, Loader2, Filter, LayoutDashboard, Users, MonitorSmartphone,
   Flame, AlertTriangle, Activity, Briefcase, BellRing, FileText, ShieldAlert, ShieldCheck, Video, Tag, Car
 } from 'lucide-react';
+
+import { buildHierarchicalOptions, getUnitEmoji, sortDonViByThuTu, groupParentUnits } from '../utils/hierarchy'; 
 
 // 🟢 2. THUẬT TOÁN TỰ ĐỘNG CỘNG THÁNG VÀO NGÀY BẮT ĐẦU
 const extractDateAndAddDuration = (durationRaw: any, startDateRaw: any): Date | null => {
@@ -156,22 +159,10 @@ export default function DashboardPage() {
   }, [donViList, unitSearchTerm, allowedDonViIds]);
   
   const parentUnits = useMemo(() => filteredUnits.filter(item => item.cap_quan_ly === 'HO' || !item.cap_quan_ly), [filteredUnits]);
-  const getChildUnits = (parentId: string) => filteredUnits.filter(item => item.cap_quan_ly === parentId);
+  const getChildUnits = (parentId: string) => sortDonViByThuTu(filteredUnits.filter(item => item.cap_quan_ly === parentId));
 
-  const { vpdhUnits, ctttNamUnits, ctttBacUnits } = useMemo(() => {
-    const vpdh = parentUnits
-      .filter(u => String(u.phia || '').toLowerCase().includes('vpđh') || String(u.loai_hinh || '').toLowerCase().includes('tổng công ty') || String(u.loai_hinh || '').toLowerCase().includes('văn phòng'))
-      .sort((a, b) => {
-        // Luôn ép THACO AUTO (Công ty mẹ) lên vị trí số 1
-        if (a.ten_don_vi === 'THACO AUTO') return -1;
-        if (b.ten_don_vi === 'THACO AUTO') return 1;
-        
-        // Các đơn vị VPĐH khác (như Phân Phối) tự động nằm bên dưới theo thứ tự gốc
-        return 0; 
-      });
-    const ctttNam = parentUnits.filter(u => !vpdh.includes(u) && String(u.phia || '').toLowerCase().includes('nam'));
-    const ctttBac = parentUnits.filter(u => !vpdh.includes(u) && !ctttNam.includes(u) && String(u.phia || '').toLowerCase().includes('bắc'));
-    return { vpdhUnits: vpdh, ctttNamUnits: ctttNam, ctttBacUnits: ctttBac };
+  const { vpdhUnits, ctttNamUnits, ctttBacUnits, otherUnits } = useMemo(() => {
+    return groupParentUnits(parentUnits);
   }, [parentUnits]);
 
   const toggleParent = (parentId: string) => setExpandedParents(prev => prev.includes(parentId) ? prev.filter(id => id !== parentId) : [...prev, parentId]);
@@ -345,14 +336,19 @@ export default function DashboardPage() {
 
         let diffDays = null;
         let dateStr = 'Chưa rõ hạn';
+        const giaHanThem = Number(an.gia_han_them) || 0; // 🟢 LẤY BIẾN GIA HẠN THÊM
 
         if (expDate) {
+          // 🟢 CỘNG DỒN SỐ THÁNG GIA HẠN VÀO TỔNG THỜI GIAN
+          if (giaHanThem > 0) {
+            expDate.setMonth(expDate.getMonth() + giaHanThem);
+          }
+
           const diffTime = expDate.getTime() - today.getTime();
           diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
           dateStr = expDate.toLocaleDateString('vi-VN');
         }
 
-        // Bổ sung lấy giá trị Chi phí thuê
         const costRaw = an.chi_phi_thue || an.chi_phi || an.gia_tri_hd || an.tong_chi_phi || '';
 
         list.push({
@@ -360,7 +356,8 @@ export default function DashboardPage() {
           provider: an.ncc_dich_vu,
           daysLeft: diffDays,
           dateStr: dateStr,
-          cost: formatCurrency(costRaw) 
+          cost: formatCurrency(costRaw),
+          giaHanThem: giaHanThem // 🟢 TRUYỀN XUỐNG GIAO DIỆN HIỂN THỊ
         });
       }
     });
@@ -729,7 +726,11 @@ export default function DashboardPage() {
                           return (
                             <tr key={idx} className={`transition-colors cursor-help ${isWarning ? 'hover:bg-red-50/30' : 'hover:bg-blue-50/30'}`} title={tooltipText}>
                               <td className="p-3 font-bold text-[#05469B] text-xs truncate max-w-[120px]" title={tooltipText}>{stat.unitName}</td>
-                              <td className="p-3 text-center font-semibold text-xs text-gray-600" title={tooltipText}>{stat.dateStr}</td>
+                              <td className="p-3 text-center font-semibold text-xs text-gray-600" title={tooltipText}>
+                                {stat.dateStr}
+                                {/* 🟢 HIỂN THỊ DẤU HIỆU CỘNG THÊM THÁNG GIA HẠN */}
+                                {stat.giaHanThem > 0 && <span className="block text-[9px] text-emerald-600 font-bold mt-0.5">(+ {stat.giaHanThem} tháng)</span>}
+                              </td>
                               <td className="p-3 text-right" title={tooltipText}>
                                 {stat.daysLeft === null ? (
                                   <span className="inline-block px-2 py-0.5 bg-gray-100 text-gray-500 font-bold rounded border border-gray-200 text-[10px]">Chưa rõ</span>

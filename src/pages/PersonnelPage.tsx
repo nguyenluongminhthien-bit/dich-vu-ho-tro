@@ -9,7 +9,7 @@ import {
 import { apiService } from '../services/api';
 import { Personnel, DonVi, ThietBi } from '../types';
 import { useAuth } from '../contexts/AuthContext';
-import { buildHierarchicalOptions, getUnitEmoji } from '../utils/hierarchy'; 
+import { buildHierarchicalOptions, getUnitEmoji, sortDonViByThuTu, groupParentUnits } from '../utils/hierarchy';
 
 // HÀM FORMAT SỐ ĐIỆN THOẠI 4-3-3
 const formatPhoneNumber = (val: string | number | undefined | null) => {
@@ -123,7 +123,7 @@ export default function PersonnelPage() {
 
   const donViMap = useMemo(() => {
     const map: Record<string, string> = {};
-    donViList.forEach(dv => { map[dv.id] = dv.ten_don_vi; });
+    donViList.forEach(dv => { map[String(dv.id)] = dv.ten_don_vi; });
     return map;
   }, [donViList]);
 
@@ -188,20 +188,10 @@ export default function PersonnelPage() {
   }, [donViList, unitSearchTerm, allowedDonViIds]);
 
   const parentUnits = useMemo(() => filteredUnits.filter(item => item.cap_quan_ly === 'HO' || !item.cap_quan_ly), [filteredUnits]);
-  const getChildUnits = (parentId: string) => filteredUnits.filter(item => item.cap_quan_ly === parentId);
+  const getChildUnits = (parentId: string) => sortDonViByThuTu(filteredUnits.filter(item => item.cap_quan_ly === parentId));
 
   const { vpdhUnits, ctttNamUnits, ctttBacUnits, otherUnits } = useMemo(() => {
-    const vpdh = parentUnits
-      .filter(u => String(u.phia || '').toLowerCase().includes('vpđh') || String(u.loai_hinh || '').toLowerCase().includes('tổng công ty') || String(u.loai_hinh || '').toLowerCase().includes('văn phòng'))
-      .sort((a, b) => {
-        if (a.ten_don_vi === 'THACO AUTO') return -1;
-        if (b.ten_don_vi === 'THACO AUTO') return 1;
-        return 0; 
-      });
-    const ctttNam = parentUnits.filter(u => !vpdh.includes(u) && String(u.phia || '').toLowerCase().includes('nam'));
-    const ctttBac = parentUnits.filter(u => !vpdh.includes(u) && !ctttNam.includes(u) && String(u.phia || '').toLowerCase().includes('bắc'));
-    const others = parentUnits.filter(u => !vpdh.includes(u) && !ctttNam.includes(u) && !ctttBac.includes(u));
-    return { vpdhUnits: vpdh, ctttNamUnits: ctttNam, ctttBacUnits: ctttBac, otherUnits: others };
+    return groupParentUnits(parentUnits);
   }, [parentUnits]);
 
   const toggleParent = (parentId: string) => {
@@ -233,7 +223,7 @@ export default function PersonnelPage() {
       result = result.filter(item => 
         String(item.ma_so_nhan_vien || '').toLowerCase().includes(lower) || 
         String(item.ho_ten || '').toLowerCase().includes(lower) || 
-        String(donViMap[item.id_don_vi || ''] || '').toLowerCase().includes(lower) ||
+        String(donViMap[String(item.id_don_vi)] || '').toLowerCase().includes(lower) ||
         String(item.chuc_vu || '').toLowerCase().includes(lower) 
       );
     }
@@ -272,17 +262,15 @@ export default function PersonnelPage() {
     });
   };
 
-    const openModal = (mode: 'create' | 'update', item?: any) => {
+  const openModal = (mode: 'create' | 'update', item?: any) => {
     if (item) {
-      // Chỉnh sửa: Nạp dữ liệu cũ
       setModal({ isOpen: true, mode, formData: { ...item } });
     } else {
-      // Thêm mới: TỰ ĐỘNG GÁN ĐƠN VỊ HIỆN TẠI (Nếu đang chọn trong Menu)
       setModal({ 
         isOpen: true, 
         mode, 
         formData: { 
-          id_don_vi: selectedUnitFilter || '' // ĐIỂM CẬP NHẬT Ở ĐÂY
+          id_don_vi: selectedUnitFilter || '' 
         } 
       });
     }
@@ -295,7 +283,7 @@ export default function PersonnelPage() {
     setIsViewModalOpen(true); 
   };
 
-    const handleDuplicate = (item: any) => {
+  const handleDuplicate = (item: any) => {
     setModal({ isOpen: true, mode: 'create', formData: { ...item, id: '', chuc_vu: item.chuc_vu ? `${item.chuc_vu} (Kiêm nhiệm)` : 'Kiêm nhiệm', trang_thai: 'Đang làm việc', ngay_nghi_viec: '' } });
     setError(null);
   };
@@ -584,7 +572,6 @@ export default function PersonnelPage() {
                     <tr key={item.id} className={`hover:bg-blue-50/50 transition-colors group ${item.trang_thai === 'Đã nghỉ việc' ? 'opacity-60 bg-gray-50' : ''}`}>
                       <td className="p-4 font-semibold text-gray-800 whitespace-nowrap">{item.ma_so_nhan_vien}</td>
                       <td className="p-4 whitespace-nowrap flex items-center gap-3">
-                        {/* Ảnh thu nhỏ trên bảng danh sách */}
                         <div className="w-8 h-8 rounded-full overflow-hidden bg-gray-100 border border-gray-200 flex items-center justify-center shrink-0">
                           {item.hinh_anh ? (
                             <img src={getDirectImageLink(item.hinh_anh)} alt="" className="w-full h-full object-cover" />
@@ -597,7 +584,7 @@ export default function PersonnelPage() {
                           {item.trang_thai === 'Đã nghỉ việc' && <span className="text-[10px] font-bold text-red-600 bg-red-100 px-1.5 py-0.5 rounded uppercase mt-0.5 inline-block">Đã nghỉ việc</span>}
                         </div>
                       </td>
-                      <td className="p-4 text-sm font-medium text-gray-700 whitespace-nowrap">{donViMap[item.id_don_vi] || item.id_don_vi || '-'}</td>
+                      <td className="p-4 text-sm font-medium text-gray-700 whitespace-nowrap">{donViMap[String(item.id_don_vi)] || item.id_don_vi || '-'}</td>
                       <td className="p-4 text-sm text-gray-600 whitespace-nowrap">{item.chuc_vu}</td>
                       
                       <td className="p-4 whitespace-nowrap">
@@ -806,7 +793,7 @@ export default function PersonnelPage() {
               <div>
                 <h4 className="font-bold text-gray-800 mb-3 uppercase tracking-wider text-sm flex items-center gap-2"><Building2 size={18} className="text-[#05469B]"/> Thông tin Công tác</h4>
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-4 bg-gray-50 p-4 rounded-xl border border-gray-200">
-                  <div><p className="text-xs text-gray-500 uppercase font-bold mb-1">Đơn vị</p><p className="font-semibold text-gray-800 break-words">{donViMap[viewData.id_don_vi] || viewData.id_don_vi || '---'}</p></div>
+                  <div><p className="text-xs text-gray-500 uppercase font-bold mb-1">Đơn vị</p><p className="font-semibold text-gray-800 break-words">{donViMap[String(viewData.id_don_vi)] || viewData.id_don_vi || '---'}</p></div>
                   <div><p className="text-xs text-gray-500 uppercase font-bold mb-1">Phân loại</p><p className="font-semibold text-gray-800">{viewData.phan_loai || '---'}</p></div>
                   <div><p className="text-xs text-gray-500 uppercase font-bold mb-1">Ngày nhận việc</p><p className="font-semibold text-gray-800">{viewData.ngay_nhan_vien ? new Date(viewData.ngay_nhan_vien).toLocaleDateString('vi-VN') : '---'}</p></div>
                   

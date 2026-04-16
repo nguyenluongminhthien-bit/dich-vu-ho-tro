@@ -30,6 +30,18 @@ const HEADERS = {
 const apiCache: Record<string, { data: any, timestamp: number }> = {};
 const CACHE_DURATION = 5 * 60 * 1000;
 
+// Khi bảng A thay đổi → tự động xóa cache các bảng liên quan
+const CACHE_DEPENDENCIES: Record = {
+  'ns_dich_vu':          ['dm_don_vi'],        // Thêm/sửa nhân sự → làm mới đơn vị
+  'dm_don_vi':           ['ns_dich_vu'],        // Sửa đơn vị → làm mới nhân sự
+  'ts_xe':               ['cp_hoat_dong_xe'],   // Sửa xe → làm mới chi phí xe
+  'cp_hoat_dong_xe':     ['ts_xe'],             // Sửa chi phí → làm mới xe
+  'ts_thiet_bi':         ['nk_thiet_bi'],       // Sửa thiết bị → làm mới nhật ký
+  'nk_thiet_bi':         ['ts_thiet_bi'],       // Sửa nhật ký → làm mới thiết bị
+  'hs_pccc':             ['ts_pccc'],            // Sửa hồ sơ PCCC → làm mới tài sản PCCC
+  'ts_pccc':             ['hs_pccc'],            // Sửa tài sản PCCC → làm mới hồ sơ
+};
+
 // ===============================================
 // 2. HÀM LÕI TẢI DỮ LIỆU (GET)
 // ===============================================
@@ -161,7 +173,8 @@ export const apiService = {
         throw new Error(`Lỗi Supabase: ${errText}`);
       }
       delete apiCache[realTableName];
-      apiService.writeLog('CẬP NHẬT MẢNG', `Bảng: ${realTableName} | Lưu ${data.length} bản ghi`);
+      CACHE_DEPENDENCIES[realTableName]?.forEach(dep => delete apiCache[dep]);
+      void apiService.writeLog('CẬP NHẬT MẢNG', `Bảng: ${realTableName} | Lưu ${data.length} bản ghi`);
       return response.json();
     }
 
@@ -208,9 +221,10 @@ export const apiService = {
       throw new Error(errorMsg); 
     }
     
-    delete apiCache[realTableName]; 
+    delete apiCache[realTableName];
+    CACHE_DEPENDENCIES[realTableName]?.forEach(dep => delete apiCache[dep]);
     const tenHanhDong = action === 'create' ? 'THÊM MỚI' : 'CẬP NHẬT';
-    apiService.writeLog(tenHanhDong, `Bảng: ${realTableName}`);
+    void apiService.writeLog(tenHanhDong, `Bảng: ${realTableName}`);
 
     // Fetch API của Supabase (khi có Prefer: return=representation) trả về Mảng
     const resultData = await response.json();
@@ -235,7 +249,8 @@ export const apiService = {
     }
     
     delete apiCache[realTableName];
-    apiService.writeLog('XÓA', `Bảng: ${realTableName} | ID Đối tượng: ${id}`);
+    CACHE_DEPENDENCIES[realTableName]?.forEach(dep => delete apiCache[dep]);
+    void apiService.writeLog('XÓA', `Bảng: ${realTableName} | ID Đối tượng: ${id}`);
     return true;
   }
 };

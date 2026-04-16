@@ -6,7 +6,7 @@ import {
   Link as LinkIcon, FileText, Briefcase, ExternalLink,
   Maximize2, Layers, DoorOpen, Coffee, UserCheck, Copy, CheckCheck,
   HardHat, CloudLightning, Utensils, Monitor,
-  Projector, Video, LayoutTemplate, MousePointerClick, 
+  Projector, Video, LayoutTemplate, MousePointerClick,
   SquarePen, PenTool, Wand2, Compass, Clock, Sun, Moon,
   MonitorSmartphone, Tag, Car, Pocket, Store, Warehouse,
   Flame, ShieldAlert, Droplets, BellRing, BatteryWarning, Settings,
@@ -15,8 +15,15 @@ import {
 import { apiService } from '../services/api';
 import { DonVi, Personnel, AnNinh, PhapNhan, PhongHop, TS_Xe, ThietBi } from '../types';
 import { useAuth } from '../contexts/AuthContext';
-import { buildHierarchicalOptions, getUnitEmoji } from '../utils/hierarchy'; 
 import { formatCurrency } from '../utils/formatters';
+import PnModal from '../components/department/PnModal';
+import PhModal from '../components/department/PhModal';
+import PvhcModal from '../components/department/PvhcModal';
+import AtvsldModal from '../components/department/AtvsldModal';
+import PcttModal from '../components/department/PcttModal';
+import SecurityModal from '../components/department/SecurityModal';
+import PcccModal from '../components/department/PcccModal';
+import { buildHierarchicalOptions, getUnitEmoji, sortDonViByThuTu, groupParentUnits } from '../utils/hierarchy'; 
 
 // 🟢 [HÀM TIỆN ÍCH CHUNG]
 const safeGet = (obj: any, key: string) => {
@@ -53,6 +60,12 @@ const formatToVN = (isoStr: string) => {
   return isoStr; 
 };
 
+// 🟢 HÀM FORMAT SỐ LƯỢNG (Không có VNĐ)
+const formatNumber = (val: string | number | undefined | null) => {
+  if (!val) return '0';
+  return val.toString().replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+};
+
 const formatPhoneNumber = (val: string | number | undefined | null) => {
   if (!val) return '';
   const cleaned = val.toString().replace(/\D/g, ''); 
@@ -61,14 +74,16 @@ const formatPhoneNumber = (val: string | number | undefined | null) => {
   return `${cleaned.slice(0, 4)} ${cleaned.slice(4, 7)} ${cleaned.slice(7, 11)}`;
 };
 
-const renderContractWarning = (ngayKy: any, soThang: any) => {
+const renderContractWarning = (ngayKy: any, soThang: any, giaHanThem: any) => {
   if (!ngayKy || !soThang) return null;
   
   const startDate = new Date(ngayKy);
   if (isNaN(startDate.getTime())) return null;
   
   const endDate = new Date(startDate);
-  endDate.setMonth(endDate.getMonth() + Number(soThang));
+  // 🟢 CỘNG DỒN THÊM SỐ THÁNG GIA HẠN VÀO TỔNG THỜI GIAN
+  const totalMonths = Number(soThang) + Number(giaHanThem || 0);
+  endDate.setMonth(endDate.getMonth() + totalMonths);
   
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -80,10 +95,14 @@ const renderContractWarning = (ngayKy: any, soThang: any) => {
   const endFormat = endDate.toLocaleDateString('vi-VN');
 
   if (diffDays < 0) {
-    return <p className="text-[10px] text-red-600 font-bold bg-red-100 p-1 rounded mt-1 w-max">Đã hết hạn ({endFormat})</p>;
+    return <p className="text-[10px] text-red-600 font-bold bg-red-100 px-1.5 py-0.5 rounded mt-1 w-max">Đã hết hạn ({endFormat})</p>;
   } else if (diffDays <= 30) {
-    return <p className="text-[10px] text-orange-600 font-bold bg-orange-100 p-1 rounded mt-1 animate-pulse w-max">⚠️ Sắp hết ({diffDays} ngày - {endFormat})</p>;
+    return <p className="text-[10px] text-orange-600 font-bold bg-orange-100 px-1.5 py-0.5 rounded mt-1 animate-pulse w-max">⚠️ Sắp hết ({diffDays} ngày - {endFormat})</p>;
   } else {
+    // Nếu có gia hạn thêm thì hiển thị rõ ra
+    if (Number(giaHanThem) > 0) {
+      return <p className="text-[10px] text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.5 border border-emerald-100 rounded mt-1 w-max">Hạn HĐ (Đã cộng gia hạn): {endFormat}</p>;
+    }
     return <p className="text-[10px] text-emerald-600 font-medium mt-1">Hạn HĐ: {endFormat}</p>;
   }
 };
@@ -161,18 +180,18 @@ export default function DepartmentPage() {
   const [pcccData, setPcccData] = useState<any[]>([]);
   const [tsPcccData, setTsPcccData] = useState<any[]>([]);
   const [isPcccModalOpen, setIsPcccModalOpen] = useState(false);
-  const [isEmergencyContactOpen, setIsEmergencyContactOpen] = useState(false); // <--- Dòng bạn vừa thêm
+  const [isEmergencyContactOpen, setIsEmergencyContactOpen] = useState(false); 
   const [pcccFormData, setPcccFormData] = useState<any>({}); 
   const [equipmentList, setEquipmentList] = useState<any[]>([]);
   const [deletedEqIds, setDeletedEqIds] = useState<string[]>([]);
 
   const [atvsldData, setAtvsldData] = useState<any[]>([]);
   const [isAtvsldModalOpen, setIsAtvsldModalOpen] = useState(false);
-  const [atvsldFormData, setAtvsldFormData] = useState<any>({});
+  const [atvsldCurrentData, setAtvsldCurrentData] = useState<any | null>(null);
 
   const [pcttData, setPcttData] = useState<any[]>([]);
   const [isPcttModalOpen, setIsPcttModalOpen] = useState(false);
-  const [pcttFormData, setPcttFormData] = useState<any>({});
+  const [pcttCurrentData, setPcttCurrentData] = useState<any | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -189,18 +208,17 @@ export default function DepartmentPage() {
   const [customKD, setCustomKD] = useState('');
 
   const [isSecurityModalOpen, setIsSecurityModalOpen] = useState(false);
-  const [securityFormData, setSecurityFormData] = useState<any>({});
 
   const [isPnModalOpen, setIsPnModalOpen] = useState(false);
   const [pnModalMode, setPnModalMode] = useState<'create' | 'update'>('create');
-  const [pnFormData, setPnFormData] = useState<Partial<PhapNhan>>({});
+  const [pnCurrentData, setPnCurrentData] = useState<any | null>(null);
   
   const [isPhModalOpen, setIsPhModalOpen] = useState(false);
   const [phModalMode, setPhModalMode] = useState<'create' | 'update'>('create');
-  const [phFormData, setPhFormData] = useState<Partial<PhongHop>>({});
+  const [phCurrentData, setPhCurrentData] = useState<any | null>(null);
 
   const [isPvhcModalOpen, setIsPvhcModalOpen] = useState(false);
-  const [pvhcFormData, setPvhcFormData] = useState<any>({});
+  const [pvhcCurrentData, setPvhcCurrentData] = useState<any | null>(null);
 
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
@@ -311,23 +329,13 @@ export default function DepartmentPage() {
   }, [filteredData, selectedUnitId]);
 
   const parentUnits = useMemo(() => filteredData.filter(item => item.cap_quan_ly === 'HO' || !item.cap_quan_ly), [filteredData]);
-  const getChildUnits = (parentId: string) => filteredData.filter(item => item.cap_quan_ly === parentId);
+  
+  // 🟢 ĐÃ ÁP DỤNG HÀM SẮP XẾP CHUẨN (sortDonViByThuTu)
+  const getChildUnits = (parentId: string) => sortDonViByThuTu(filteredData.filter(item => item.cap_quan_ly === parentId));
 
+  // 🟢 ĐÃ ÁP DỤNG HÀM NHÓM CHUẨN (groupParentUnits)
   const { vpdhUnits, ctttNamUnits, ctttBacUnits, otherUnits } = useMemo(() => {
-    const vpdh = parentUnits
-      .filter(u => String(u.phia || '').toLowerCase().includes('vpđh') || String(u.loai_hinh || '').toLowerCase().includes('tổng công ty') || String(u.loai_hinh || '').toLowerCase().includes('văn phòng'))
-      .sort((a, b) => {
-        // Luôn ép THACO AUTO (Công ty mẹ) lên vị trí số 1
-        if (a.ten_don_vi === 'THACO AUTO') return -1;
-        if (b.ten_don_vi === 'THACO AUTO') return 1;
-        
-        // Các đơn vị VPĐH khác (như Phân Phối) tự động nằm bên dưới theo thứ tự gốc
-        return 0; 
-      });
-    const ctttNam = parentUnits.filter(u => !vpdh.includes(u) && String(u.phia || '').toLowerCase().includes('nam'));
-    const ctttBac = parentUnits.filter(u => !vpdh.includes(u) && !ctttNam.includes(u) && String(u.phia || '').toLowerCase().includes('bắc'));
-    const others = parentUnits.filter(u => !vpdh.includes(u) && !ctttNam.includes(u) && !ctttBac.includes(u));
-    return { vpdhUnits: vpdh, ctttNamUnits: ctttNam, ctttBacUnits: ctttBac, otherUnits: others };
+    return groupParentUnits(parentUnits);
   }, [parentUnits]);
 
   const toggleParent = (parentId: string) => setExpandedParents(prev => prev.includes(parentId) ? prev.filter(id => id !== parentId) : [...prev, parentId]);
@@ -580,18 +588,8 @@ export default function DepartmentPage() {
     const maNV = person?.ma_so_nhan_vien || '';
     const chucVu = person ? person.chuc_vu : title;
 
-    // Tìm Lãnh đạo và Phụ trách DVHT của Đơn vị đang được chọn
-  const currentUnitPersonnel = personnelData.filter(ns => ns.id_don_vi === selectedUnitId && ns.trang_thai !== 'Đã nghỉ việc');
-  
-  const leader = currentUnitPersonnel.find(ns => 
-    String(ns.phan_loai).toLowerCase().includes('lãnh đạo') || 
-    String(ns.chuc_vu).toLowerCase().includes('giám đốc')
-  );
-  
-  const dvht1 = currentUnitPersonnel.find(ns => 
-    String(ns.phan_loai).toLowerCase().includes('pt dvht')
-  );
-
+    const currentUnitPersonnel = personnelData.filter(ns => ns.id_don_vi === selectedUnitId && ns.trang_thai !== 'Đã nghỉ việc');
+    
     return (
       <div className={`bg-white rounded-xl border border-gray-200 shadow-sm flex flex-col overflow-hidden transition-all hover:shadow-md relative group ${isLarge ? 'md:col-span-2' : ''}`}>
         {!isEditing && !isSavingLocal && person && (
@@ -607,7 +605,7 @@ export default function DepartmentPage() {
               <label className="text-xs font-bold text-[#05469B] mb-2">Chọn nhân sự phụ trách:</label>
               <select onChange={onSelectChange} defaultValue={person?.id || ''} className="w-full p-2 border border-blue-300 rounded-lg bg-blue-50 outline-none focus:ring-2 focus:ring-[#05469B] text-sm font-semibold text-gray-800">
                 <option value="">-- Trống (Xóa người này) --</option>
-                {unitStaff.map(p => (<option key={p.id} value={p.id}>{p.ho_ten} ({p.ma_so_nhan_vien})</option>))}
+                {currentUnitPersonnel.map(p => (<option key={p.id} value={p.id}>{p.ho_ten} ({p.ma_so_nhan_vien})</option>))}
               </select>
               <button onClick={() => setIsEditing(false)} className="mt-3 text-xs font-bold text-gray-400 hover:text-red-500 text-center">Hủy thao tác</button>
             </div>
@@ -626,7 +624,7 @@ export default function DepartmentPage() {
               </div>
             </>
           ) : (
-            <div onClick={() => { if(unitStaff.length > 0) setIsEditing(true); else alert('Chưa có nhân sự nào trong danh sách!'); }} className="flex-1 flex flex-col items-center justify-center py-6 border-2 border-dashed border-gray-200 rounded-lg bg-gray-50/50 hover:bg-blue-50 hover:border-blue-300 cursor-pointer transition-colors group/box">
+            <div onClick={() => { if(currentUnitPersonnel.length > 0) setIsEditing(true); else alert('Chưa có nhân sự nào trong danh sách!'); }} className="flex-1 flex flex-col items-center justify-center py-6 border-2 border-dashed border-gray-200 rounded-lg bg-gray-50/50 hover:bg-blue-50 hover:border-blue-300 cursor-pointer transition-colors group/box">
               <p className="text-sm text-gray-400 group-hover/box:text-[#05469B] font-medium italic transition-colors">Chưa có {roleDefault}</p>
             </div>
           )}
@@ -634,6 +632,7 @@ export default function DepartmentPage() {
       </div>
     );
   };
+
   const openModal = (mode: 'create' | 'update', item?: DonVi) => {
     setModalMode(mode); 
     setCustomKD(''); 
@@ -655,43 +654,37 @@ export default function DepartmentPage() {
   };
 
   const openPnModal = (mode: 'create' | 'update', item?: PhapNhan) => {
-  setPnModalMode(mode);
-  if (item) { setPnFormData({ ...item }); } 
-  else { setPnFormData({ id: `PN${Date.now()}`, id_don_vi: selectedUnitId || '', ten_cong_ty: '', ma_so_thue: '', dia_chi: '', gpkd: '', mail: '' }); }
-  setIsPnModalOpen(true);
-};
-
-  const handlePnSave = async (e: React.FormEvent) => {
-    e.preventDefault(); setSubmitting(true); setError(null);
-    try {
-      const response = await apiService.save(pnFormData, pnModalMode, "dm_phap_nhan");
-      const savedId = response?.newId || response?.id || pnFormData.id;
-      const finalData = { ...pnFormData, id: savedId } as PhapNhan;
-      if (pnModalMode === 'create') { setPhapNhanData(prev => [...prev, finalData]); } 
-      else { setPhapNhanData(prev => prev.map(item => item.id === savedId ? finalData : item)); }
-      setIsPnModalOpen(false);
-    } catch (err: any) { setError(err.message || 'Lỗi lưu dữ liệu Pháp nhân.'); } 
-    finally { setSubmitting(false); }
+    setPnModalMode(mode);
+    setPnCurrentData(item || null);
+    setIsPnModalOpen(true);
   };
 
   const openPhModal = (mode: 'create' | 'update', item?: any) => {
     setPhModalMode(mode);
-    if (item) { setPhFormData({ ...item, id: item.id }); } 
-    else { setPhFormData({ id: `PH${Date.now()}`, id_don_vi: selectedUnitId || '', ten_phong_hop: '', vi_tri: '', suc_chua: '', tb_trinh_chieu: '', tb_hop_online: false, bang_viet: false, but_viet: '', but_chi: '', tb_chuyen_slide: false, layout: '', ghi_chu: '' }); }
+    setPhCurrentData(item || null);
     setIsPhModalOpen(true);
   };
 
-  const handlePhSave = async (e: React.FormEvent) => {
-    e.preventDefault(); setSubmitting(true); setError(null);
-    try {
-      const response = await apiService.save(phFormData, phModalMode, "dm_phong_hop");
-      const savedId = response?.newId || response?.id || phFormData.id;
-      const finalData = { ...phFormData, id: savedId } as PhongHop;
-      if (phModalMode === 'create') { setPhongHopData(prev => [...prev, finalData]); } 
-      else { setPhongHopData(prev => prev.map(item => item.id === savedId ? finalData : item)); }
-      setIsPhModalOpen(false);
-    } catch (err: any) { setError(err.message || 'Lỗi lưu dữ liệu Phòng họp.'); } 
-    finally { setSubmitting(false); }
+  const openSecurityModal = () => setIsSecurityModalOpen(true);
+
+  const openPvhcModal = () => {
+    setPvhcCurrentData(currentPvhc || null);
+    setIsPvhcModalOpen(true);
+  };
+
+  const openPcccModal = (mode: 'create' | 'update' | 'view') => {
+    setPcccMode(mode);
+    setIsPcccModalOpen(true);
+  };
+
+  const openAtvsldModal = () => {
+    setAtvsldCurrentData(currentAtvsld || null);
+    setIsAtvsldModalOpen(true);
+  };
+
+  const openPcttModal = () => {
+    setPcttCurrentData(currentPctt || null);
+    setIsPcttModalOpen(true);
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>, formType: 'pn' | 'ph' | 'sec' | 'pvhc' | 'pccc' | 'atvsld' | 'pctt' = 'pn') => {
@@ -713,163 +706,6 @@ export default function DepartmentPage() {
     }
     else if (formType === 'atvsld') { setAtvsldFormData((prev: any) => ({ ...prev, [name]: finalValue })); }
     else if (formType === 'pctt') { setPcttFormData((prev: any) => ({ ...prev, [name]: finalValue })); }
-  };
-
-  const openSecurityModal = () => {
-    if (currentAnNinh) { setSecurityFormData({ ...currentAnNinh, id: getSecId(currentAnNinh) }); } 
-    else { setSecurityFormData({ id: `AN${Date.now()}`, id_don_vi: selectedUnitId || '', bv_noi_bo: '', bv_dich_vu: '', vi_tri_bv_dv: '', ncc_dich_vu: '', chi_phi_thue: '', ngay_ky_hd: '', han_hop_dong: '', tong_bv: '', dinh_bien_bv: '', ngay_co_dinh: '', ngay_tuan_tra: '', dem_co_dinh: '', dem_tuan_tra: '', bo_tri_nghi_ca: '', sl_camera: '', camera_hoat_dong: '', camera_hu: '', ly_do_camera_hu: '', thoi_gian_luu: '', vi_tri_he_thong_camera: '', vi_tri_gs_camera: '', link_pa_anbv: '', tinh_hinh_khu_vuc: '', tiep_giap_truoc: '', tiep_giap_sau: '', tiep_giap_trai: '', tiep_giap_phai: '' }); }
-    setIsSecurityModalOpen(true);
-  };
-
-  const handleSecuritySave = async (e: React.FormEvent) => {
-    e.preventDefault(); setSubmitting(true); setError(null);
-    const soNB = Number(securityFormData.bv_noi_bo) || 0;
-    const soDV = Number(securityFormData.bv_dich_vu) || 0;
-    let finalData: any = { ...securityFormData, tong_bv: soNB + soDV };
-    if (soDV < 1) { finalData.vi_tri_bv_dv = ''; finalData.ncc_dich_vu = ''; finalData.chi_phi_thue = ''; }
-    
-    const isCreate = !currentAnNinh;
-    const mode = isCreate ? 'create' : 'update';
-    if (isCreate && (!finalData.id || finalData.id === '')) finalData.id = `AN${Date.now()}`;
-
-    try {
-      await apiService.save(finalData, mode, "hs_an_ninh");
-      if (mode === 'create') setAnNinhData(prev => [...prev, finalData as AnNinh]);
-      else setAnNinhData(prev => prev.map(item => item.id === finalData.id ? (finalData as AnNinh) : item));
-      setIsSecurityModalOpen(false);
-    } catch (err: any) { setError(err.message || 'Lỗi lưu dữ liệu An Ninh.'); } 
-    finally { setSubmitting(false); }
-  };
-
-  const openPvhcModal = () => {
-    if (currentPvhc) { setPvhcFormData({ ...currentPvhc, id: getPvhcId(currentPvhc) }); } 
-    else { setPvhcFormData({ id: `HC${Date.now()}`, id_don_vi: selectedUnitId || '', dinh_bien: '', pvhc_khach_cho: '', pvhc_ve_sinh: '', hien_huu: '', pvhc_dich_vu: '', vi_tri: '', ncc_dich_vu: '', chi_phi_thue: '' }); }
-    setIsPvhcModalOpen(true);
-  };
-
-  const handlePvhcSave = async (e: React.FormEvent) => {
-    e.preventDefault(); setSubmitting(true); setError(null);
-    const khachCho = Number(pvhcFormData.pvhc_khach_cho) || 0;
-    const veSinh = Number(pvhcFormData.pvhc_ve_sinh) || 0;
-    const dichVu = Number(pvhcFormData.pvhc_dich_vu) || 0;
-    let finalData: any = { ...pvhcFormData, hien_huu: khachCho + veSinh };
-    if (dichVu < 1) { finalData.vi_tri = ''; finalData.ncc_dich_vu = ''; finalData.chi_phi_thue = ''; }
-    
-    const isCreate = !currentPvhc;
-    const mode = isCreate ? 'create' : 'update';
-    if (isCreate && (!finalData.id || finalData.id === '')) finalData.id = `HC${Date.now()}`;
-
-    try {
-      await apiService.save(finalData, mode, "hs_pvhc");
-      if (mode === 'create') setPvhcData(prev => [...prev, finalData]);
-      else setPvhcData(prev => prev.map(item => item.id === finalData.id ? finalData : item));
-      setIsPvhcModalOpen(false);
-    } catch (err: any) { setError(err.message || 'Lỗi lưu dữ liệu Hậu cần.'); } 
-    finally { setSubmitting(false); }
-  };
-
-  const openPcccModal = (mode: 'create' | 'update' | 'view') => {
-    setModalMode(mode as any);
-    if (currentPccc && mode !== 'create') { 
-      setPcccFormData({ ...currentPccc, id: getPcccIdSafe(currentPccc) }); 
-      setEquipmentList(tsPcccData.filter(eq => getUnitIdSafe(eq) === currentPccc.id_don_vi).map(e => ({...e}))); 
-    } else { 
-  setPcccFormData({ 
-    id: `PC${Date.now()}`, id_don_vi: selectedUnitId || '', giay_phep_pccc: 'Nghiệm thu', bao_hiem_chay_no: 'Có', ngay_het_han_bh: '', 
-        ho_ten_doi_truong: '', sdt_doi_truong: '', chuc_vu: '', tong_sl_thanh_vien: '', sl_huy_dong_ban_ngay: '', sl_huy_dong_ban_dem: '', 
-        ngay_dien_tap: '', link_phuong_an_pccc: '', sdt_pccc: '114', sdt_ub: '', sdt_ca_pccc_catt: '', sdt_cax: '', 
-        sdt_dien_luc: '', sdt_cap_thoat_nuoc: '', sdt_yte: '', ht_bao_chay_tu_dong: 'Có', ht_chua_chay_tu_dong_nuoc: 'Không', 
-        ht_chua_chay_nuoc: 'Có', dung_cu_pccc: 'Có', khu_vuc_rui_ro_cao: '', loi_ton_tai_chua_khac_phuc: '', ghi_chu: ''
-      }); 
-      setEquipmentList([]);
-    }
-    setDeletedEqIds([]);
-    setIsPcccModalOpen(true);
-  };
-
-  const addEquipmentRow = () => {
-    const defaultGroup = getAvailableEquipmentGroups(pcccFormData)[0] || '';
-    setEquipmentList([...equipmentList, { id: '', id_don_vi: '', nhom_he_thong: defaultGroup, loai_thiet_bi: '', so_luong: '', don_vi_tinh: 'Cái', vi_tri_bo_tri: '', ngay_bom_sac: '', ngay_het_han: '', tinh_trang: 'Hoạt động tốt' }]);
-  };
-
-  const handleEquipmentChange = (index: number, field: string, value: string) => {
-    const newList = [...equipmentList]; newList[index][field] = value; setEquipmentList(newList);
-  };
-
-  const removeEquipmentRow = (index: number) => {
-    const eq = equipmentList[index];
-    if (eq.id) setDeletedEqIds([...deletedEqIds, eq.id]); 
-    setEquipmentList(equipmentList.filter((_, i) => i !== index));
-  };
-
-  const handlePcccSave = async (e: React.FormEvent) => {
-    e.preventDefault(); setSubmitting(true); setError(null);
-    let finalData = { ...pcccFormData };
-    
-    const isCreate = modalMode === 'create';
-    if (isCreate && (!finalData.id || finalData.id === '')) finalData.id = `PC${Date.now()}`;
-
-    try {
-      await apiService.save(finalData, modalMode, "hs_pccc");
-      
-      for (const delId of deletedEqIds) { await apiService.delete(delId, "ts_pccc"); }
-      if (equipmentList.length > 0) {
-        const eqToSave = equipmentList.map((eq, i) => {
-          const cleaned = { ...eq, id_don_vi: finalData.id_don_vi };
-          if (!cleaned.id || cleaned.id === '') cleaned.id = `EQ${Date.now()}${i}`;
-          return cleaned;
-        });
-        await apiService.save(eqToSave, 'update', 'ts_pccc'); 
-      }
-      setIsPcccModalOpen(false); loadData(); 
-    } catch (err: any) { setError(err.message || 'Lỗi lưu dữ liệu PCCC.'); } 
-    finally { setSubmitting(false); }
-  };
-
-  const openAtvsldModal = () => {
-    if (currentAtvsld) { setAtvsldFormData({ ...currentAtvsld, id: safeGet(currentAtvsld, 'id') }); } 
-    else { setAtvsldFormData({ id: `AT${Date.now()}`, id_don_vi: selectedUnitId || '', nguoi_phu_trach: '', so_luong_mang_luoi: '', link_ho_so_quy_dinh: '', ngay_huan_luyen_gan_nhat: '', ty_le_hoan_thanh_hl: '100%', ngay_ksk: '', nngay_kham_bnn: '', so_luong_thiet_bi_nghiem_ngat: '', so_luong_thiet_bi_qua_han_kt: '0', ngay_quan_trac_mt: '', ty_le_cap_bhld: 'Đầy đủ', ngay_tu_kiem_tra: '', cac_loi_hien_truong: '', so_tai_nan_trong_nam: '0', link_bien_ban_kiem_tra: '', ghi_chu: '' }); }
-    setIsAtvsldModalOpen(true);
-  };
-
-  const handleAtvsldSave = async (e: React.FormEvent) => {
-    e.preventDefault(); setSubmitting(true); setError(null);
-    let finalData = { ...atvsldFormData };
-
-    const isCreate = !currentAtvsld;
-    const mode = isCreate ? 'create' : 'update';
-    if (isCreate && (!finalData.id || finalData.id === '')) finalData.id = `AT${Date.now()}`;
-
-    try {
-      await apiService.save(finalData, mode, "hs_an_toan_lao_dong");
-      if (mode === 'create') setAtvsldData(prev => [finalData, ...prev]);
-      else setAtvsldData(prev => prev.map(item => item.id === finalData.id ? finalData : item));
-      setIsAtvsldModalOpen(false);
-    } catch (err: any) { setError(err.message || 'Lỗi lưu dữ liệu ATVSLĐ.'); } 
-    finally { setSubmitting(false); }
-  };
-
-  const openPcttModal = () => {
-    if (currentPctt) { setPcttFormData({ ...currentPctt, id: safeGet(currentPctt, 'id') }); } 
-    else { setPcttFormData({ id: '', id_don_vi: selectedUnitId || '', doi_truong_pctt: '', sl_nhan_su_doi: '', link_pa_pctt: '', vi_tri_di_doi: '', ngay_kiem_tra_pctt: '', tinh_trang_ha_tang: 'Đã hoàn thành', tinh_trang_bao_hiem: 'Đầy đủ', ngay_cap_nhat_tai_san: '', so_vu_thien_tai: '0', link_ho_so_boi_thuong: '', tinh_trang_khac_phuc: 'Không có sự cố', ghi_chu: '' }); }
-    setIsPcttModalOpen(true);
-  };
-
-  const handlePcttSave = async (e: React.FormEvent) => {
-    e.preventDefault(); setSubmitting(true); setError(null);
-    let finalData = { ...pcttFormData };
-
-    const isCreate = !currentPctt;
-    const mode = isCreate ? 'create' : 'update';
-    if (isCreate && (!finalData.id || finalData.id === '')) finalData.id = `PT${Date.now()}`;
-
-    try {
-      await apiService.save(finalData, mode, "hs_pctt");
-      if (mode === 'create') setPcttData(prev => [finalData, ...prev]);
-      else setPcttData(prev => prev.map(item => item.id === finalData.id ? finalData : item));
-      setIsPcttModalOpen(false);
-    } catch (err: any) { setError(err.message || 'Lỗi lưu dữ liệu PCTT.'); } 
-    finally { setSubmitting(false); }
   };
 
   const confirmDelete = async () => {
@@ -923,6 +759,7 @@ export default function DepartmentPage() {
       </div>
     );
   };
+
   return (
     <div className="flex h-full bg-[#f4f7f9] overflow-hidden relative">
       {isListCollapsed && (
@@ -1084,7 +921,7 @@ export default function DepartmentPage() {
                         <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 z-10"><Maximize2 size={24} strokeWidth={2} /></div>
                         <div className="relative z-10 flex-1">
                           <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">Tổng diện tích mặt bằng</p>
-                          <p className="text-2xl font-black text-gray-800">{formatCurrency(aggregatedStats.totalDienTich)} <span className="text-sm font-semibold text-gray-500">m²</span></p>
+                          <p className="text-2xl font-black text-gray-800">{formatNumber(aggregatedStats.totalDienTich)} <span className="text-sm font-semibold text-gray-500">m²</span></p>
                         </div>
                       </div>
                       <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-cyan-200 transition-all relative overflow-hidden group flex items-center gap-4">
@@ -1092,7 +929,7 @@ export default function DepartmentPage() {
                         <div className="w-12 h-12 rounded-xl bg-cyan-50 text-cyan-600 flex items-center justify-center shrink-0 z-10"><DoorOpen size={24} strokeWidth={2} /></div>
                         <div className="relative z-10 flex-1">
                           <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">Tổng số cổng an ninh</p>
-                          <p className="text-2xl font-black text-gray-800">{formatCurrency(aggregatedStats.totalCong)} <span className="text-sm font-semibold text-gray-500">Cổng</span></p>
+                          <p className="text-2xl font-black text-gray-800">{formatNumber(aggregatedStats.totalCong)} <span className="text-sm font-semibold text-gray-500">Cổng</span></p>
                         </div>
                       </div>
                       <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-orange-200 transition-all relative overflow-hidden group flex items-center gap-4">
@@ -1100,7 +937,7 @@ export default function DepartmentPage() {
                         <div className="w-12 h-12 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center shrink-0 z-10"><Coffee size={24} strokeWidth={2} /></div>
                         <div className="relative z-10 flex-1">
                           <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">Tổng số phòng chờ</p>
-                          <p className="text-2xl font-black text-gray-800">{formatCurrency(aggregatedStats.totalPhongCho)} <span className="text-sm font-semibold text-gray-500">Phòng</span></p>
+                          <p className="text-2xl font-black text-gray-800">{formatNumber(aggregatedStats.totalPhongCho)} <span className="text-sm font-semibold text-gray-500">Phòng</span></p>
                         </div>
                       </div>
                       <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-emerald-200 transition-all relative overflow-hidden group flex items-center gap-4">
@@ -1108,7 +945,7 @@ export default function DepartmentPage() {
                         <div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 z-10"><UserCheck size={24} strokeWidth={2} /></div>
                         <div className="relative z-10 flex-1">
                           <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">Tổng lượt khách trung bình</p>
-                          <p className="text-2xl font-black text-gray-800">{formatCurrency(aggregatedStats.totalKhach)} <span className="text-sm font-semibold text-gray-500">/ ngày</span></p>
+                          <p className="text-2xl font-black text-gray-800">{formatNumber(aggregatedStats.totalKhach)} <span className="text-sm font-semibold text-gray-500">/ ngày</span></p>
                         </div>
                       </div>
                       <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-rose-200 transition-all relative overflow-hidden group flex items-center gap-4">
@@ -1116,7 +953,7 @@ export default function DepartmentPage() {
                         <div className="w-12 h-12 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0 z-10"><Users size={24} strokeWidth={2} /></div>
                         <div className="relative z-10 flex-1">
                           <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">Tổng nhân sự hệ thống</p>
-                          <p className="text-2xl font-black text-gray-800">{formatCurrency(aggregatedStats.totalNhanSu)} <span className="text-sm font-semibold text-gray-500">Người</span></p>
+                          <p className="text-2xl font-black text-gray-800">{formatNumber(aggregatedStats.totalNhanSu)} <span className="text-sm font-semibold text-gray-500">Người</span></p>
                         </div>
                       </div>
                     </div>
@@ -1127,7 +964,7 @@ export default function DepartmentPage() {
                         <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 z-10"><Maximize2 size={24} strokeWidth={2} /></div>
                         <div className="relative z-10 flex-1">
                           <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">Diện tích sàn</p>
-                          <p className="text-2xl font-black text-gray-800">{formatCurrency(selectedUnit.dien_tich || 0)} <span className="text-sm font-semibold text-gray-500">m²</span></p>
+                          <p className="text-2xl font-black text-gray-800">{formatNumber(selectedUnit.dien_tich || 0)} <span className="text-sm font-semibold text-gray-500">m²</span></p>
                         </div>
                       </div>
                       <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-purple-200 transition-all relative overflow-hidden group flex items-center gap-4">
@@ -1143,7 +980,7 @@ export default function DepartmentPage() {
                         <div className="w-12 h-12 rounded-xl bg-cyan-50 text-cyan-600 flex items-center justify-center shrink-0 z-10"><DoorOpen size={24} strokeWidth={2} /></div>
                         <div className="relative z-10 flex-1">
                           <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">Số cổng</p>
-                          <p className="text-2xl font-black text-gray-800">{selectedUnit.so_cong || 0} <span className="text-sm font-semibold text-gray-500">Cổng</span></p>
+                          <p className="text-2xl font-black text-gray-800">{formatNumber(selectedUnit.so_cong || 0)} <span className="text-sm font-semibold text-gray-500">Cổng</span></p>
                         </div>
                       </div>
                       <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-orange-200 transition-all relative overflow-hidden group flex items-center gap-4">
@@ -1151,7 +988,7 @@ export default function DepartmentPage() {
                         <div className="w-12 h-12 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center shrink-0 z-10"><Coffee size={24} strokeWidth={2} /></div>
                         <div className="relative z-10 flex-1">
                           <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">Số phòng chờ</p>
-                          <p className="text-2xl font-black text-gray-800">{selectedUnit.so_phong_cho || 0} <span className="text-sm font-semibold text-gray-500">Phòng</span></p>
+                          <p className="text-2xl font-black text-gray-800">{formatNumber(selectedUnit.so_phong_cho || 0)} <span className="text-sm font-semibold text-gray-500">Phòng</span></p>
                         </div>
                       </div>
                       <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-emerald-200 transition-all relative overflow-hidden group flex items-center gap-4">
@@ -1159,7 +996,7 @@ export default function DepartmentPage() {
                         <div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 z-10"><UserCheck size={24} strokeWidth={2} /></div>
                         <div className="relative z-10 flex-1">
                           <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">Khách TB ra vào</p>
-                          <p className="text-2xl font-black text-gray-800">{formatCurrency(selectedUnit.luot_khach_bq || 0)} <span className="text-sm font-semibold text-gray-500">/ ngày</span></p>
+                          <p className="text-2xl font-black text-gray-800">{formatNumber(selectedUnit.luot_khach_bq || 0)} <span className="text-sm font-semibold text-gray-500">/ ngày</span></p>
                         </div>
                       </div>
                       <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-rose-200 transition-all relative overflow-hidden group flex items-center gap-4">
@@ -1167,7 +1004,7 @@ export default function DepartmentPage() {
                         <div className="w-12 h-12 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0 z-10"><Users size={24} strokeWidth={2} /></div>
                         <div className="relative z-10 flex-1">
                           <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">Nhân sự Đơn vị</p>
-                          <p className="text-2xl font-black text-gray-800">{formatCurrency(selectedUnit.tong_nhan_su || 0)} <span className="text-sm font-semibold text-gray-500">Người</span></p>
+                          <p className="text-2xl font-black text-gray-800">{formatNumber(selectedUnit.tong_nhan_su || 0)} <span className="text-sm font-semibold text-gray-500">Người</span></p>
                         </div>
                       </div>
                     </div>
@@ -1292,8 +1129,12 @@ export default function DepartmentPage() {
                                     <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-1 sm:gap-0">
                                       <span className="text-gray-500 font-medium whitespace-nowrap shrink-0 mt-0.5">Thời hạn HĐ:</span>
                                       <div className="flex flex-col items-start sm:items-end">
-                                        <span className="font-bold text-gray-800">{currentAnNinh.han_hop_dong ? `${currentAnNinh.han_hop_dong} tháng` : '---'} {currentAnNinh.ngay_ky_hd ? `(từ ${new Date(currentAnNinh.ngay_ky_hd).toLocaleDateString('vi-VN')})` : ''}</span>
-                                        {renderContractWarning(currentAnNinh.ngay_ky_hd, currentAnNinh.han_hop_dong)}
+                                        <span className="font-bold text-gray-800">
+                                          {currentAnNinh.han_hop_dong ? `${currentAnNinh.han_hop_dong} tháng` : '---'}
+                                          {Number(currentAnNinh.gia_han_them) > 0 && <span className="text-emerald-600"> (+ {currentAnNinh.gia_han_them} tháng)</span>}
+                                          {currentAnNinh.ngay_ky_hd ? ` (từ ${new Date(currentAnNinh.ngay_ky_hd).toLocaleDateString('vi-VN')})` : ''}
+                                        </span>
+                                        {renderContractWarning(currentAnNinh.ngay_ky_hd, currentAnNinh.han_hop_dong, currentAnNinh.gia_han_them)}
                                       </div>
                                     </div>
                                 </div>
@@ -1939,116 +1780,57 @@ export default function DepartmentPage() {
       )}
 
       {/* 2. MODAL AN NINH */}
-      {isSecurityModalOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl flex flex-col max-h-[90vh] animate-in fade-in zoom-in duration-200">
-            <div className="flex justify-between items-center p-5 border-b border-indigo-100 bg-indigo-50 rounded-t-2xl text-indigo-900"><h3 className="text-xl font-bold flex items-center gap-2"><Shield size={24}/> Cập nhật An ninh & Hệ thống Camera</h3><button onClick={() => setIsSecurityModalOpen(false)} disabled={submitting} className="text-indigo-400 hover:text-red-500 rounded-full p-1.5 bg-white shadow-sm"><X className="w-6 h-6" /></button></div>
-            <form onSubmit={handleSecuritySave} className="p-6 overflow-y-auto space-y-6">
-              <div className="bg-blue-50/50 p-5 rounded-xl border border-blue-100"><h4 className="font-bold text-blue-800 mb-4 flex items-center gap-2 border-b border-blue-200 pb-2"><Users size={18}/> Lực lượng Bảo vệ</h4><div className="grid grid-cols-1 md:grid-cols-3 gap-5"><div><label className="block text-xs font-bold text-gray-700 mb-1">Định biên ANBV (Người)</label><input type="number" name="dinh_bien_bv" value={securityFormData.dinh_bien_bv || ''} onChange={(e) => handleInputChange(e, 'sec')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-blue-500" /></div><div><label className="block text-xs font-bold text-gray-700 mb-1">Bảo vệ Nội bộ (Người)</label><input type="number" name="bv_noi_bo" value={securityFormData.bv_noi_bo || ''} onChange={(e) => handleInputChange(e, 'sec')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-blue-500" /></div><div><label className="block text-xs font-bold text-gray-700 mb-1">Bảo vệ Dịch vụ (Người)</label><input type="number" name="bv_dich_vu" value={securityFormData.bv_dich_vu || ''} onChange={(e) => handleInputChange(e, 'sec')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-blue-500" /></div></div>{Number(securityFormData.bv_dich_vu) >= 1 && (
-                    <div className="flex flex-col gap-4 mt-4 pt-4 border-t border-blue-100 animate-in fade-in slide-in-from-top-2">
-                      <div className="flex flex-col md:flex-row gap-4">
-                        <div className="w-full md:w-[50%]">
-                          <label className="block text-xs font-bold text-gray-700 mb-1">Nhà cung cấp BV</label>
-                          <input type="text" name="ncc_dich_vu" value={securityFormData.ncc_dich_vu || ''} onChange={(e) => handleInputChange(e, 'sec')} placeholder="YUKI, Sepre 24..." className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-blue-500" />
-                        </div>
-                        <div className="w-full md:w-[50%]">
-                          <label className="block text-xs font-bold text-red-600 mb-1">Chi phí thuê (VNĐ/Tháng)</label>
-                          <input type="text" name="chi_phi_thue" value={formatCurrency(securityFormData.chi_phi_thue)} onChange={(e) => handleInputChange(e, 'sec')} placeholder="Nhập số tiền..." className="w-full p-2.5 border border-red-200 text-red-600 font-bold rounded-lg bg-red-50 focus:bg-white outline-none focus:ring-2 focus:ring-red-500" />
-                        </div>
-                      </div>
-                      <div className="flex flex-col md:flex-row gap-4">
-                        <div className="w-full md:w-[40%]">
-                          <label className="block text-xs font-bold text-gray-700 mb-1">Ngày ký HĐ thuê</label>
-                          <input type="date" name="ngay_ky_hd" value={normalizeDateToISO(securityFormData.ngay_ky_hd)} onChange={(e) => handleInputChange(e, 'sec')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-blue-500" />
-                        </div>
-                        <div className="w-full md:w-[20%]">
-                          <label className="block text-xs font-bold text-gray-700 mb-1">Thời hạn HĐ (tháng)</label>
-                          <input type="number" min="1" name="han_hop_dong" value={securityFormData.han_hop_dong || ''} onChange={(e) => handleInputChange(e, 'sec')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-blue-500" />
-                        </div>
-                        <div className="w-full md:w-[40%]">
-                          <label className="block text-xs font-bold text-gray-700 mb-1">Vị trí (Mô tả)</label>
-                          <input type="text" name="vi_tri_bv_dv" value={securityFormData.vi_tri_bv_dv || ''} onChange={(e) => handleInputChange(e, 'sec')} placeholder="Cổng chính, cổng phụ..." className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-blue-500" />
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                  </div>
-              <div className="bg-amber-50/50 p-5 rounded-xl border border-amber-100"><h4 className="font-bold text-amber-800 mb-4 flex items-center gap-2 border-b border-amber-200 pb-2"><Clock size={18}/> Bố trí Ca trực</h4><div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4"><div><label className="block text-[10px] font-bold text-amber-700 mb-1 uppercase flex items-center gap-1"><Sun size={12}/> Ngày (Cố định)</label><input type="number" name="ngay_co_dinh" value={securityFormData.ngay_co_dinh || ''} onChange={(e) => handleInputChange(e, 'sec')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-amber-500" /></div><div><label className="block text-[10px] font-bold text-amber-700 mb-1 uppercase flex items-center gap-1"><Sun size={12}/> Ngày (Tuần tra)</label><input type="number" name="ngay_tuan_tra" value={securityFormData.ngay_tuan_tra || ''} onChange={(e) => handleInputChange(e, 'sec')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-amber-500" /></div><div><label className="block text-[10px] font-bold text-indigo-700 mb-1 uppercase flex items-center gap-1"><Moon size={12}/> Đêm (Cố định)</label><input type="number" name="dem_co_dinh" value={securityFormData.dem_co_dinh || ''} onChange={(e) => handleInputChange(e, 'sec')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-indigo-500" /></div><div><label className="block text-[10px] font-bold text-indigo-700 mb-1 uppercase flex items-center gap-1"><Moon size={12}/> Đêm (Tuần tra)</label><input type="number" name="dem_tuan_tra" value={securityFormData.dem_tuan_tra || ''} onChange={(e) => handleInputChange(e, 'sec')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-indigo-500" /></div></div><div><label className="block text-xs font-bold text-gray-700 mb-1">Bố trí nghỉ ca / Đổi ca</label><textarea name="bo_tri_nghi_ca" value={securityFormData.bo_tri_nghi_ca || ''} onChange={(e) => handleInputChange(e, 'sec')} rows={2} placeholder="Mô tả cách thức bố trí người nghỉ ca..." className="w-full p-2.5 border border-gray-200 rounded-lg bg-white resize-none outline-none focus:ring-2 focus:ring-amber-500"></textarea></div></div>
-              <div className="bg-gray-50 p-5 rounded-xl border border-gray-200"><h4 className="font-bold text-gray-800 mb-4 flex items-center gap-2 border-b border-gray-200 pb-2"><Camera size={18}/> Hệ thống Camera Giám sát</h4><div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4"><div><label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Tổng SL (Mắt)</label><input type="number" name="sl_camera" value={securityFormData.sl_camera || ''} onChange={(e) => handleInputChange(e, 'sec')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-indigo-500" /></div><div><label className="block text-[10px] font-bold text-emerald-600 mb-1 uppercase">Hoạt động</label><input type="number" name="camera_hoat_dong" value={securityFormData.camera_hoat_dong || ''} onChange={(e) => handleInputChange(e, 'sec')} className="w-full p-2.5 border border-emerald-200 rounded-lg bg-emerald-50 outline-none focus:ring-2 focus:ring-emerald-500 font-bold text-emerald-700" /></div><div><label className="block text-[10px] font-bold text-red-600 mb-1 uppercase">Hư hỏng</label><input type="number" name="camera_hu" value={securityFormData.camera_hu || ''} onChange={(e) => handleInputChange(e, 'sec')} className="w-full p-2.5 border border-red-200 rounded-lg bg-red-50 outline-none focus:ring-2 focus:ring-red-500 font-bold text-red-700" /></div><div><label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Lưu hình (Ngày)</label><input type="number" name="thoi_gian_luu" value={securityFormData.thoi_gian_luu || ''} onChange={(e) => handleInputChange(e, 'sec')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-indigo-500" /></div></div>{Number(securityFormData.camera_hu) > 0 && (<div className="mb-4 p-4 bg-red-50/50 rounded-lg border border-red-100 animate-in fade-in zoom-in duration-200"><label className="block text-xs font-bold text-red-700 mb-2">Lý do Camera hư/hỏng</label><select value={securityFormData.ly_do_camera_hu && !['Sự cố nguồn điện', 'Dây tín hiệu và Jack kết nối', 'Lỗi phần cứng Camera', 'Lỗi đầu ghi (DVR/NVR) và Lưu trữ', 'Vấn đề phần mềm & Mạng'].includes(securityFormData.ly_do_camera_hu) ? 'Khác' : (securityFormData.ly_do_camera_hu || '')} onChange={(e) => { const val = e.target.value; setSecurityFormData({...securityFormData, ly_do_camera_hu: val === 'Khác' ? 'Khác' : val}); }} className="w-full p-2.5 border border-red-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-red-500 text-sm font-medium text-red-800 mb-2"><option value="">-- Chọn lý do --</option><option value="Sự cố nguồn điện">Sự cố nguồn điện</option><option value="Dây tín hiệu và Jack kết nối">Dây tín hiệu và Jack kết nối</option><option value="Lỗi phần cứng Camera">Lỗi phần cứng Camera</option><option value="Lỗi đầu ghi (DVR/NVR) và Lưu trữ">Lỗi đầu ghi (DVR/NVR) và Lưu trữ</option><option value="Vấn đề phần mềm & Mạng">Vấn đề phần mềm & Mạng</option><option value="Khác">Khác (Nhập lý do cụ thể...)</option></select>{(securityFormData.ly_do_camera_hu && !['Sự cố nguồn điện', 'Dây tín hiệu và Jack kết nối', 'Lỗi phần cứng Camera', 'Lỗi đầu ghi (DVR/NVR) và Lưu trữ', 'Vấn đề phần mềm & Mạng', ''].includes(securityFormData.ly_do_camera_hu)) && (<input type="text" value={securityFormData.ly_do_camera_hu === 'Khác' ? '' : securityFormData.ly_do_camera_hu} onChange={(e) => setSecurityFormData({...securityFormData, ly_do_camera_hu: e.target.value || 'Khác'})} placeholder="Gõ lý do hư hỏng cụ thể..." className="w-full p-2.5 border border-red-300 rounded-lg bg-white outline-none focus:ring-2 focus:ring-red-500 text-sm" />)}</div>)}<div className="grid grid-cols-1 md:grid-cols-2 gap-4"><div><label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Vị trí đặt hệ thống (Đầu ghi)</label><input type="text" name="vi_tri_he_thong_camera" value={securityFormData.vi_tri_he_thong_camera || ''} onChange={(e) => handleInputChange(e, 'sec')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-indigo-500" placeholder="VD: Phòng IT..." /></div><div><label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Vị trí giám sát chính</label><textarea name="vi_tri_gs_camera" value={securityFormData.vi_tri_gs_camera || ''} onChange={(e) => handleInputChange(e, 'sec')} rows={1} placeholder="Mô tả các góc giám sát..." className="w-full p-2.5 border border-gray-200 rounded-lg bg-white resize-none outline-none focus:ring-2 focus:ring-indigo-500"></textarea></div></div></div>
-              <div className="bg-emerald-50/50 p-5 rounded-xl border border-emerald-100"><h4 className="font-bold text-emerald-800 mb-4 flex items-center gap-2 border-b border-emerald-200 pb-2"><Compass size={18}/> Đặc điểm Địa bàn</h4><div className="space-y-5"><div className="grid grid-cols-2 md:grid-cols-4 gap-4"><div><label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Tiếp giáp Trước</label><input type="text" name="tiep_giap_truoc" value={securityFormData.tiep_giap_truoc || ''} onChange={(e) => handleInputChange(e, 'sec')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-emerald-500" /></div><div><label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Tiếp giáp Sau</label><input type="text" name="tiep_giap_sau" value={securityFormData.tiep_giap_sau || ''} onChange={(e) => handleInputChange(e, 'sec')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-emerald-500" /></div><div><label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Tiếp giáp Trái</label><input type="text" name="tiep_giap_trai" value={securityFormData.tiep_giap_trai || ''} onChange={(e) => handleInputChange(e, 'sec')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-emerald-500" /></div><div><label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Tiếp giáp Phải</label><input type="text" name="tiep_giap_phai" value={securityFormData.tiep_giap_phai || ''} onChange={(e) => handleInputChange(e, 'sec')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-emerald-500" /></div></div><div><label className="block text-xs font-bold text-emerald-800 mb-1">Đánh giá Tình hình ANTT Khu vực</label><input type="text" name="tinh_hinh_khu_vuc" value={securityFormData.tinh_hinh_khu_vuc || ''} onChange={(e) => handleInputChange(e, 'sec')} placeholder="VD: Phức tạp, Thường xuyên mất cắp..." className="w-full p-2.5 border border-emerald-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-emerald-500" /></div></div></div>
-              <div className="bg-purple-50/50 p-5 rounded-xl border border-purple-100"><h4 className="font-bold text-purple-800 mb-4 flex items-center gap-2 border-b border-purple-200 pb-2"><FileText size={18}/> Phương án ANBV</h4><div><label className="block text-xs font-bold text-gray-700 mb-1">Link Phương án ANBV (Drive/PDF)</label><div className="relative"><LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} /><input type="url" name="link_pa_anbv" value={securityFormData.link_pa_anbv || ''} onChange={(e) => handleInputChange(e, 'sec')} placeholder="Dán link phương án..." className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-lg bg-white text-blue-600 outline-none focus:ring-2 focus:ring-purple-500" /></div></div></div>
-              <div className="pt-4 flex justify-end gap-3 mt-6 border-t border-gray-100"><button type="button" onClick={() => setIsSecurityModalOpen(false)} className="px-8 py-3 bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors shadow-sm font-bold rounded-xl">Hủy</button><button type="submit" disabled={submitting} className="px-8 py-3 bg-[#05469B] text-white rounded-xl font-bold flex items-center gap-2 hover:bg-[#04367a] shadow-md transition-colors">{submitting ? <Loader2 className="animate-spin"/> : <Save/>} Lưu Cập Nhật</button></div>
-            </form>
-          </div>
-        </div>
-      )}
+      <SecurityModal
+        isOpen={isSecurityModalOpen}
+        currentData={currentAnNinh}
+        selectedUnitId={selectedUnitId}
+        onSaved={(data, isCreate) => {
+          if (isCreate) setAnNinhData(prev => [...prev, data]);
+          else setAnNinhData(prev => prev.map(item => item.id === data.id ? data : item));
+        }}
+        onClose={() => setIsSecurityModalOpen(false)}
+      />
+
       {/* 3. MODAL HẬU CẦN */}
-      {isPvhcModalOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[90vh] animate-in fade-in zoom-in duration-200">
-            <div className="flex justify-between items-center p-5 border-b border-emerald-100 bg-emerald-50 rounded-t-2xl text-emerald-900"><h3 className="text-xl font-bold flex items-center gap-2"><Utensils size={24}/> Cập nhật Phục vụ Hậu cần</h3><button onClick={() => setIsPvhcModalOpen(false)} disabled={submitting} className="text-emerald-400 hover:text-red-500 rounded-full p-1.5 bg-white shadow-sm"><X className="w-6 h-6" /></button></div>
-            <form onSubmit={handlePvhcSave} className="p-6 overflow-y-auto space-y-6">
-              <div className="bg-emerald-50/50 p-5 rounded-xl border border-emerald-100"><h4 className="font-bold text-emerald-800 mb-4 flex items-center gap-2 border-b border-emerald-200 pb-2"><Pocket size={18}/> 1. Lực lượng Nội bộ</h4><div className="grid grid-cols-1 sm:grid-cols-3 gap-5"><div><label className="block text-xs font-bold text-gray-700 mb-1">Định biên (Người) *</label><input type="number" required name="dinh_bien" value={pvhcFormData.dinh_bien || ''} onChange={(e) => handleInputChange(e, 'pvhc')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-emerald-500" /></div><div><label className="block text-xs font-bold text-gray-700 mb-1">NV Khách chờ (Phòng chờ)</label><input type="number" name="pvhc_khach_cho" value={pvhcFormData.pvhc_khach_cho || ''} onChange={(e) => handleInputChange(e, 'pvhc')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-emerald-500" /></div><div><label className="block text-xs font-bold text-gray-700 mb-1">NV PVHC (Vệ sinh-5S)</label><input type="number" name="pvhc_ve_sinh" value={pvhcFormData.pvhc_ve_sinh || ''} onChange={(e) => handleInputChange(e, 'pvhc')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-emerald-500" /></div></div><p className="text-[10px] text-gray-500 mt-3 italic">* Hệ thống sẽ tự động tính <strong>Hiện hữu</strong> = Khách chờ + Vệ sinh</p></div>
-              <div className="bg-orange-50/50 p-5 rounded-xl border border-orange-100"><h4 className="font-bold text-orange-800 mb-4 flex items-center gap-2 border-b border-orange-200 pb-2"><Briefcase size={18}/> 2. Dịch vụ Thuê ngoài</h4><div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-5"><div><label className="block text-xs font-bold text-gray-700 mb-1">Số lượng Thuê ngoài (Người)</label><input type="number" name="pvhc_dich_vu" value={pvhcFormData.pvhc_dich_vu || ''} onChange={(e) => handleInputChange(e, 'pvhc')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-orange-500" /></div>{Number(pvhcFormData.pvhc_dich_vu) > 0 && (<div className="animate-in fade-in"><label className="block text-xs font-bold text-gray-700 mb-1">Vị trí đảm nhận *</label><input type="text" required name="vi_tri" value={pvhcFormData.vi_tri || ''} onChange={(e) => handleInputChange(e, 'pvhc')} placeholder="VD: Khách chờ, Vệ sinh-5S..." className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-orange-500" /></div>)}</div>{Number(pvhcFormData.pvhc_dich_vu) > 0 && (<div className="grid grid-cols-1 sm:grid-cols-2 gap-5 pt-4 border-t border-orange-100 animate-in fade-in"><div><label className="block text-xs font-bold text-gray-700 mb-1">Nhà cung cấp *</label><input type="text" required name="ncc_dich_vu" value={pvhcFormData.ncc_dich_vu || ''} onChange={(e) => handleInputChange(e, 'pvhc')} placeholder="Tên công ty thuê ngoài..." className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-orange-500" /></div><div><label className="block text-xs font-bold text-red-600 mb-1">Chi phí thuê / tháng (VNĐ) *</label><input type="text" required name="chi_phi_thue" value={formatCurrency(pvhcFormData.chi_phi_thue)} onChange={(e) => handleInputChange(e, 'pvhc')} placeholder="Nhập số tiền..." className="w-full p-2.5 border border-red-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-red-500 font-bold text-red-600" /></div></div>)}</div>
-              <div className="pt-4 flex justify-end gap-3 mt-6 border-t border-gray-100"><button type="button" onClick={() => setIsPvhcModalOpen(false)} className="px-8 py-3 bg-gray-100 text-gray-700 rounded-xl font-bold hover:bg-gray-200 transition-colors shadow-sm">Hủy</button><button type="submit" disabled={submitting} className="px-8 py-3 bg-[#05469B] text-white rounded-xl font-bold flex items-center gap-2 hover:bg-[#04367a] shadow-md transition-colors">{submitting ? <Loader2 className="animate-spin"/> : <Save/>} Lưu Cập Nhật</button></div>
-            </form>
-          </div>
-        </div>
-      )}
+      <PvhcModal
+        isOpen={isPvhcModalOpen}
+        currentData={pvhcCurrentData}
+        selectedUnitId={selectedUnitId}
+        onSaved={(data, isCreate) => {
+          if (isCreate) setPvhcData(prev => [...prev, data]);
+          else setPvhcData(prev => prev.map(item => item.id === data.id ? data : item));
+        }}
+        onClose={() => setIsPvhcModalOpen(false)}
+      />
 
       {/* 4. MODAL PHÁP NHÂN */}
-      {isPnModalOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl flex flex-col max-h-[90vh] animate-in fade-in zoom-in duration-200">
-            <div className="flex justify-between items-center p-5 border-b border-orange-100 bg-orange-50 rounded-t-2xl text-orange-900"><h3 className="text-xl font-bold flex items-center gap-2"><Briefcase size={24}/> {pnModalMode === 'create' ? 'Thêm Pháp nhân mới' : 'Cập nhật Pháp nhân'}</h3><button onClick={() => setIsPnModalOpen(false)} disabled={submitting} className="text-orange-400 hover:text-red-500 rounded-full p-1.5 bg-white shadow-sm"><X className="w-6 h-6" /></button></div>
-            <form onSubmit={handlePnSave} className="p-6 overflow-y-auto space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                <div className="md:col-span-2"><label className="block text-xs font-bold text-gray-600 mb-1">Tên Công ty (Pháp nhân) *</label><input type="text" required name="ten_cong_ty" value={pnFormData.ten_cong_ty || ''} onChange={(e) => handleInputChange(e, 'pn')} placeholder="VD: Công ty TNHH MTV Phân phối Ô tô..." className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-orange-500 font-bold text-gray-800" /></div>
-                <div><label className="block text-xs font-bold text-gray-600 mb-1">Mã số thuế (MST) *</label><input type="text" required name="ma_so_thue" value={pnFormData.ma_so_thue || ''} onChange={(e) => handleInputChange(e, 'pn')} placeholder="Nhập MST..." className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-orange-500 font-bold text-orange-700 tracking-widest" /></div>
-                <div className="md:col-span-3"><label className="block text-xs font-bold text-gray-600 mb-1">Đơn vị trực thuộc *</label><select required name="id_don_vi" value={pnFormData.id_don_vi || ''} onChange={(e) => handleInputChange(e, 'pn')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-orange-500 font-bold text-[#05469B]" style={{ fontFamily: 'monospace, sans-serif' }}><option value="">-- Chọn Đơn vị --</option>{buildHierarchicalOptions(data.filter(dv => selectedUnitSubordinates.includes(dv.id))).map(({ unit, prefix }) => (<option key={unit.id} value={unit.id} className="font-normal text-gray-700">{prefix}{getUnitEmoji(unit.loai_hinh)} {unit.ten_don_vi}</option>))}</select></div>
-                <div className="md:col-span-2"><label className="block text-xs font-bold text-gray-600 mb-1">Địa chỉ đăng ký kinh doanh</label><input type="text" name="dia_chi" value={pnFormData.dia_chi || ''} onChange={(e) => handleInputChange(e, 'pn')} placeholder="Địa chỉ ghi trên Giấy phép kinh doanh..." className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-orange-500" /></div>
-                <div><label className="block text-xs font-bold text-gray-600 mb-1">Email nhận Hóa đơn</label><input type="email" name="mail" value={pnFormData.mail || ''} onChange={(e) => handleInputChange(e, 'pn')} placeholder="ketoan@thaco.com.vn..." className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-orange-500" /></div>
-                <div className="md:col-span-3"><label className="block text-xs font-bold text-gray-600 mb-1">Link Giấy phép Kinh doanh (Drive / File scan)</label><input type="url" name="gpkd" value={pnFormData.gpkd || ''} onChange={(e) => handleInputChange(e, 'pn')} placeholder="Dán link file đính kèm..." className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-orange-500 text-blue-600" /></div>
-              </div>
-              <div className="pt-4 border-t border-gray-100 flex justify-end gap-3 mt-6"><button type="button" onClick={() => setIsPnModalOpen(false)} className="px-8 py-3 bg-gray-100 text-gray-700 hover:bg-gray-200 font-bold rounded-xl transition-colors">Hủy</button><button type="submit" disabled={submitting} className="px-8 py-3 text-white bg-orange-600 hover:bg-orange-700 font-bold rounded-xl flex items-center gap-2 shadow-md transition-colors">{submitting ? <Loader2 className="animate-spin" /> : 'Lưu Pháp nhân'}</button></div>
-            </form>
-          </div>
-        </div>
-      )}
+        <PnModal
+        isOpen={isPnModalOpen}
+        mode={pnModalMode}
+        currentData={pnCurrentData}
+        selectedUnitId={selectedUnitId}
+        // 🟢 BỔ SUNG DÒNG NÀY: Truyền danh sách đơn vị toàn hệ thống xuống
+        unitList={data} 
+        onSaved={(pnData, isCreate) => {
+          if (isCreate) setPhapNhanData(prev => [...prev, pnData]);
+          else setPhapNhanData(prev => prev.map(item => item.id === pnData.id ? pnData : item));
+        }}
+        onClose={() => setIsPnModalOpen(false)}
+      />
 
       {/* 5. MODAL PHÒNG HỌP */}
-      {isPhModalOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl flex flex-col max-h-[90vh] animate-in fade-in zoom-in duration-200">
-            <div className="flex justify-between items-center p-5 border-b border-fuchsia-100 bg-fuchsia-50 rounded-t-2xl text-fuchsia-900"><h3 className="text-xl font-bold flex items-center gap-2"><Monitor size={24}/> {phModalMode === 'create' ? 'Thêm Phòng họp mới' : 'Cập nhật Phòng họp'}</h3><button onClick={() => setIsPhModalOpen(false)} disabled={submitting} className="text-fuchsia-400 hover:text-red-500 rounded-full p-1.5 bg-white shadow-sm"><X className="w-6 h-6" /></button></div>
-            <form onSubmit={handlePhSave} className="p-6 overflow-y-auto space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
-                <div className="md:col-span-2"><label className="block text-xs font-bold text-gray-600 mb-1">Tên Phòng họp *</label><input type="text" required name="ten_phong_hop" value={phFormData.ten_phong_hop || ''} onChange={(e) => handleInputChange(e, 'ph')} placeholder="VD: Phòng họp Tầng 2..." className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-fuchsia-500 font-bold text-gray-800" /></div>
-                <div><label className="block text-xs font-bold text-gray-600 mb-1">Vị trí *</label><input type="text" required name="vi_tri" value={phFormData.vi_tri || ''} onChange={(e) => handleInputChange(e, 'ph')} placeholder="VD: Lầu 2..." className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-fuchsia-500" /></div>
-                <div><label className="block text-xs font-bold text-gray-600 mb-1">Sức chứa tối đa (Người) *</label><input type="number" required name="suc_chua" value={phFormData.suc_chua || ''} onChange={(e) => handleInputChange(e, 'ph')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-fuchsia-500" /></div>
-              </div>
-              <div className="bg-gray-50 p-5 rounded-xl border border-gray-200 space-y-5">
-                <h4 className="text-sm font-bold text-[#05469B] flex items-center gap-2 border-b border-gray-200 pb-2"><Projector size={16}/> Trang thiết bị</h4>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                  <div className="md:col-span-2"><label className="block text-xs font-bold text-gray-600 mb-1">Thiết bị trình chiếu (Loại - Inch)</label><input type="text" name="tb_trinh_chieu" value={phFormData.tb_trinh_chieu || ''} onChange={(e) => handleInputChange(e, 'ph')} placeholder="VD: Tivi - 100 inch..." className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-fuchsia-500" /></div>
-                  <div><label className="block text-xs font-bold text-gray-600 mb-1">Số lượng Bút Laser</label><input type="number" name="but_chi" value={phFormData.but_chi || ''} onChange={(e) => handleInputChange(e, 'ph')} placeholder="Nhập số lượng..." className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-fuchsia-500" /></div>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-                  <label className="flex items-center p-3 border border-gray-200 rounded-lg bg-white cursor-pointer hover:border-fuchsia-500 transition-colors shadow-sm"><input type="checkbox" name="tb_hop_online" checked={phFormData.tb_hop_online || false} onChange={(e) => handleInputChange(e, 'ph')} className="w-4 h-4 text-fuchsia-600 rounded border-gray-300 mr-2.5 focus:ring-fuchsia-500" /><span className="text-xs font-bold text-gray-700">Thiết bị Họp Online</span></label>
-                  <label className="flex items-center p-3 border border-gray-200 rounded-lg bg-white cursor-pointer hover:border-fuchsia-500 transition-colors shadow-sm"><input type="checkbox" name="bang_viet" checked={phFormData.bang_viet || false} onChange={(e) => handleInputChange(e, 'ph')} className="w-4 h-4 text-fuchsia-600 rounded border-gray-300 mr-2.5 focus:ring-fuchsia-500" /><span className="text-xs font-bold text-gray-700">Bảng viết</span></label>
-                  <label className="flex items-center p-3 border border-gray-200 rounded-lg bg-white cursor-pointer hover:border-fuchsia-500 transition-colors shadow-sm"><input type="checkbox" name="tb_chuyen_slide" checked={phFormData.tb_chuyen_slide || false} onChange={(e) => handleInputChange(e, 'ph')} className="w-4 h-4 text-fuchsia-600 rounded border-gray-300 mr-2.5 focus:ring-fuchsia-500" /><span className="text-xs font-bold text-gray-700">Bút chuyển slide</span></label>
-                  <div className="flex flex-col justify-center bg-white border border-gray-200 rounded-lg p-2 px-3 shadow-sm"><label className="block text-[10px] font-bold text-gray-400 mb-1">MÀU BÚT LÔNG</label><div className="flex gap-3">{['Xanh', 'Đỏ', 'Đen'].map(color => { const isChecked = phFormData.but_viet?.includes(color); return (<label key={color} className="flex items-center cursor-pointer group"><input type="checkbox" checked={isChecked} onChange={(e) => handleButVietChange(color, e.target.checked)} className="w-3.5 h-3.5 rounded border-gray-300 text-fuchsia-600 focus:ring-fuchsia-500 mr-1" /><span className={`text-xs font-medium transition-colors ${isChecked ? 'text-gray-800' : 'text-gray-500 group-hover:text-fuchsia-600'}`}>{color}</span></label>) })}</div></div>
-                </div>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <div><label className="block text-xs font-bold text-gray-600 mb-1">Link Layout Phòng (Drive / File PDF)</label><input type="url" name="layout" value={phFormData.layout || ''} onChange={(e) => handleInputChange(e, 'ph')} placeholder="Dán link layout..." className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-fuchsia-500 text-blue-600" /></div>
-                <div><label className="block text-xs font-bold text-gray-600 mb-1">Ghi chú khác</label><input type="text" name="ghi_chu" value={phFormData.ghi_chu || ''} onChange={(e) => handleInputChange(e, 'ph')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-fuchsia-500" /></div>
-              </div>
-              <div className="pt-4 border-t border-gray-100 flex justify-end gap-3 mt-6"><button type="button" onClick={() => setIsPhModalOpen(false)} className="px-8 py-3 bg-gray-100 text-gray-700 hover:bg-gray-200 font-bold rounded-xl transition-colors">Hủy</button><button type="submit" disabled={submitting} className="px-8 py-3 text-white bg-fuchsia-600 hover:bg-fuchsia-700 font-bold rounded-xl flex items-center gap-2 shadow-md transition-colors">{submitting ? <Loader2 className="animate-spin" /> : 'Lưu Phòng Họp'}</button></div>
-            </form>
-          </div>
-        </div>
-      )}
+      <PhModal
+        isOpen={isPhModalOpen}
+        mode={phModalMode}
+        currentData={phCurrentData}
+        selectedUnitId={selectedUnitId}
+        onSaved={(data, isCreate) => {
+          if (isCreate) setPhongHopData(prev => [...prev, data]);
+          else setPhongHopData(prev => prev.map(item => item.id === data.id ? data : item));
+        }}
+        onClose={() => setIsPhModalOpen(false)}
+      />
+
       {/* 6. MODAL PCCC (ALL IN ONE) */}
       {isPcccModalOpen && (
         <div className={`fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm transition-all duration-300 ${!isListCollapsed ? 'lg:pl-80' : ''}`}>
@@ -2194,133 +1976,28 @@ export default function DepartmentPage() {
       )}
 
       {/* 7. MODAL ATVSLĐ */}
-      {isAtvsldModalOpen && (
-        <div className={`fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm transition-all duration-300 ${!isListCollapsed ? 'lg:pl-80' : ''}`}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl flex flex-col max-h-[90vh] animate-in fade-in zoom-in duration-200">
-            <div className="flex justify-between p-5 border-b border-emerald-100 bg-emerald-50 rounded-t-2xl shrink-0">
-              <h3 className="text-xl font-bold text-emerald-800 flex items-center gap-2"><HardHat size={24}/> {atvsldFormData.id ? 'Cập nhật Hồ sơ ATVSLĐ' : 'Tạo Hồ sơ ATVSLĐ'}</h3>
-              <button onClick={() => setIsAtvsldModalOpen(false)} disabled={submitting} className="text-emerald-400 hover:text-red-500 rounded-full p-1.5 bg-white shadow-sm transition-colors"><X className="w-6 h-6" /></button>
-            </div>
-            
-            <form onSubmit={handleAtvsldSave} className="p-6 overflow-y-auto space-y-6 flex-1 min-h-0 custom-scrollbar">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                
-                {/* CỘT 1 */}
-                <div className="space-y-6">
-                  <div className="bg-blue-50/40 p-5 rounded-xl border border-blue-100 shadow-sm">
-                    <h4 className="font-bold text-blue-800 mb-4 flex items-center gap-2 border-b border-blue-200 pb-2"><Users size={18}/> 1. Tổ chức & Nhân sự</h4>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="col-span-2"><label className="block text-xs font-bold text-gray-700 mb-1">Người phụ trách ATVSLĐ</label><input type="text" name="nguoi_phu_trach" value={atvsldFormData.nguoi_phu_trach || ''} onChange={(e) => handleInputChange(e, 'atvsld')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-blue-500" placeholder="Họ và tên..." /></div>
-                      <div><label className="block text-xs font-bold text-gray-700 mb-1">Mạng lưới ATVS Viên (Người)</label><input type="number" name="so_luong_mang_luoi" value={atvsldFormData.so_luong_mang_luoi || ''} onChange={(e) => handleInputChange(e, 'atvsld')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-blue-500" /></div>
-                      <div><label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">Tỷ lệ Cấp phát BHLĐ</label><select name="ty_le_cap_bhld" value={atvsldFormData.ty_le_cap_bhld || 'Đầy đủ'} onChange={(e) => handleInputChange(e, 'atvsld')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-blue-500"><option value="Đầy đủ">Đầy đủ</option><option value="Đang thiếu">Đang thiếu / Chờ cấp</option></select></div>
-                      <div className="col-span-2"><label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">Link Quyết định / Quy trình / Kế hoạch năm</label><input type="url" name="link_ho_so_quy_dinh" value={atvsldFormData.link_ho_so_quy_dinh || ''} onChange={(e) => handleInputChange(e, 'atvsld')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-blue-500 text-blue-600" placeholder="https://drive.google.com/..." /></div>
-                    </div>
-                  </div>
-                  <div className="bg-emerald-50/40 p-5 rounded-xl border border-emerald-100 shadow-sm">
-                    <h4 className="font-bold text-emerald-800 mb-4 flex items-center gap-2 border-b border-emerald-200 pb-2"><Shield size={18}/> 2. Sức khỏe & Huấn luyện</h4>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div><label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">Ngày Huấn luyện gần nhất</label><input type="date" name="ngay_huan_luyen_gan_nhat" value={atvsldFormData.ngay_huan_luyen_gan_nhat ? atvsldFormData.ngay_huan_luyen_gan_nhat.split('T')[0] : ''} onChange={(e) => handleInputChange(e, 'atvsld')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-emerald-500" /></div>
-                      <div><label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">Tỷ lệ hoàn thành HL (%)</label><input type="text" name="ty_le_hoan_thanh_hl" value={atvsldFormData.ty_le_hoan_thanh_hl || ''} onChange={(e) => handleInputChange(e, 'atvsld')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-emerald-500" placeholder="VD: 100%" /></div>
-                      <div><label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">Ngày Khám SK Định kỳ</label><input type="date" name="ngay_ksk" value={atvsldFormData.ngay_ksk ? atvsldFormData.ngay_ksk.split('T')[0] : ''} onChange={(e) => handleInputChange(e, 'atvsld')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-emerald-500 font-bold text-emerald-700" /></div>
-                      <div><label className="block text-[10px] font-bold text-orange-600 mb-1 uppercase">Ngày Khám Bệnh Nghề nghiệp</label><input type="date" name="nngay_kham_bnn" value={atvsldFormData.nngay_kham_bnn ? atvsldFormData.nngay_kham_bnn.split('T')[0] : ''} onChange={(e) => handleInputChange(e, 'atvsld')} className="w-full p-2.5 border border-orange-200 rounded-lg bg-orange-50 outline-none focus:ring-2 focus:ring-orange-500 font-bold text-orange-700" title="Dành cho LĐ Nặng nhọc/Độc hại" /></div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* CỘT 2 */}
-                <div className="space-y-6">
-                  <div className="bg-orange-50/40 p-5 rounded-xl border border-orange-100 shadow-sm">
-                    <h4 className="font-bold text-orange-800 mb-4 flex items-center gap-2 border-b border-orange-200 pb-2"><Settings size={18}/> 3. Máy móc & Môi trường</h4>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div><label className="block text-xs font-bold text-gray-700 mb-1">Tổng Thiết bị Nghiêm ngặt</label><input type="number" name="so_luong_thiet_bi_nghiem_ngat" value={atvsldFormData.so_luong_thiet_bi_nghiem_ngat || ''} onChange={(e) => handleInputChange(e, 'atvsld')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-orange-500" placeholder="Thang nâng, máy nén..." /></div>
-                      <div><label className="block text-xs font-bold text-red-600 mb-1">Thiết bị Quá hạn Kiểm định</label><input type="number" name="so_luong_thiet_bi_qua_han_kt" value={atvsldFormData.so_luong_thiet_bi_qua_han_kt || '0'} onChange={(e) => handleInputChange(e, 'atvsld')} className="w-full p-2.5 border border-red-300 rounded-lg bg-red-50 outline-none focus:ring-2 focus:ring-red-500 font-bold text-red-700" /></div>
-                      <div className="col-span-2"><label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">Ngày Đo kiểm Môi trường LĐ gần nhất</label><input type="date" name="ngay_quan_trac_mt" value={atvsldFormData.ngay_quan_trac_mt ? atvsldFormData.ngay_quan_trac_mt.split('T')[0] : ''} onChange={(e) => handleInputChange(e, 'atvsld')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-orange-500 font-bold text-gray-700" /></div>
-                    </div>
-                  </div>
-
-                  <div className="bg-red-50/40 p-5 rounded-xl border border-red-200 shadow-sm">
-                    <h4 className="font-bold text-red-800 mb-4 flex items-center gap-2 border-b border-red-200 pb-2"><AlertCircle size={18}/> 4. Hiện trường & Sự cố</h4>
-                    <div className="space-y-4">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div><label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">Ngày Tự KT / Checklist</label><input type="date" name="ngay_tu_kiem_tra" value={atvsldFormData.ngay_tu_kiem_tra ? atvsldFormData.ngay_tu_kiem_tra.split('T')[0] : ''} onChange={(e) => handleInputChange(e, 'atvsld')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-red-500" /></div>
-                        <div><label className="block text-[10px] font-bold text-red-600 mb-1 uppercase">Số vụ Tai nạn LĐ (Năm)</label><input type="number" name="so_tai_nan_trong_nam" value={atvsldFormData.so_tai_nan_trong_nam || '0'} onChange={(e) => handleInputChange(e, 'atvsld')} className="w-full p-2.5 border border-red-300 rounded-lg bg-white outline-none focus:ring-2 focus:ring-red-500 font-bold text-red-700" /></div>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-red-700 mb-1">Các rủi ro / Lỗi hiện trường cần khắc phục</label>
-                        <textarea name="cac_loi_hien_truong" value={atvsldFormData.cac_loi_hien_truong || ''} onChange={(e) => handleInputChange(e, 'atvsld')} rows={2} className="w-full p-2.5 border border-red-300 rounded-lg bg-white outline-none focus:ring-2 focus:ring-red-500 resize-none font-medium text-red-800" placeholder="VD: Sàn xưởng trơn trượt, chưa đeo dây đai an toàn..."></textarea>
-                      </div>
-                      <div><label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">Link Biên bản tuần tra (Checklist PDF)</label><input type="url" name="link_bien_ban_kiem_tra" value={atvsldFormData.link_bien_ban_kiem_tra || ''} onChange={(e) => handleInputChange(e, 'atvsld')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-red-500 text-blue-600" /></div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="pt-5 border-t border-gray-100 flex justify-end gap-3 mt-8 shrink-0">
-                <button type="button" onClick={() => setIsAtvsldModalOpen(false)} className="px-8 py-3 bg-gray-100 text-gray-700 hover:bg-gray-200 rounded-xl font-bold transition-colors">Hủy</button>
-                <button type="submit" disabled={submitting} className="px-8 py-3 text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl font-bold flex items-center gap-2 shadow-lg transition-colors">{submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />} Lưu ATVSLĐ</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <AtvsldModal
+        isOpen={isAtvsldModalOpen}
+        currentData={atvsldCurrentData}
+        selectedUnitId={selectedUnitId}
+        onSaved={(data, isCreate) => {
+          if (isCreate) setAtvsldData(prev => [data, ...prev]);
+          else setAtvsldData(prev => prev.map(item => item.id === data.id ? data : item));
+        }}
+        onClose={() => setIsAtvsldModalOpen(false)}
+      />
 
       {/* 8. MODAL PCTT */}
-      {isPcttModalOpen && (
-        <div className={`fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm transition-all duration-300 ${!isListCollapsed ? 'lg:pl-80' : ''}`}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl flex flex-col max-h-[90vh] animate-in fade-in zoom-in duration-200">
-            <div className="flex justify-between p-5 border-b border-blue-100 bg-blue-50 rounded-t-2xl shrink-0">
-              <h3 className="text-xl font-bold text-blue-800 flex items-center gap-2"><CloudLightning size={24}/> {pcttFormData.id ? 'Cập nhật Hồ sơ PCTT & Bảo hiểm' : 'Tạo Hồ sơ PCTT'}</h3>
-              <button onClick={() => setIsPcttModalOpen(false)} disabled={submitting} className="text-blue-400 hover:text-red-500 rounded-full p-1.5 bg-white shadow-sm transition-colors"><X className="w-6 h-6" /></button>
-            </div>
-            <form onSubmit={handlePcttSave} className="p-6 overflow-y-auto space-y-6 flex-1 min-h-0 custom-scrollbar">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="space-y-6">
-                  <div className="bg-gray-50 p-5 rounded-xl border border-gray-200 shadow-sm">
-                    <h4 className="font-bold text-gray-800 mb-4 flex items-center gap-2 border-b border-gray-200 pb-2"><Users size={18}/> 1. Tổ chức Đội PCTT & Phương án</h4>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="col-span-2"><label className="block text-xs font-bold text-gray-700 mb-1">Đội trưởng chỉ huy PCTT</label><input type="text" name="doi_truong_pctt" value={pcttFormData.doi_truong_pctt || ''} onChange={(e) => handleInputChange(e, 'pctt')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-blue-500" placeholder="VD: GĐ Showroom..." /></div>
-                      <div><label className="block text-xs font-bold text-gray-700 mb-1">Lực lượng ứng phó (Người)</label><input type="number" name="sl_nhan_su_doi" value={pcttFormData.sl_nhan_su_doi || ''} onChange={(e) => handleInputChange(e, 'pctt')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-blue-500" /></div>
-                      <div className="col-span-2"><label className="block text-xs font-bold text-gray-700 mb-1">Vị trí di dời xe & tài sản an toàn</label><textarea name="vi_tri_di_doi" value={pcttFormData.vi_tri_di_doi || ''} onChange={(e) => handleInputChange(e, 'pctt')} rows={2} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-blue-500 resize-none" placeholder="Mô tả bãi đỗ xe tránh ngập lụt, cây xanh..."></textarea></div>
-                      <div className="col-span-2"><label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">Link Phương án PCTT (PDF/Drive)</label><input type="url" name="link_pa_pctt" value={pcttFormData.link_pa_pctt || ''} onChange={(e) => handleInputChange(e, 'pctt')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-blue-500 text-blue-600" /></div>
-                    </div>
-                  </div>
-                  <div className="bg-emerald-50/40 p-5 rounded-xl border border-emerald-100 shadow-sm">
-                    <h4 className="font-bold text-emerald-800 mb-4 flex items-center gap-2 border-b border-emerald-200 pb-2"><Shield size={18}/> 2. Bảo hiểm & Quản trị Tài sản</h4>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div><label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">Bảo hiểm mọi rủi ro TS</label><select name="tinh_trang_bao_hiem" value={pcttFormData.tinh_trang_bao_hiem || 'Đầy đủ'} onChange={(e) => handleInputChange(e, 'pctt')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-emerald-500 font-bold text-emerald-700"><option value="Đầy đủ">Đầy đủ</option><option value="Đang thiếu">Đang thiếu / Chưa mua</option></select></div>
-                      <div><label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">Ngày chốt TS gửi Kế toán</label><input type="date" name="ngay_cap_nhat_tai_san" value={pcttFormData.ngay_cap_nhat_tai_san ? pcttFormData.ngay_cap_nhat_tai_san.split('T')[0] : ''} onChange={(e) => handleInputChange(e, 'pctt')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-emerald-500" title="Chốt biến động kho xe, phụ tùng định kỳ" /></div>
-                    </div>
-                  </div>
-                </div>
-                <div className="space-y-6">
-                  <div className="bg-orange-50/40 p-5 rounded-xl border border-orange-100 shadow-sm">
-                    <h4 className="font-bold text-orange-800 mb-4 flex items-center gap-2 border-b border-orange-200 pb-2"><HardHat size={18}/> 3. Hạ tầng & Bảo trì</h4>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div><label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">Ngày KT/Bảo trì PCTT</label><input type="date" name="ngay_kiem_tra_pctt" value={pcttFormData.ngay_kiem_tra_pctt ? pcttFormData.ngay_kiem_tra_pctt.split('T')[0] : ''} onChange={(e) => handleInputChange(e, 'pctt')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-orange-500" /></div>
-                      <div><label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">Khơi thông cống / Mái tôn</label><select name="tinh_trang_ha_tang" value={pcttFormData.tinh_trang_ha_tang || 'Đã hoàn thành'} onChange={(e) => handleInputChange(e, 'pctt')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-orange-500"><option value="Đã hoàn thành">Đã hoàn thành</option><option value="Chờ xử lý">Chờ xử lý / Tắc nghẽn</option></select></div>
-                    </div>
-                  </div>
-                  <div className="bg-red-50/40 p-5 rounded-xl border border-red-200 shadow-sm">
-                    <h4 className="font-bold text-red-800 mb-4 flex items-center gap-2 border-b border-red-200 pb-2"><AlertCircle size={18}/> 4. Thiệt hại & Khắc phục</h4>
-                    <div className="space-y-4">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div><label className="block text-[10px] font-bold text-red-600 mb-1 uppercase">Số đợt bão lụt / thiên tai</label><input type="number" name="so_vu_thien_tai" value={pcttFormData.so_vu_thien_tai || '0'} onChange={(e) => handleInputChange(e, 'pctt')} className="w-full p-2.5 border border-red-300 rounded-lg bg-white outline-none focus:ring-2 focus:ring-red-500 font-bold text-red-700" /></div>
-                        <div><label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">Tình trạng khắc phục</label><select name="tinh_trang_khac_phuc" value={pcttFormData.tinh_trang_khac_phuc || 'Không có sự cố'} onChange={(e) => handleInputChange(e, 'pctt')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-red-500"><option value="Không có sự cố">Không có sự cố</option><option value="Đang xử lý">Đang xử lý</option><option value="Đã hoàn thành">Đã hoàn thành</option></select></div>
-                      </div>
-                      <div><label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">Link Hồ sơ bảo hiểm (Hình ảnh, xác nhận)</label><input type="url" name="link_ho_so_boi_thuong" value={pcttFormData.link_ho_so_boi_thuong || ''} onChange={(e) => handleInputChange(e, 'pctt')} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-red-500 text-blue-600" /></div>
-                      <div><label className="block text-[10px] font-bold text-gray-600 mb-1 uppercase">Ghi chú tổn thất</label><textarea name="ghi_chu" value={pcttFormData.ghi_chu || ''} onChange={(e) => handleInputChange(e, 'pctt')} rows={2} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-red-500 resize-none"></textarea></div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div className="pt-5 border-t border-gray-100 flex justify-end gap-3 mt-8 shrink-0">
-                <button type="button" onClick={() => setIsPcttModalOpen(false)} className="px-8 py-3 bg-gray-100 text-gray-700 hover:bg-gray-200 rounded-xl font-bold transition-colors">Hủy</button>
-                <button type="submit" disabled={submitting} className="px-8 py-3 text-white bg-blue-600 hover:bg-blue-700 rounded-xl font-bold flex items-center gap-2 shadow-lg transition-colors">{submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />} Lưu PCTT</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <PcttModal
+        isOpen={isPcttModalOpen}
+        currentData={pcttCurrentData}
+        selectedUnitId={selectedUnitId}
+        onSaved={(data, isCreate) => {
+          if (isCreate) setPcttData(prev => [data, ...prev]);
+          else setPcttData(prev => prev.map(item => item.id === data.id ? data : item));
+        }}
+        onClose={() => setIsPcttModalOpen(false)}
+      />
 
       {/* 9. MODAL CONFIRM XÓA */}
       {isConfirmOpen && (
@@ -2436,5 +2113,3 @@ export default function DepartmentPage() {
     </div>
   );
 }
-                 
-            

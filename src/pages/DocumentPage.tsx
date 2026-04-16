@@ -1,4 +1,4 @@
-import { buildHierarchicalOptions, getUnitEmoji } from '../utils/hierarchy';
+import { buildHierarchicalOptions, getUnitEmoji, sortDonViByThuTu, groupParentUnits } from '../utils/hierarchy';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Search, Plus, Edit, Trash2, X, AlertCircle, Loader2, Save, 
@@ -156,7 +156,7 @@ export default function DocumentPage() {
 
   const donViMap = useMemo(() => {
     const map: Record<string, string> = {};
-    donViList.forEach(dv => { map[dv.id] = dv.ten_don_vi; });
+    donViList.forEach(dv => { map[String(dv.id)] = dv.ten_don_vi; });
     return map;
   }, [donViList]);
 
@@ -249,23 +249,13 @@ export default function DocumentPage() {
   }, [donViList, unitSearchTerm, allowedDonViIds]);
 
   const parentUnits = useMemo(() => filteredUnits.filter(item => item.cap_quan_ly === 'HO' || !item.cap_quan_ly), [filteredUnits]);
-  const getChildUnits = (parentId: string) => filteredUnits.filter(item => item.cap_quan_ly === parentId);
+  
+  // 🟢 ĐÃ SỬA: Dùng hàm sortDonViByThuTu để sắp xếp đơn vị con
+  const getChildUnits = (parentId: string) => sortDonViByThuTu(filteredUnits.filter(item => item.cap_quan_ly === parentId));
 
+  // 🟢 ĐÃ SỬA: Dùng hàm groupParentUnits để tự động sắp xếp Công ty Mẹ
   const { vpdhUnits, ctttNamUnits, ctttBacUnits, otherUnits } = useMemo(() => {
-    const vpdh = parentUnits
-      .filter(u => String(u.phia || '').toLowerCase().includes('vpđh') || String(u.loai_hinh || '').toLowerCase().includes('tổng công ty') || String(u.loai_hinh || '').toLowerCase().includes('văn phòng'))
-      .sort((a, b) => {
-        // Luôn ép THACO AUTO (Công ty mẹ) lên vị trí số 1
-        if (a.ten_don_vi === 'THACO AUTO') return -1;
-        if (b.ten_don_vi === 'THACO AUTO') return 1;
-        
-        // Các đơn vị VPĐH khác (như Phân Phối) tự động nằm bên dưới theo thứ tự gốc
-        return 0; 
-      });
-    const ctttNam = parentUnits.filter(u => !vpdh.includes(u) && String(u.phia || '').toLowerCase().includes('nam'));
-    const ctttBac = parentUnits.filter(u => !vpdh.includes(u) && !ctttNam.includes(u) && String(u.phia || '').toLowerCase().includes('bắc'));
-    const others = parentUnits.filter(u => !vpdh.includes(u) && !ctttNam.includes(u) && !ctttBac.includes(u));
-    return { vpdhUnits: vpdh, ctttNamUnits: ctttNam, ctttBacUnits: ctttBac, otherUnits: others };
+    return groupParentUnits(parentUnits);
   }, [parentUnits]);
 
   const toggleParent = (parentId: string) => {
@@ -286,7 +276,7 @@ export default function DocumentPage() {
   const filteredDocs = useMemo(() => {
     let result = [...visibleDocuments];
     
-    if (selectedUnitFilter) result = result.filter(item => item.id_don_vi === selectedUnitFilter || item.pham_vi_ap_dung === selectedUnitFilter);
+    if (selectedUnitFilter) result = result.filter(item => String(item.id_don_vi) === String(selectedUnitFilter) || String(item.pham_vi_ap_dung) === String(selectedUnitFilter));
     if (selectedPhanLoai) result = result.filter(item => item.phan_loai === selectedPhanLoai);
     if (selectedYear !== 'all') {
       result = result.filter(item => item.ngay_ban_hanh && new Date(item.ngay_ban_hanh).getFullYear().toString() === selectedYear);
@@ -317,7 +307,7 @@ export default function DocumentPage() {
 
   const selectedUnitName = useMemo(() => {
     if (!selectedUnitFilter) return 'Toàn hệ thống';
-    const unit = donViList.find(d => d.id === selectedUnitFilter);
+    const unit = donViList.find(d => String(d.id) === String(selectedUnitFilter));
     return unit ? unit.ten_don_vi : 'Đơn vị không xác định';
   }, [selectedUnitFilter, donViList]);
 
@@ -388,7 +378,7 @@ export default function DocumentPage() {
         finalData.id = response.id || response.newId || finalData.id;
         setVbData(prev => [finalData, ...prev]); 
       } else {
-        setVbData(prev => prev.map(item => item.id === finalData.id ? finalData : item));
+        setVbData(prev => prev.map(item => String(item.id) === String(finalData.id) ? finalData : item));
       }
       setIsModalOpen(false); 
     } catch (err: any) { 
@@ -412,7 +402,7 @@ export default function DocumentPage() {
     setSubmitting(true);
     try {
       await apiService.delete(itemToDelete, "vb_tb");
-      setVbData(prev => prev.filter(item => item.id !== itemToDelete));
+      setVbData(prev => prev.filter(item => String(item.id) !== String(itemToDelete)));
       setIsConfirmOpen(false); setItemToDelete(null); 
     } catch (err: any) { 
       setError(err.message || 'Lỗi xóa dữ liệu.'); 
@@ -581,8 +571,8 @@ export default function DocumentPage() {
                         )}
                       </td>
                       <td className="p-4 text-sm">
-                        <span className="font-semibold text-gray-700">{item.pham_vi_ap_dung === 'Toàn hệ thống' ? '🌍 Toàn hệ thống' : donViMap[item.pham_vi_ap_dung] || item.pham_vi_ap_dung}</span>
-                        <p className="text-[10px] text-gray-400 mt-1 uppercase">Từ: {donViMap[item.id_don_vi] || item.id_don_vi}</p>
+                        <span className="font-semibold text-gray-700">{item.pham_vi_ap_dung === 'Toàn hệ thống' ? '🌍 Toàn hệ thống' : donViMap[String(item.pham_vi_ap_dung)] || item.pham_vi_ap_dung}</span>
+                        <p className="text-[10px] text-gray-400 mt-1 uppercase">Từ: {donViMap[String(item.id_don_vi)] || item.id_don_vi}</p>
                       </td>
                       <td className="p-4 text-sm">
                         {item.nghiep_vu ? <span className="px-2 py-1 bg-indigo-50 text-indigo-700 rounded text-xs font-bold border border-indigo-100">{item.nghiep_vu}</span> : <span className="text-gray-400 italic text-xs">Chưa PL</span>}
@@ -624,7 +614,7 @@ export default function DocumentPage() {
               
               {/* KHỐI 1: THÔNG TIN HÀNH CHÍNH (CỐ ĐỊNH) */}
               <div className="bg-blue-50/40 p-5 rounded-xl border border-blue-100">
-                <h4 className="font-bold text-[#05469B] mb-4 flex items-center gap-2"><div className="w-2 h-6 bg-[#05469B] rounded-full"></div> 1. Thông tin Hành chính</h4>
+                <h4 className="font-bold text-[#05469B] mb-4 flex items-center gap-2"><div className="w-2 h-6 bg-[#05469B] rounded-full"></div> 1. Thông Điệp Hành chính</h4>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
                   <div className="md:col-span-2">
                     <label className="block text-xs font-bold text-gray-700 mb-1">Đơn vị ban hành (Lưu trữ) *</label>
@@ -866,8 +856,8 @@ export default function DocumentPage() {
               )}
 
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 bg-blue-50/30 p-4 rounded-xl border border-blue-100">
-                <div className="col-span-2"><p className="text-xs text-gray-500 uppercase font-bold mb-1">Nơi ban hành (Lưu trữ)</p><p className="font-semibold text-[#05469B]">{donViMap[viewData.id_don_vi] || viewData.id_don_vi}</p></div>
-                <div className="col-span-2"><p className="text-xs text-gray-500 uppercase font-bold mb-1">Phạm vi áp dụng</p><p className="font-semibold text-[#05469B]">{viewData.pham_vi_ap_dung === 'Toàn hệ thống' ? '🌍 Toàn hệ thống' : donViMap[viewData.pham_vi_ap_dung] || viewData.pham_vi_ap_dung}</p></div>
+                <div className="col-span-2"><p className="text-xs text-gray-500 uppercase font-bold mb-1">Nơi ban hành (Lưu trữ)</p><p className="font-semibold text-[#05469B]">{donViMap[String(viewData.id_don_vi)] || viewData.id_don_vi}</p></div>
+                <div className="col-span-2"><p className="text-xs text-gray-500 uppercase font-bold mb-1">Phạm vi áp dụng</p><p className="font-semibold text-[#05469B]">{viewData.pham_vi_ap_dung === 'Toàn hệ thống' ? '🌍 Toàn hệ thống' : donViMap[String(viewData.pham_vi_ap_dung)] || viewData.pham_vi_ap_dung}</p></div>
                 
                 {viewData.phan_loai !== 'Thông báo' && (
                   <div className="col-span-2 md:col-span-4 border-t border-blue-100/50 pt-3 mt-1 grid grid-cols-1 md:grid-cols-3 gap-4">

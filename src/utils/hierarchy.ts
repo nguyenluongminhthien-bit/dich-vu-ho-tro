@@ -43,3 +43,22 @@ export const buildHierarchicalOptions = (units: DonVi[]) => {
   buildTree(roots, '');
   return result;
 };
+
+// 🟢 1. Hàm dùng chung để sắp xếp bất kỳ danh sách nào theo cột "thu_tu"
+export const sortDonViByThuTu = (units: any[]) => {
+  return [...units].sort((a, b) => (Number(a.thu_tu) || 0) - (Number(b.thu_tu) || 0));
+};
+
+// 🟢 2. Hàm dùng chung để phân nhóm Phía Nam, Phía Bắc, VPĐH
+export const groupParentUnits = (parentUnits: any[]) => {
+  // Sắp xếp toàn bộ theo cột thu_tu trước
+  const sortedParents = sortDonViByThuTu(parentUnits);
+
+  // Lọc ra từng nhóm (Lúc này các nhóm đã tự động kế thừa đúng thứ tự)
+  const vpdhUnits = sortedParents.filter(u => String(u.phia || '').toLowerCase().includes('vpđh') || String(u.loai_hinh || '').toLowerCase().includes('tổng công ty') || String(u.loai_hinh || '').toLowerCase().includes('văn phòng'));
+  const ctttNamUnits = sortedParents.filter(u => !vpdhUnits.includes(u) && String(u.phia || '').toLowerCase().includes('nam'));
+  const ctttBacUnits = sortedParents.filter(u => !vpdhUnits.includes(u) && !ctttNamUnits.includes(u) && String(u.phia || '').toLowerCase().includes('bắc'));
+  const otherUnits = sortedParents.filter(u => !vpdhUnits.includes(u) && !ctttNamUnits.includes(u) && !ctttBacUnits.includes(u));
+
+  return { vpdhUnits, ctttNamUnits, ctttBacUnits, otherUnits };
+};
