@@ -3,7 +3,8 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Search, Plus, Edit, Trash2, X, AlertCircle, Loader2, Save, 
   FileText, Building2, MapPin, ChevronDown, ChevronRight, PanelLeftClose, PanelLeftOpen,
-  Link as LinkIcon, Calendar, CheckCircle2, Bookmark, Eye, Lock, Zap, Clock, Send
+  Link as LinkIcon, Calendar, CheckCircle2, Bookmark, Eye, Lock, Zap, Clock, Send,
+  PenTool, Hash, Briefcase, Layers, ExternalLink
 } from 'lucide-react';
 import { apiService } from '../services/api';
 import { DonVi, VB_TB } from '../types';
@@ -250,10 +251,8 @@ export default function DocumentPage() {
 
   const parentUnits = useMemo(() => filteredUnits.filter(item => item.cap_quan_ly === 'HO' || !item.cap_quan_ly), [filteredUnits]);
   
-  // 🟢 ĐÃ SỬA: Dùng hàm sortDonViByThuTu để sắp xếp đơn vị con
   const getChildUnits = (parentId: string) => sortDonViByThuTu(filteredUnits.filter(item => item.cap_quan_ly === parentId));
 
-  // 🟢 ĐÃ SỬA: Dùng hàm groupParentUnits để tự động sắp xếp Công ty Mẹ
   const { vpdhUnits, ctttNamUnits, ctttBacUnits, otherUnits } = useMemo(() => {
     return groupParentUnits(parentUnits);
   }, [parentUnits]);
@@ -291,12 +290,10 @@ export default function DocumentPage() {
     }
 
     result.sort((a, b) => {
-      // 1. Theo Ngày ban hành
       const dateA = a.ngay_ban_hanh ? new Date(a.ngay_ban_hanh).getTime() : 0;
       const dateB = b.ngay_ban_hanh ? new Date(b.ngay_ban_hanh).getTime() : 0;
       if (dateB !== dateA) return dateB - dateA;
 
-      // 2. Theo Số hiệu (Nếu cùng ngày)
       const numA = parseInt(String(a.so_hieu || '').match(/^\d+/)?.[0] || '0', 10);
       const numB = parseInt(String(b.so_hieu || '').match(/^\d+/)?.[0] || '0', 10);
       return numB - numA;
@@ -311,7 +308,6 @@ export default function DocumentPage() {
     return unit ? unit.ten_don_vi : 'Đơn vị không xác định';
   }, [selectedUnitFilter, donViList]);
 
-  // HÀM MỞ MODAL & KHỞI TẠO STATE
   const openModal = (mode: 'create' | 'update', item?: any) => {
     setModalMode(mode);
     const defaultDonViId = user?.id_don_vi || (user as any)?.idDonVi;
@@ -344,7 +340,6 @@ export default function DocumentPage() {
     
     let finalData = { ...formData };
     
-    // Tự động clear các trường không thuộc về phân loại
     if (finalData.phan_loai !== 'Công văn đến') {
       finalData.so_den = null;
       finalData.ngay_nhan = null;
@@ -355,17 +350,14 @@ export default function DocumentPage() {
       finalData.trang_thai_xu_ly = null;
     }
 
-    // 🟢 TIỀN XỬ LÝ SIÊU CỨNG: Ép rỗng thành NULL cho mọi cột
     Object.keys(finalData).forEach(key => {
       if (finalData[key] === '' || finalData[key] === ' ') {
         finalData[key] = null;
       }
     });
 
-    // 🟢 ÉP KIỂU BOOLEAN
     finalData.mat = !!finalData.mat; 
 
-    // Tự sinh ID cho trường hợp tạo mới nếu rỗng
     if (modalMode === 'create' && !finalData.id) {
       finalData.id = `VB-${Date.now()}`;
     }
@@ -561,7 +553,7 @@ export default function DocumentPage() {
                         <p className="text-xs text-gray-500 line-clamp-2 mb-2">{item.noi_dung}</p>
                         {item.link_vb && (
                           <a href={item.link_vb} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-bold text-blue-600 hover:underline hover:text-blue-800 bg-blue-50 px-2 py-1 rounded border border-blue-100">
-                            <LinkIcon size={12}/> File đính kèm
+                            <LinkIcon size={12}/> Mở file gốc
                           </a>
                         )}
                         {item.hieu_luc === 'Thay thế VB khác' && item.van_ban_thay_the && (
@@ -795,104 +787,138 @@ export default function DocumentPage() {
         </div>
       )}
 
-      {/* MODAL XEM CHI TIẾT */}
+      {/* 🟢 MODAL XEM CHI TIẾT (BỐ CỤC 1 CỘT, LÀM NỔI BẬT THÔNG TIN NGƯỜI KÝ & NGHIỆP VỤ) */}
       {isViewModalOpen && viewData && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl flex flex-col max-h-[90vh] animate-in fade-in zoom-in duration-200">
-            <div className="flex justify-between p-5 border-b border-gray-100 bg-[#05469B] text-white rounded-t-2xl shrink-0">
+            <div className="flex justify-between items-center p-4 sm:p-5 border-b border-gray-100 bg-[#05469B] text-white rounded-t-2xl shrink-0">
               <h3 className="text-xl font-bold flex items-center gap-2"><FileText size={24}/> Chi tiết Văn bản</h3>
-              <button onClick={() => setIsViewModalOpen(false)} className="text-blue-200 hover:text-white rounded-full p-1 transition-colors"><X className="w-6 h-6" /></button>
+              <div className="flex items-center gap-3">
+                {viewData.link_vb && (
+                  <a href={viewData.link_vb} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded-lg text-sm font-bold transition-colors border border-white/20">
+                    <ExternalLink size={16}/> Mở file
+                  </a>
+                )}
+                <button onClick={() => setIsViewModalOpen(false)} className="text-blue-200 hover:text-white rounded-full p-1 transition-colors"><X className="w-6 h-6" /></button>
+              </div>
             </div>
             
-            <div className="p-6 overflow-y-auto">
+            <div className="p-5 sm:p-8 overflow-y-auto custom-scrollbar flex-1">
               
               {isMatDocument(viewData.mat) && (
-                <div className="mb-5 p-3.5 bg-red-50 border border-red-200 rounded-xl flex items-center gap-3 shadow-sm">
-                  <div className="w-10 h-10 rounded-full bg-red-100 text-red-600 flex items-center justify-center shrink-0"><Lock size={20} /></div>
+                <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl flex items-center gap-3 shadow-sm">
+                  <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center shrink-0"><Lock size={24} /></div>
                   <div>
-                    <p className="text-sm font-black text-red-700 uppercase">Tài liệu Mật</p>
-                    <p className="text-xs font-medium text-red-600">Đề nghị không sao chép, chụp ảnh hay phát tán ra bên ngoài dưới mọi hình thức.</p>
+                    <p className="text-base font-black text-red-700 uppercase">Tài liệu Mật</p>
+                    <p className="text-sm font-medium text-red-600 mt-0.5">Đề nghị không sao chép, chụp ảnh hay phát tán dưới mọi hình thức.</p>
                   </div>
                 </div>
               )}
 
-              <div className="mb-6">
-                <div className="flex flex-wrap items-center gap-3 mb-2">
-                  <span className="bg-blue-100 text-[#05469B] font-black px-3 py-1 rounded text-lg border border-blue-200">{viewData.so_hieu}</span>
-                  <span className="bg-gray-100 text-gray-600 font-bold px-2 py-1 rounded text-xs uppercase">{viewData.phan_loai}</span>
+              <div className="mb-8 border-b border-gray-100 pb-6">
+                <div className="flex flex-wrap items-center gap-3 mb-3">
+                  <span className="bg-blue-100 text-[#05469B] font-black px-3 py-1.5 rounded text-lg border border-blue-200 shadow-sm">{viewData.so_hieu}</span>
+                  <span className="bg-gray-100 text-gray-600 font-bold px-3 py-1.5 rounded text-xs uppercase">{viewData.phan_loai}</span>
                   
                   {viewData.muc_do_khan && viewData.muc_do_khan !== 'Bình thường' && (
-                    <span className={`px-2.5 py-1 rounded text-xs font-black border uppercase ${viewData.muc_do_khan === 'Hỏa tốc' ? 'bg-red-100 text-red-700 border-red-300 animate-pulse' : 'bg-orange-100 text-orange-700 border-orange-300'}`}>
+                    <span className={`px-3 py-1.5 rounded text-xs font-black border uppercase ${viewData.muc_do_khan === 'Hỏa tốc' ? 'bg-red-100 text-red-700 border-red-300 animate-pulse' : 'bg-orange-100 text-orange-700 border-orange-300'}`}>
                       {viewData.muc_do_khan}
                     </span>
                   )}
                   
-                  <span className={`px-2 py-1 rounded text-xs font-bold ${viewData.hieu_luc === 'Còn hiệu lực' ? 'bg-green-100 text-green-700' : viewData.hieu_luc === 'Hết hiệu lực' ? 'bg-gray-200 text-gray-700' : 'bg-orange-100 text-orange-700'}`}>
+                  <span className={`px-3 py-1.5 rounded text-xs font-bold border ${viewData.hieu_luc === 'Còn hiệu lực' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : viewData.hieu_luc === 'Hết hiệu lực' ? 'bg-gray-100 text-gray-500 border-gray-200' : 'bg-orange-50 text-orange-700 border-orange-200'}`}>
                     {viewData.hieu_luc}
                   </span>
                 </div>
-                <h2 className={`text-2xl font-black leading-tight mt-3 ${isMatDocument(viewData.mat) ? 'text-red-700' : 'text-gray-800'}`}>{viewData.tieu_de}</h2>
-                <p className="text-sm text-gray-500 mt-2 flex items-center gap-2"><Calendar size={14}/> Ban hành: <span className="font-bold text-gray-700">{viewData.ngay_ban_hanh ? new Date(viewData.ngay_ban_hanh).toLocaleDateString('vi-VN') : '-'}</span></p>
+                <h2 className={`text-2xl sm:text-3xl font-black leading-tight mt-4 ${isMatDocument(viewData.mat) ? 'text-red-700' : 'text-gray-800'}`}>{viewData.tieu_de}</h2>
+                <p className="text-sm text-gray-500 mt-3 flex items-center gap-2"><Calendar size={16}/> Ban hành: <span className="font-bold text-gray-700">{viewData.ngay_ban_hanh ? new Date(viewData.ngay_ban_hanh).toLocaleDateString('vi-VN') : '-'}</span></p>
               </div>
 
-              <div className="bg-gray-50 p-4 rounded-xl border border-gray-100 mb-6 text-sm text-gray-700 whitespace-pre-wrap leading-relaxed shadow-inner">
-                {viewData.noi_dung || <span className="italic text-gray-400">Không có trích yếu nội dung.</span>}
+              <div className="mb-8">
+                <h4 className="text-sm font-bold text-gray-700 mb-2 flex items-center gap-2"><FileText size={18}/> Trích yếu nội dung:</h4>
+                <div className="bg-gray-50 p-5 rounded-xl border border-gray-100 text-base text-gray-700 whitespace-pre-wrap leading-relaxed shadow-inner">
+                  {viewData.noi_dung || <span className="italic text-gray-400">Không có trích yếu nội dung.</span>}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-8 bg-blue-50/50 p-5 rounded-xl border border-blue-100">
+                <div>
+                  <p className="text-xs text-gray-500 uppercase font-bold mb-1">Nơi ban hành (Lưu trữ)</p>
+                  <p className="font-semibold text-[#05469B] text-base break-words">{donViMap[String(viewData.id_don_vi)] || viewData.id_don_vi}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 uppercase font-bold mb-1">Phạm vi áp dụng</p>
+                  <p className="font-semibold text-[#05469B] text-base break-words">{viewData.pham_vi_ap_dung === 'Toàn hệ thống' ? '🌍 Toàn hệ thống' : donViMap[String(viewData.pham_vi_ap_dung)] || viewData.pham_vi_ap_dung}</p>
+                </div>
+              </div>
+
+              {viewData.phan_loai !== 'Thông báo' && (
+                <div className="mb-8 p-5 rounded-xl border border-indigo-100 bg-indigo-50/50 shadow-sm">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className={viewData.phan_loai === 'Công văn đến' ? 'md:col-span-2' : ''}>
+                        <p className="text-xs text-indigo-500 uppercase font-bold mb-1">{getNoiGuiNhanLabel(viewData.phan_loai)}</p>
+                        <p className="font-bold text-indigo-900 text-base">{viewData.noi_goi_nhan || '-'}</p>
+                    </div>
+                    {viewData.phan_loai === 'Công văn đến' && (
+                      <>
+                        <div><p className="text-xs text-indigo-500 uppercase font-bold mb-1">Số đến nội bộ</p><p className="font-black text-[#05469B] text-base">{viewData.so_den || '-'}</p></div>
+                        <div><p className="text-xs text-indigo-500 uppercase font-bold mb-1">Ngày nhận CV</p><p className="font-semibold text-gray-800 text-base">{viewData.ngay_nhan ? new Date(viewData.ngay_nhan).toLocaleDateString('vi-VN') : '-'}</p></div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* 🟢 KHỐI NGƯỜI KÝ & NGHIỆP VỤ ĐƯỢC DÀN HÀNG NGANG */}
+              <div className="bg-white p-5 rounded-xl border border-blue-100 shadow-sm mb-8">
+                <h4 className="text-sm font-bold text-[#05469B] mb-4 flex items-center gap-2 uppercase tracking-wider"><Briefcase size={18} /> Phân công & Nghiệp vụ</h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100/50 flex flex-col justify-center">
+                     <span className="text-[10px] text-gray-500 font-bold flex items-center gap-1.5 uppercase mb-1.5"><PenTool size={14} className="text-blue-500"/> Người ký</span>
+                     <p className="font-black text-gray-800 text-base">{viewData.nguoi_ky || '---'}</p>
+                     <p className="text-[10px] text-gray-500 uppercase mt-0.5 font-bold">{viewData.chuc_vu || '---'}</p>
+                  </div>
+                  <div className="bg-emerald-50/50 p-4 rounded-xl border border-emerald-100/50 flex flex-col justify-center">
+                     <span className="text-[10px] text-gray-500 font-bold flex items-center gap-1.5 uppercase mb-1.5"><Hash size={14} className="text-emerald-500"/> Lấy số bởi</span>
+                     <p className="font-black text-gray-800 text-base">{viewData.nguoi_lay_so || '---'}</p>
+                     <p className="text-[10px] text-gray-500 uppercase mt-0.5 font-bold">{viewData.bo_phan_lay_so || '---'}</p>
+                  </div>
+                  <div className="bg-orange-50/50 p-4 rounded-xl border border-orange-100/50 flex flex-col justify-center items-start">
+                     <span className="text-[10px] text-gray-500 font-bold flex items-center gap-1.5 uppercase mb-2"><Layers size={14} className="text-orange-500"/> Phân loại Nghiệp vụ</span>
+                     <span className="font-black text-[#05469B] text-sm px-3 py-1.5 bg-white rounded border border-[#05469B]/20 shadow-sm">{viewData.nghiep_vu || '---'}</span>
+                  </div>
+                </div>
               </div>
 
               {(viewData.phan_loai === 'Công văn đến' || viewData.phan_loai === 'Tờ trình') && (
-                <div className="mb-6 p-4 rounded-xl border border-orange-200 bg-orange-50/50 shadow-sm">
-                  <h4 className="text-sm font-bold text-orange-800 mb-3 flex items-center gap-2"><Clock size={16}/> Theo dõi Xử lý</h4>
+                <div className="mb-6 p-5 rounded-xl border border-orange-200 bg-orange-50/50 shadow-sm flex flex-col">
+                  <h4 className="text-sm font-bold text-orange-800 mb-4 flex items-center gap-2 uppercase tracking-wider"><Clock size={18}/> Theo dõi Xử lý</h4>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div><p className="text-xs text-gray-500 font-bold mb-1 uppercase">Đơn vị / Người xử lý</p><p className="font-semibold text-gray-800">{viewData.bo_phan_xu_ly || 'Chưa giao việc'}</p></div>
-                    <div><p className="text-xs text-gray-500 font-bold mb-1 uppercase">Hạn xử lý</p><p className="font-semibold text-red-600">{viewData.han_xu_ly ? new Date(viewData.han_xu_ly).toLocaleDateString('vi-VN') : '-'}</p></div>
+                    <div><p className="text-[10px] text-gray-500 font-bold mb-1 uppercase">Người xử lý</p><p className="font-semibold text-gray-800 text-base">{viewData.bo_phan_xu_ly || 'Chưa giao'}</p></div>
+                    <div><p className="text-[10px] text-gray-500 font-bold mb-1 uppercase">Hạn xử lý</p><p className="font-bold text-red-600 text-base">{viewData.han_xu_ly ? new Date(viewData.han_xu_ly).toLocaleDateString('vi-VN') : '-'}</p></div>
                     <div>
-                      <p className="text-xs text-gray-500 font-bold mb-1 uppercase">Trạng thái</p>
-                      <p className={`font-bold ${viewData.trang_thai_xu_ly === 'Đã hoàn thành' ? 'text-green-600' : viewData.trang_thai_xu_ly === 'Đang xử lý' ? 'text-blue-600' : 'text-orange-600'}`}>
+                      <p className="text-[10px] text-gray-500 font-bold mb-1 uppercase">Trạng thái</p>
+                      <span className={`inline-block font-black px-3 py-1.5 rounded border text-sm ${viewData.trang_thai_xu_ly === 'Đã hoàn thành' ? 'bg-green-100 text-green-700 border-green-200' : viewData.trang_thai_xu_ly === 'Đang xử lý' ? 'bg-blue-100 text-blue-700 border-blue-200' : 'bg-orange-100 text-orange-700 border-orange-200'}`}>
                         {viewData.trang_thai_xu_ly || 'Chờ xử lý'}
-                      </p>
+                      </span>
                     </div>
                   </div>
                 </div>
               )}
 
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 bg-blue-50/30 p-4 rounded-xl border border-blue-100">
-                <div className="col-span-2"><p className="text-xs text-gray-500 uppercase font-bold mb-1">Nơi ban hành (Lưu trữ)</p><p className="font-semibold text-[#05469B]">{donViMap[String(viewData.id_don_vi)] || viewData.id_don_vi}</p></div>
-                <div className="col-span-2"><p className="text-xs text-gray-500 uppercase font-bold mb-1">Phạm vi áp dụng</p><p className="font-semibold text-[#05469B]">{viewData.pham_vi_ap_dung === 'Toàn hệ thống' ? '🌍 Toàn hệ thống' : donViMap[String(viewData.pham_vi_ap_dung)] || viewData.pham_vi_ap_dung}</p></div>
-                
-                {viewData.phan_loai !== 'Thông báo' && (
-                  <div className="col-span-2 md:col-span-4 border-t border-blue-100/50 pt-3 mt-1 grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="col-span-1 md:col-span-2">
-                        <p className="text-xs text-gray-500 uppercase font-bold mb-1">{getNoiGuiNhanLabel(viewData.phan_loai)}</p>
-                        <p className="font-semibold text-gray-800">{viewData.noi_goi_nhan || '-'}</p>
-                    </div>
-                    {viewData.phan_loai === 'Công văn đến' && (
-                      <>
-                        <div><p className="text-xs text-gray-500 uppercase font-bold mb-1">Số đến nội bộ</p><p className="font-black text-[#05469B]">{viewData.so_den || '-'}</p></div>
-                        <div><p className="text-xs text-gray-500 uppercase font-bold mb-1">Ngày nhận CV</p><p className="font-semibold text-gray-800">{viewData.ngay_nhan ? new Date(viewData.ngay_nhan).toLocaleDateString('vi-VN') : '-'}</p></div>
-                      </>
-                    )}
-                  </div>
-                )}
-
-                <div className="col-span-2 md:col-span-4 border-t border-blue-100/50 pt-3 mt-1 grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div><p className="text-xs text-gray-500 uppercase font-bold mb-1">Người ký</p><p className="font-semibold text-gray-800">{viewData.nguoi_ky || '-'} <span className="text-gray-500 font-normal">({viewData.chuc_vu || '-'})</span></p></div>
-                  <div><p className="text-xs text-gray-500 uppercase font-bold mb-1">Người lấy số</p><p className="font-semibold text-gray-800">{viewData.nguoi_lay_so || '-'} <span className="text-gray-500 font-normal">({viewData.bo_phan_lay_so || '-'})</span></p></div>
-                  <div className="col-span-2"><p className="text-xs text-gray-500 uppercase font-bold mb-1">Phân loại Nghiệp vụ</p><p className="font-semibold text-gray-800">{viewData.nghiep_vu || '-'}</p></div>
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-3">
+              <div className="flex flex-col sm:flex-row gap-4 mt-8">
                 {viewData.link_vb && (
-                  <a href={viewData.link_vb} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-2 py-3 bg-[#05469B] hover:bg-[#04367a] text-white rounded-xl font-bold transition-colors shadow-md">
-                    <LinkIcon size={18}/> Mở File Đính Kèm
+                  <a href={viewData.link_vb} target="_blank" rel="noreferrer" className="flex-1 flex items-center justify-center gap-2 py-4 bg-[#05469B] hover:bg-[#04367a] text-white rounded-xl font-bold transition-colors shadow-md text-lg">
+                    <ExternalLink size={20}/> Mở File Văn Bản
                   </a>
                 )}
                 {viewData.hieu_luc === 'Thay thế VB khác' && viewData.van_ban_thay_the && (
-                  <a href={viewData.van_ban_thay_the} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-2 py-3 bg-white border-2 border-orange-500 text-orange-600 hover:bg-orange-50 rounded-xl font-bold transition-colors">
-                    <LinkIcon size={18}/> Mở Văn Bản bị thay thế
+                  <a href={viewData.van_ban_thay_the} target="_blank" rel="noreferrer" className="flex-1 flex items-center justify-center gap-2 py-4 bg-red-50 border border-red-200 text-red-700 hover:bg-red-100 rounded-xl font-bold transition-colors shadow-sm text-lg">
+                    <ExternalLink size={20}/> Xem Văn bản bị thay thế
                   </a>
                 )}
               </div>
+
             </div>
           </div>
         </div>
