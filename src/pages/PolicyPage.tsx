@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Search, Plus, Edit, Trash2, X, AlertCircle, Loader2, Save, 
-  BookOpen, Link as LinkIcon, Calendar, Eye, Bookmark, Briefcase, Filter, Info, CheckCircle2
+  BookOpen, Link as LinkIcon, Calendar, Eye, Bookmark, Briefcase, Filter, Info, CheckCircle2,
+  PenTool, Hash, Layers, FileText, ExternalLink
 } from 'lucide-react';
 import { apiService } from '../services/api';
 import { QuyDinhQuyTrinh, VB_TB } from '../types'; 
@@ -10,6 +11,10 @@ import { useAuth } from '../contexts/AuthContext';
 interface PolicyItem extends QuyDinhQuyTrinh {
   isFromVB?: boolean;
   hieu_luc?: string; 
+  nguoi_ky?: string;
+  chuc_vu?: string;
+  nguoi_lay_so?: string;
+  bo_phan_lay_so?: string;
 }
 
 export default function PolicyPage() {
@@ -61,8 +66,12 @@ export default function PolicyPage() {
           tieu_de: item.tieu_de,
           noi_dung: item.noi_dung,
           nghiep_vu: item.nghiep_vu,
-          link_vb: item.link_vb_dinh_kem,
-          hieu_luc: item.hieu_luc || 'Còn hiệu lực', 
+          link_vb: item.link_vb, 
+          hieu_luc: item.hieu_luc || 'Còn hiệu lực',
+          nguoi_ky: item.nguoi_ky,
+          chuc_vu: item.chuc_vu,
+          nguoi_lay_so: item.nguoi_lay_so,
+          bo_phan_lay_so: item.bo_phan_lay_so,
           isFromVB: true 
         }));
 
@@ -129,7 +138,6 @@ export default function PolicyPage() {
     
     setSubmitting(true); setError(null);
     try {
-      // 🟢 XÓA TRƯỜNG DỮ LIỆU FRONTEND TRƯỚC KHI GỬI LÊN SUPABASE
       const dataToSave = { ...formData };
       delete dataToSave.isFromVB; 
 
@@ -441,10 +449,32 @@ export default function PolicyPage() {
                 {viewData.noi_dung || <span className="italic text-gray-400">Không có trích yếu nội dung.</span>}
               </div>
 
+              {/* 🟢 KHỐI NGƯỜI KÝ & NGHIỆP VỤ BỔ SUNG NẰM NGANG */}
+              {viewData.isFromVB && (
+                <div className="bg-white p-4 rounded-xl border border-blue-100 shadow-sm mb-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="flex items-start justify-between border-b sm:border-b-0 sm:border-r border-gray-100 pb-3 sm:pb-0 sm:pr-4">
+                       <span className="text-xs text-gray-500 font-bold flex items-center gap-1.5"><PenTool size={14}/> Người ký:</span>
+                       <div className="text-right">
+                          <p className="font-bold text-gray-800 text-sm">{viewData.nguoi_ky || '---'}</p>
+                          <p className="text-[10px] text-gray-500 uppercase mt-0.5 font-semibold">{viewData.chuc_vu || '---'}</p>
+                       </div>
+                    </div>
+                    <div className="flex items-start justify-between">
+                       <span className="text-xs text-gray-500 font-bold flex items-center gap-1.5"><Hash size={14}/> Lấy số bởi:</span>
+                       <div className="text-right">
+                          <p className="font-bold text-gray-800 text-sm">{viewData.nguoi_lay_so || '---'}</p>
+                          <p className="text-[10px] text-gray-500 uppercase mt-0.5 font-semibold">{viewData.bo_phan_lay_so || '---'}</p>
+                       </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="flex flex-col gap-3">
                 {viewData.link_vb ? (
                   <a href={viewData.link_vb} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-2 py-3 bg-[#05469B] hover:bg-[#04367a] text-white rounded-xl font-bold transition-colors shadow-md">
-                    <LinkIcon size={18}/> Đọc Tài Liệu Gốc
+                    <ExternalLink size={18}/> Mở Tài Liệu Trực Tuyến
                   </a>
                 ) : (
                   <button disabled className="flex items-center justify-center gap-2 py-3 bg-gray-200 text-gray-500 rounded-xl font-bold cursor-not-allowed">
