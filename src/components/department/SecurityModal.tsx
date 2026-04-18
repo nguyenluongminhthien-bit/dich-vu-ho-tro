@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Loader2, Save, Shield, Camera, Users, Link as LinkIcon, Compass, Clock, Sun, Moon, FileText } from 'lucide-react';
 import { apiService } from '../../services/api';
+import { toast } from "../../utils/toast";
 
 const formatPhoneNumber = (val: string | number | undefined | null) => {
   if (!val) return '';
@@ -78,23 +79,52 @@ export default function SecurityModal({ isOpen, currentData, selectedUnitId, onS
   };
 
   const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault(); setSubmitting(true); setError(null);
+    e.preventDefault(); 
+    setSubmitting(true); 
+    setError(null);
+    
     const soNB = Number(formData.bv_noi_bo) || 0;
     const soDV = Number(formData.bv_dich_vu) || 0;
     let finalData: any = { ...formData, tong_bv: soNB + soDV };
+    
+    // Đã đổi chuỗi rỗng '' thành null cho an toàn với Database
     if (soDV < 1) { 
-      finalData.vi_tri_bv_dv = ''; finalData.ncc_dich_vu = ''; 
-      finalData.chi_phi_thue = ''; finalData.gia_han_them = ''; 
+      finalData.vi_tri_bv_dv = null; 
+      finalData.ncc_dich_vu = null; 
+      finalData.chi_phi_thue = null; 
+      finalData.gia_han_them = null; 
     }
+
+    // 🟢 Dọn dẹp dữ liệu: Tự động chuyển các chuỗi rỗng còn lại thành null
+    Object.keys(finalData).forEach(key => {
+      if (finalData[key] === '' || finalData[key] === ' ') {
+        finalData[key] = null;
+      }
+    });
+
     const isCreate = !currentData;
     const mode = isCreate ? 'create' : 'update';
     if (isCreate && (!finalData.id || finalData.id === '')) finalData.id = `AN${Date.now()}`;
+    
     try {
       await apiService.save(finalData, mode, 'hs_an_ninh');
       onSaved(finalData, isCreate);
       onClose();
-    } catch (err: any) { setError(err.message || 'Lỗi lưu dữ liệu An Ninh.'); }
-    finally { setSubmitting(false); }
+      // 🟢 Thêm thông báo thành công
+      if (isCreate) {
+        toast.success("Thêm mới hồ sơ An ninh thành công!");
+      } else {
+        toast.success("Cập nhật hồ sơ An ninh thành công!");
+      }
+
+    } catch (err: any) { 
+      setError(err.message || 'Lỗi lưu dữ liệu An Ninh.'); 
+      // 🔴 Thêm thông báo lỗi
+      toast.error(err.message || "Đã xảy ra lỗi khi lưu hồ sơ An ninh!");
+      
+    } finally { 
+      setSubmitting(false); 
+    }
   };
 
   return (

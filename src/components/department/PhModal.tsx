@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { X, Loader2, Save, Monitor, Projector, Video } from 'lucide-react';
 import { apiService } from '../../services/api';
+import { toast } from "../../utils/toast";
+
 
 const EMPTY_FORM = {
   id: '', id_don_vi: '', ten_phong_hop: '', vi_tri: '', suc_chua: '', tb_trinh_chieu: '',
@@ -47,15 +49,40 @@ export default function PhModal({ isOpen, mode, currentData, selectedUnitId, onS
   };
 
   const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault(); setSubmitting(true); setError(null);
+    e.preventDefault(); 
+    setSubmitting(true); 
+    setError(null);
+    
     try {
-      const response = await apiService.save(formData, mode, 'dm_phong_hop');
-      const savedId = response?.newId || response?.id || formData.id;
-      const finalData = { ...formData, id: savedId };
+      // 🟢 Dọn dẹp dữ liệu: Tự động chuyển chuỗi rỗng thành null
+      const dataToSave: any = { ...formData };
+      Object.keys(dataToSave).forEach(key => {
+        if (dataToSave[key] === '' || dataToSave[key] === ' ') {
+          dataToSave[key] = null;
+        }
+      });
+
+      const response = await apiService.save(dataToSave, mode, 'dm_phong_hop');
+      const savedId = response?.newId || response?.id || dataToSave.id;
+      const finalData = { ...dataToSave, id: savedId };
+      
       onSaved(finalData, mode === 'create');
       onClose();
-    } catch (err: any) { setError(err.message || 'Lỗi lưu dữ liệu Phòng họp.'); }
-    finally { setSubmitting(false); }
+      // 🟢 Thêm thông báo thành công (Phân biệt hành động)
+      if (mode === 'create') {
+        toast.success("Thêm mới phòng họp thành công!");
+      } else {
+        toast.success("Cập nhật thông tin phòng họp thành công!");
+      }
+
+    } catch (err: any) { 
+      setError(err.message || 'Lỗi lưu dữ liệu Phòng họp.'); 
+      // 🔴 Thêm thông báo lỗi
+      toast.error(err.message || "Đã xảy ra lỗi khi lưu thông tin phòng họp!");
+      
+    } finally { 
+      setSubmitting(false); 
+    }
   };
 
   return (

@@ -3,6 +3,7 @@ import { X, Loader2, Briefcase } from 'lucide-react';
 import { apiService } from '../../services/api';
 // 🟢 Import hàm vẽ cây đơn vị
 import { buildHierarchicalOptions, getUnitEmoji } from '../../utils/hierarchy'; 
+import { toast } from "../../utils/toast";
 
 const EMPTY_FORM = { id: '', id_don_vi: '', ten_cong_ty: '', ma_so_thue: '', dia_chi: '', gpkd: '', mail: '' };
 
@@ -47,7 +48,8 @@ export default function PnModal({ isOpen, mode, currentData, selectedUnitId, uni
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault(); 
-    if (!formData.id_don_vi) return alert("Vui lòng chọn Đơn vị trực thuộc!");
+    // 🟢 Thay alert bằng toast.warning
+    if (!formData.id_don_vi) return toast.warning("Vui lòng chọn Đơn vị trực thuộc!");
 
     setSubmitting(true); setError(null);
     try {
@@ -59,8 +61,21 @@ export default function PnModal({ isOpen, mode, currentData, selectedUnitId, uni
       // 🟢 BÁO CÁO LẠI CHO FILE MẸ ĐỂ CẬP NHẬT GIAO DIỆN
       onSaved(finalData, mode === 'create');
       onClose();
-    } catch (err: any) { setError(err.message || 'Lỗi lưu dữ liệu Pháp nhân.'); }
-    finally { setSubmitting(false); }
+      // 🟢 Thêm thông báo thành công (Phân biệt hành động)
+      if (mode === 'create') {
+        toast.success("Thêm mới Pháp nhân thành công!");
+      } else {
+        toast.success("Cập nhật thông tin Pháp nhân thành công!");
+      }
+
+    } catch (err: any) { 
+      setError(err.message || 'Lỗi lưu dữ liệu Pháp nhân.'); 
+      // 🔴 Thêm thông báo lỗi
+      toast.error(err.message || "Đã xảy ra lỗi khi lưu thông tin Pháp nhân!");
+      
+    } finally { 
+      setSubmitting(false); 
+    }
   };
 
   return (

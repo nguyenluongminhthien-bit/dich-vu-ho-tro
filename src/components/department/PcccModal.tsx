@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { X, Loader2, Save, Flame, Plus, Trash2, PlusCircle, Siren, Droplets, PhoneCall, FileText, Users, Sun, Moon, Link as LinkIcon } from 'lucide-react';
 import { apiService } from '../../services/api';
+import { toast } from "../../utils/toast";
+
 
 const formatPhoneNumber = (val: string | number | undefined | null) => {
   if (!val) return '';
@@ -116,25 +118,65 @@ export default function PcccModal({ isOpen, pcccMode, currentData, currentEquipm
   };
 
   const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault(); setSubmitting(true); setError(null);
-    let finalData = { ...formData };
+    e.preventDefault(); 
+    setSubmitting(true); 
+    setError(null);
+    
+    let finalData: any = { ...formData };
+
+    // 🟢 Dọn dẹp dữ liệu Hồ sơ: Tự động chuyển các chuỗi rỗng thành null
+    Object.keys(finalData).forEach(key => {
+      if (finalData[key] === '' || finalData[key] === ' ') {
+        finalData[key] = null;
+      }
+    });
+
     const isCreate = pcccMode === 'create';
-    if (isCreate && (!finalData.id || finalData.id === '')) finalData.id = `PC${Date.now()}`;
+    if (isCreate && (!finalData.id || finalData.id === '')) {
+      finalData.id = `PC${Date.now()}`;
+    }
+    
     try {
       await apiService.save(finalData, pcccMode === 'view' ? 'update' : pcccMode, 'hs_pccc');
-      for (const delId of deletedEqIds) { await apiService.delete(delId, 'ts_pccc'); }
+      
+      for (const delId of deletedEqIds) { 
+        await apiService.delete(delId, 'ts_pccc'); 
+      }
+      
       if (equipmentList.length > 0) {
         const eqToSave = equipmentList.map((eq, i) => {
-          const cleaned = { ...eq, id_don_vi: finalData.id_don_vi };
+          const cleaned: any = { ...eq, id_don_vi: finalData.id_don_vi };
+          
+          // 🟢 Dọn dẹp dữ liệu Thiết bị: Tự động chuyển các chuỗi rỗng thành null
+          Object.keys(cleaned).forEach(key => {
+            if (cleaned[key] === '' || cleaned[key] === ' ') {
+              cleaned[key] = null;
+            }
+          });
+
           if (!cleaned.id || cleaned.id === '') cleaned.id = `EQ${Date.now()}${i}`;
           return cleaned;
         });
         await apiService.save(eqToSave, 'update', 'ts_pccc');
       }
+      
       onSaved(finalData, equipmentList, isCreate);
       onClose();
-    } catch (err: any) { setError(err.message || 'Lỗi lưu dữ liệu PCCC.'); }
-    finally { setSubmitting(false); }
+      // 🟢 Thêm thông báo thành công
+      if (isCreate) {
+        toast.success("Thêm mới hồ sơ PCCC thành công!");
+      } else {
+        toast.success("Cập nhật hồ sơ PCCC thành công!");
+      }
+
+    } catch (err: any) { 
+      setError(err.message || 'Lỗi lưu dữ liệu PCCC.'); 
+      // 🔴 Thêm thông báo lỗi
+      toast.error(err.message || "Đã xảy ra lỗi khi lưu hồ sơ PCCC!");
+      
+    } finally { 
+      setSubmitting(false); 
+    }
   };
 
   return (

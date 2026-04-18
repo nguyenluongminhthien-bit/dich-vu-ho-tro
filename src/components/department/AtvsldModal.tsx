@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { X, Loader2, Save, HardHat, Users, Shield, Settings, AlertCircle } from 'lucide-react';
 import { apiService } from '../../services/api';
+import { toast } from "../../utils/toast";
+
 
 const EMPTY_FORM = {
   id: '', id_don_vi: '', nguoi_phu_trach: '', so_luong_mang_luoi: '', link_ho_so_quy_dinh: '',
@@ -41,17 +43,45 @@ export default function AtvsldModal({ isOpen, currentData, selectedUnitId, onSav
   };
 
   const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault(); setSubmitting(true); setError(null);
-    let finalData = { ...formData };
+    e.preventDefault(); 
+    setSubmitting(true); 
+    setError(null);
+    
+    let finalData: any = { ...formData };
+
+    // 🟢 Dọn dẹp dữ liệu: Tự động chuyển các chuỗi rỗng thành null
+    Object.keys(finalData).forEach(key => {
+      if (finalData[key] === '' || finalData[key] === ' ') {
+        finalData[key] = null;
+      }
+    });
+
     const isCreate = !currentData;
     const mode = isCreate ? 'create' : 'update';
-    if (isCreate && (!finalData.id || finalData.id === '')) finalData.id = `AT${Date.now()}`;
+    
+    if (isCreate && (!finalData.id || finalData.id === '')) {
+      finalData.id = `AT${Date.now()}`;
+    }
+    
     try {
       await apiService.save(finalData, mode, 'hs_an_toan_lao_dong');
       onSaved(finalData, isCreate);
       onClose();
-    } catch (err: any) { setError(err.message || 'Lỗi lưu dữ liệu ATVSLĐ.'); }
-    finally { setSubmitting(false); }
+      // 🟢 Thêm thông báo thành công
+      if (isCreate) {
+        toast.success("Thêm mới hồ sơ An toàn lao động thành công!");
+      } else {
+        toast.success("Cập nhật hồ sơ An toàn lao động thành công!");
+      }
+
+    } catch (err: any) { 
+      setError(err.message || 'Lỗi lưu dữ liệu ATVSLĐ.'); 
+      // 🔴 Thêm thông báo lỗi
+      toast.error(err.message || "Đã xảy ra lỗi khi lưu hồ sơ ATVSLĐ!");
+      
+    } finally { 
+      setSubmitting(false); 
+    }
   };
 
   return (

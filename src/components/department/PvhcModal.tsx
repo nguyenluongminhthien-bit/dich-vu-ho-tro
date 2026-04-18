@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Loader2, Save, Utensils, Briefcase, Pocket } from 'lucide-react';
 import { apiService } from '../../services/api';
+import { toast } from "../../utils/toast";
 
 const formatCurrency = (val: string | number | undefined | null) => {
   if (!val) return '';
@@ -44,21 +45,52 @@ export default function PvhcModal({ isOpen, currentData, selectedUnitId, onSaved
   };
 
   const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault(); setSubmitting(true); setError(null);
+    e.preventDefault(); 
+    setSubmitting(true); 
+    setError(null);
+    
     const khachCho = Number(formData.pvhc_khach_cho) || 0;
     const veSinh = Number(formData.pvhc_ve_sinh) || 0;
     const dichVu = Number(formData.pvhc_dich_vu) || 0;
     let finalData: any = { ...formData, hien_huu: khachCho + veSinh };
-    if (dichVu < 1) { finalData.vi_tri = ''; finalData.ncc_dich_vu = ''; finalData.chi_phi_thue = ''; }
+    
+    // Đã đổi chuỗi rỗng '' thành null cho an toàn với Database
+    if (dichVu < 1) { 
+      finalData.vi_tri = null; 
+      finalData.ncc_dich_vu = null; 
+      finalData.chi_phi_thue = null; 
+    }
+
+    // 🟢 Dọn dẹp dữ liệu: Tự động chuyển các chuỗi rỗng còn lại thành null
+    Object.keys(finalData).forEach(key => {
+      if (finalData[key] === '' || finalData[key] === ' ') {
+        finalData[key] = null;
+      }
+    });
+
     const isCreate = !currentData;
     const mode = isCreate ? 'create' : 'update';
     if (isCreate && (!finalData.id || finalData.id === '')) finalData.id = `HC${Date.now()}`;
+    
     try {
       await apiService.save(finalData, mode, 'hs_pvhc');
       onSaved(finalData, isCreate);
       onClose();
-    } catch (err: any) { setError(err.message || 'Lỗi lưu dữ liệu Hậu cần.'); }
-    finally { setSubmitting(false); }
+      // 🟢 Thêm thông báo thành công
+      if (isCreate) {
+        toast.success("Thêm mới hồ sơ Hậu cần thành công!");
+      } else {
+        toast.success("Cập nhật hồ sơ Hậu cần thành công!");
+      }
+
+    } catch (err: any) { 
+      setError(err.message || 'Lỗi lưu dữ liệu Hậu cần.'); 
+      // 🔴 Thêm thông báo lỗi
+      toast.error(err.message || "Đã xảy ra lỗi khi lưu hồ sơ Hậu cần!");
+      
+    } finally { 
+      setSubmitting(false); 
+    }
   };
 
   return (

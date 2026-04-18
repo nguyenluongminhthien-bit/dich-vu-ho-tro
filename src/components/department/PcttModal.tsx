@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Loader2, Save, CloudLightning, Users, Shield, HardHat, AlertCircle } from 'lucide-react';
 import { apiService } from '../../services/api';
+import { toast } from "../../utils/toast";
 
 const EMPTY_FORM = {
   id: '', id_don_vi: '', doi_truong_pctt: '', sl_nhan_su_doi: '', link_pa_pctt: '',
@@ -40,17 +41,45 @@ export default function PcttModal({ isOpen, currentData, selectedUnitId, onSaved
   };
 
   const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault(); setSubmitting(true); setError(null);
-    let finalData = { ...formData };
+    e.preventDefault(); 
+    setSubmitting(true); 
+    setError(null);
+    
+    let finalData: any = { ...formData };
+
+    // 🟢 Dọn dẹp dữ liệu: Tự động chuyển các chuỗi rỗng thành null
+    Object.keys(finalData).forEach(key => {
+      if (finalData[key] === '' || finalData[key] === ' ') {
+        finalData[key] = null;
+      }
+    });
+
     const isCreate = !currentData;
     const mode = isCreate ? 'create' : 'update';
-    if (isCreate && (!finalData.id || finalData.id === '')) finalData.id = `PT${Date.now()}`;
+    
+    if (isCreate && (!finalData.id || finalData.id === '')) {
+      finalData.id = `PT${Date.now()}`;
+    }
+    
     try {
       await apiService.save(finalData, mode, 'hs_pctt');
       onSaved(finalData, isCreate);
       onClose();
-    } catch (err: any) { setError(err.message || 'Lỗi lưu dữ liệu PCTT.'); }
-    finally { setSubmitting(false); }
+      // 🟢 Thêm thông báo thành công
+      if (isCreate) {
+        toast.success("Thêm mới hồ sơ PCTT thành công!");
+      } else {
+        toast.success("Cập nhật hồ sơ PCTT thành công!");
+      }
+
+    } catch (err: any) { 
+      setError(err.message || 'Lỗi lưu dữ liệu PCTT.'); 
+      // 🔴 Thêm thông báo lỗi
+      toast.error(err.message || "Đã xảy ra lỗi khi lưu hồ sơ PCTT!");
+      
+    } finally { 
+      setSubmitting(false); 
+    }
   };
 
   return (
