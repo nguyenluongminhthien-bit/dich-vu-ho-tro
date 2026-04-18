@@ -181,7 +181,8 @@ export default function DepartmentPage() {
   const [pcccData, setPcccData] = useState<any[]>([]);
   const [tsPcccData, setTsPcccData] = useState<any[]>([]);
   const [isPcccModalOpen, setIsPcccModalOpen] = useState(false);
-  const [isEmergencyContactOpen, setIsEmergencyContactOpen] = useState(false); 
+  const [isEmergencyContactOpen, setIsEmergencyContactOpen] = useState(false);
+  const [pcccMode, setPcccMode] = useState<'create' | 'update' | 'view'>('create'); 
   const [pcccFormData, setPcccFormData] = useState<any>({}); 
   const [equipmentList, setEquipmentList] = useState<any[]>([]);
   const [deletedEqIds, setDeletedEqIds] = useState<string[]>([]);
@@ -805,6 +806,110 @@ export default function DepartmentPage() {
       setSubmitting(false); 
     }
   };
+
+  // =====================================================================
+  // 🟢 CÁC HÀM XỬ LÝ LOGIC CHO TAB PCCC (VỪA ĐƯỢC PHỤC HỒI)
+  // =====================================================================
+
+  const addEquipmentRow = () => {
+    setEquipmentList([
+      ...equipmentList, 
+      { id: '', nhom_he_thong: '', loai_thiet_bi: '', so_luong: 1, don_vi_tinh: '', vi_tri_bo_tri: '', ngay_bom_sac: '', ngay_het_han: '', tinh_trang: 'Hoạt động tốt' }
+    ]);
+  };
+
+  const removeEquipmentRow = (index: number) => {
+    const eqToRemove = equipmentList[index];
+    // Nếu thiết bị đã có ID thật trên DB (không phải mã tạm thời EQ...), thì đưa vào mảng xóa
+    if (eqToRemove.id && !eqToRemove.id.startsWith('EQ')) {
+      setDeletedEqIds([...deletedEqIds, eqToRemove.id]);
+    }
+    const newList = [...equipmentList];
+    newList.splice(index, 1);
+    setEquipmentList(newList);
+  };
+
+  const handleEquipmentChange = (index: number, field: string, value: any) => {
+    const newList = [...equipmentList];
+    newList[index] = { ...newList[index], [field]: value };
+    setEquipmentList(newList);
+  };
+
+  const handlePcccSave = async (e: React.FormEvent) => {
+    e.preventDefault(); 
+    setSubmitting(true); 
+    setError(null);
+    
+    let finalData: any = { ...pcccFormData };
+
+    // Vì ô input Đơn vị bị disabled, ta phải lấy thẳng từ selectedUnitId
+    if (!finalData.id_don_vi) {
+      finalData.id_don_vi = selectedUnitId;
+    }
+
+    // 🟢 Dọn dẹp dữ liệu Hồ sơ
+    Object.keys(finalData).forEach(key => {
+      if (finalData[key] === '' || finalData[key] === ' ') finalData[key] = null;
+    });
+
+    const isCreate = pcccMode === 'create';
+    if (isCreate && (!finalData.id || finalData.id === '')) {
+      finalData.id = `PC${Date.now()}`;
+    }
+    
+    try {
+      // 1. Lưu Hồ sơ PCCC
+      await apiService.save(finalData, pcccMode === 'view' ? 'update' : pcccMode, 'hs_pccc');
+      
+      // 2. Xóa các thiết bị bị loại bỏ
+      for (const delId of deletedEqIds) { 
+        await apiService.delete(delId, 'ts_pccc'); 
+      }
+      
+      // 3. Lưu mảng thiết bị hiện tại
+      let savedEquipment = [...equipmentList];
+      if (savedEquipment.length > 0) {
+        const eqToSave = savedEquipment.map((eq, i) => {
+          const cleaned: any = { ...eq, id_don_vi: finalData.id_don_vi };
+          Object.keys(cleaned).forEach(key => {
+            if (cleaned[key] === '' || cleaned[key] === ' ') cleaned[key] = null;
+          });
+          if (!cleaned.id || cleaned.id === '') cleaned.id = `EQ${Date.now()}${i}`;
+          return cleaned;
+        });
+        await apiService.save(eqToSave, 'update', 'ts_pccc');
+        savedEquipment = eqToSave;
+      }
+      
+      // 4. Cập nhật lại giao diện (State)
+      if (isCreate) {
+        setPcccData(prev => [...prev, finalData]);
+      } else {
+        setPcccData(prev => prev.map(item => item.id === finalData.id ? finalData : item));
+      }
+      
+      // Cập nhật mảng thiết bị tổng
+      const otherUnitEqs = tsPcccData.filter(eq => eq.id_don_vi !== finalData.id_don_vi);
+      setTsPcccData([...otherUnitEqs, ...savedEquipment]);
+      setDeletedEqIds([]); // Reset mảng xóa
+
+      setIsPcccModalOpen(false);
+
+      // 🟢 Thông báo thành công
+      if (isCreate) {
+        toast.success("Thêm mới hồ sơ PCCC thành công!");
+      } else {
+        toast.success("Cập nhật hồ sơ PCCC thành công!");
+      }
+
+    } catch (err: any) { 
+      setError(err.message || 'Lỗi lưu dữ liệu PCCC.'); 
+      toast.error(err.message || "Đã xảy ra lỗi khi lưu hồ sơ PCCC!");
+    } finally { 
+      setSubmitting(false); 
+    }
+  };
+  // =====================================================================
 
   const renderUnitTree = (parent: DonVi, level: number = 1) => {
     const children = getChildUnits(parent.id);
