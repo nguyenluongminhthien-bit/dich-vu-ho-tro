@@ -7,6 +7,7 @@ import {
 import { apiService } from '../services/api';
 import { QuyDinhQuyTrinh, VB_TB } from '../types'; 
 import { useAuth } from '../contexts/AuthContext';
+import { toast } from '../utils/toast';
 
 interface PolicyItem extends QuyDinhQuyTrinh {
   isFromVB?: boolean;
@@ -134,7 +135,7 @@ export default function PolicyPage() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.nghiep_vu) return alert("Vui lòng nhập/chọn Nghiệp vụ!");
+    if (!formData.nghiep_vu) return toast.warning("Vui lòng nhập/chọn Nghiệp vụ!");
     
     setSubmitting(true); setError(null);
     try {
@@ -149,8 +150,17 @@ export default function PolicyPage() {
         setQdData(prev => prev.map(item => item.id === dataToSave.id ? { ...dataToSave, isFromVB: false } as PolicyItem : item));
       }
       setIsModalOpen(false); 
+      
+      // 🟢 Thông báo thành công (Phân biệt Thêm mới / Cập nhật)
+      if (modalMode === 'create') {
+        toast.success("Ban hành tài liệu thành công!");
+      } else {
+        toast.success("Cập nhật tài liệu thành công!");
+      }
     } catch (err: any) { 
       setError(err.message || 'Lỗi lưu dữ liệu.'); 
+      // 🔴 Thông báo lỗi
+      toast.error(err.message || "Đã xảy ra lỗi khi lưu!");
     } finally { 
       setSubmitting(false); 
     }
@@ -167,16 +177,20 @@ export default function PolicyPage() {
     try {
       await apiService.delete(itemToDelete, "qd_qt");
       setQdData(prev => prev.filter(item => item.id !== itemToDelete));
-      setIsConfirmOpen(false); setItemToDelete(null); 
+      setIsConfirmOpen(false); setItemToDelete(null);
+      // 🟢 Thông báo thành công đặt ở cuối khối try
+      toast.success("Xóa tài liệu thành công!"); 
     } catch (err: any) { 
-      setError(err.message || 'Lỗi xóa dữ liệu.'); 
+      setError(err.message || 'Lỗi xóa dữ liệu.');
+      // 🔴 Thông báo lỗi đặt trong khối catch
+      toast.error(err.message || "Đã xảy ra lỗi khi xóa!"); 
     } finally { 
       setSubmitting(false); 
     }
   };
 
   const handleBlockedAction = (action: 'Sửa' | 'Xóa') => {
-    alert(`Đây là tài liệu được đồng bộ từ mục "Văn bản - Thông báo".\n\nVui lòng sang mục Văn bản để ${action} tài liệu này!`);
+    toast.info(`Đây là tài liệu được đồng bộ từ mục "Văn bản - Thông báo".\n\nVui lòng sang mục Văn bản để ${action} tài liệu này!`);
   };
 
   return (

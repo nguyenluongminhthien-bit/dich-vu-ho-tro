@@ -10,6 +10,7 @@ import { apiService } from '../services/api';
 import { DonVi } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { buildHierarchicalOptions, getUnitEmoji, sortDonViByThuTu, groupParentUnits } from '../utils/hierarchy'; 
+import { toast } from '../utils/toast';
 
 const normalizeDateToISO = (val: any) => {
   if (!val) return '';
@@ -267,25 +268,38 @@ export default function FireSafetyPage() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.id_don_vi) return alert("Vui lòng chọn Đơn vị!");
+    // 🟢 Thay alert bằng toast.warning
+    if (!formData.id_don_vi) return toast.warning("Vui lòng chọn Đơn vị!");
 
     let finalData = { ...formData };
-    if(!finalData.ngay_het_han_bh) finalData.ngay_het_han_bh = null;
-    if(!finalData.ngay_dien_tap) finalData.ngay_dien_tap = null;
+    
+    // 🟢 Dọn dẹp dữ liệu rỗng thành null cho Hồ sơ PCCC
+    Object.keys(finalData).forEach(key => {
+      if (finalData[key] === '' || finalData[key] === ' ') {
+        finalData[key] = null;
+      }
+    });
 
-    if (modalMode === 'create') {
+    if (modalMode === 'create' && !finalData.id) {
       finalData.id = `PCCC-${Date.now()}`;
     }
 
     setSubmitting(true); setError(null);
     try {
       await apiService.save(finalData, modalMode, "hs_pccc");
+      
       for (const delId of deletedEqIds) await apiService.delete(delId, "ts_pccc");
+      
       if (equipmentList.length > 0) {
         for (const eq of equipmentList) {
           let updatedEq = { ...eq, id_don_vi: formData.id_don_vi };
-          if (!updatedEq.ngay_bom_sac) updatedEq.ngay_bom_sac = null;
-          if (!updatedEq.ngay_het_han) updatedEq.ngay_het_han = null;
+          
+          // 🟢 Dọn dẹp dữ liệu rỗng thành null cho từng Thiết bị PCCC
+          Object.keys(updatedEq).forEach(key => {
+            if (updatedEq[key] === '' || updatedEq[key] === ' ') {
+              updatedEq[key] = null;
+            }
+          });
 
           if (!updatedEq.id) {
             updatedEq.id = `TBPCCC-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
@@ -295,19 +309,37 @@ export default function FireSafetyPage() {
           }
         }
       }
+      
       setIsModalOpen(false); 
       loadData(); 
-    } catch (err: any) { setError(err.message || 'Lỗi lưu dữ liệu PCCC.'); } 
-    finally { setSubmitting(false); }
+      // 🟢 Thông báo thành công
+      if (modalMode === 'create') {
+        toast.success("Thêm mới hồ sơ PCCC thành công!");
+      } else {
+        toast.success("Cập nhật hồ sơ PCCC thành công!");
+      }
+
+    } catch (err: any) { 
+      setError(err.message || 'Lỗi lưu dữ liệu PCCC.'); 
+      // 🔴 Thông báo lỗi
+      toast.error(err.message || "Đã xảy ra lỗi khi lưu hồ sơ PCCC!");
+    } finally { 
+      setSubmitting(false); 
+    }
   };
 
   const confirmDelete = async () => {
-    if (!itemToDelete) return; setSubmitting(true); setError(null);
+    if (!itemToDelete) return; 
+    setSubmitting(true); 
+    setError(null);
+    
     try {
       const pcccToDelete = pcccData.find(item => getPcccIdSafe(item) === itemToDelete);
       const relatedDonViId = pcccToDelete ? getUnitIdSafe(pcccToDelete) : null;
+      
       await apiService.delete(itemToDelete, "hs_pccc");
       setPcccData(prev => prev.filter(item => getPcccIdSafe(item) !== itemToDelete));
+      
       if (relatedDonViId) {
         const eqToDelete = tsPcccData.filter(eq => getUnitIdSafe(eq) === relatedDonViId);
         for (const eq of eqToDelete) {
@@ -316,9 +348,19 @@ export default function FireSafetyPage() {
         }
         setTsPcccData(prev => prev.filter(eq => getUnitIdSafe(eq) !== relatedDonViId));
       }
-      setIsConfirmOpen(false); setItemToDelete(null); 
-    } catch (err: any) { setError(err.message || 'Lỗi xóa dữ liệu.'); } 
-    finally { setSubmitting(false); }
+      
+      setIsConfirmOpen(false); 
+      setItemToDelete(null); 
+      // 🟢 Thông báo xóa thành công
+      toast.success("Xóa hồ sơ và thiết bị PCCC thành công!");
+
+    } catch (err: any) { 
+      setError(err.message || 'Lỗi xóa dữ liệu.'); 
+      // 🔴 Thông báo lỗi
+      toast.error(err.message || "Đã xảy ra lỗi khi xóa hồ sơ PCCC!");
+    } finally { 
+      setSubmitting(false); 
+    }
   };
 
   const renderUnitTree = (parent: DonVi, level: number = 1, idx: number = 0) => {

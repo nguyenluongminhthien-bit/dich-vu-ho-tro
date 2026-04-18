@@ -10,6 +10,7 @@ import { DonVi, ThietBi, NhatKyThietBi, Personnel } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { buildHierarchicalOptions, getUnitEmoji, sortDonViByThuTu, groupParentUnits } from '../utils/hierarchy';
 import { formatCurrency } from '../utils/formatters';
+import { toast } from '../utils/toast';
 
 // --- DANH SÁCH NHÓM TÀI SẢN CHUẨN ---
 const ASSET_GROUPS = [
@@ -254,8 +255,10 @@ export default function EquipmentPage() {
   // 1. CẬP NHẬT HÀM LƯU TÀI SẢN (THIẾT BỊ)
   const handleTbSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!tbFormData.id_don_vi) return alert("Vui lòng chọn Đơn vị quản lý!");
-    if (!tbFormData.nhom_thiet_bi) return alert("Vui lòng chọn hoặc nhập Nhóm Thiết bị!");
+    
+    // 🟢 Thay alert bằng toast.warning
+    if (!tbFormData.id_don_vi) return toast.warning("Vui lòng chọn Đơn vị quản lý!");
+    if (!tbFormData.nhom_thiet_bi) return toast.warning("Vui lòng chọn hoặc nhập Nhóm Thiết bị!");
     
     let finalData = { ...tbFormData };
     if (!isITEquipment(finalData.nhom_thiet_bi)) {
@@ -279,7 +282,21 @@ export default function EquipmentPage() {
       else setTbData(prev => prev.map(item => item.id === savedId ? newTb : item));
       
       setIsTbModalOpen(false); 
-    } catch (err: any) { setError(err.message); } finally { setSubmitting(false); }
+      // 🟢 Thêm thông báo thành công tại đây (Phân biệt hành động)
+      if (tbModalMode === 'create') {
+        toast.success("Thêm mới thiết bị thành công!");
+      } else {
+        toast.success("Cập nhật thông tin thiết bị thành công!");
+      }
+
+    } catch (err: any) { 
+      setError(err.message); 
+      // 🔴 Thêm thông báo lỗi tại đây
+      toast.error(err.message || "Đã xảy ra lỗi khi lưu thông tin thiết bị!");
+      
+    } finally { 
+      setSubmitting(false); 
+    }
   };
 
   const handleTbChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -367,7 +384,10 @@ export default function EquipmentPage() {
   };
 
   const confirmDelete = async () => {
-    if (!itemToDelete) return; setSubmitting(true); setError(null);
+    if (!itemToDelete) return; 
+    setSubmitting(true); 
+    setError(null);
+    
     try {
       if (itemToDelete.type === 'tb') {
         const logsToDelete = nkData.filter(nk => nk.id_ts_thiet_bi === itemToDelete.id);
@@ -379,12 +399,27 @@ export default function EquipmentPage() {
         await apiService.delete(itemToDelete.id, "ts_thiet_bi");
         setTbData(prev => prev.filter(item => item.id !== itemToDelete.id));
         setNkData(prev => prev.filter(item => item.id_ts_thiet_bi !== itemToDelete.id));
+        // 🟢 Thông báo khi xóa Thiết bị thành công
+        toast.success("Xóa thiết bị thành công!");
+        
       } else {
         await apiService.delete(itemToDelete.id, "nk_thiet_bi");
         setNkData(prev => prev.filter(item => item.id !== itemToDelete.id));
+        // 🟢 Thông báo khi xóa Nhật ký bảo dưỡng thành công
+        toast.success("Xóa nhật ký bảo dưỡng thành công!");
       }
-      setIsConfirmOpen(false); setItemToDelete(null); 
-    } catch (err: any) { setError(err.message); } finally { setSubmitting(false); }
+      
+      setIsConfirmOpen(false); 
+      setItemToDelete(null); 
+      
+    } catch (err: any) { 
+      setError(err.message); 
+      // 🔴 Thông báo lỗi nếu API gặp sự cố
+      toast.error(err.message || "Đã xảy ra lỗi khi xóa dữ liệu!");
+      
+    } finally { 
+      setSubmitting(false); 
+    }
   };
 
   return (

@@ -9,6 +9,7 @@ import {
 import { apiService } from '../services/api';
 import { DonVi, VB_TB } from '../types';
 import { useAuth } from '../contexts/AuthContext';
+import { toast } from '../utils/toast';
 
 // HÀM KIỂM TRA VĂN BẢN MẬT
 const isMatDocument = (val: any) => {
@@ -335,8 +336,8 @@ export default function DocumentPage() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.id_don_vi) return alert("Vui lòng chọn Đơn vị ban hành/lưu trữ!");
-    if (formData.hieu_luc === 'Thay thế VB khác' && !formData.van_ban_thay_the) return alert("Vui lòng dán Link văn bản bị thay thế!");
+    if (!formData.id_don_vi) return toast.warning("Vui lòng chọn Đơn vị ban hành/lưu trữ!");
+    if (formData.hieu_luc === 'Thay thế VB khác' && !formData.van_ban_thay_the) return toast.warning("Vui lòng dán Link văn bản bị thay thế!");
     
     let finalData = { ...formData };
     
@@ -373,8 +374,20 @@ export default function DocumentPage() {
         setVbData(prev => prev.map(item => String(item.id) === String(finalData.id) ? finalData : item));
       }
       setIsModalOpen(false); 
+      
+      // 🟢 Thêm thông báo thành công tại đây (Phân biệt hành động)
+      if (modalMode === 'create') {
+        toast.success("Ban hành văn bản thành công!");
+      } else {
+        toast.success("Cập nhật văn bản thành công!");
+      }
+
     } catch (err: any) { 
       setError(err.message || 'Lỗi lưu dữ liệu Văn bản.'); 
+      
+      // 🔴 Thêm thông báo lỗi tại đây
+      toast.error(err.message || "Đã xảy ra lỗi khi lưu văn bản!");
+      
     } finally { 
       setSubmitting(false); 
     }
@@ -395,9 +408,14 @@ export default function DocumentPage() {
     try {
       await apiService.delete(itemToDelete, "vb_tb");
       setVbData(prev => prev.filter(item => String(item.id) !== String(itemToDelete)));
-      setIsConfirmOpen(false); setItemToDelete(null); 
+      setIsConfirmOpen(false); 
+      setItemToDelete(null); 
+      // 🟢 Thêm thông báo thành công tại đây
+      toast.success("Xóa văn bản thành công!");
     } catch (err: any) { 
       setError(err.message || 'Lỗi xóa dữ liệu.'); 
+       // 🔴 Thêm thông báo lỗi tại đây
+      toast.error(err.message || "Đã xảy ra lỗi khi xóa!");
     } finally { 
       setSubmitting(false); 
     }

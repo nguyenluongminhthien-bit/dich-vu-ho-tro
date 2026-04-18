@@ -3,6 +3,7 @@ import { Search, Plus, Edit, Trash2, X, AlertCircle, Loader2, Save, UserCog, Shi
 import { apiService } from '../services/api';
 import { User, DonVi } from '../types';
 import { buildHierarchicalOptions, getUnitEmoji } from '../utils/hierarchy';
+import { toast } from '../utils/toast';
 
 export default function AccountPage() {
   const [data, setData] = useState<User[]>([]);
@@ -75,21 +76,44 @@ export default function AccountPage() {
         setData(prev => prev.map(item => item.id === finalData.id ? finalData as User : item));
       }
       setIsModalOpen(false);
+      // 🟢 Thêm thông báo thành công (chỉ chèn thêm, không sửa logic trên)
+      if (modalMode === 'create') {
+        toast.success("Tạo tài khoản mới thành công!");
+      } else {
+        toast.success("Cập nhật tài khoản thành công!");
+      }
+
     } catch (err: any) { 
       setError(err.message || 'Lỗi lưu tài khoản.'); 
+      // 🔴 Thêm thông báo lỗi
+      toast.error(err.message || "Đã xảy ra lỗi khi lưu tài khoản!");
+      
     } finally { 
       setSubmitting(false); 
     }
   };
 
   const confirmDelete = async () => {
-    if (!itemToDelete) return; setSubmitting(true); setError(null);
+    if (!itemToDelete) return; 
+    setSubmitting(true); 
+    setError(null);
+    
     try {
       await apiService.delete(itemToDelete, "config_users");
       setData(prev => prev.filter(item => item.id !== itemToDelete));
-      setIsConfirmOpen(false); setItemToDelete(null);
-    } catch (err: any) { setError(err.message || 'Lỗi xóa tài khoản.'); } 
-    finally { setSubmitting(false); }
+      setIsConfirmOpen(false); 
+      setItemToDelete(null);
+      // 🟢 Thêm thông báo xóa thành công
+      toast.success("Xóa tài khoản thành công!");
+
+    } catch (err: any) { 
+      setError(err.message || 'Lỗi xóa tài khoản.'); 
+      // 🔴 Thêm thông báo lỗi
+      toast.error(err.message || "Đã xảy ra lỗi khi xóa tài khoản!");
+      
+    } finally { 
+      setSubmitting(false); 
+    }
   };
 
   return (

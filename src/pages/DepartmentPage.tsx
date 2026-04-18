@@ -24,6 +24,7 @@ import PcttModal from '../components/department/PcttModal';
 import SecurityModal from '../components/department/SecurityModal';
 import PcccModal from '../components/department/PcccModal';
 import { buildHierarchicalOptions, getUnitEmoji, sortDonViByThuTu, groupParentUnits } from '../utils/hierarchy'; 
+import { toast } from '../utils/toast';
 
 // 🟢 [HÀM TIỆN ÍCH CHUNG]
 const safeGet = (obj: any, key: string) => {
@@ -568,7 +569,7 @@ export default function DepartmentPage() {
     try {
       await apiService.save(updatedUnit, 'update', 'dm_don_vi');
       setData(prev => prev.map(item => item.id === updatedUnit.id ? updatedUnit : item));
-    } catch (err) { alert("Lỗi cập nhật nhân sự."); }
+    } catch (err) { toast.error("Lỗi cập nhật nhân sự."); }
   };
 
   const PersonnelCard = ({ title, person, roleDefault, fieldKey, isLarge = false }: any) => {
@@ -624,7 +625,7 @@ export default function DepartmentPage() {
               </div>
             </>
           ) : (
-            <div onClick={() => { if(currentUnitPersonnel.length > 0) setIsEditing(true); else alert('Chưa có nhân sự nào trong danh sách!'); }} className="flex-1 flex flex-col items-center justify-center py-6 border-2 border-dashed border-gray-200 rounded-lg bg-gray-50/50 hover:bg-blue-50 hover:border-blue-300 cursor-pointer transition-colors group/box">
+            <div onClick={() => { if(currentUnitPersonnel.length > 0) setIsEditing(true); else toast.info('Chưa có nhân sự nào trong danh sách!'); }} className="flex-1 flex flex-col items-center justify-center py-6 border-2 border-dashed border-gray-200 rounded-lg bg-gray-50/50 hover:bg-blue-50 hover:border-blue-300 cursor-pointer transition-colors group/box">
               <p className="text-sm text-gray-400 group-hover/box:text-[#05469B] font-medium italic transition-colors">Chưa có {roleDefault}</p>
             </div>
           )}
@@ -641,16 +642,48 @@ export default function DepartmentPage() {
   };
 
   const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault(); setSubmitting(true); setError(null);
+    e.preventDefault(); 
+    setSubmitting(true); 
+    setError(null);
+    
     try {
-      const res = await apiService.save(formData, modalMode, "dm_don_vi");
-      const savedId = res?.newId || res?.id || formData.id;
-      const finalData = { ...formData, id: savedId } as DonVi;
-      if (modalMode === 'create') { setData(prev => [...prev, finalData]); setSelectedUnitId(savedId); } 
-      else { setData(prev => prev.map(item => item.id === savedId ? finalData : item)); }
+      // 🟢 Dọn dẹp dữ liệu: Tự động chuyển chuỗi rỗng thành null để tránh lỗi Supabase
+      const dataToSave: any = { ...formData };
+      Object.keys(dataToSave).forEach(key => {
+        if (dataToSave[key] === '' || dataToSave[key] === ' ') {
+          dataToSave[key] = null;
+        }
+      });
+
+      const res = await apiService.save(dataToSave, modalMode, "dm_don_vi");
+      const savedId = res?.newId || res?.id || dataToSave.id;
+      const finalData = { ...dataToSave, id: savedId } as DonVi;
+      
+      if (modalMode === 'create') { 
+        setData(prev => [...prev, finalData]); 
+        setSelectedUnitId(savedId); 
+      } else { 
+        setData(prev => prev.map(item => item.id === savedId ? finalData : item)); 
+      }
+      
       setIsModalOpen(false); 
-    } catch (err: any) { setError(err.message || 'Lỗi lưu dữ liệu.'); } 
-    finally { setSubmitting(false); }
+
+      // 🟢 Thông báo thành công
+      if (modalMode === 'create') {
+        toast.success("Thêm mới đơn vị thành công!");
+      } else {
+        toast.success("Cập nhật thông tin đơn vị thành công!");
+      }
+
+    } catch (err: any) { 
+      setError(err.message || 'Lỗi lưu dữ liệu.'); 
+      
+      // 🔴 Thông báo lỗi
+      toast.error(err.message || "Đã xảy ra lỗi khi lưu thông tin đơn vị!");
+      
+    } finally { 
+      setSubmitting(false); 
+    }
   };
 
   const openPnModal = (mode: 'create' | 'update', item?: PhapNhan) => {
@@ -709,23 +742,38 @@ export default function DepartmentPage() {
   };
 
   const confirmDelete = async () => {
-    if (!itemToDelete) return; setSubmitting(true); setError(null);
+    if (!itemToDelete) return; 
+    setSubmitting(true); 
+    setError(null);
+    
     try {
       if (itemToDelete.type === 'donvi') {
         await apiService.delete(itemToDelete.id, "dm_don_vi");
         setData(prev => prev.filter(item => item.id !== itemToDelete.id));
         if (selectedUnitId === itemToDelete.id) setSelectedUnitId(null);
+        
+        // 🟢 Thông báo xóa Đơn vị
+        toast.success("Xóa thông tin Đơn vị thành công!");
+        
       } else if (itemToDelete.type === 'phapnhan') {
         await apiService.delete(itemToDelete.id, "dm_phap_nhan");
         setPhapNhanData(prev => prev.filter(item => item.id !== itemToDelete.id));
+        // 🟢 Thông báo xóa Pháp nhân
+        toast.success("Xóa thông tin Pháp nhân thành công!");
+        
       } else if (itemToDelete.type === 'phonghop') {
         await apiService.delete(itemToDelete.id, "dm_phong_hop");
         setPhongHopData(prev => prev.filter(item => item.id !== itemToDelete.id));
+        // 🟢 Thông báo xóa Phòng họp
+        toast.success("Xóa thông tin Phòng họp thành công!");
+        
       } else if (itemToDelete.type === 'pccc') {
         const pcccToDelete = pcccData.find(item => getPcccIdSafe(item) === itemToDelete.id);
         const relatedDonViId = pcccToDelete ? getUnitIdSafe(pcccToDelete) : null;
+        
         await apiService.delete(itemToDelete.id, "hs_pccc");
         setPcccData(prev => prev.filter(item => getPcccIdSafe(item) !== itemToDelete.id));
+        
         if (relatedDonViId) {
           const eqToDelete = tsPcccData.filter(eq => getUnitIdSafe(eq) === relatedDonViId);
           for (const eq of eqToDelete) {
@@ -734,13 +782,28 @@ export default function DepartmentPage() {
           }
           setTsPcccData(prev => prev.filter(eq => getUnitIdSafe(eq) !== relatedDonViId));
         }
+        
+        // 🟢 Thông báo xóa Hồ sơ PCCC & Thiết bị
+        toast.success("Xóa hồ sơ PCCC và thiết bị liên quan thành công!");
+        
       } else if (itemToDelete.type === 'pctt') {
         await apiService.delete(itemToDelete.id, "hs_pctt");
         setPcttData(prev => prev.filter(item => safeGet(item, 'id') !== itemToDelete.id));
+        // 🟢 Thông báo xóa Hồ sơ PCTT
+        toast.success("Xóa hồ sơ PCTT thành công!");
       }
-      setIsConfirmOpen(false); setItemToDelete(null);
-    } catch (err: any) { setError(err.message || 'Lỗi xóa dữ liệu.'); } 
-    finally { setSubmitting(false); }
+      
+      setIsConfirmOpen(false); 
+      setItemToDelete(null);
+      
+    } catch (err: any) { 
+      setError(err.message || 'Lỗi xóa dữ liệu.'); 
+      // 🔴 Thông báo lỗi chung
+      toast.error(err.message || "Đã xảy ra lỗi khi xóa dữ liệu!");
+      
+    } finally { 
+      setSubmitting(false); 
+    }
   };
 
   const renderUnitTree = (parent: DonVi, level: number = 1) => {

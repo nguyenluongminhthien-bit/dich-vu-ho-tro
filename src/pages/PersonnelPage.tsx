@@ -10,6 +10,8 @@ import { apiService } from '../services/api';
 import { Personnel, DonVi, ThietBi } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { buildHierarchicalOptions, getUnitEmoji, sortDonViByThuTu, groupParentUnits } from '../utils/hierarchy';
+import { toast } from '../utils/toast';
+
 
 // HÀM FORMAT SỐ ĐIỆN THOẠI 4-3-3
 const formatPhoneNumber = (val: string | number | undefined | null) => {
@@ -290,7 +292,8 @@ export default function PersonnelPage() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.id_don_vi) return alert("Vui lòng chọn Đơn vị công tác!");
+    // 🟢 1. Thay alert bằng toast.warning
+    if (!formData.id_don_vi) return toast.warning("Vui lòng chọn Đơn vị công tác!");
     
     let calculatedTuoi = '';
     if (formData.nam_sinh) {
@@ -308,6 +311,7 @@ export default function PersonnelPage() {
       trang_thai: formData.trang_thai || 'Đang làm việc'
     };
 
+    // Giữ nguyên 100% code gán null của bạn
     if(!finalDataToSave.nam_sinh) finalDataToSave.nam_sinh = null;
     if(!finalDataToSave.ngay_nhan_vien) finalDataToSave.ngay_nhan_vien = null;
     if(!finalDataToSave.ngay_nghi_viec) finalDataToSave.ngay_nghi_viec = null;
@@ -323,18 +327,43 @@ export default function PersonnelPage() {
         setData(prev => prev.map(item => item.id === finalDataToSave.id ? finalDataToSave : item));
       }
       setModal(prev => ({ ...prev, isOpen: false }));  
-    } catch (err: any) { setError(err.message || 'Lỗi lưu dữ liệu.'); } 
-    finally { setSubmitting(false); }
+      // 🟢 2. Thêm thông báo thành công
+      if (modal.mode === 'create') {
+        toast.success("Thêm mới nhân sự thành công!");
+      } else {
+        toast.success("Cập nhật thông tin nhân sự thành công!");
+      }
+
+    } catch (err: any) { 
+      setError(err.message || 'Lỗi lưu dữ liệu.'); 
+      // 🔴 3. Thêm thông báo lỗi
+      toast.error(err.message || "Đã xảy ra lỗi khi lưu thông tin nhân sự!");
+      
+    } finally { 
+      setSubmitting(false); 
+    }
   };
 
   const confirmDelete = async () => {
-    if (!itemToDelete) return; setSubmitting(true); setError(null);
+    if (!itemToDelete) return; 
+    setSubmitting(true); 
+    setError(null);
+    
     try {
       await apiService.delete(itemToDelete, "ns_dich_vu");
       setData(prev => prev.filter(item => item.id !== itemToDelete));
-      setIsConfirmOpen(false); setItemToDelete(null); 
-    } catch (err: any) { setError(err.message || 'Lỗi xóa dữ liệu.'); } 
-    finally { setSubmitting(false); }
+      setIsConfirmOpen(false); 
+      setItemToDelete(null); 
+      // 🟢 Thông báo xóa thành công
+      toast.success("Xóa nhân sự thành công!");
+      
+    } catch (err: any) { 
+      setError(err.message || 'Lỗi xóa dữ liệu.'); 
+      // 🔴 Thông báo lỗi
+      toast.error(err.message || "Đã xảy ra lỗi khi xóa nhân sự!");
+    } finally { 
+      setSubmitting(false); 
+    }
   };
 
   // --- XỬ LÝ HÀM VÀO LÀM LẠI ---
@@ -972,6 +1001,7 @@ export default function PersonnelPage() {
                       <option value="PT DVHC">PT DVHC</option>
                       <option value="PT NS">PT NS</option>
                       <option value="BV, ĐTKH">BV, ĐTKH</option>
+                      <option value="Chuyên viên">Chuyên viên</option>
                     </select>
                   </div>
                   <div>

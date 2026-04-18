@@ -8,6 +8,7 @@ import { apiService } from '../services/api';
 import { DonVi, TS_Xe, CP_HoatDongXe } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { buildHierarchicalOptions, getUnitEmoji, sortDonViByThuTu, groupParentUnits } from '../utils/hierarchy';
+import { toast } from '../utils/toast';
 
 // --- HÀM TỰ ĐỘNG DÒ TÌM ID TỪ SUPABASE ---
 const getCostId = (cp: any) => cp.id || cp.id_chi_phi_xe || '';
@@ -210,8 +211,8 @@ export default function VehiclePage() {
   // 1. CẬP NHẬT HÀM LƯU XE CHÍNH
   const handleCarSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!carFormData.id_don_vi) return alert("Vui lòng chọn Đơn vị quản lý!");
-    if (!carFormData.hieu_xe) return alert("Vui lòng chọn Hiệu xe!");
+    if (!carFormData.id_don_vi) return toast.warning("Vui lòng chọn Đơn vị quản lý!");
+    if (!carFormData.hieu_xe) return toast.warning("Vui lòng chọn Hiệu xe!");
     
     let finalData = { ...carFormData };
 
@@ -231,8 +232,21 @@ export default function VehiclePage() {
       else setXeData(prev => prev.map(item => item.id === savedId ? newCar : item));
       
       setCarModal(prev => ({ ...prev, isOpen: false })); 
-    } catch (err: any) { setError(err.message || 'Lỗi lưu dữ liệu Xe.'); } 
-    finally { setSubmitting(false); }
+      // 🟢 Thêm thông báo thành công (Phân biệt Thêm mới / Cập nhật)
+      if (modalMode === 'create') {
+        toast.success("Thêm mới phương tiện thành công!");
+      } else {
+        toast.success("Cập nhật thông tin xe thành công!");
+      }
+
+    } catch (err: any) { 
+      setError(err.message || 'Lỗi lưu dữ liệu Xe.'); 
+      // 🔴 Thêm thông báo lỗi tại đây
+      toast.error(err.message || "Đã xảy ra lỗi khi lưu thông tin xe!");
+      
+    } finally { 
+      setSubmitting(false); 
+    }
   };
 
   const handleInputCarChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -345,7 +359,9 @@ export default function VehiclePage() {
   }, [viewHistoryCosts]);
 
   const confirmDelete = async () => {
-    if (!itemToDelete) return; setSubmitting(true); setError(null);
+    if (!itemToDelete) return; 
+    setSubmitting(true); 
+    setError(null);
     try {
       if (itemToDelete.type === 'xe') {
         const costsToDelete = chiPhiData.filter(cp => getCostCarId(cp) === itemToDelete.id);
@@ -358,13 +374,27 @@ export default function VehiclePage() {
         await apiService.delete(itemToDelete.id, "ts_xe");
         setXeData(prev => prev.filter(item => item.id !== itemToDelete.id));
         setChiPhiData(prev => prev.filter(item => getCostCarId(item) !== itemToDelete.id));
+        // 🟢 Thông báo khi xóa Xe thành công
+        toast.success("Xóa thông tin xe thành công!");
+        
       } else {
         await apiService.delete(itemToDelete.id, "cp_hoat_dong_xe");
         setChiPhiData(prev => prev.filter(item => getCostId(item) !== itemToDelete.id));
+        // 🟢 Thông báo khi xóa Chi phí thành công
+        toast.success("Xóa chi phí hoạt động thành công!");
       }
-      setIsConfirmOpen(false); setItemToDelete(null); 
-    } catch (err: any) { setError(err.message || 'Lỗi xóa dữ liệu.'); } 
-    finally { setSubmitting(false); }
+      
+      setIsConfirmOpen(false); 
+      setItemToDelete(null); 
+      
+    } catch (err: any) { 
+      setError(err.message || 'Lỗi xóa dữ liệu.'); 
+      // 🔴 Thông báo khi có lỗi
+      toast.error(err.message || "Đã xảy ra lỗi khi xóa dữ liệu!");
+      
+    } finally { 
+      setSubmitting(false); 
+    }
   };
 
   const getUnitFullName = (id: string) => {
