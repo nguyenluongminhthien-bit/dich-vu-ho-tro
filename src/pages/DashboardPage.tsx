@@ -4,6 +4,8 @@ import { apiService } from '../services/api';
 import { DonVi, Personnel, ThietBi } from '../types';
 import { getUnitEmoji } from '../utils/hierarchy';
 import { formatCurrency, parseDateStrict } from '../utils/formatters';
+import { DashboardSkeleton } from '../components/SkeletonLoader';
+import ExpiryAlert from '../components/ExpiryAlert';
 
 import { 
   Building2, MapPin, ChevronDown, ChevronRight, PanelLeftClose, PanelLeftOpen,
@@ -426,6 +428,7 @@ export default function DashboardPage() {
     return Object.keys(groupStats).map(key => ({ name: key, ...groupStats[key] })).sort((a, b) => b.total - a.total); 
   }, [tbData, currentSubordinateIds]);
 
+  if (loading) return <DashboardSkeleton />;
   return (
     <div className="flex h-full bg-[#f4f7f9] overflow-hidden relative">
       {isListCollapsed && (
@@ -476,6 +479,12 @@ export default function DashboardPage() {
           </div>
         ) : (
           <div className="space-y-6">
+
+            {/* 🟢 CHÈN CẢNH BÁO TỰ ĐỘNG VÀO ĐÂY */}
+            <ExpiryAlert 
+              selectedUnitId={selectedUnitFilter} 
+              donViMap={donViMap} 
+            />
             
             {/* 🟢 VÙNG 1: WIDGETS TỔNG QUAN QUY MÔ (ĐÃ CẬP NHẬT GIAO DIỆN 1 HÀNG) */}
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">

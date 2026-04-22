@@ -25,6 +25,7 @@ import SecurityModal from '../components/department/SecurityModal';
 import PcccModal from '../components/department/PcccModal';
 import { buildHierarchicalOptions, getUnitEmoji, sortDonViByThuTu, groupParentUnits } from '../utils/hierarchy'; 
 import { toast } from '../utils/toast';
+import { PageWithFilterSkeleton } from '../components/SkeletonLoader';
 
 // 🟢 [HÀM TIỆN ÍCH CHUNG]
 const safeGet = (obj: any, key: string) => {
@@ -928,6 +929,7 @@ export default function DepartmentPage() {
     );
   };
 
+  if (loading) return <PageWithFilterSkeleton rows={8} />;
   return (
     <div className="flex h-full bg-[#f4f7f9] overflow-hidden relative">
       {isListCollapsed && (

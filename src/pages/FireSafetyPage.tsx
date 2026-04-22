@@ -11,6 +11,7 @@ import { DonVi } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { buildHierarchicalOptions, getUnitEmoji, sortDonViByThuTu, groupParentUnits } from '../utils/hierarchy'; 
 import { toast } from '../utils/toast';
+import { PageWithFilterSkeleton } from '../components/SkeletonLoader';
 
 const normalizeDateToISO = (val: any) => {
   if (!val) return '';
@@ -92,6 +93,9 @@ export default function FireSafetyPage() {
   // 🟢 STATE CHO MODAL DANH BẠ
   const [isEmergencyContactOpen, setIsEmergencyContactOpen] = useState(false);
   const [selectedPcccForContact, setSelectedPcccForContact] = useState<any | null>(null);
+  // 🟢 STATE CHO THANH CẢNH BÁO PCCC
+  const [isWarningOpen, setIsWarningOpen] = useState(true);
+  const [isDismissed, setIsDismissed] = useState(false);
 
   const loadData = async () => {
     setLoading(true); setError(null);
@@ -190,6 +194,60 @@ export default function FireSafetyPage() {
     }
     return result;
   }, [pcccData, searchTerm, selectedUnitFilter, allowedDonViIds, donViList, donViMap]);
+
+  // 🟢 TỰ ĐỘNG LỌC HẠNG MỤC PCCC SẮP/ĐÃ HẾT HẠN (Trước 30 ngày)
+  const expiringPCCC = useMemo(() => {
+    const warnings: any[] = [];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // Xác định phạm vi đơn vị đang xem
+    const validUnitIds = selectedUnitFilter 
+      ? [selectedUnitFilter, ...donViList.filter(item => item.cap_quan_ly === selectedUnitFilter).map(c => c.id)]
+      : allowedDonViIds;
+
+    // 1. Quét Hạn sạc/Kiểm định Thiết bị PCCC
+    tsPcccData.forEach(eq => {
+      if (validUnitIds.includes(eq.id_don_vi) && eq.ngay_het_han) {
+        const expDate = new Date(eq.ngay_het_han);
+        if (!isNaN(expDate.getTime())) {
+          expDate.setHours(0,0,0,0);
+          const diffDays = Math.ceil((expDate.getTime() - today.getTime()) / 86400000);
+          if (diffDays <= 30) {
+            warnings.push({
+              type: 'Kiểm định TB',
+              name: eq.loai_thiet_bi || 'Thiết bị không tên',
+              unitName: donViMap[eq.id_don_vi] || eq.id_don_vi,
+              diffDays,
+              dateStr: expDate.toLocaleDateString('vi-VN')
+            });
+          }
+        }
+      }
+    });
+
+    // 2. Quét Hạn Bảo hiểm Cháy nổ trong Hồ sơ
+    pcccData.forEach(p => {
+      if (validUnitIds.includes(p.id_don_vi) && p.bao_hiem_chay_no === 'Có' && p.ngay_het_han_bh) {
+        const expDate = new Date(p.ngay_het_han_bh);
+        if (!isNaN(expDate.getTime())) {
+          expDate.setHours(0,0,0,0);
+          const diffDays = Math.ceil((expDate.getTime() - today.getTime()) / 86400000);
+          if (diffDays <= 30) {
+            warnings.push({
+              type: 'Bảo hiểm cháy nổ',
+              name: 'Hồ sơ pháp lý',
+              unitName: donViMap[p.id_don_vi] || p.id_don_vi,
+              diffDays,
+              dateStr: expDate.toLocaleDateString('vi-VN')
+            });
+          }
+        }
+      }
+    });
+
+    return warnings.sort((a, b) => a.diffDays - b.diffDays);
+  }, [tsPcccData, pcccData, selectedUnitFilter, allowedDonViIds, donViList, donViMap]);
 
   const getStatusColor = (dateString: string, type: 'BH' | 'DT' | 'TB') => {
     if (!dateString) return { color: 'bg-gray-100 text-gray-500 border-gray-200', text: 'Chưa có', isDanger: false };
@@ -378,6 +436,7 @@ export default function FireSafetyPage() {
     );
   };
 
+  if (loading) return <PageWithFilterSkeleton rows={8} />;
   return (
     <div className="flex h-full bg-[#f4f7f9] overflow-hidden relative">
       {isListCollapsed && (
@@ -431,6 +490,83 @@ export default function FireSafetyPage() {
         </div>
         {error && <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-500 text-red-700 flex items-start gap-3 rounded-r-lg shadow-sm"><AlertCircle className="w-5 h-5 shrink-0 mt-0.5" /><p>{error}</p></div>}
 
+        {/* 🟢 THANH CẢNH BÁO HẠN PCCC (ĐỒNG BỘ GIAO DIỆN) */}
+        {expiringPCCC.length > 0 && !isDismissed && (
+          <div className={`mb-6 transition-all duration-300 ${isListCollapsed ? 'pl-10 lg:pl-12' : ''}`}>
+            <div className="bg-red-50 border border-red-200 rounded-xl overflow-hidden shadow-sm">
+              
+              {/* HEADER - BẤM ĐỂ MỞ RỘNG/THU GỌN */}
+              <div className="flex justify-between items-center p-3 sm:p-4">
+                <div 
+                  className="flex items-center gap-2 text-red-700 cursor-pointer flex-1"
+                  onClick={() => setIsWarningOpen(!isWarningOpen)}
+                >
+                  <AlertCircle size={18} className={expiringPCCC.some(i => i.diffDays < 0) ? "animate-pulse shrink-0" : "shrink-0"} />
+                  <h3 className="font-bold text-sm">
+                    {expiringPCCC.length} hạng mục PCCC sắp / đã quá hạn
+                  </h3>
+                </div>
+
+                {/* KHỐI NÚT THAO TÁC Ở GÓC PHẢI */}
+                <div className="flex items-center gap-2 text-gray-400 shrink-0">
+                  <button 
+                    onClick={() => setIsWarningOpen(!isWarningOpen)}
+                    className="p-1 hover:text-red-600 hover:bg-red-100 rounded transition-colors"
+                    title="Xem chi tiết"
+                  >
+                    {isWarningOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                  </button>
+                  <div className="w-px h-4 bg-gray-300"></div>
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsDismissed(true);
+                    }}
+                    className="p-1 hover:text-red-600 hover:bg-red-100 rounded transition-colors"
+                    title="Đóng cảnh báo"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+              </div>
+
+              {/* DANH SÁCH CHI TIẾT KHI MỞ RỘNG */}
+              {isWarningOpen && (
+                <div className="border-t border-red-100 bg-white">
+                  <div className="max-h-60 overflow-y-auto custom-scrollbar">
+                    <table className="w-full text-left text-sm">
+                      <tbody className="divide-y divide-gray-100">
+                        {expiringPCCC.map((warn, idx) => (
+                          <tr key={idx} className="hover:bg-red-50/30 transition-colors">
+                            <td className="p-3 w-28">
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${warn.diffDays < 0 ? 'bg-red-100 text-red-700 border-red-200' : warn.diffDays === 0 ? 'bg-orange-100 text-orange-700 border-orange-200' : 'bg-yellow-50 text-yellow-700 border-yellow-200'}`}>
+                                {warn.diffDays < 0 ? 'QUÁ HẠN' : warn.diffDays === 0 ? 'HÔM NAY' : 'SẮP HẾT HẠN'}
+                              </span>
+                            </td>
+                            <td className="p-3 font-semibold text-gray-800">
+                              {warn.type}
+                              <span className="text-gray-400 mx-2">—</span>
+                              <span className="text-gray-600 font-normal">{warn.name}</span>
+                            </td>
+                            <td className="p-3 text-gray-600 text-xs w-48">
+                              {warn.unitName}
+                            </td>
+                            <td className="p-3 text-right font-bold text-gray-700 text-xs w-32">
+                              {warn.dateStr}
+                              {warn.diffDays > 0 && <span className="block text-[10px] font-normal text-gray-500 mt-0.5">Còn {warn.diffDays} ngày</span>}
+                              {warn.diffDays < 0 && <span className="block text-[10px] font-normal text-red-500 mt-0.5">Trễ {Math.abs(warn.diffDays)} ngày</span>}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+        
         {/* BẢNG DỮ LIỆU HIỂN THỊ TRONG MÀN HÌNH CHÍNH */}
         <div className={`bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden transition-all duration-300 ${isListCollapsed ? 'ml-10 lg:ml-0' : ''}`}>
           <div className="overflow-x-auto w-full custom-scrollbar">

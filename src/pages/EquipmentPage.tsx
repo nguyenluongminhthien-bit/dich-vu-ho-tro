@@ -11,6 +11,10 @@ import { useAuth } from '../contexts/AuthContext';
 import { buildHierarchicalOptions, getUnitEmoji, sortDonViByThuTu, groupParentUnits } from '../utils/hierarchy';
 import { formatCurrency } from '../utils/formatters';
 import { toast } from '../utils/toast';
+import { PageWithFilterSkeleton } from '../components/SkeletonLoader';
+import ExpiryBadge from '../components/ExpiryBadge';
+import ExpiryAlert from '../components/ExpiryAlert';
+
 
 // --- DANH SÁCH NHÓM TÀI SẢN CHUẨN ---
 const ASSET_GROUPS = [
@@ -73,6 +77,11 @@ export default function EquipmentPage() {
   // Modal Xóa
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<{id: string, type: 'tb' | 'nk'} | null>(null);
+  // Trạng thái mở/đóng thanh cảnh báo Hạn bảo hành
+  const [isWarningOpen, setIsWarningOpen] = useState(true);
+  
+  // 🟢 THÊM DÒNG NÀY: Trạng thái ẩn hoàn toàn thông báo
+  const [isDismissed, setIsDismissed] = useState(false);
 
   const loadData = async () => {
     setLoading(true); setError(null);
@@ -169,6 +178,31 @@ export default function EquipmentPage() {
   const { vpdhUnits, ctttNamUnits, ctttBacUnits, otherUnits } = useMemo(() => {
     return groupParentUnits(parentUnits);
   }, [parentUnits]);
+  // 🟢 LỌC THIẾT BỊ SẮP HẾT HẠN BẢO HÀNH (Cảnh báo trước 30 ngày)
+  const expiringEquipments = useMemo(() => {
+    const warnings: any[] = [];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    filteredTBs.forEach(tb => {
+      if (!tb.han_bao_hanh) return;
+      const expDate = new Date(tb.han_bao_hanh);
+      if (isNaN(expDate.getTime())) return;
+      expDate.setHours(0, 0, 0, 0);
+
+      const diffTime = expDate.getTime() - today.getTime();
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+      if (diffDays <= 30 && tb.tinh_trang === 'Đang sử dụng') {
+        warnings.push({
+          ...tb,
+          diffDays,
+          dateStr: expDate.toLocaleDateString('vi-VN')
+        });
+      }
+    });
+    return warnings.sort((a, b) => a.diffDays - b.diffDays);
+  }, [filteredTBs]);
 
   const toggleParent = (parentId: string) => setExpandedParents(prev => prev.includes(parentId) ? prev.filter(id => id !== parentId) : [...prev, parentId]);
 
@@ -181,9 +215,9 @@ export default function EquipmentPage() {
       <div key={parent.id} className={level === 1 ? "mb-1" : "mt-1"}>
         <button 
           onClick={() => { setSelectedUnitFilter(parent.id); if (children.length > 0) toggleParent(parent.id); }} 
-          className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold transition-colors ${selectedUnitFilter === parent.id ? 'bg-blue-50 text-[#05469B]' : 'text-gray-700 hover:bg-gray-50'} ${isParentDimmed ? 'opacity-50' : ''}`}
+          className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold transition-colors ${selectedUnitFilter === parent.id ? 'bg-[#05469B] text-white shadow-md' : 'text-gray-700 hover:bg-gray-100'} ${isParentDimmed ? 'opacity-50' : ''}`}
         >
-          {children.length > 0 ? (isExpanded ? <ChevronDown size={16} className="text-gray-400 shrink-0" /> : <ChevronRight size={16} className="text-gray-400 shrink-0" />) : <div className="w-4 shrink-0" />}
+          {children.length > 0 ? (isExpanded ? <ChevronDown size={16} className="shrink-0" /> : <ChevronRight size={16} className="shrink-0" />) : <div className="w-4 shrink-0" />}
           <span className="shrink-0">{getUnitEmoji(parent.loai_hinh)}</span>
           <span className="truncate text-left">{parent.ten_don_vi}</span>
         </button>
@@ -422,26 +456,35 @@ export default function EquipmentPage() {
     }
   };
 
+  if (loading) return <PageWithFilterSkeleton rows={8} />;
   return (
     <div className="flex h-full bg-[#f4f7f9] overflow-hidden relative">
       {isListCollapsed && (<button onClick={() => setIsListCollapsed(false)} className="absolute top-6 left-6 z-20 bg-white p-2.5 rounded-lg shadow-md border border-gray-200 text-[#05469B] hover:bg-blue-50 transition-all"><PanelLeftOpen size={20} /></button>)}
 
       {/* CỘT TRÁI (BỘ LỌC) */}
-      <div className={`${isListCollapsed ? 'w-0 opacity-0' : 'w-80 opacity-100'} transition-all duration-300 bg-white border-r border-gray-200 flex flex-col h-full shadow-sm z-10 shrink-0 overflow-hidden`}>
-        <div className="p-4 border-b border-gray-100">
-          <div className="flex justify-between items-center mb-4"><h2 className="text-lg font-bold text-[#05469B] flex items-center gap-2"><MapPin size={20} /> Bộ lọc Đơn vị</h2><button onClick={() => setIsListCollapsed(true)} className="p-1.5 text-gray-400 hover:text-[#05469B] hover:bg-blue-50 rounded-md"><PanelLeftClose size={18} /></button></div>
-          <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} /><input type="text" placeholder="Tìm tên đơn vị..." className="w-full pl-9 pr-4 py-2 bg-[#FFFFF0] border rounded-lg text-sm focus:ring-2 focus:ring-[#05469B] outline-none" value={unitSearchTerm} onChange={(e) => setUnitSearchTerm(e.target.value)} /></div>
+      <div className={`${isListCollapsed ? 'w-0 opacity-0 -ml-80 lg:ml-0' : 'w-80 opacity-100 absolute lg:relative inset-y-0 left-0'} transition-all duration-300 ease-in-out bg-white border-r border-gray-200 flex flex-col h-full shadow-2xl lg:shadow-sm z-50 lg:z-10 shrink-0 overflow-hidden`}>
+        <div className="p-4 border-b border-gray-100 bg-blue-50/50">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-lg font-black text-[#05469B] flex items-center gap-2"><MapPin size={20} /> Bộ lọc Đơn vị</h2>
+            <button onClick={() => setIsListCollapsed(true)} className="p-1.5 text-gray-400 hover:text-[#05469B] hover:bg-blue-100 rounded-md transition-colors"><PanelLeftClose size={18} /></button>
+          </div>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[#05469B]/50" size={16} />
+            <input type="text" placeholder="Tìm tên đơn vị..." className="w-full pl-9 pr-4 py-2 bg-white border border-blue-100 rounded-lg text-sm focus:ring-2 focus:ring-[#05469B] outline-none shadow-sm" value={unitSearchTerm} onChange={(e) => setUnitSearchTerm(e.target.value)} />
+          </div>
         </div>
-        <div className="flex-1 overflow-y-auto p-2 min-w-[319px]">
-          <button onClick={() => setSelectedUnitFilter(null)} className={`w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-bold mb-4 ${selectedUnitFilter === null ? 'bg-blue-50 text-[#05469B] border border-blue-100' : 'text-gray-700 hover:bg-gray-50'}`}><Package size={18} className={selectedUnitFilter === null ? 'text-[#05469B]' : 'text-gray-400'} /> Tất cả Tài sản / Thiết bị</button>
+        <div className="flex-1 overflow-y-auto p-2 min-w-[319px] custom-scrollbar">
+          <button onClick={() => setSelectedUnitFilter(null)} className={`w-full flex items-center gap-2 px-3 py-3 rounded-xl text-sm font-black mb-4 transition-all ${selectedUnitFilter === null ? 'bg-gradient-to-r from-[#05469B] to-[#0a5bc4] text-white shadow-md' : 'text-gray-600 hover:bg-blue-50'}`}>
+            <Package size={18} className={selectedUnitFilter === null ? 'text-blue-100' : 'text-[#05469B]'} /> Tất cả Tài sản / Thiết bị
+          </button>
           <hr className="border-gray-100 mb-4 mx-2"/>
           {loading ? (<div className="flex justify-center p-8"><Loader2 className="animate-spin text-[#05469B]" /></div>) : (
-            <>
-              {vpdhUnits.length > 0 && (<div className="mb-6"><p className="px-3 text-[10px] font-black text-[#05469B] uppercase tracking-wider mb-2">VPĐH</p>{vpdhUnits.map(dv => renderUnitTree(dv))}</div>)}
-              {ctttNamUnits.length > 0 && (<div className="mb-6"><p className="px-3 text-[10px] font-black text-[#05469B] uppercase tracking-wider mb-2">CTTT Phía Nam</p>{ctttNamUnits.map(dv => renderUnitTree(dv))}</div>)}
-              {ctttBacUnits.length > 0 && (<div className="mb-6"><p className="px-3 text-[10px] font-black text-[#05469B] uppercase tracking-wider mb-2">CTTT Phía Bắc</p>{ctttBacUnits.map(dv => renderUnitTree(dv))}</div>)}
-              {otherUnits.length > 0 && (<div className="mb-6"><p className="px-3 text-[10px] font-black text-gray-400 uppercase tracking-wider mb-2">Đơn vị khác</p>{otherUnits.map(dv => renderUnitTree(dv))}</div>)}
-            </>
+            <div className="space-y-6">
+              {vpdhUnits.length > 0 && (<div><p className="px-3 text-[10px] font-black text-[#05469B] uppercase tracking-wider mb-2 flex items-center gap-1">VPĐH / TCT</p>{vpdhUnits.map(dv => renderUnitTree(dv))}</div>)}
+              {ctttNamUnits.length > 0 && (<div><p className="px-3 text-[10px] font-black text-[#05469B] uppercase tracking-wider mb-2 flex items-center gap-1">CTTT Phía Nam</p>{ctttNamUnits.map(dv => renderUnitTree(dv))}</div>)}
+              {ctttBacUnits.length > 0 && (<div><p className="px-3 text-[10px] font-black text-[#05469B] uppercase tracking-wider mb-2 flex items-center gap-1">CTTT Phía Bắc</p>{ctttBacUnits.map(dv => renderUnitTree(dv))}</div>)}
+              {otherUnits.length > 0 && (<div><p className="px-3 text-[10px] font-black text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1">Đơn vị khác</p>{otherUnits.map(dv => renderUnitTree(dv))}</div>)}
+            </div>
           )}
         </div>
       </div>
@@ -465,6 +508,87 @@ export default function EquipmentPage() {
         {error && <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-500 text-red-700 flex items-start gap-3 rounded-r-lg shadow-sm"><AlertCircle className="w-5 h-5 shrink-0 mt-0.5" /><p>{error}</p></div>}
 
         <div className={`bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden ${isListCollapsed ? 'ml-10' : ''}`}>
+        
+        {/* 🟢 THANH CẢNH BÁO HẠN BẢO HÀNH (ĐỒNG BỘ VỚI DASHBOARD) */}
+        {expiringEquipments.length > 0 && !isDismissed && (
+          <div className={`mb-6 transition-all duration-300 ${isListCollapsed ? 'ml-10' : ''}`}>
+            <div className="bg-red-50 border border-red-200 rounded-xl overflow-hidden shadow-sm">
+              
+              {/* HEADER - BẤM ĐỂ MỞ RỘNG/THU GỌN */}
+              <div className="flex justify-between items-center p-3 sm:p-4">
+                
+                {/* Khối bấm mở rộng/thu gọn danh sách */}
+                <div 
+                  className="flex items-center gap-2 text-red-700 cursor-pointer flex-1"
+                  onClick={() => setIsWarningOpen(!isWarningOpen)}
+                >
+                  <AlertCircle size={18} className={expiringEquipments.some(i => i.diffDays < 0) ? "animate-pulse shrink-0" : "shrink-0"} />
+                  <h3 className="font-bold text-sm">
+                    {expiringEquipments.length} thiết bị sắp / đã hết hạn bảo hành
+                  </h3>
+                </div>
+
+                {/* 🟢 KHỐI NÚT THAO TÁC Ở GÓC PHẢI (CHUẨN ĐỒNG BỘ) */}
+                <div className="flex items-center gap-2 text-gray-400 shrink-0">
+                  <button 
+                    onClick={() => setIsWarningOpen(!isWarningOpen)}
+                    className="p-1 hover:text-red-600 hover:bg-red-100 rounded transition-colors"
+                    title="Xem chi tiết"
+                  >
+                    {isWarningOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                  </button>
+                  
+                  <div className="w-px h-4 bg-gray-300"></div> {/* Thanh phân cách nhỏ */}
+                  
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation(); // Ngăn sự kiện click lan ra ngoài
+                      setIsDismissed(true);
+                    }}
+                    className="p-1 hover:text-red-600 hover:bg-red-100 rounded transition-colors"
+                    title="Đóng cảnh báo"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+
+              </div>
+
+              {/* DANH SÁCH CHI TIẾT KHI MỞ RỘNG */}
+              {isWarningOpen && (
+                <div className="border-t border-red-100 bg-white">
+                  <div className="max-h-60 overflow-y-auto custom-scrollbar">
+                    <table className="w-full text-left text-sm">
+                      <tbody className="divide-y divide-gray-100">
+                        {expiringEquipments.map((tb, idx) => (
+                          <tr key={idx} className="hover:bg-red-50/30 transition-colors">
+                            <td className="p-3 w-28">
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${tb.diffDays < 0 ? 'bg-red-100 text-red-700 border-red-200' : tb.diffDays === 0 ? 'bg-orange-100 text-orange-700 border-orange-200' : 'bg-yellow-50 text-yellow-700 border-yellow-200'}`}>
+                                {tb.diffDays < 0 ? 'QUÁ HẠN' : tb.diffDays === 0 ? 'HÔM NAY' : 'SẮP HẾT HẠN'}
+                              </span>
+                            </td>
+                            <td className="p-3 font-semibold text-gray-800">
+                              {tb.ten_thiet_bi} <span className="text-gray-400 font-normal text-xs ml-1">({tb.ma_tai_san || 'Không mã'})</span>
+                            </td>
+                            <td className="p-3 text-gray-600 text-xs w-48">
+                              {donViMap[tb.id_don_vi] || tb.id_don_vi}
+                            </td>
+                            <td className="p-3 text-right font-bold text-gray-700 text-xs w-32">
+                              {tb.dateStr}
+                              {tb.diffDays > 0 && <span className="block text-[10px] font-normal text-gray-500 mt-0.5">Còn {tb.diffDays} ngày</span>}
+                              {tb.diffDays < 0 && <span className="block text-[10px] font-normal text-red-500 mt-0.5">Trễ {Math.abs(tb.diffDays)} ngày</span>}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
           <div className="overflow-x-auto custom-scrollbar">
             <table className="w-full text-left border-collapse min-w-[1300px]">
               <thead>
@@ -882,7 +1006,7 @@ export default function EquipmentPage() {
               {/* LƯU KHO KẾ TOÁN */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-gray-50 p-5 rounded-xl border border-gray-200 mb-6">
                 <div><p className="text-xs text-gray-500 font-bold mb-1">Ngày mua</p><p className="font-semibold text-gray-800">{viewData.ngay_mua ? new Date(viewData.ngay_mua).toLocaleDateString('vi-VN') : '-'}</p></div>
-                <div><p className="text-xs text-gray-500 font-bold mb-1">Hạn bảo hành</p><p className="font-semibold text-gray-800">{viewData.han_bao_hanh ? new Date(viewData.han_bao_hanh).toLocaleDateString('vi-VN') : '-'}</p></div>
+                <div><p className="text-xs text-gray-500 font-bold mb-1">Hạn bảo hành</p>{viewData.han_bao_hanh ? (<ExpiryBadge dateStr={viewData.han_bao_hanh} label="Hạn BH" warningDays={30} />) : (<p className="font-semibold text-gray-800">-</p>)}</div>
                 <div><p className="text-xs text-gray-500 font-bold mb-1">Nguyên giá</p><p className="font-bold text-red-600">{formatCurrency(viewData.gia_mua)} đ</p></div>
                 <div><p className="text-xs text-gray-500 font-bold mb-1">Nhà cung cấp</p><p className="font-semibold text-gray-800">{viewData.nha_cung_cap || '-'}</p></div>
                 <div className="md:col-span-4"><p className="text-xs text-gray-500 font-bold mb-1">Mô tả ngoại hình / Ghi chú</p><p className="font-medium text-gray-700 bg-white p-2 rounded border border-gray-100">{viewData.mo_ta_dac_diem || '-'}</p></div>

@@ -10,6 +10,7 @@ import { apiService } from '../services/api';
 import { DonVi, VB_TB } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { toast } from '../utils/toast';
+import { PageWithFilterSkeleton } from '../components/SkeletonLoader';
 
 // HÀM KIỂM TRA VĂN BẢN MẬT
 const isMatDocument = (val: any) => {
@@ -446,6 +447,7 @@ export default function DocumentPage() {
     );
   };
 
+  if (loading) return <PageWithFilterSkeleton rows={8} />;
   return (
     <div className="flex h-full bg-[#f4f7f9] overflow-hidden relative">
       {isListCollapsed && (

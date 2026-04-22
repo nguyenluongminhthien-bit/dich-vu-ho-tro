@@ -8,6 +8,8 @@ import { apiService } from '../services/api';
 import { QuyDinhQuyTrinh, VB_TB } from '../types'; 
 import { useAuth } from '../contexts/AuthContext';
 import { toast } from '../utils/toast';
+import { PageWithFilterSkeleton } from '../components/SkeletonLoader';
+
 
 interface PolicyItem extends QuyDinhQuyTrinh {
   isFromVB?: boolean;
@@ -193,6 +195,8 @@ export default function PolicyPage() {
     toast.info(`Đây là tài liệu được đồng bộ từ mục "Văn bản - Thông báo".\n\nVui lòng sang mục Văn bản để ${action} tài liệu này!`);
   };
 
+  
+  if (loading) return <PageWithFilterSkeleton rows={8} />;
   return (
     <div className="flex h-full bg-[#f4f7f9] overflow-hidden relative">
       {isListCollapsed && (

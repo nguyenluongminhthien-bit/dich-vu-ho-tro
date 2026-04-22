@@ -11,6 +11,7 @@ import { Personnel, DonVi, ThietBi } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { buildHierarchicalOptions, getUnitEmoji, sortDonViByThuTu, groupParentUnits } from '../utils/hierarchy';
 import { toast } from '../utils/toast';
+import { PageWithFilterSkeleton } from '../components/SkeletonLoader';
 
 
 // HÀM FORMAT SỐ ĐIỆN THOẠI 4-3-3
@@ -501,6 +502,7 @@ export default function PersonnelPage() {
     );
   };
 
+  if (loading) return <PageWithFilterSkeleton rows={8} />;
   return (
     <div className="flex h-full bg-[#f4f7f9] overflow-hidden relative">
       {isListCollapsed && (
