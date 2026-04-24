@@ -102,6 +102,10 @@ export interface AnNinh {
   tiep_giap_sau: string;
   tiep_giap_trai: string;
   tiep_giap_phai: string;
+  hang_rao_truoc?: string;
+  hang_rao_sau?: string;
+  hang_rao_trai?: string;
+  hang_rao_phai?: string;
   link_pa_anbv: string;
   bo_tri_nghi_ca?: string;
   camera_hoat_dong?: string | number;

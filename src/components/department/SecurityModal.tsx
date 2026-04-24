@@ -36,14 +36,15 @@ const renderContractWarning = (ngayKy: any, soThang: any, giaHanThem: any) => {
   return <p className="text-[11px] text-emerald-700 font-bold mt-2 bg-emerald-50 px-2 py-1 rounded-md border border-emerald-200 w-max shadow-sm">Hạn HĐ (Đã cộng {giaHanThem || 0} tháng gia hạn): {endFormat}</p>;
 };
 
-// 🟢 BỔ SUNG TRƯỜNG GIA HẠN THÊM VÀO DỮ LIỆU GỐC
+// 🟢 BỔ SUNG TRƯỜNG GIA HẠN THÊM VÀ CÁC TRƯỜNG HÀNG RÀO VÀO DỮ LIỆU GỐC
 const EMPTY_FORM = {
   id: '', id_don_vi: '', bv_noi_bo: '', bv_dich_vu: '', vi_tri_bv_dv: '', ncc_dich_vu: '',
   chi_phi_thue: '', ngay_ky_hd: '', han_hop_dong: '', gia_han_them: '', tong_bv: '', dinh_bien_bv: '',
   ngay_co_dinh: '', ngay_tuan_tra: '', dem_co_dinh: '', dem_tuan_tra: '', bo_tri_nghi_ca: '',
   sl_camera: '', camera_hoat_dong: '', camera_hu: '', ly_do_camera_hu: '', thoi_gian_luu: '',
   vi_tri_he_thong_camera: '', vi_tri_gs_camera: '', link_pa_anbv: '', tinh_hinh_khu_vuc: '',
-  tiep_giap_truoc: '', tiep_giap_sau: '', tiep_giap_trai: '', tiep_giap_phai: ''
+  tiep_giap_truoc: '', tiep_giap_sau: '', tiep_giap_trai: '', tiep_giap_phai: '',
+  hang_rao_truoc: '', hang_rao_sau: '', hang_rao_trai: '', hang_rao_phai: ''
 };
 
 interface Props {
@@ -249,11 +250,51 @@ export default function SecurityModal({ isOpen, currentData, selectedUnitId, onS
               <Compass size={18}/> Đặc điểm Địa bàn
             </h4>
             <div className="grid grid-cols-1 sm:grid-cols-4 gap-5 mb-5">
-              <div><label className="block text-[10px] font-bold text-gray-500 mb-1.5 uppercase">Tiếp giáp Trước</label><input type="text" name="tiep_giap_truoc" value={formData.tiep_giap_truoc || ''} onChange={handleChange} className="w-full p-2.5 border border-gray-200 rounded-lg outline-none focus:border-emerald-400 transition-colors bg-white font-medium" /></div>
-              <div><label className="block text-[10px] font-bold text-gray-500 mb-1.5 uppercase">Tiếp giáp Sau</label><input type="text" name="tiep_giap_sau" value={formData.tiep_giap_sau || ''} onChange={handleChange} className="w-full p-2.5 border border-gray-200 rounded-lg outline-none focus:border-emerald-400 transition-colors bg-white font-medium" /></div>
-              <div><label className="block text-[10px] font-bold text-gray-500 mb-1.5 uppercase">Tiếp giáp Trái</label><input type="text" name="tiep_giap_trai" value={formData.tiep_giap_trai || ''} onChange={handleChange} className="w-full p-2.5 border border-gray-200 rounded-lg outline-none focus:border-emerald-400 transition-colors bg-white font-medium" /></div>
-              <div><label className="block text-[10px] font-bold text-gray-500 mb-1.5 uppercase">Tiếp giáp Phải</label><input type="text" name="tiep_giap_phai" value={formData.tiep_giap_phai || ''} onChange={handleChange} className="w-full p-2.5 border border-gray-200 rounded-lg outline-none focus:border-emerald-400 transition-colors bg-white font-medium" /></div>
+              {/* TRƯỚC */}
+              <div className="flex flex-col gap-2">
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-500 mb-1.5 uppercase">Tiếp giáp Trước</label>
+                  <input type="text" name="tiep_giap_truoc" value={formData.tiep_giap_truoc || ''} onChange={handleChange} placeholder="VD: Quốc lộ 1A" className="w-full p-2.5 border border-gray-200 rounded-lg outline-none focus:border-emerald-400 transition-colors bg-white font-medium" />
+                </div>
+                <div>
+                  <input type="text" name="hang_rao_truoc" value={formData.hang_rao_truoc || ''} onChange={handleChange} placeholder="Mô tả hàng rào, tường bao..." className="w-full p-2 border border-dashed border-gray-300 rounded-lg outline-none focus:border-emerald-400 transition-colors bg-white text-xs font-medium text-gray-600" />
+                </div>
+              </div>
+
+              {/* SAU */}
+              <div className="flex flex-col gap-2">
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-500 mb-1.5 uppercase">Tiếp giáp Sau</label>
+                  <input type="text" name="tiep_giap_sau" value={formData.tiep_giap_sau || ''} onChange={handleChange} placeholder="VD: Nhà dân" className="w-full p-2.5 border border-gray-200 rounded-lg outline-none focus:border-emerald-400 transition-colors bg-white font-medium" />
+                </div>
+                <div>
+                  <input type="text" name="hang_rao_sau" value={formData.hang_rao_sau || ''} onChange={handleChange} placeholder="Mô tả hàng rào, tường bao..." className="w-full p-2 border border-dashed border-gray-300 rounded-lg outline-none focus:border-emerald-400 transition-colors bg-white text-xs font-medium text-gray-600" />
+                </div>
+              </div>
+
+              {/* TRÁI */}
+              <div className="flex flex-col gap-2">
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-500 mb-1.5 uppercase">Tiếp giáp Trái</label>
+                  <input type="text" name="tiep_giap_trai" value={formData.tiep_giap_trai || ''} onChange={handleChange} placeholder="VD: Bãi đất trống" className="w-full p-2.5 border border-gray-200 rounded-lg outline-none focus:border-emerald-400 transition-colors bg-white font-medium" />
+                </div>
+                <div>
+                  <input type="text" name="hang_rao_trai" value={formData.hang_rao_trai || ''} onChange={handleChange} placeholder="Mô tả hàng rào, tường bao..." className="w-full p-2 border border-dashed border-gray-300 rounded-lg outline-none focus:border-emerald-400 transition-colors bg-white text-xs font-medium text-gray-600" />
+                </div>
+              </div>
+
+              {/* PHẢI */}
+              <div className="flex flex-col gap-2">
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-500 mb-1.5 uppercase">Tiếp giáp Phải</label>
+                  <input type="text" name="tiep_giap_phai" value={formData.tiep_giap_phai || ''} onChange={handleChange} placeholder="VD: Xưởng công nghiệp" className="w-full p-2.5 border border-gray-200 rounded-lg outline-none focus:border-emerald-400 transition-colors bg-white font-medium" />
+                </div>
+                <div>
+                  <input type="text" name="hang_rao_phai" value={formData.hang_rao_phai || ''} onChange={handleChange} placeholder="Mô tả hàng rào, tường bao..." className="w-full p-2 border border-dashed border-gray-300 rounded-lg outline-none focus:border-emerald-400 transition-colors bg-white text-xs font-medium text-gray-600" />
+                </div>
+              </div>
             </div>
+            
             <div>
               <label className="block text-[10px] font-bold text-[#047857] mb-1.5 uppercase">Đánh giá Tình hình ANTT Khu vực</label>
               <input type="text" name="tinh_hinh_khu_vuc" value={formData.tinh_hinh_khu_vuc || ''} onChange={handleChange} className="w-full p-2.5 border border-emerald-200 rounded-lg outline-none focus:border-emerald-400 transition-colors bg-white font-medium" />

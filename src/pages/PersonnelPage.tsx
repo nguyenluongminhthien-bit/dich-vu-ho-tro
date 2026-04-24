@@ -4,7 +4,7 @@ import {
   Users, ShieldCheck, Flame, LifeBuoy, Heart, Activity, 
   Dumbbell, Car, Utensils, Coffee, Languages, Monitor, Copy, Eye, EyeOff, User as UserIcon, 
   Building2, Phone, Mail, Info, MapPin, ChevronDown, ChevronRight, PanelLeftClose, PanelLeftOpen, CheckCheck, Briefcase,
-  LogOut, AlertTriangle, Image as ImageIcon, RotateCcw
+  LogOut, AlertTriangle, Image as ImageIcon, RotateCcw, Download, FileSpreadsheet
 } from 'lucide-react';
 import { apiService } from '../services/api';
 import { Personnel, DonVi, ThietBi } from '../types';
@@ -12,7 +12,6 @@ import { useAuth } from '../contexts/AuthContext';
 import { buildHierarchicalOptions, getUnitEmoji, sortDonViByThuTu, groupParentUnits } from '../utils/hierarchy';
 import { toast } from '../utils/toast';
 import { PageWithFilterSkeleton } from '../components/SkeletonLoader';
-
 
 // HÀM FORMAT SỐ ĐIỆN THOẠI 4-3-3
 const formatPhoneNumber = (val: string | number | undefined | null) => {
@@ -85,6 +84,10 @@ export default function PersonnelPage() {
   const [isRehireModalOpen, setIsRehireModalOpen] = useState(false);
   const [personnelToRehire, setPersonnelToRehire] = useState<any | null>(null);
   const [rehireDate, setRehireDate] = useState(new Date().toISOString().split('T')[0]);
+
+  // 🟢 STATE CHO TÍNH NĂNG XUẤT EXCEL
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [exportRegion, setExportRegion] = useState<'ALL' | 'NAM' | 'BAC' | 'SPECIFIC'>('ALL');
 
   const [copiedRole, setCopiedRole] = useState<string | null>(null);
   const formData = modal.formData;
@@ -293,7 +296,6 @@ export default function PersonnelPage() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    // 🟢 1. Thay alert bằng toast.warning
     if (!formData.id_don_vi) return toast.warning("Vui lòng chọn Đơn vị công tác!");
     
     let calculatedTuoi = '';
@@ -312,7 +314,6 @@ export default function PersonnelPage() {
       trang_thai: formData.trang_thai || 'Đang làm việc'
     };
 
-    // Giữ nguyên 100% code gán null của bạn
     if(!finalDataToSave.nam_sinh) finalDataToSave.nam_sinh = null;
     if(!finalDataToSave.ngay_nhan_vien) finalDataToSave.ngay_nhan_vien = null;
     if(!finalDataToSave.ngay_nghi_viec) finalDataToSave.ngay_nghi_viec = null;
@@ -328,18 +329,14 @@ export default function PersonnelPage() {
         setData(prev => prev.map(item => item.id === finalDataToSave.id ? finalDataToSave : item));
       }
       setModal(prev => ({ ...prev, isOpen: false }));  
-      // 🟢 2. Thêm thông báo thành công
       if (modal.mode === 'create') {
         toast.success("Thêm mới nhân sự thành công!");
       } else {
         toast.success("Cập nhật thông tin nhân sự thành công!");
       }
-
     } catch (err: any) { 
       setError(err.message || 'Lỗi lưu dữ liệu.'); 
-      // 🔴 3. Thêm thông báo lỗi
       toast.error(err.message || "Đã xảy ra lỗi khi lưu thông tin nhân sự!");
-      
     } finally { 
       setSubmitting(false); 
     }
@@ -349,25 +346,20 @@ export default function PersonnelPage() {
     if (!itemToDelete) return; 
     setSubmitting(true); 
     setError(null);
-    
     try {
       await apiService.delete(itemToDelete, "ns_dich_vu");
       setData(prev => prev.filter(item => item.id !== itemToDelete));
       setIsConfirmOpen(false); 
       setItemToDelete(null); 
-      // 🟢 Thông báo xóa thành công
       toast.success("Xóa nhân sự thành công!");
-      
     } catch (err: any) { 
       setError(err.message || 'Lỗi xóa dữ liệu.'); 
-      // 🔴 Thông báo lỗi
       toast.error(err.message || "Đã xảy ra lỗi khi xóa nhân sự!");
     } finally { 
       setSubmitting(false); 
     }
   };
 
-  // --- XỬ LÝ HÀM VÀO LÀM LẠI ---
   const handleConfirmRehire = async () => {
     if (!personnelToRehire) return;
     setSubmitting(true);
@@ -470,6 +462,154 @@ export default function PersonnelPage() {
     }
   };
 
+  // 🟢 HÀM XỬ LÝ XUẤT EXCEL GỘP Ô BẰNG HTML VANILLA (ĐÃ CẬP NHẬT: CHỈ CÔNG TY MẸ & SẮP XẾP THEO THỨ TỰ)
+  const handleExportExcel = () => {
+    // 1. Xác định Vùng xuất dữ liệu
+    let unitsToExport: DonVi[] = [];
+    
+    const getRegion = (unitId: string): string => {
+      const getAncestors = (id: string): string[] => {
+         const u = donViList.find(d => d.id === id);
+         if (!u || !u.cap_quan_ly || u.cap_quan_ly === 'HO') return [id];
+         return [id, ...getAncestors(u.cap_quan_ly)];
+      }
+      const ancestors = getAncestors(unitId);
+      
+      const namIds = ctttNamUnits.map(u => u.id);
+      const bacIds = ctttBacUnits.map(u => u.id);
+      
+      if (ancestors.some(id => bacIds.includes(id))) return 'Phía Bắc';
+      if (ancestors.some(id => namIds.includes(id))) return 'Phía Nam';
+      return 'VPĐH / Khác';
+    }
+
+    // 🟢 CHỈ LỌC LẤY CÁC CÔNG TY MẸ (Trực thuộc HO)
+    const topLevelUnits = donViList.filter(dv => 
+      allowedDonViIds.includes(dv.id) && 
+      (dv.cap_quan_ly === 'HO' || !dv.cap_quan_ly)
+    );
+
+    if (exportRegion === 'ALL') {
+      unitsToExport = topLevelUnits;
+    } else if (exportRegion === 'NAM') {
+      unitsToExport = topLevelUnits.filter(dv => getRegion(dv.id) === 'Phía Nam');
+    } else if (exportRegion === 'BAC') {
+      unitsToExport = topLevelUnits.filter(dv => getRegion(dv.id) === 'Phía Bắc');
+    } else if (exportRegion === 'SPECIFIC' && selectedUnitFilter) {
+      // Nếu đang chọn 1 Showroom con, tự động dò ngược lên tìm Công ty mẹ của nó để xuất
+      const getTopLevelParent = (id: string): DonVi | undefined => {
+        const u = donViList.find(d => d.id === id);
+        if (!u) return undefined;
+        if (u.cap_quan_ly === 'HO' || !u.cap_quan_ly) return u;
+        return getTopLevelParent(u.cap_quan_ly);
+      };
+      const topParent = getTopLevelParent(selectedUnitFilter);
+      if (topParent && allowedDonViIds.includes(topParent.id)) {
+        unitsToExport = [topParent];
+      }
+    }
+
+    // Lọc bỏ đơn vị ảo (Đại lý)
+    unitsToExport = unitsToExport.filter(u => u.trang_thai !== 'Đại lý' && u.trang_thai !== 'Đầu tư mới');
+    
+    // 🟢 SẮP XẾP THEO CỘT thu_tu TRONG DB (Thay vì xếp theo vần A-Z)
+    unitsToExport.sort((a, b) => {
+       const thuTuA = Number(a.thu_tu) || 9999;
+       const thuTuB = Number(b.thu_tu) || 9999;
+       return thuTuA - thuTuB;
+    });
+
+    // 2. Tạo nội dung các dòng dữ liệu
+    let rowsHTML = '';
+    let stt = 1;
+
+    unitsToExport.forEach(dv => {
+      const phia = getRegion(dv.id);
+      const tenDV = dv.ten_don_vi;
+
+      // 🟢 GOM NHÂN SỰ TOÀN CỤM: Quét cả Công ty mẹ lẫn các Showroom con để không bỏ sót Lãnh đạo
+      const subIds = getAllSubordinateIds(dv.id, donViList);
+      const validIds = [dv.id, ...subIds];
+      const unitStaff = data.filter(p => validIds.includes(p.id_don_vi) && p.trang_thai !== 'Đã nghỉ việc');
+      
+      // Dò chức vụ tương ứng
+      const dvht = unitStaff.find(p => p.phan_loai === 'PT DVHT KD' || String(p.chuc_vu).toLowerCase().includes('dvht')) || {};
+      const tgd = unitStaff.find(p => p.phan_loai === 'Lãnh đạo' || String(p.chuc_vu).toLowerCase().includes('tổng giám đốc') || String(p.chuc_vu).toLowerCase().includes('giám đốc')) || {};
+
+      // Nếu công ty này hoàn toàn trống nhân sự (không có cả NV) thì có thể bỏ qua, 
+      // Hoặc nếu muốn hiển thị dòng trống thì comment dòng if dưới lại.
+      if (!dvht.ho_ten && !tgd.ho_ten && unitStaff.length === 0) return; 
+
+      rowsHTML += `
+        <tr>
+          <td class="center">${stt++}</td>
+          <td>${phia}</td>
+          <td class="bold">${tenDV}</td>
+          <td>${dvht.ho_ten || ''}</td>
+          <td>${dvht.email || ''}</td>
+          <td class="center">${dvht.sdt_cong_ty || dvht.sdt_ca_nhan ? formatPhoneNumber(dvht.sdt_cong_ty || dvht.sdt_ca_nhan) : ''}</td>
+          <td>${tgd.ho_ten || ''}</td>
+          <td>${tgd.email || ''}</td>
+          <td class="center">${tgd.sdt_cong_ty || tgd.sdt_ca_nhan ? formatPhoneNumber(tgd.sdt_cong_ty || tgd.sdt_ca_nhan) : ''}</td>
+        </tr>
+      `;
+    });
+
+    // 3. Khung HTML Table với CSS mô phỏng y hệt hình ảnh mẫu
+    const tableHTML = `
+      <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+      <head>
+        <meta charset="UTF-8">
+        <style>
+          table { border-collapse: collapse; font-family: 'Times New Roman', serif; }
+          th, td { border: 1px solid #000000; padding: 6px; vertical-align: middle; }
+          .header { background-color: #fff2cc; color: #002060; font-weight: bold; text-align: center; }
+          .center { text-align: center; }
+          .bold { font-weight: bold; color: #002060; }
+        </style>
+      </head>
+      <body>
+        <table>
+          <thead>
+            <tr class="header">
+              <th rowspan="2">STT</th>
+              <th rowspan="2">Phía</th>
+              <th rowspan="2" style="width: 250px;">ĐƠN VỊ</th>
+              <th colspan="3">PT DVHT KD</th>
+              <th colspan="3">TỔNG GIÁM ĐỐC</th>
+            </tr>
+            <tr class="header">
+              <th>Họ và tên</th>
+              <th>Email</th>
+              <th>SĐT</th>
+              <th>Họ và tên</th>
+              <th>Email</th>
+              <th>SĐT</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rowsHTML}
+          </tbody>
+        </table>
+      </body>
+      </html>
+    `;
+
+    // 4. Tạo Blob và tải file
+    const blob = new Blob([tableHTML], { type: 'application/vnd.ms-excel' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Danh_Ba_Lanh_Dao_DVHT_${new Date().toISOString().slice(0, 10)}.xls`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    
+    setIsExportModalOpen(false);
+    toast.success("Đã xuất file Danh bạ (Excel) thành công!");
+  };
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, type } = e.target;
     let value: string | boolean = type === 'checkbox' ? (e.target as HTMLInputElement).checked : e.target.value;
@@ -558,6 +698,9 @@ export default function PersonnelPage() {
                 <input type="text" placeholder="Tìm Mã NV, Họ Tên, Chức vụ..." className="w-full pl-9 pr-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#05469B] outline-none shadow-sm text-sm" value={personnelSearchTerm} onChange={(e) => setPersonnelSearchTerm(e.target.value)} />
               </div>
               <button onClick={() => openModal('create')} className="w-full sm:w-auto flex items-center justify-center gap-2 bg-[#05469B] hover:bg-[#04367a] text-white px-5 py-2.5 rounded-lg font-bold shadow-sm transition-all whitespace-nowrap"><Plus className="w-5 h-5" /> Thêm Mới</button>
+              
+              {/* 🟢 NÚT GỌI MODAL XUẤT BÁO CÁO EXCEL */}
+              <button onClick={() => setIsExportModalOpen(true)} className="w-full sm:w-auto flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-lg font-bold shadow-sm transition-all whitespace-nowrap"><FileSpreadsheet className="w-5 h-5" /> Xuất Danh bạ</button>
             </div>
             
             <div className="flex flex-wrap justify-end gap-2 w-full sm:w-auto">
@@ -666,6 +809,55 @@ export default function PersonnelPage() {
           </div>
         </div>
       </div>
+
+      {/* 🟢 MODAL TÙY CHỌN XUẤT EXCEL DANH BẠ LÃNH ĐẠO */}
+      {isExportModalOpen && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 animate-in zoom-in duration-200">
+            <div className="flex justify-between items-start mb-4">
+              <h3 className="text-xl font-black text-emerald-700 flex items-center gap-2">
+                <FileSpreadsheet size={24}/> Xuất Excel Danh bạ
+              </h3>
+              <button onClick={() => setIsExportModalOpen(false)} className="text-gray-400 hover:text-red-500 transition-colors"><X size={20}/></button>
+            </div>
+            
+            <p className="text-sm text-gray-600 mb-6">
+              Bạn muốn tải xuống danh bạ (Gồm Lãnh đạo & PT Dịch vụ Hỗ trợ) của khu vực nào?
+            </p>
+            
+            <div className="flex flex-col gap-3 mb-6">
+              <label className={`flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-colors ${exportRegion === 'ALL' ? 'border-emerald-500 bg-emerald-50' : 'border-gray-100 hover:bg-gray-50'}`}>
+                <input type="radio" name="exportRegion" checked={exportRegion === 'ALL'} onChange={() => setExportRegion('ALL')} className="w-4 h-4 text-emerald-600 focus:ring-emerald-500" />
+                <span className="font-bold text-gray-800">Toàn quốc (Toàn bộ Hệ thống)</span>
+              </label>
+              
+              <label className={`flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-colors ${exportRegion === 'NAM' ? 'border-emerald-500 bg-emerald-50' : 'border-gray-100 hover:bg-gray-50'}`}>
+                <input type="radio" name="exportRegion" checked={exportRegion === 'NAM'} onChange={() => setExportRegion('NAM')} className="w-4 h-4 text-emerald-600 focus:ring-emerald-500" />
+                <span className="font-bold text-gray-800">CTTT Phía Nam (Các tỉnh Miền Nam)</span>
+              </label>
+              
+              <label className={`flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-colors ${exportRegion === 'BAC' ? 'border-emerald-500 bg-emerald-50' : 'border-gray-100 hover:bg-gray-50'}`}>
+                <input type="radio" name="exportRegion" checked={exportRegion === 'BAC'} onChange={() => setExportRegion('BAC')} className="w-4 h-4 text-emerald-600 focus:ring-emerald-500" />
+                <span className="font-bold text-gray-800">CTTT Phía Bắc (Các tỉnh Miền Bắc)</span>
+              </label>
+              
+              <label className={`flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-colors ${exportRegion === 'SPECIFIC' ? 'border-emerald-500 bg-emerald-50' : 'border-gray-100 hover:bg-gray-50'}`}>
+                <input type="radio" name="exportRegion" checked={exportRegion === 'SPECIFIC'} onChange={() => setExportRegion('SPECIFIC')} className="w-4 h-4 text-emerald-600 focus:ring-emerald-500" />
+                <span className="font-bold text-gray-800 flex-1">
+                  Đơn vị đang xem: <span className="text-emerald-600">{selectedUnitName}</span>
+                </span>
+              </label>
+            </div>
+
+            <div className="flex gap-3">
+              <button onClick={() => setIsExportModalOpen(false)} className="flex-1 py-3 bg-gray-100 text-gray-700 font-bold rounded-xl hover:bg-gray-200 transition-colors">Hủy</button>
+              <button onClick={handleExportExcel} className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 transition-colors text-white font-bold rounded-xl flex items-center justify-center gap-2 shadow-lg">
+                <Download size={20}/> Tải File .XLS
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 🟢 [MODAL: OFFBOARDING & THU HỒI TÀI SẢN] */}
       {isOffboardOpen && personnelToOffboard && (
@@ -1080,7 +1272,16 @@ export default function PersonnelPage() {
                     const Icon = cert.icon;
                     return (
                       <label key={cert.id} className="flex items-center p-2.5 border border-emerald-200 rounded-lg bg-[#FFFFF0] cursor-pointer hover:border-emerald-500 transition-colors shadow-sm">
-                        <input type="checkbox" name={cert.id} checked={formData[cert.id] as boolean || false} onChange={handleInputChange} className="w-4 h-4 text-emerald-600 rounded border-gray-300 mr-2 focus:ring-emerald-500" />
+                        
+                        {/* 🟢 ĐÃ FIX LỖI ÉP KIỂU BOOLEAN Ở DÒNG BÊN DƯỚI */}
+                        <input 
+                          type="checkbox" 
+                          name={cert.id} 
+                          checked={formData[cert.id] === true || String(formData[cert.id]).toLowerCase() === 'true'} 
+                          onChange={handleInputChange} 
+                          className="w-4 h-4 text-emerald-600 rounded border-gray-300 mr-2 focus:ring-emerald-500" 
+                        />
+                        
                         <Icon size={16} className="text-gray-500 mr-1.5 shrink-0" />
                         <span className="text-[11px] sm:text-xs font-bold text-gray-700 leading-tight">{cert.label}</span>
                       </label>
@@ -1143,6 +1344,7 @@ export default function PersonnelPage() {
         </div>
       )}
 
+      {/* XÓA VĨNH VIỄN */}
       {isConfirmOpen && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-sm text-center animate-in zoom-in duration-200">

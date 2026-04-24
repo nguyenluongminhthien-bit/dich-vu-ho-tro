@@ -1275,8 +1275,11 @@ export default function DepartmentPage() {
                   
                   {currentAnNinh ? (
                     <div className="space-y-5 animate-in fade-in duration-300">
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                        <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex flex-col">
+                      {/* BẮT ĐẦU CHỈNH SỬA TỈ LỆ 2 CỘT Ở ĐÂY */}
+                      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+                        
+                        {/* CỘT 1: LỰC LƯỢNG BV (Chiếm 5/12 không gian) */}
+                        <div className="lg:col-span-5 bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex flex-col">
                           <h4 className="font-bold text-[#05469B] mb-4 flex items-center gap-2 border-b border-gray-100 pb-2"><Users size={18} /> Lực lượng BV, ĐTKH</h4>
                           <div className="space-y-3 text-sm flex-1">
                              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-0"><span className="text-gray-500 font-medium whitespace-nowrap shrink-0">Tổng ANBV / Định biên:</span><span className="font-black text-[#05469B] sm:text-right">{currentAnNinh.tong_bv || 0} / {currentAnNinh.dinh_bien_bv || 0}</span></div>
@@ -1331,25 +1334,32 @@ export default function DepartmentPage() {
                              </div>
                           </div>
                         </div>
-                        <div className="bg-emerald-50/50 p-5 rounded-xl border border-emerald-100 shadow-sm flex flex-col h-full">
+
+                        {/* CỘT 2: ĐẶC ĐIỂM ĐỊA BÀN (Chiếm 7/12 không gian để rộng rãi hiển thị Hàng rào) */}
+                        <div className="lg:col-span-7 bg-emerald-50/50 p-5 rounded-xl border border-emerald-100 shadow-sm flex flex-col h-full">
                            <h4 className="font-bold text-emerald-700 mb-4 flex items-center gap-2 border-b border-emerald-200 pb-2"><Compass size={18} /> Đặc điểm Địa bàn & Phương án</h4>
-                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-5 flex-1">
-                              <div className="bg-white p-3 rounded-lg border border-emerald-100/50 shadow-sm">
-                                <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Tiếp giáp Trước</p>
-                                <p className="text-sm font-semibold text-gray-700 line-clamp-2" title={currentAnNinh.tiep_giap_truoc}>{currentAnNinh.tiep_giap_truoc || '---'}</p>
-                              </div>
-                              <div className="bg-white p-3 rounded-lg border border-emerald-100/50 shadow-sm">
-                                <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Tiếp giáp Sau</p>
-                                <p className="text-sm font-semibold text-gray-700 line-clamp-2" title={currentAnNinh.tiep_giap_sau}>{currentAnNinh.tiep_giap_sau || '---'}</p>
-                              </div>
-                              <div className="bg-white p-3 rounded-lg border border-emerald-100/50 shadow-sm">
-                                <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Tiếp giáp Trái</p>
-                                <p className="text-sm font-semibold text-gray-700 line-clamp-2" title={currentAnNinh.tiep_giap_trai}>{currentAnNinh.tiep_giap_trai || '---'}</p>
-                              </div>
-                              <div className="bg-white p-3 rounded-lg border border-emerald-100/50 shadow-sm">
-                                <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Tiếp giáp Phải</p>
-                                <p className="text-sm font-semibold text-gray-700 line-clamp-2" title={currentAnNinh.tiep_giap_phai}>{currentAnNinh.tiep_giap_phai || '---'}</p>
-                              </div>
+                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-5 flex-1">
+                              {[
+                                { label: 'Tiếp giáp Trước', val: currentAnNinh.tiep_giap_truoc, hr: currentAnNinh.hang_rao_truoc },
+                                { label: 'Tiếp giáp Sau', val: currentAnNinh.tiep_giap_sau, hr: currentAnNinh.hang_rao_sau },
+                                { label: 'Tiếp giáp Trái', val: currentAnNinh.tiep_giap_trai, hr: currentAnNinh.hang_rao_trai },
+                                { label: 'Tiếp giáp Phải', val: currentAnNinh.tiep_giap_phai, hr: currentAnNinh.hang_rao_phai }
+                              ].map((item, idx) => (
+                                <div key={idx} className="bg-white p-3 rounded-lg border border-emerald-100/50 shadow-sm flex flex-col justify-between">
+                                  <div>
+                                    <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">{item.label}</p>
+                                    <p className="text-sm font-semibold text-gray-700 line-clamp-2" title={item.val}>{item.val || '---'}</p>
+                                  </div>
+                                  {/* ĐOẠN NÀY LÀ MÔ TẢ HÀNG RÀO ĐƯỢC TÍCH HỢP */}
+                                  {item.hr && (
+                                    <div className="mt-2 pt-2 border-t border-dashed border-gray-100">
+                                      <p className="text-[11px] text-gray-500 italic leading-relaxed">
+                                        <span className="font-bold">Hàng rào:</span> {item.hr}
+                                      </p>
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
                            </div>
                            <div className="pt-4 border-t border-emerald-200/50">
                               <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">Đánh giá Tình hình ANTT Khu vực</p>
