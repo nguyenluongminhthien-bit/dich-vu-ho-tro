@@ -26,6 +26,7 @@ import PcccModal from '../components/department/PcccModal';
 import { buildHierarchicalOptions, getUnitEmoji, sortDonViByThuTu, groupParentUnits } from '../utils/hierarchy'; 
 import { toast } from '../utils/toast';
 import { PageWithFilterSkeleton } from '../components/SkeletonLoader';
+import { exportSecurityReport } from '../utils/exportExcel';
 
 // 🟢 [HÀM TIỆN ÍCH CHUNG]
 const safeGet = (obj: any, key: string) => {
@@ -335,6 +336,24 @@ export default function DepartmentPage() {
   
   // 🟢 ĐÃ ÁP DỤNG HÀM SẮP XẾP CHUẨN (sortDonViByThuTu)
   const getChildUnits = (parentId: string) => sortDonViByThuTu(filteredData.filter(item => item.cap_quan_ly === parentId));
+  // 🟢 HÀM XUẤT EXCEL (GỌI TỪ FILE UTILS)
+  const handleExportExcel = () => {
+    if (!selectedUnit) return;
+    
+    // Xác định danh sách cần xuất
+    const unitsToExport = isParentUnit 
+      ? data.filter(u => selectedUnitSubordinates.includes(u.id))
+      : [selectedUnit];
+
+    // Gọi hàm chuyên trách từ file utils sang để xử lý
+    exportSecurityReport(
+      selectedUnit, 
+      unitsToExport, 
+      anNinhData, 
+      isParentUnit, 
+      getUnitIdSafe
+    );
+  };
 
   // 🟢 ĐÃ ÁP DỤNG HÀM NHÓM CHUẨN (groupParentUnits)
   const { vpdhUnits, ctttNamUnits, ctttBacUnits, otherUnits } = useMemo(() => {
@@ -808,7 +827,7 @@ export default function DepartmentPage() {
     }
   };
 
-  // =====================================================================
+    // =====================================================================
   // 🟢 CÁC HÀM XỬ LÝ LOGIC CHO TAB PCCC (VỪA ĐƯỢC PHỤC HỒI)
   // =====================================================================
 
@@ -912,6 +931,7 @@ export default function DepartmentPage() {
   };
   // =====================================================================
 
+    // 🟢 3. HÀM RENDER CÂY THƯ MỤC (Vừa được khôi phục)
   const renderUnitTree = (parent: DonVi, level: number = 1) => {
     const children = getChildUnits(parent.id);
     const isExpanded = expandedParents.includes(parent.id) || !!searchTerm;
@@ -1187,9 +1207,17 @@ export default function DepartmentPage() {
                     <h3 className="text-lg font-black text-[#05469B] flex items-center gap-2 uppercase tracking-wider">
                       <div className="w-1.5 h-6 bg-[#05469B] rounded-full"></div> {isParentUnit ? 'D. TỔNG HỢP AN NINH TOÀN CỤM & CƠ SỞ' : 'D. AN NINH & HỆ THỐNG CAMERA'}
                     </h3>
-                    <button onClick={openSecurityModal} className="px-4 py-2 text-sm font-bold text-[#05469B] bg-blue-50 hover:bg-blue-100 rounded-lg flex items-center gap-2 transition-colors border border-blue-100 shadow-sm">
-                      {currentAnNinh ? <><Edit size={16} /> Cập nhật</> : <><Plus size={16} /> Cập nhật AN-BV & Camera Giám sát</>}
-                    </button>
+                    
+                    <div className="flex items-center gap-3">
+                      {/* Nút xuất báo cáo luôn hiển thị không cần điều kiện lọc */}
+                      <button onClick={handleExportExcel} className="px-4 py-2 text-sm font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-lg flex items-center gap-2 transition-colors border border-emerald-200 shadow-sm">
+                        <FileText size={16} /> Báo cáo ANBV
+                      </button>
+                      
+                      <button onClick={openSecurityModal} className="px-4 py-2 text-sm font-bold text-[#05469B] bg-blue-50 hover:bg-blue-100 rounded-lg flex items-center gap-2 transition-colors border border-blue-100 shadow-sm">
+                        {currentAnNinh ? <><Edit size={16} /> Cập nhật</> : <><Plus size={16} /> Cập nhật AN-BV & Camera Giám sát</>}
+                      </button>
+                    </div>
                   </div>
 
                   {isParentUnit && aggregatedSecurity && (
@@ -1275,10 +1303,11 @@ export default function DepartmentPage() {
                   
                   {currentAnNinh ? (
                     <div className="space-y-5 animate-in fade-in duration-300">
-                      {/* BẮT ĐẦU CHỈNH SỬA TỈ LỆ 2 CỘT Ở ĐÂY */}
+                      
+                      {/* BẮT ĐẦU: Lực lượng BV (5 phần) & Đặc điểm Địa bàn (7 phần) */}
                       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
                         
-                        {/* CỘT 1: LỰC LƯỢNG BV (Chiếm 5/12 không gian) */}
+                        {/* CỘT 1: LỰC LƯỢNG BV */}
                         <div className="lg:col-span-5 bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex flex-col">
                           <h4 className="font-bold text-[#05469B] mb-4 flex items-center gap-2 border-b border-gray-100 pb-2"><Users size={18} /> Lực lượng BV, ĐTKH</h4>
                           <div className="space-y-3 text-sm flex-1">
@@ -1335,7 +1364,7 @@ export default function DepartmentPage() {
                           </div>
                         </div>
 
-                        {/* CỘT 2: ĐẶC ĐIỂM ĐỊA BÀN (Chiếm 7/12 không gian để rộng rãi hiển thị Hàng rào) */}
+                        {/* CỘT 2: ĐẶC ĐIỂM ĐỊA BÀN (Có thông tin Hàng rào) */}
                         <div className="lg:col-span-7 bg-emerald-50/50 p-5 rounded-xl border border-emerald-100 shadow-sm flex flex-col h-full">
                            <h4 className="font-bold text-emerald-700 mb-4 flex items-center gap-2 border-b border-emerald-200 pb-2"><Compass size={18} /> Đặc điểm Địa bàn & Phương án</h4>
                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-5 flex-1">
@@ -1350,7 +1379,6 @@ export default function DepartmentPage() {
                                     <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">{item.label}</p>
                                     <p className="text-sm font-semibold text-gray-700 line-clamp-2" title={item.val}>{item.val || '---'}</p>
                                   </div>
-                                  {/* ĐOẠN NÀY LÀ MÔ TẢ HÀNG RÀO ĐƯỢC TÍCH HỢP */}
                                   {item.hr && (
                                     <div className="mt-2 pt-2 border-t border-dashed border-gray-100">
                                       <p className="text-[11px] text-gray-500 italic leading-relaxed">
@@ -1380,6 +1408,7 @@ export default function DepartmentPage() {
                         </div>
                       </div>
                       
+                      {/* BẮT ĐẦU: CAMERA (Tỉ lệ 3-6-3) */}
                       <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex flex-col w-full">
                           <h4 className="font-bold text-[#05469B] mb-4 flex items-center gap-2 border-b border-gray-100 pb-2"><Camera size={18} /> Hệ thống Camera Giám sát</h4>
                           
@@ -1402,16 +1431,16 @@ export default function DepartmentPage() {
                             </div>
                           </div>
 
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-stretch">
-                            <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 flex flex-col">
+                          <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-stretch">
+                            <div className="md:col-span-3 bg-blue-50 p-4 rounded-xl border border-blue-100 flex flex-col">
                               <span className="text-[10px] font-bold text-blue-600 uppercase tracking-wider mb-2">Vị trí đặt hệ thống (Đầu ghi)</span>
                               <span className="font-bold text-blue-900 text-sm whitespace-pre-wrap break-words">{currentAnNinh.vi_tri_he_thong_camera || '---'}</span>
                             </div>
-                            <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-100 flex flex-col">
+                            <div className="md:col-span-6 bg-emerald-50 p-4 rounded-xl border border-emerald-100 flex flex-col">
                               <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider mb-2">Vị trí giám sát chính</span>
                               <span className="font-bold text-emerald-900 text-sm whitespace-pre-wrap break-words">{currentAnNinh.vi_tri_gs_camera || '---'}</span>
                             </div>
-                            <div className="bg-red-50 p-4 rounded-xl border border-red-100 flex flex-col">
+                            <div className="md:col-span-3 bg-red-50 p-4 rounded-xl border border-red-100 flex flex-col">
                               <span className="text-[10px] font-bold text-red-600 uppercase tracking-wider mb-2">Lý do hư hỏng</span>
                               {Number(currentAnNinh.camera_hu) > 0 ? (
                                 <span className="font-bold text-red-900 text-sm whitespace-pre-wrap break-words">{currentAnNinh.ly_do_camera_hu || '---'}</span>
