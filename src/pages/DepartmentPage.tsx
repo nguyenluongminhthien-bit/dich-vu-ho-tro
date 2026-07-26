@@ -108,25 +108,25 @@ const EMERGENCY_CONTACTS = [
 ];
 
 const getStatusColor = (dateString: string, type: 'BH' | 'DT' | 'TB') => {
-  if (!dateString) return { color: 'bg-gray-100 text-gray-500 border-gray-200', text: 'Chưa có', isDanger: false };
+  if (!dateString) return { color: 'bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-gray-400 border-gray-200 dark:border-slate-700', text: 'Chưa có', isDanger: false };
   const dateVN = formatToVN(dateString);
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const targetDate = new Date(dateString); targetDate.setHours(0, 0, 0, 0);
   const diffDays = Math.ceil((targetDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 
   if (type === 'BH') {
-    if (diffDays < 0) return { color: 'bg-red-50 text-red-700 border-red-200 font-bold animate-pulse', text: `${dateVN} (Quá hạn)`, isDanger: true };
-    if (diffDays <= 30) return { color: 'bg-orange-50 text-orange-700 border-orange-200 font-bold', text: `${dateVN} (Sắp hết)`, isDanger: true };
-    return { color: 'bg-emerald-50 text-emerald-700 border-emerald-200 font-semibold', text: `${dateVN} (Còn hạn)`, isDanger: false };
+    if (diffDays < 0) return { color: 'bg-red-50 dark:bg-red-950/50 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800/60 font-bold animate-pulse', text: `${dateVN} (Quá hạn)`, isDanger: true };
+    if (diffDays <= 30) return { color: 'bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800/60 font-bold', text: `${dateVN} (Sắp hết)`, isDanger: true };
+    return { color: 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/60 font-semibold', text: `${dateVN} (Còn hạn)`, isDanger: false };
   } else if (type === 'DT') {
     const passedDays = -diffDays; 
-    if (passedDays > 365) return { color: 'bg-red-50 text-red-700 border-red-200 font-bold animate-pulse', text: `${dateVN} (Quá 1 năm)`, isDanger: true };
-    if (passedDays > 335) return { color: 'bg-orange-50 text-orange-700 border-orange-200 font-bold', text: `${dateVN} (Sắp tới hạn)`, isDanger: true };
-    return { color: 'bg-emerald-50 text-emerald-700 border-emerald-200 font-semibold', text: `${dateVN} (Đạt YC)`, isDanger: false };
+    if (passedDays > 365) return { color: 'bg-red-50 dark:bg-red-950/50 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800/60 font-bold animate-pulse', text: `${dateVN} (Quá 1 năm)`, isDanger: true };
+    if (passedDays > 335) return { color: 'bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800/60 font-bold', text: `${dateVN} (Sắp tới hạn)`, isDanger: true };
+    return { color: 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/60 font-semibold', text: `${dateVN} (Đạt YC)`, isDanger: false };
   } else if (type === 'TB') {
-    if (diffDays < 0) return { color: 'bg-red-50 text-red-700 border-red-200 font-bold', text: `${dateVN} (Quá hạn)`, isDanger: true };
-    if (diffDays <= 15) return { color: 'bg-red-100 text-red-800 border-red-300 font-bold', text: `${dateVN} (Sắp hết)`, isDanger: true }; 
-    return { color: 'bg-emerald-50 text-emerald-700 border-emerald-200 font-medium', text: `${dateVN}`, isDanger: false };
+    if (diffDays < 0) return { color: 'bg-red-50 dark:bg-red-950/50 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800/60 font-bold', text: `${dateVN} (Quá hạn)`, isDanger: true };
+    if (diffDays <= 15) return { color: 'bg-red-100 dark:bg-red-900/60 text-red-800 dark:text-red-200 border-red-300 dark:border-red-700/60 font-bold', text: `${dateVN} (Sắp hết)`, isDanger: true }; 
+    return { color: 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/60 font-medium', text: `${dateVN}`, isDanger: false };
   }
   return { color: '', text: dateVN, isDanger: false };
 };

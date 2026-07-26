@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { 
-  Search, Plus, Edit, Trash2, X, AlertCircle, Loader2, Save, 
-  Users, ShieldCheck, Flame, LifeBuoy, Heart, Activity, 
-  Dumbbell, Car, Utensils, Coffee, Languages, Monitor, Copy, Eye, EyeOff, User as UserIcon, 
+import {
+  Search, Plus, Edit, Trash2, X, AlertCircle, Loader2, Save,
+  Users, ShieldCheck, Flame, LifeBuoy, Heart, Activity,
+  Dumbbell, Car, Utensils, Coffee, Languages, Monitor, Copy, Eye, EyeOff, User as UserIcon,
   Building2, Phone, Mail, Info, MapPin, ChevronDown, ChevronRight, ChevronLeft, PanelLeftClose, PanelLeftOpen, CheckCheck, Briefcase,
   LogOut, AlertTriangle, Image as ImageIcon, RotateCcw, Download, FileSpreadsheet, ClipboardPaste,
   BarChart3, PieChart as PieChartIcon, TrendingUp, Cake, Filter, Layers, Tag, Sparkles, Wrench, Settings2, UserPlus
@@ -11,6 +11,7 @@ import { apiService } from '../services/api';
 import { Personnel, DonVi, ThietBi } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { buildHierarchicalOptions, getUnitEmoji, sortDonViByThuTu, groupParentUnits, getAllSubordinateIds } from '../utils/hierarchy';
+import { useDebounce } from '../hooks/useDebounce';
 import { toast } from '../utils/toast';
 import { PageWithFilterSkeleton } from '../components/SkeletonLoader';
 import { formatPhoneNumber, getDirectImageLink, formatCurrencySpace as formatCurrency, toUnaccented, stripAccents } from '../utils/formatters';
@@ -18,6 +19,7 @@ import UnitFilterSidebar from '../components/ui/UnitFilterSidebar';
 import Pagination from '../components/ui/Pagination';
 import { useAllowedUnits } from '../hooks/useAllowedUnits';
 import PersonnelModal from '../components/personnel/PersonnelModal';
+import { calcGiaTriDen, getChungNhanByNhom } from '../utils/atvsld';
 import CuocDiDongTab from '../components/personnel/CuocDiDongTab';
 import PersonnelDetailCuocChart from '../components/personnel/PersonnelDetailCuocChart';
 import { CERTIFICATES } from '../constants/certificates';
@@ -28,9 +30,196 @@ const extractStartDateFromMaNV = (maNV: string) => {
   const mm = maNV.substring(2, 4);
   const monthNum = parseInt(mm, 10);
   if (isNaN(monthNum) || monthNum < 1 || monthNum > 12) return null;
-  const fullYear = parseInt(yy, 10) > 50 ? `19${yy}` : `20${yy}`; 
-  return `${fullYear}-${mm}-01`; 
+  const fullYear = parseInt(yy, 10) > 50 ? `19${yy}` : `20${yy}`;
+  return `${fullYear}-${mm}-01`;
 };
+
+const PersonnelDesktopRow = React.memo(({ item, props }: any) => {
+  const { showSelectCheckboxes, selectedPersonnelIds, handleSelectRow, donViMap, hasRule, handleView, handleDuplicate, openModal, handleOffboardClick, setPersonnelToRehire, setIsRehireModalOpen, setItemToDelete, setIsConfirmOpen, calculateSeniority } = props;
+  return (
+    <tr className={`hover:bg-blue-50/50 transition-colors group ${item.trang_thai === 'Đã nghỉ việc' ? 'opacity-60 bg-gray-50' : ''}`}>
+      {showSelectCheckboxes && (
+        <td className="py-2.5 px-3 text-center align-middle">
+          <input
+            type="checkbox"
+            checked={selectedPersonnelIds.includes(item.id)}
+            onChange={(e) => handleSelectRow(item.id, e.target.checked)}
+            className="w-4 h-4 text-[#05469B] rounded border-gray-300 focus:ring-[#05469B] cursor-pointer"
+          />
+        </td>
+      )}
+      <td className="py-2.5 px-3 font-semibold text-gray-800 whitespace-nowrap text-[11px] align-middle text-left">{item.ma_so_nhan_vien}</td>
+      <td className="py-2.5 px-3 align-middle text-left">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-full overflow-hidden bg-gray-100 border border-gray-200 flex items-center justify-center shrink-0">
+            {item.hinh_anh ? <img src={getDirectImageLink(item.hinh_anh)} alt="" className="w-full h-full object-cover" /> : <UserIcon size={14} className="text-gray-400" />}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="font-bold text-[#05469B] leading-snug text-[13px] truncate" title={item.ho_ten}>{item.ho_ten}</p>
+            {item.trang_thai === 'Đã nghỉ việc' && <span className="text-[9px] font-bold text-red-600 bg-red-100 px-1.5 py-0.5 rounded uppercase mt-0.5 inline-block">Đã nghỉ việc</span>}
+          </div>
+        </div>
+      </td>
+      <td className="py-2.5 px-3 align-middle text-left">
+        <div className="flex flex-col justify-center">
+          <p className="font-bold text-gray-800 text-[12px] leading-snug truncate" title={item.chuc_vu}>{item.chuc_vu || '---'}</p>
+          {((item.phong_ban && item.phong_ban !== '-' && item.phong_ban !== 'Chưa phân bộ' && item.phong_ban !== 'Chưa có') || (item.khoi && item.khoi !== '-' && item.khoi !== 'Chưa có')) && (
+            <div className="flex items-center gap-1 mt-0.5 overflow-hidden whitespace-nowrap">
+              {item.phong_ban && item.phong_ban !== '-' && item.phong_ban !== 'Chưa phân bộ' && item.phong_ban !== 'Chưa có' && (
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-700 border border-slate-200 shadow-2xs truncate max-w-[140px]" title={`Bộ phận: ${item.phong_ban}`}>
+                  BP: {item.phong_ban}
+                </span>
+              )}
+              {item.khoi && item.khoi !== '-' && item.khoi !== 'Chưa có' && (
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-100 shadow-2xs truncate max-w-[140px]" title={`Khối: ${item.khoi}`}>
+                  {String(item.khoi).startsWith('Khối') ? item.khoi : `Khối: ${item.khoi}`}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+      </td>
+      <td className="py-2.5 px-3 text-[11.5px] font-medium text-gray-700 leading-normal align-middle text-left">{donViMap[String(item.id_don_vi)] || item.id_don_vi || '-'}</td>
+      <td className="py-2.5 px-3 whitespace-nowrap align-middle text-left">
+        <div className="flex flex-col gap-1 text-[11px]">
+          {item.sdt_cong_ty && <a href={`tel:${String(item.sdt_cong_ty).replace(/\D/g, '')}`} className="font-bold text-[#05469B] hover:underline flex items-center gap-1 w-fit"><Phone size={11} className="text-blue-400" /> {formatPhoneNumber(item.sdt_cong_ty)}</a>}
+          {item.sdt_ca_nhan && (
+            hasRule('NS_HIDE_SENSITIVE') ? (
+              <span className="text-gray-400 font-medium flex items-center gap-1 w-fit"><Lock size={11} className="text-gray-300" /> ***</span>
+            ) : (
+              <a href={`tel:${String(item.sdt_ca_nhan).replace(/\D/g, '')}`} className="font-bold text-emerald-500 hover:underline flex items-center gap-1 w-fit"><Phone size={11} className="text-emerald-400" /> {formatPhoneNumber(item.sdt_ca_nhan)}</a>
+            )
+          )}
+          {!item.sdt_cong_ty && !item.sdt_ca_nhan && <span className="text-gray-400 font-medium">---</span>}
+        </div>
+      </td>
+      <td className="py-2.5 px-3 text-[11.5px] font-medium text-emerald-600 whitespace-nowrap align-middle text-left">
+        <span className={`rounded-md inline-block px-1.5 py-0.5 border ${item.trang_thai === 'Đã nghỉ việc' ? 'bg-gray-100 text-gray-500 border-gray-200' : 'bg-emerald-50/50 border-emerald-100'}`}>{calculateSeniority(item.ngay_nhan_vien, item.trang_thai || 'Đang làm việc', item.ngay_nghi_viec || '')}</span>
+      </td>
+      <td className="py-2.5 px-3 align-middle text-center">
+        <div className="flex items-center justify-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+          <button onClick={() => handleView(item)} className="p-1.5 text-indigo-600 hover:bg-indigo-100 rounded-md transition-colors" title="Xem chi tiết"><Eye className="w-3.5 h-3.5" /></button>
+          {item.trang_thai !== 'Đã nghỉ việc' && (
+            <>
+              <button onClick={() => handleDuplicate(item)} className="p-1.5 text-emerald-600 hover:bg-emerald-100 rounded-md transition-colors" title="Nhân bản (Tạo hồ sơ kiêm nhiệm)"><Copy className="w-3.5 h-3.5" /></button>
+              <button onClick={() => openModal('update', item)} className="p-1.5 text-blue-600 hover:bg-blue-100 rounded-md transition-colors" title="Sửa"><Edit className="w-3.5 h-3.5" /></button>
+              <button onClick={() => handleOffboardClick(item)} className="p-1.5 text-orange-600 hover:bg-orange-100 rounded-md transition-colors border border-transparent hover:border-orange-200" title="Điều chuyển / Nghỉ việc"><LogOut className="w-3.5 h-3.5" /></button>
+            </>
+          )}
+          {item.trang_thai === 'Đã nghỉ việc' && (
+            <>
+              <button onClick={() => { setPersonnelToRehire(item); setIsRehireModalOpen(true); }} className="p-1.5 text-emerald-600 hover:bg-emerald-100 rounded-md transition-colors" title="Vào làm lại"><RotateCcw className="w-3.5 h-3.5" /></button>
+              <button onClick={() => { setItemToDelete(item.id); setIsConfirmOpen(true); }} className="p-1.5 text-red-600 hover:bg-red-100 rounded-md transition-colors" title="Xóa vĩnh viễn"><Trash2 className="w-3.5 h-3.5" /></button>
+            </>
+          )}
+        </div>
+      </td>
+    </tr>
+  );
+}, (prev, next) => {
+  return prev.item.id === next.item.id &&
+         prev.item === next.item &&
+         prev.props.showSelectCheckboxes === next.props.showSelectCheckboxes &&
+         prev.props.selectedPersonnelIds.includes(prev.item.id) === next.props.selectedPersonnelIds.includes(next.item.id);
+});
+
+const PersonnelMobileCard = React.memo(({ item, props }: any) => {
+  const { showSelectCheckboxes, selectedPersonnelIds, handleSelectRow, donViMap, hasRule, handleView, handleDuplicate, openModal, handleOffboardClick, setPersonnelToRehire, setIsRehireModalOpen, setItemToDelete, setIsConfirmOpen, calculateSeniority } = props;
+  const seniorityStr = calculateSeniority(item.ngay_nhan_vien, item.trang_thai || 'Đang làm việc', item.ngay_nghi_viec || '');
+  return (
+    <div className={`p-4 bg-white rounded-2xl border border-gray-100 shadow-sm relative flex flex-col gap-3 transition-all ${item.trang_thai === 'Đã nghỉ việc' ? 'opacity-70 bg-gray-50' : ''}`}>
+      <div className="flex items-center gap-3 pb-2.5 border-b border-gray-100">
+        {showSelectCheckboxes && (
+          <input
+            type="checkbox"
+            checked={selectedPersonnelIds.includes(item.id)}
+            onChange={(e) => handleSelectRow(item.id, e.target.checked)}
+            className="w-4 h-4 text-[#05469B] rounded border-gray-300 focus:ring-[#05469B] shrink-0 cursor-pointer"
+          />
+        )}
+        <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-100 border border-gray-200 flex items-center justify-center shrink-0">
+          {item.hinh_anh ? <img src={getDirectImageLink(item.hinh_anh)} alt="" className="w-full h-full object-cover" /> : <UserIcon size={16} className="text-gray-400" />}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center justify-between gap-1">
+            <span className="font-semibold text-gray-500 text-[10px]">ID: {item.ma_so_nhan_vien}</span>
+            {item.trang_thai === 'Đã nghỉ việc' ? (
+              <span className="text-[9px] font-black text-red-600 bg-red-50 border border-red-100 px-1.5 py-0.5 rounded uppercase">Đã nghỉ việc</span>
+            ) : (
+              <span className="text-[9px] font-black text-emerald-600 bg-emerald-50 border border-emerald-100 px-1.5 py-0.5 rounded uppercase">Đang làm việc</span>
+            )}
+          </div>
+          <h4 className="font-extrabold text-[#05469B] text-sm leading-snug truncate mt-0.5">{item.ho_ten}</h4>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-xs">
+        <div className="col-span-2">
+          <p className="text-[10px] font-bold text-gray-400 uppercase">Chức vụ &amp; Bộ phận</p>
+          <p className="font-bold text-gray-800 leading-normal truncate">{item.chuc_vu || '---'}</p>
+          {((item.phong_ban && item.phong_ban !== '-' && item.phong_ban !== 'Chưa phân bộ' && item.phong_ban !== 'Chưa có') || (item.khoi && item.khoi !== '-' && item.khoi !== 'Chưa có')) && (
+            <div className="flex items-center gap-1.5 mt-1">
+              {item.phong_ban && item.phong_ban !== '-' && item.phong_ban !== 'Chưa phân bộ' && item.phong_ban !== 'Chưa có' && (
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+                  BP: {item.phong_ban}
+                </span>
+              )}
+              {item.khoi && item.khoi !== '-' && item.khoi !== 'Chưa có' && (
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-100">
+                  {String(item.khoi).startsWith('Khối') ? item.khoi : `Khối: ${item.khoi}`}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+        <div className="col-span-2">
+          <p className="text-[10px] font-bold text-gray-400 uppercase">Đơn vị quản lý</p>
+          <p className="font-medium text-gray-700 leading-normal truncate">{donViMap[String(item.id_don_vi)] || item.id_don_vi || '-'}</p>
+        </div>
+        <div>
+          <p className="text-[10px] font-bold text-gray-400 uppercase">Điện thoại</p>
+          <div className="flex flex-col gap-1 mt-1">
+            {item.sdt_cong_ty && <a href={`tel:${String(item.sdt_cong_ty).replace(/\D/g, '')}`} className="font-bold text-[#05469B] hover:underline flex items-center gap-1 text-[11px]"><Phone size={11} className="text-blue-400 shrink-0" /> {formatPhoneNumber(item.sdt_cong_ty)}</a>}
+            {item.sdt_ca_nhan && (
+              hasRule('NS_HIDE_SENSITIVE') ? (
+                <span className="text-gray-400 font-medium flex items-center gap-1 text-[11px]"><Lock size={11} className="text-gray-300 shrink-0" /> ***</span>
+              ) : (
+                <a href={`tel:${String(item.sdt_ca_nhan).replace(/\D/g, '')}`} className="font-bold text-emerald-600 hover:underline flex items-center gap-1 text-[11px]"><Phone size={11} className="text-emerald-400 shrink-0" /> {formatPhoneNumber(item.sdt_ca_nhan)}</a>
+              )
+            )}
+            {!item.sdt_cong_ty && !item.sdt_ca_nhan && <span className="text-gray-400 font-medium">---</span>}
+          </div>
+        </div>
+        <div>
+          <p className="text-[10px] font-bold text-gray-400 uppercase">Thâm niên</p>
+          <span className="mt-1 inline-block text-[11px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">{seniorityStr}</span>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-end gap-1.5 pt-3 border-t border-gray-100 mt-1">
+        <button onClick={() => handleView(item)} className="p-1.5 text-indigo-600 bg-indigo-50 border border-indigo-100 hover:bg-indigo-100 rounded-lg transition-colors flex items-center gap-1 text-[11px] font-bold shadow-2xs" title="Xem chi tiết"><Eye className="w-3.5 h-3.5" /> Xem</button>
+        {item.trang_thai !== 'Đã nghỉ việc' && (
+          <>
+            <button onClick={() => handleDuplicate(item)} className="p-1.5 text-emerald-600 bg-emerald-50 border border-emerald-100 hover:bg-emerald-100 rounded-lg transition-colors flex items-center gap-1 text-[11px] font-bold shadow-2xs" title="Kiêm nhiệm"><Copy className="w-3.5 h-3.5" /> Kiêm nhiệm</button>
+            <button onClick={() => openModal('update', item)} className="p-1.5 text-blue-600 bg-blue-50 border border-blue-100 hover:bg-blue-100 rounded-lg transition-colors flex items-center gap-1 text-[11px] font-bold shadow-2xs" title="Sửa"><Edit className="w-3.5 h-3.5" /> Sửa</button>
+            <button onClick={() => handleOffboardClick(item)} className="p-1.5 text-orange-600 bg-orange-50 border border-orange-200 hover:bg-orange-100 rounded-lg transition-colors flex items-center gap-1 text-[11px] font-bold shadow-2xs" title="Điều chuyển / Nghỉ việc"><LogOut className="w-3.5 h-3.5" /> Chuyển/Nghỉ</button>
+          </>
+        )}
+        {item.trang_thai === 'Đã nghỉ việc' && (
+          <>
+            <button onClick={() => { setPersonnelToRehire(item); setIsRehireModalOpen(true); }} className="p-1.5 text-emerald-600 bg-emerald-50 border border-emerald-100 hover:bg-emerald-100 rounded-lg transition-colors flex items-center gap-1 text-[11px] font-bold shadow-2xs" title="Vào làm lại"><RotateCcw className="w-3.5 h-3.5" /> Làm lại</button>
+            <button onClick={() => { setItemToDelete(item.id); setIsConfirmOpen(true); }} className="p-1.5 text-red-600 bg-red-50 border border-red-100 hover:bg-red-100 rounded-lg transition-colors flex items-center gap-1 text-[11px] font-bold shadow-2xs" title="Xóa vĩnh viễn"><Trash2 className="w-3.5 h-3.5" /> Xóa</button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}, (prev, next) => {
+  return prev.item.id === next.item.id &&
+         prev.item === next.item &&
+         prev.props.showSelectCheckboxes === next.props.showSelectCheckboxes &&
+         prev.props.selectedPersonnelIds.includes(prev.item.id) === next.props.selectedPersonnelIds.includes(next.item.id);
+});
 
 export default function PersonnelPage() {
   const { user } = useAuth();
@@ -44,7 +233,7 @@ export default function PersonnelPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
+
   const [personnelSearchTerm, setPersonnelSearchTerm] = useState('');
   const [filterPhongBan, setFilterPhongBan] = useState<string>('');
   const [filterKhoi, setFilterKhoi] = useState<string>('');
@@ -54,19 +243,23 @@ export default function PersonnelPage() {
   const [isFeaturesDropdownOpen, setIsFeaturesDropdownOpen] = useState(false);
   const [isAddNewExpanded, setIsAddNewExpanded] = useState(false);
   const [unitSearchTerm, setUnitSearchTerm] = useState('');
+  const debouncedPersonnelSearchTerm = useDebounce(personnelSearchTerm, 300);
+  const debouncedUnitSearchTerm = useDebounce(unitSearchTerm, 300);
   const [isListCollapsed, setIsListCollapsed] = useState(false);
   const [selectedUnitFilter, setSelectedUnitFilter] = useState<string | null>(null);
   const [expandedParents, setExpandedParents] = useState<string[]>([]);
 
   const [phapNhanList, setPhapNhanList] = useState<any[]>([]);
+  const [chuKyList, setChuKyList] = useState<any[]>([]);
 
   const [activeTab, setActiveTab] = useState<'info' | 'stats' | 'cuoc'>('info');
 
   const [modal, setModal] = useState<{ isOpen: boolean; mode: 'create' | 'update'; formData: any; }>({ isOpen: false, mode: 'create', formData: {} });
-  
+
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [viewData, setViewData] = useState<any | null>(null);
   const [showNgachLuong, setShowNgachLuong] = useState(false);
+  const [showCCCD, setShowCCCD] = useState(false);
 
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<string | null>(null);
@@ -83,6 +276,11 @@ export default function PersonnelPage() {
   const [unreturnedAssets, setUnreturnedAssets] = useState<any[]>([]);
   const [forceOffboard, setForceOffboard] = useState(false);
   const [checkingAssets, setCheckingAssets] = useState(false);
+
+  // Thêm state cho Điều chuyển / Nghỉ việc
+  const [transferType, setTransferType] = useState<'INTERNAL' | 'EXTERNAL' | 'OFFBOARD'>('OFFBOARD');
+  const [transferInternalUnitId, setTransferInternalUnitId] = useState('');
+  const [transferExternalUnitName, setTransferExternalUnitName] = useState('');
 
   const [isRehireModalOpen, setIsRehireModalOpen] = useState(false);
   const [personnelToRehire, setPersonnelToRehire] = useState<any | null>(null);
@@ -105,22 +303,30 @@ export default function PersonnelPage() {
 
 
 
-  const loadData = async () => {
+  const loadData = async (forceRefresh = false) => {
     setLoading(true); setError(null);
     try {
-      const [nsResult, dvResult, pnResult] = await Promise.all([
-        apiService.getPersonnel(),
-        apiService.getDonVi(),
-        apiService.getPhapNhan()
+      const [nsResult, dvResult, pnResult, chuKyResult] = await Promise.all([
+        apiService.getPersonnel(forceRefresh),
+        apiService.getDonVi(forceRefresh),
+        apiService.getPhapNhan(forceRefresh),
+        apiService.getChuKyATVSLD ? apiService.getChuKyATVSLD(forceRefresh).catch(() => []) : Promise.resolve([])
       ]);
       setData(nsResult);
       setDonViList(dvResult);
       setPhapNhanList(pnResult || []);
-    } catch (err: any) { setError(err.message || 'Lỗi tải dữ liệu.'); } 
+      setChuKyList(chuKyResult || []);
+    } catch (err: any) { setError(err.message || 'Lỗi tải dữ liệu.'); }
     finally { setLoading(false); }
   };
 
   useEffect(() => { loadData(); }, []);
+
+  const donViLookupMap = useMemo(() => {
+    const map = new Map<string, DonVi>();
+    donViList.forEach(dv => map.set(String(dv.id), dv));
+    return map;
+  }, [donViList]);
 
   const donViMap = useMemo(() => {
     const map: Record<string, string> = {};
@@ -128,19 +334,21 @@ export default function PersonnelPage() {
     return map;
   }, [donViList]);
 
-  const getFullUnitName = (unitId: string): string => {
-    const parts: string[] = [];
-    let currentId = unitId;
-    let iterations = 0;
-    while (currentId && iterations < 10) {
-      const dv = donViList.find(item => String(item.id) === String(currentId));
-      if (!dv) break;
-      parts.push(dv.ten_don_vi);
-      currentId = dv.cap_quan_ly;
-      iterations++;
-    }
-    return parts.reverse().join(' ➜ ');
-  };
+  const getFullUnitName = useMemo(() => {
+    return (unitId: string): string => {
+      const parts: string[] = [];
+      let currentId = unitId;
+      let iterations = 0;
+      while (currentId && iterations < 10) {
+        const dv = donViLookupMap.get(String(currentId));
+        if (!dv) break;
+        parts.push(dv.ten_don_vi);
+        currentId = dv.cap_quan_ly;
+        iterations++;
+      }
+      return parts.reverse().join(' ➜ ');
+    };
+  }, [donViLookupMap]);
 
   const allowedDonViIds = useAllowedUnits(donViList);
 
@@ -158,9 +366,9 @@ export default function PersonnelPage() {
 
   const filteredUnits = useMemo(() => {
     let baseUnits = donViList.filter(dv => allowedDonViIds.includes(dv.id));
-    if (!unitSearchTerm) return baseUnits;
+    if (!debouncedUnitSearchTerm) return baseUnits;
 
-    const lower = unitSearchTerm.toLowerCase();
+    const lower = debouncedUnitSearchTerm.toLowerCase();
     const matchedIds = new Set<string>();
 
     baseUnits.forEach(u => {
@@ -183,12 +391,12 @@ export default function PersonnelPage() {
         }
       });
     };
-    
+
     const initialMatches = Array.from(matchedIds);
     initialMatches.forEach(id => addChildren(id));
 
     return baseUnits.filter(item => matchedIds.has(item.id));
-  }, [donViList, unitSearchTerm, allowedDonViIds]);
+  }, [donViList, debouncedUnitSearchTerm, allowedDonViIds]);
 
   const parentUnits = useMemo(() => filteredUnits.filter(item => item.cap_quan_ly === 'HO' || !item.cap_quan_ly), [filteredUnits]);
   const getChildUnits = (parentId: string) => sortDonViByThuTu(filteredUnits.filter(item => item.cap_quan_ly === parentId));
@@ -211,7 +419,7 @@ export default function PersonnelPage() {
     if (selectedUnitFilter) {
       base = base.filter(item => selectedUnitSubordinates.includes(item.id_don_vi));
     }
-    
+
     const getUnique = (key: string, currentList: any[]) => {
       const set = new Set<string>();
       currentList.forEach(item => {
@@ -223,22 +431,22 @@ export default function PersonnelPage() {
       return Array.from(set).sort((a, b) => a.localeCompare(b, 'vi'));
     };
 
-    const listForPhongBan = base.filter(item => 
+    const listForPhongBan = base.filter(item =>
       (!filterKhoi || String(item.khoi || '').trim() === filterKhoi) &&
       (!filterChucVu || String(item.chuc_vu || '').trim() === filterChucVu) &&
       (!filterPhanLoai || String(item.phan_loai || '').trim() === filterPhanLoai)
     );
-    const listForKhoi = base.filter(item => 
+    const listForKhoi = base.filter(item =>
       (!filterPhongBan || String(item.phong_ban || '').trim() === filterPhongBan) &&
       (!filterChucVu || String(item.chuc_vu || '').trim() === filterChucVu) &&
       (!filterPhanLoai || String(item.phan_loai || '').trim() === filterPhanLoai)
     );
-    const listForChucVu = base.filter(item => 
+    const listForChucVu = base.filter(item =>
       (!filterPhongBan || String(item.phong_ban || '').trim() === filterPhongBan) &&
       (!filterKhoi || String(item.khoi || '').trim() === filterKhoi) &&
       (!filterPhanLoai || String(item.phan_loai || '').trim() === filterPhanLoai)
     );
-    const listForPhanLoai = base.filter(item => 
+    const listForPhanLoai = base.filter(item =>
       (!filterPhongBan || String(item.phong_ban || '').trim() === filterPhongBan) &&
       (!filterKhoi || String(item.khoi || '').trim() === filterKhoi) &&
       (!filterChucVu || String(item.chuc_vu || '').trim() === filterChucVu)
@@ -256,23 +464,23 @@ export default function PersonnelPage() {
   const filteredPersonnel = useMemo(() => {
     let result = data.filter(item => allowedDonViIds.includes(item.id_don_vi));
     if (selectedUnitFilter) result = result.filter(item => selectedUnitSubordinates.includes(item.id_don_vi));
-    
-    if (personnelSearchTerm) {
-      const cleanSearch = stripAccents(personnelSearchTerm);
-      const digitsSearch = personnelSearchTerm.replace(/\D/g, '');
-      
+
+    if (debouncedPersonnelSearchTerm) {
+      const cleanSearch = stripAccents(debouncedPersonnelSearchTerm);
+      const digitsSearch = debouncedPersonnelSearchTerm.replace(/\D/g, '');
+
       result = result.filter(item => {
         const cleanPhone1 = String(item.sdt_ca_nhan || '').replace(/\D/g, '');
         const cleanPhone2 = String(item.sdt_cong_ty || '').replace(/\D/g, '');
-        
-        return stripAccents(item.ma_so_nhan_vien || '').includes(cleanSearch) || 
-               stripAccents(item.ho_ten || '').includes(cleanSearch) || 
-               stripAccents(donViMap[String(item.id_don_vi)] || '').includes(cleanSearch) ||
-               stripAccents(item.chuc_vu || '').includes(cleanSearch) ||
-               stripAccents(item.phong_ban || '').includes(cleanSearch) ||
-               stripAccents(item.sdt_ca_nhan || '').includes(cleanSearch) ||
-               stripAccents(item.sdt_cong_ty || '').includes(cleanSearch) ||
-               (digitsSearch !== '' && (cleanPhone1.includes(digitsSearch) || cleanPhone2.includes(digitsSearch)));
+
+        return stripAccents(item.ma_so_nhan_vien || '').includes(cleanSearch) ||
+          stripAccents(item.ho_ten || '').includes(cleanSearch) ||
+          stripAccents(donViMap[String(item.id_don_vi)] || '').includes(cleanSearch) ||
+          stripAccents(item.chuc_vu || '').includes(cleanSearch) ||
+          stripAccents(item.phong_ban || '').includes(cleanSearch) ||
+          stripAccents(item.sdt_ca_nhan || '').includes(cleanSearch) ||
+          stripAccents(item.sdt_cong_ty || '').includes(cleanSearch) ||
+          (digitsSearch !== '' && (cleanPhone1.includes(digitsSearch) || cleanPhone2.includes(digitsSearch)));
       });
     }
 
@@ -309,17 +517,17 @@ export default function PersonnelPage() {
       if (orderA !== orderB) return orderA - orderB;
       const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
       const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
-      return timeA - timeB; 
+      return timeA - timeB;
     });
-  }, [data, personnelSearchTerm, selectedUnitFilter, allowedDonViIds, donViMap, selectedUnitSubordinates, filterPhongBan, filterKhoi, filterChucVu, filterPhanLoai]);
+  }, [data, debouncedPersonnelSearchTerm, selectedUnitFilter, allowedDonViIds, donViMap, selectedUnitSubordinates, filterPhongBan, filterKhoi, filterChucVu, filterPhanLoai]);
 
   const [selectedPersonnelIds, setSelectedPersonnelIds] = useState<string[]>([]);
 
   const showSelectCheckboxes = useMemo(() => {
     return showAdvancedFilters && (
-      filterPhongBan !== '' || 
-      filterKhoi !== '' || 
-      filterChucVu !== '' || 
+      filterPhongBan !== '' ||
+      filterKhoi !== '' ||
+      filterChucVu !== '' ||
       filterPhanLoai !== ''
     );
   }, [showAdvancedFilters, filterPhongBan, filterKhoi, filterChucVu, filterPhanLoai]);
@@ -480,16 +688,10 @@ export default function PersonnelPage() {
     return unit ? unit.ten_don_vi : 'Đơn vị không xác định';
   }, [selectedUnitFilter, donViList]);
 
-  // 🟢 LOGIC TÍNH TOÁN CÁC BIỂU ĐỒ & KPI
-  // =================================================================================
-  // 🟢 THUẬT TOÁN KHỬ TRÙNG LẶP: 1 MÃ NV = 1 HEADCOUNT THỰC TẾ (Ưu tiên vai trò chính)
-  // =================================================================================
   const uniqueActiveStaff = useMemo(() => {
     const active = filteredPersonnel.filter(p => p.trang_thai !== 'Đã nghỉ việc');
     const seen = new Set<string>();
     const unique: any[] = [];
-    
-    // Sắp xếp: Ưu tiên record KHÔNG chứa chữ "Kiêm nhiệm" lên đầu để làm record gốc
     const sortedActive = [...active].sort((a, b) => {
       const aKiem = String(a.chuc_vu || '').includes('Kiêm nhiệm') ? 1 : 0;
       const bKiem = String(b.chuc_vu || '').includes('Kiêm nhiệm') ? 1 : 0;
@@ -499,18 +701,15 @@ export default function PersonnelPage() {
     for (const p of sortedActive) {
       const maNV = String(p.ma_so_nhan_vien || '').toLowerCase().trim();
       if (!maNV) {
-        unique.push(p); // Nếu vô tình không có mã NV thì vẫn tính
+        unique.push(p);
       } else if (!seen.has(maNV)) {
-        seen.add(maNV); // Ghi nhớ mã NV này đã được đếm
+        seen.add(maNV);
         unique.push(p);
       }
     }
     return unique;
   }, [filteredPersonnel]);
 
-  // =================================================================================
-  // 🟢 LOGIC TÍNH TOÁN CÁC BIỂU ĐỒ & KPI CHO TAB THỐNG KÊ (Dùng List đã khử trùng)
-  // =================================================================================
   const stats = useMemo(() => {
     const currentMonth = new Date().getMonth();
     const currentYear = new Date().getFullYear();
@@ -543,32 +742,24 @@ export default function PersonnelPage() {
     return { total, newThisMonth, male, female, seniority, ageGroups, atvsldTrained, birthdays, currentMonth };
   }, [uniqueActiveStaff]);
 
-  // =================================================================================
-  // 🟢 LOGIC TÍNH TOÁN BẢNG CHÉO BẢO VỆ / PVHC (Dùng List đã khử trùng)
-  // =================================================================================
-
-
-  // =================================================================================
-  // 🟢 1. LOGIC BẢNG CHÉO BẢO VỆ / PVHC (Đã tích hợp Danh sách Hover)
-  // =================================================================================
   const crossTabStats = useMemo(() => {
     const calcStatsForIds = (ids: string[]) => {
       const staff = uniqueActiveStaff.filter(p => ids.includes(p.id_don_vi));
       let bv_nv = 0, bv_tt_tp = 0, pvhc_nv = 0, pvhc_tt_tp = 0;
       let l_bv_nv: any[] = [], l_bv_tt_tp: any[] = [], l_pvhc_nv: any[] = [], l_pvhc_tt_tp: any[] = [];
-      
+
       staff.forEach(p => {
         const bp = String(p.phong_ban || '').toLowerCase();
-        const pl = String(p.phan_loai || '').toLowerCase(); 
-        
+        const pl = String(p.phan_loai || '').toLowerCase();
+
         const isBV = bp.includes('bv') || bp.includes('bảo vệ') || bp.includes('đón tiếp') || pl.includes('bv, đtkh');
         const isPVHC = bp.includes('pvhc') || bp.includes('hành chính') || bp.includes('hcns') || pl.includes('pt dvhc');
-        
+
         if (isBV) {
-          if (pl.includes('tổ trưởng') || pl.includes('tổ phó') || pl.includes('trưởng nhóm')) { bv_tt_tp++; l_bv_tt_tp.push(p); } 
+          if (pl.includes('tổ trưởng') || pl.includes('tổ phó') || pl.includes('trưởng nhóm')) { bv_tt_tp++; l_bv_tt_tp.push(p); }
           else { bv_nv++; l_bv_nv.push(p); }
         } else if (isPVHC) {
-          if (pl.includes('tổ trưởng') || pl.includes('tổ phó') || pl.includes('trưởng nhóm')) { pvhc_tt_tp++; l_pvhc_tt_tp.push(p); } 
+          if (pl.includes('tổ trưởng') || pl.includes('tổ phó') || pl.includes('trưởng nhóm')) { pvhc_tt_tp++; l_pvhc_tt_tp.push(p); }
           else { pvhc_nv++; l_pvhc_nv.push(p); }
         }
       });
@@ -576,9 +767,9 @@ export default function PersonnelPage() {
       const l_totalPVHC = [...l_pvhc_nv, ...l_pvhc_tt_tp];
       const l_totalRow = [...l_totalBV, ...l_totalPVHC];
 
-      return { 
-        bv_nv, bv_tt_tp, totalBV: l_totalBV.length, 
-        pvhc_nv, pvhc_tt_tp, totalPVHC: l_totalPVHC.length, 
+      return {
+        bv_nv, bv_tt_tp, totalBV: l_totalBV.length,
+        pvhc_nv, pvhc_tt_tp, totalPVHC: l_totalPVHC.length,
         totalRow: l_totalRow.length,
         lists: { bv_nv: l_bv_nv, bv_tt_tp: l_bv_tt_tp, totalBV: l_totalBV, pvhc_nv: l_pvhc_nv, pvhc_tt_tp: l_pvhc_tt_tp, totalPVHC: l_totalPVHC, totalRow: l_totalRow }
       };
@@ -636,9 +827,14 @@ export default function PersonnelPage() {
     return { rows, grandTotal };
   }, [uniqueActiveStaff, donViList, selectedUnitFilter, allowedDonViIds, ctttBacUnits, ctttNamUnits, vpdhUnits, otherUnits]);
 
-  // =================================================================================
-  // 🟢 2. LOGIC BẢNG CƠ CẤU BỘ PHẬN & CHỨC DANH (Đã tích hợp Danh sách Hover)
-  // =================================================================================
+  const [currentPage, setCurrentPage] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState<number | string>(100);
+
+  const actualRowsPerPage = typeof rowsPerPage === 'number' && rowsPerPage > 0 ? rowsPerPage : 100;
+  const totalPages = Math.ceil(filteredPersonnel.length / actualRowsPerPage) || 1;
+
+  useEffect(() => { setCurrentPage(1); }, [selectedUnitFilter, debouncedPersonnelSearchTerm, filterPhongBan, filterKhoi, filterChucVu, filterPhanLoai]);
+
   const deptTabStats = useMemo(() => {
     const deptMap: Record<string, Record<string, number>> = {};
     const deptListMap: Record<string, Record<string, any[]>> = {};
@@ -648,10 +844,10 @@ export default function PersonnelPage() {
       const pb = p.phong_ban?.trim() || 'Chưa phân bổ';
       const pl = p.phan_loai?.trim() || 'Chưa phân loại';
       phanLoaiSet.add(pl);
-      
+
       if (!deptMap[pb]) { deptMap[pb] = { total: 0 }; deptListMap[pb] = { total: [] }; }
       if (!deptMap[pb][pl]) { deptMap[pb][pl] = 0; deptListMap[pb][pl] = []; }
-      
+
       deptMap[pb][pl]++;
       deptMap[pb].total++;
       deptListMap[pb][pl].push(p);
@@ -677,46 +873,35 @@ export default function PersonnelPage() {
         const lowerName = name.toLowerCase();
         if (lowerName === 'ban lãnh đạo') return 1;
         if (lowerName === 'lãnh đạo') return 2;
-        if (lowerName === 'chưa phân bổ') return 99; 
-        return 3; 
+        if (lowerName === 'chưa phân bổ') return 99;
+        return 3;
       };
       const pA = getPriority(a);
       const pB = getPriority(b);
       if (pA !== pB) return pA - pB;
-      return a.localeCompare(b, 'vi'); 
+      return a.localeCompare(b, 'vi');
     });
 
     const colTotals: Record<string, number> = {};
     const colLists: Record<string, any[]> = {};
     let grandTotalList: any[] = [];
-    
+
     activeColumnsByGroup.forEach(g => { g.activeRoles.forEach(c => { colTotals[c] = 0; colLists[c] = []; }); });
-    
-    rows.forEach(r => { 
-      activeColumnsByGroup.forEach(g => { 
-        g.activeRoles.forEach(c => { 
-          colTotals[c] += (deptMap[r][c] || 0); 
+
+    rows.forEach(r => {
+      activeColumnsByGroup.forEach(g => {
+        g.activeRoles.forEach(c => {
+          colTotals[c] += (deptMap[r][c] || 0);
           if (deptListMap[r][c]) {
             colLists[c].push(...deptListMap[r][c]);
             grandTotalList.push(...deptListMap[r][c]);
           }
-        }); 
-      }); 
+        });
+      });
     });
 
     return { deptMap, deptListMap, groupedColumns: activeColumnsByGroup, rows, colTotals, colLists, grandTotal: uniqueActiveStaff.length, grandTotalList };
   }, [uniqueActiveStaff]);
-
-//🟢 PHẦN 2: CÁC HÀM XỬ LÝ SỰ KIỆN (Thêm/Sửa/Xóa/Excel)
-
-  // 🟢 LOGIC PHÂN TRANG (PAGINATION)
-  const [currentPage, setCurrentPage] = useState(1);
-  const [rowsPerPage, setRowsPerPage] = useState<number | string>(100);
-
-  const actualRowsPerPage = typeof rowsPerPage === 'number' && rowsPerPage > 0 ? rowsPerPage : 100;
-  const totalPages = Math.ceil(filteredPersonnel.length / actualRowsPerPage) || 1;
-
-  useEffect(() => { setCurrentPage(1); }, [selectedUnitFilter, personnelSearchTerm, filterPhongBan, filterKhoi, filterChucVu, filterPhanLoai]);
 
   const paginatedPersonnel = useMemo(() => {
     const startIndex = (currentPage - 1) * actualRowsPerPage;
@@ -728,8 +913,8 @@ export default function PersonnelPage() {
     filteredPersonnel.forEach(p => {
       if (!p.email || p.trang_thai === 'Đã nghỉ việc') return;
       const chucVu = String(p.chuc_vu || '').toLowerCase();
-      if (roleType === 'LD' && chucVu.includes('tổng giám đốc')) { emails.push(p.email); } 
-      else if (roleType === 'DVHT' && (chucVu.includes('dvht') || chucVu.includes('dịch vụ hỗ trợ'))) { emails.push(p.email); } 
+      if (roleType === 'LD' && chucVu.includes('tổng giám đốc')) { emails.push(p.email); }
+      else if (roleType === 'DVHT' && (chucVu.includes('dvht') || chucVu.includes('dịch vụ hỗ trợ'))) { emails.push(p.email); }
       else if (roleType === 'NS' && chucVu.includes('nhân sự')) { emails.push(p.email); }
     });
 
@@ -739,15 +924,15 @@ export default function PersonnelPage() {
   };
 
   const openModal = (mode: 'create' | 'update', item?: any) => {
-    if (item) { 
-      setModal({ isOpen: true, mode, formData: { ...item } }); 
-    } else { 
+    if (item) {
+      setModal({ isOpen: true, mode, formData: { ...item } });
+    } else {
       const defaultUnitId = selectedUnitFilter || allowedDonViIds[0] || (donViList[0]?.id ? String(donViList[0].id) : '');
       const targetUnit = donViList.find(d => String(d.id) === String(defaultUnitId));
       const defaultLegal = targetUnit ? (targetUnit.id_phap_nhan || '') : (phapNhanList[0]?.id || '');
-      setModal({ 
-        isOpen: true, 
-        mode, 
+      setModal({
+        isOpen: true,
+        mode,
         formData: {
           ma_so_nhan_vien: '', ho_ten: '', ngay_sinh: '', cmnd: '',
           sdt_ca_nhan: '', sdt_cong_ty: '', email: '', email_ca_nhan: '',
@@ -758,20 +943,21 @@ export default function PersonnelPage() {
           phong_ban: '', chuc_vu: '', ngach_luong: '',
           ngay_nhan_viec: new Date().toISOString().split('T')[0],
           gioi_tinh: 'Nam', trang_thai: 'Đang làm việc'
-        } 
-      }); 
+        }
+      });
     }
     setError(null);
   };
 
-  const handleView = (item: any) => { 
+  const handleView = (item: any) => {
     if (hasRule('NS_NO_DETAIL')) {
       toast.warning("Bạn không có quyền xem chi tiết hồ sơ nhân sự này!");
       return;
     }
-    setViewData(item); 
-    setShowNgachLuong(false); 
-    setIsViewModalOpen(true); 
+    setViewData(item);
+    setShowNgachLuong(false);
+    setShowCCCD(false);
+    setIsViewModalOpen(true);
   };
 
   const handleDuplicate = (item: any) => {
@@ -779,11 +965,10 @@ export default function PersonnelPage() {
     setError(null);
   };
 
-  // 🟢 HÀM LƯU DỮ LIỆU BẰNG TAY (THÊM / SỬA)
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.id_don_vi) return toast.warning("Vui lòng chọn Đơn vị công tác!");
-    
+
     let calculatedTuoi = '';
     if (formData.nam_sinh) {
       const birthDate = new Date(formData.nam_sinh); const today = new Date();
@@ -793,26 +978,25 @@ export default function PersonnelPage() {
       calculatedTuoi = age.toString();
     }
 
-    const finalDataToSave = { 
-      ...formData, tuoi: calculatedTuoi, 
+    const finalDataToSave = {
+      ...formData, tuoi: calculatedTuoi,
       tham_nien: calculateSeniority(formData.ngay_nhan_vien || '', formData.trang_thai || 'Đang làm việc', formData.ngay_nghi_viec || ''),
       trang_thai: formData.trang_thai || 'Đang làm việc'
     };
 
     if (!finalDataToSave.ngay_nhan_vien && finalDataToSave.ma_so_nhan_vien) { finalDataToSave.ngay_nhan_vien = extractStartDateFromMaNV(finalDataToSave.ma_so_nhan_vien); }
-    if(!finalDataToSave.nam_sinh) finalDataToSave.nam_sinh = null;
-    if(!finalDataToSave.ngay_nhan_vien) finalDataToSave.ngay_nhan_vien = null;
-    if(!finalDataToSave.ngay_nghi_viec) finalDataToSave.ngay_nghi_viec = null;
-    if(!finalDataToSave.ngay_vao_lam_lai) finalDataToSave.ngay_vao_lam_lai = null;
+    if (!finalDataToSave.nam_sinh) finalDataToSave.nam_sinh = null;
+    if (!finalDataToSave.ngay_nhan_vien) finalDataToSave.ngay_nhan_vien = null;
+    if (!finalDataToSave.ngay_nghi_viec) finalDataToSave.ngay_nghi_viec = null;
+    if (!finalDataToSave.ngay_vao_lam_lai) finalDataToSave.ngay_vao_lam_lai = null;
 
-    // 🟢 TỰ ĐỘNG CHUẨN HOÁ TÊN CHỨNG NHẬN ATVSLĐ TRƯỚC KHI LƯU DB
     if (finalDataToSave.nhom_doi_tuong) {
-      const nhom = String(finalDataToSave.nhom_doi_tuong);
+      const nhom = String(finalDataToSave.nhom_doi_tuong).replace(/\D/g, '');
       if (nhom === '1' || nhom === '2' || nhom === '6') finalDataToSave.chung_nhan = 'Giấy chứng nhận huấn luyện ATVSLĐ';
       else if (nhom === '3') finalDataToSave.chung_nhan = 'Thẻ An toàn lao động';
       else if (nhom === '4') finalDataToSave.chung_nhan = 'Quyết định Công nhận Kết quả Huấn luyện ATVSLĐ';
-      
-      finalDataToSave.cc_atvsld = true; // Bắt buộc bật cờ có chứng chỉ
+
+      finalDataToSave.cc_atvsld = true;
     } else {
       finalDataToSave.chung_nhan = null;
     }
@@ -838,23 +1022,23 @@ export default function PersonnelPage() {
         }
       }
 
-      if (modal.mode === 'create') { setData(prev => [...prev, finalDataToSave]); } 
+      if (modal.mode === 'create') { setData(prev => [...prev, finalDataToSave]); }
       else { setData(prev => prev.map(item => item.id === finalDataToSave.id ? finalDataToSave : item)); }
-      
-      setModal(prev => ({ ...prev, isOpen: false }));  
+
+      setModal(prev => ({ ...prev, isOpen: false }));
       toast.success(modal.mode === 'create' ? "Thêm mới thành công!" : "Cập nhật thành công!");
-    } catch (err: any) { setError(err.message || 'Lỗi lưu dữ liệu.'); toast.error(err.message || "Đã xảy ra lỗi!"); } 
+    } catch (err: any) { setError(err.message || 'Lỗi lưu dữ liệu.'); toast.error(err.message || "Đã xảy ra lỗi!"); }
     finally { setSubmitting(false); }
   };
 
   const confirmDelete = async () => {
-    if (!itemToDelete) return; 
+    if (!itemToDelete) return;
     setSubmitting(true); setError(null);
     try {
       await apiService.delete(itemToDelete, "ns_dich_vu");
       setData(prev => prev.filter(item => item.id !== itemToDelete));
       setIsConfirmOpen(false); setItemToDelete(null); toast.success("Xóa thành công!");
-    } catch (err: any) { setError(err.message || 'Lỗi xóa dữ liệu.'); toast.error(err.message || "Đã xảy ra lỗi!"); } 
+    } catch (err: any) { setError(err.message || 'Lỗi xóa dữ liệu.'); toast.error(err.message || "Đã xảy ra lỗi!"); }
     finally { setSubmitting(false); }
   };
 
@@ -889,18 +1073,40 @@ export default function PersonnelPage() {
         }
       });
       setUnreturnedAssets(foundAssets);
-    } catch (err) { alert("Cảnh báo: Không thể kiểm tra CSDL Tài sản."); setIsOffboardOpen(false); } 
+    } catch (err) { alert("Cảnh báo: Không thể kiểm tra CSDL Tài sản."); setIsOffboardOpen(false); }
     finally { setCheckingAssets(false); }
   };
 
   const confirmOffboard = async () => {
     if (!personnelToOffboard) return;
     if (unreturnedAssets.length > 0 && !forceOffboard) { alert("Vui lòng xử lý tài sản!"); return; }
+
+    if (transferType === 'INTERNAL' && !transferInternalUnitId) {
+      alert("Vui lòng chọn đơn vị đích nội bộ!");
+      return;
+    }
+    if (transferType === 'EXTERNAL' && !transferExternalUnitName.trim()) {
+      alert("Vui lòng nhập tên đơn vị / công ty ngoài!");
+      return;
+    }
+
     setSubmitting(true);
     try {
-      const offboardData = { ...personnelToOffboard, trang_thai: 'Đã nghỉ việc', ngay_nghi_viec: new Date().toISOString().split('T')[0] };
-      await apiService.save(offboardData, "update", "ns_dich_vu");
-      setData(prev => prev.map(item => item.id === personnelToOffboard.id ? offboardData : item));
+      let updatedData: any = { ...personnelToOffboard };
+
+      if (transferType === 'OFFBOARD') {
+        updatedData.trang_thai = 'Đã nghỉ việc';
+        updatedData.ngay_nghi_viec = new Date().toISOString().split('T')[0];
+      } else if (transferType === 'EXTERNAL') {
+        updatedData.trang_thai = 'Đã điều chuyển';
+        updatedData.ngay_nghi_viec = new Date().toISOString().split('T')[0];
+        updatedData.ghi_chu = `[Đã điều chuyển ra ngoài: ${transferExternalUnitName}] ` + (updatedData.ghi_chu || '');
+      } else if (transferType === 'INTERNAL') {
+        updatedData.id_don_vi = transferInternalUnitId;
+      }
+
+      await apiService.save(updatedData, "update", "ns_dich_vu");
+      setData(prev => prev.map(item => item.id === personnelToOffboard.id ? updatedData : item));
       setIsOffboardOpen(false); setPersonnelToOffboard(null);
     } catch (err: any) { alert("Lỗi: " + err.message); } finally { setSubmitting(false); }
   };
@@ -909,9 +1115,9 @@ export default function PersonnelPage() {
     let unitsToExport: DonVi[] = [];
     const getRegion = (unitId: string): string => {
       const getAncestors = (id: string): string[] => {
-         const u = donViList.find(d => d.id === id);
-         if (!u || !u.cap_quan_ly || u.cap_quan_ly === 'HO') return [id];
-         return [id, ...getAncestors(u.cap_quan_ly)];
+        const u = donViList.find(d => d.id === id);
+        if (!u || !u.cap_quan_ly || u.cap_quan_ly === 'HO') return [id];
+        return [id, ...getAncestors(u.cap_quan_ly)];
       }
       const ancestors = getAncestors(unitId);
       const namIds = ctttNamUnits.map(u => u.id); const bacIds = ctttBacUnits.map(u => u.id);
@@ -920,9 +1126,9 @@ export default function PersonnelPage() {
       return 'VPĐH / Khác';
     }
     const topLevelUnits = donViList.filter(dv => allowedDonViIds.includes(dv.id) && (dv.cap_quan_ly === 'HO' || !dv.cap_quan_ly));
-    if (exportRegion === 'ALL') { unitsToExport = topLevelUnits; } 
-    else if (exportRegion === 'NAM') { unitsToExport = topLevelUnits.filter(dv => getRegion(dv.id) === 'Phía Nam'); } 
-    else if (exportRegion === 'BAC') { unitsToExport = topLevelUnits.filter(dv => getRegion(dv.id) === 'Phía Bắc'); } 
+    if (exportRegion === 'ALL') { unitsToExport = topLevelUnits; }
+    else if (exportRegion === 'NAM') { unitsToExport = topLevelUnits.filter(dv => getRegion(dv.id) === 'Phía Nam'); }
+    else if (exportRegion === 'BAC') { unitsToExport = topLevelUnits.filter(dv => getRegion(dv.id) === 'Phía Bắc'); }
     else if (exportRegion === 'SPECIFIC' && selectedUnitFilter) {
       const getTopLevelParent = (id: string): DonVi | undefined => {
         const u = donViList.find(d => d.id === id); if (!u) return undefined;
@@ -939,18 +1145,28 @@ export default function PersonnelPage() {
       const validIds = [dv.id, ...getAllSubordinateIds(dv.id, donViList)];
       const unitStaff = data.filter(p => validIds.includes(p.id_don_vi) && p.trang_thai !== 'Đã nghỉ việc');
       const dvht = unitStaff.find(p => p.phan_loai === 'PT QTVP & ASĐS' || p.phan_loai === 'PT QTVT & ASĐS' || p.phan_loai === 'PT DVHT KD' || String(p.chuc_vu).toLowerCase().includes('dvht') || String(p.chuc_vu).toLowerCase().includes('qtvp')) || {};
-      const tgd = unitStaff.find(p => p.phan_loai === 'Lãnh đạo' || String(p.chuc_vu).toLowerCase().includes('tổng giám đốc') || String(p.chuc_vu).toLowerCase().includes('giám đốc')) || {};
-      if (!dvht.ho_ten && !tgd.ho_ten && unitStaff.length === 0) return; 
+      let tgd;
+      const cleanTenDV = tenDV.trim().toUpperCase();
+      if (cleanTenDV === 'THACO AUTO') {
+        tgd = unitStaff.find(p => String(p.chuc_vu).trim().toLowerCase() === 'tổng giám đốc') || {};
+      } else if (cleanTenDV === 'PHÂN PHỐI THACO AUTO') {
+        tgd = unitStaff.find(p => String(p.chuc_vu).toLowerCase().includes('chủ tịch')) || {};
+      } else {
+        tgd = unitStaff.find(p => {
+          const cv = String(p.chuc_vu).trim().toLowerCase();
+          return cv.includes('chủ tịch') || cv === 'tổng giám đốc' || cv.includes('thường trực');
+        }) || {};
+      }
+      if (!dvht.ho_ten && !tgd.ho_ten && unitStaff.length === 0) return;
       rowsHTML += `<tr><td class="center">${stt++}</td><td>${phia}</td><td class="bold">${tenDV}</td><td>${dvht.ho_ten || ''}</td><td>${dvht.email || ''}</td><td class="center">${dvht.sdt_cong_ty || dvht.sdt_ca_nhan ? formatPhoneNumber(dvht.sdt_cong_ty || dvht.sdt_ca_nhan) : ''}</td><td>${tgd.ho_ten || ''}</td><td>${tgd.email || ''}</td><td class="center">${tgd.sdt_cong_ty || tgd.sdt_ca_nhan ? formatPhoneNumber(tgd.sdt_cong_ty || tgd.sdt_ca_nhan) : ''}</td></tr>`;
     });
-    const tableHTML = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="UTF-8"><style>table { border-collapse: collapse; font-family: 'Times New Roman', serif; } th, td { border: 1px solid #000000; padding: 6px; vertical-align: middle; } .header { background-color: #fff2cc; color: #002060; font-weight: bold; text-align: center; } .center { text-align: center; } .bold { font-weight: bold; color: #002060; }</style></head><body><table><thead><tr class="header"><th rowspan="2">STT</th><th rowspan="2">Phía</th><th rowspan="2" style="width: 250px;">ĐƠN VỊ</th><th colspan="3">PT DVHT KD</th><th colspan="3">TỔNG GIÁM ĐỐC</th></tr><tr class="header"><th>Họ và tên</th><th>Email</th><th>SĐT</th><th>Họ và tên</th><th>Email</th><th>SĐT</th></tr></thead><tbody>${rowsHTML}</tbody></table></body></html>`;
+    const tableHTML = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="UTF-8"><style>table { border-collapse: collapse; font-family: 'Times New Roman', serif; } th, td { border: 1px solid #000000; padding: 6px; vertical-align: middle; } .header { background-color: #fff2cc; color: #002060; font-weight: bold; text-align: center; } .center { text-align: center; } .bold { font-weight: bold; color: #002060; }</style></head><body><table><thead><tr class="header"><th rowspan="2">STT</th><th rowspan="2">Phía</th><th rowspan="2" style="width: 250px;">ĐƠN VỊ</th><th colspan="3">PT DVHT KD</th><th colspan="3">LÃNH ĐẠO ĐƠN VỊ</th></tr><tr class="header"><th>Họ và tên</th><th>Email</th><th>SĐT</th><th>Họ và tên</th><th>Email</th><th>SĐT</th></tr></thead><tbody>${rowsHTML}</tbody></table></body></html>`;
     const blob = new Blob([tableHTML], { type: 'application/vnd.ms-excel' }); const url = URL.createObjectURL(blob);
     const link = document.createElement('a'); link.href = url; link.download = `Danh_Ba_Lanh_Dao_DVHT_${new Date().toISOString().slice(0, 10)}.xls`;
     document.body.appendChild(link); link.click(); document.body.removeChild(link); URL.revokeObjectURL(url);
     setIsExportModalOpen(false); toast.success("Đã xuất file Danh bạ (Excel) thành công!");
   };
-  
-  // 🟢 HÀM XỬ LÝ IMPORT EXCEL (ĐÃ CẬP NHẬT CHUẨN HOÁ TÊN CHỨNG NHẬN)
+
   const handlePasteBulkData = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const rawText = e.target.value; setBulkImportText(rawText);
     if (!rawText.trim()) { setBulkImportData([]); return; }
@@ -961,71 +1177,88 @@ export default function PersonnelPage() {
         for (let i = 0; i < rawText.length; i++) {
           const char = rawText[i];
           if (inQuotes) {
-            if (char === '"') { if (i + 1 < rawText.length && rawText[i + 1] === '"') { currentCell += '"'; i++; } else { inQuotes = false; } } 
+            if (char === '"') { if (i + 1 < rawText.length && rawText[i + 1] === '"') { currentCell += '"'; i++; } else { inQuotes = false; } }
             else { currentCell += char; }
           } else {
-            if (char === '"') { inQuotes = true; } else if (char === '\t') { currentRow.push(currentCell.trim()); currentCell = ''; } 
-            else if (char === '\n') { currentRow.push(currentCell.trim()); rows.push(currentRow); currentRow = []; currentCell = ''; } 
-            else if (char === '\r') {} else { currentCell += char; }
+            if (char === '"') { inQuotes = true; } else if (char === '\t') { currentRow.push(currentCell.trim()); currentCell = ''; }
+            else if (char === '\n') { currentRow.push(currentCell.trim()); rows.push(currentRow); currentRow = []; currentCell = ''; }
+            else if (char === '\r') { } else { currentCell += char; }
           }
         }
         if (currentCell !== '' || currentRow.length > 0) { currentRow.push(currentCell.trim()); rows.push(currentRow); }
-        
+
         const formatExcelDate = (dateStr: string) => {
-          if (!dateStr) return ''; const parts = dateStr.split(/[\/\-.]/); 
+          if (!dateStr) return ''; const parts = dateStr.split(/[\/\-.]/);
           if (parts.length === 3) { let d = parts[0].padStart(2, '0'); let m = parts[1].padStart(2, '0'); let y = parts[2]; if (y.length === 2) y = '20' + y; return `${y}-${m}-${d}`; }
           return dateStr;
         };
 
         const parsedData = [];
         for (let i = 0; i < rows.length; i++) {
-          const row = rows[i]; if (row.length < 3) continue; 
+          const row = rows[i]; if (row.length < 3) continue;
           const checkHeader2 = toUnaccented(row[1] || ''); const checkHeader3 = toUnaccented(row[2] || '');
-          if (checkHeader2.includes('ma') || checkHeader3.includes('ten')) continue; 
-          
-          const maNV = row[1]?.trim() || ''; 
+          if (checkHeader2.includes('ma') || checkHeader3.includes('ten')) continue;
+
+          const maNV = row[1]?.trim() || '';
           const excelDate = formatExcelDate(row[12]?.trim());
-          
+
           let rawNhom = row[16]?.trim() || '';
-          const nhomNum = rawNhom.replace(/\D/g, ''); 
-          
+          const nhomNum = rawNhom.replace(/\D/g, '');
+          const nhomFormatted = nhomNum ? `Nhóm ${nhomNum}` : '';
+
           const hlTu = formatExcelDate(row[17]?.trim());
           const hlDen = formatExcelDate(row[18]?.trim());
           let giaTriDen = formatExcelDate(row[19]?.trim());
 
-          // 🟢 BỔ SUNG LẤY DỮ LIỆU CỘT 21 VÀ 22
-          const khoiVal = row[20]?.trim() || ''; // Cột 21 (Khối)
-          const diaDiemVal = row[21]?.trim() || ''; // Cột 22 (Địa điểm làm việc)
+          const khoiVal = row[20]?.trim() || '';
+          const diaDiemVal = row[21]?.trim() || '';
 
-          if (!giaTriDen && hlDen && nhomNum) {
-            const denDate = new Date(hlDen);
-            if (!isNaN(denDate.getTime())) {
-              let yearsToAdd = 0;
-              if (nhomNum === '1' || nhomNum === '2') { yearsToAdd = 2; } else if (nhomNum === '3' || nhomNum === '4' || nhomNum === '6') { yearsToAdd = 1; }
-              if (yearsToAdd > 0) {
-                denDate.setFullYear(denDate.getFullYear() + yearsToAdd);
-                const yyyy = denDate.getFullYear(); const mm = String(denDate.getMonth() + 1).padStart(2, '0'); const dd = String(denDate.getDate()).padStart(2, '0');
-                giaTriDen = `${yyyy}-${mm}-${dd}`;
-              }
-            }
+          const cccdVal = (row[22] || '').trim();
+          const theThangVal = (row[23] || '').trim();
+          const theXeVal = (row[24] || '').trim();
+          const hangLoaiXeVal = (row[25] || '').trim();
+          const bksVal = (row[26] || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+
+          if (!giaTriDen && hlDen && nhomFormatted) {
+            giaTriDen = calcGiaTriDen(hlDen, nhomFormatted, chuKyList);
           }
 
-          let certName = '';
-          if (nhomNum === '1' || nhomNum === '2' || nhomNum === '6') certName = 'Giấy chứng nhận huấn luyện ATVSLĐ';
-          else if (nhomNum === '3') certName = 'Thẻ An toàn lao động';
-          else if (nhomNum === '4') certName = 'Quyết định Công nhận Kết quả Huấn luyện ATVSLĐ';
+          const certName = getChungNhanByNhom(nhomFormatted) || '';
 
-          parsedData.push({
-            ma_so_nhan_vien: maNV, ho_ten: row[2]?.trim() || '', chuc_vu: row[3]?.trim() || '', phong_ban: row[4]?.trim() || '', 
-            phan_loai: row[8]?.trim() || 'Nhân viên', sdt_cong_ty: row[9]?.trim() || '', gioi_tinh: row[10]?.trim() || '', 
-            nam_sinh: formatExcelDate(row[11]?.trim()), ngay_nhan_vien: excelDate ? excelDate : extractStartDateFromMaNV(maNV),
-            sdt_ca_nhan: row[13]?.trim() || '', email: row[14]?.trim() || '', ngach_luong: row[15]?.trim() || '', id_don_vi: selectedUnitFilter || '',
-            nhom_doi_tuong: nhomNum, huan_luyen_tu: hlTu, huan_luyen_den: hlDen, gia_tri_den: giaTriDen,
-            chung_nhan: certName, cc_atvsld: (nhomNum || hlTu || giaTriDen) ? true : false,
-            // 🟢 TRUYỀN VÀO OBJECT LƯU LÊN SUPABASE
-            khoi: khoiVal,
-            dia_diem_lam_viec: diaDiemVal
-          });
+          const item: Record<string, any> = {
+            ma_so_nhan_vien: maNV,
+            ho_ten: row[2]?.trim() || ''
+          };
+
+          if (row[3]?.trim()) item.chuc_vu = row[3].trim();
+          if (row[4]?.trim()) item.phong_ban = row[4].trim();
+          if (row[8]?.trim()) item.phan_loai = row[8].trim();
+          if (row[9]?.trim()) item.sdt_cong_ty = row[9].trim();
+          if (row[10]?.trim()) item.gioi_tinh = row[10].trim();
+          if (row[11]?.trim()) item.nam_sinh = formatExcelDate(row[11].trim());
+          if (excelDate) item.ngay_nhan_vien = excelDate;
+          else if (extractStartDateFromMaNV(maNV)) item.ngay_nhan_vien = extractStartDateFromMaNV(maNV);
+          if (row[13]?.trim()) item.sdt_ca_nhan = row[13].trim();
+          if (row[14]?.trim()) item.email = row[14].trim();
+          if (row[15]?.trim()) item.ngach_luong = row[15].trim();
+          if (selectedUnitFilter) item.id_don_vi = selectedUnitFilter;
+
+          if (nhomFormatted) item.nhom_doi_tuong = nhomFormatted;
+          if (hlTu) item.huan_luyen_tu = hlTu;
+          if (hlDen) item.huan_luyen_den = hlDen;
+          if (giaTriDen) item.gia_tri_den = giaTriDen;
+          if (certName) item.chung_nhan = certName;
+          if (nhomFormatted || hlTu || giaTriDen) item.cc_atvsld = true;
+
+          if (khoiVal) item.khoi = khoiVal;
+          if (diaDiemVal) item.dia_diem_lam_viec = diaDiemVal;
+          if (cccdVal) item.cccd = cccdVal;
+          if (theThangVal) item.the_thang = theThangVal;
+          if (theXeVal) item.the_xe = theXeVal;
+          if (hangLoaiXeVal) item.hang_loai_xe = hangLoaiXeVal;
+          if (bksVal) item.bks = bksVal;
+
+          parsedData.push(item);
         }
         setBulkImportData(parsedData.filter(d => d.ma_so_nhan_vien && d.ho_ten));
         toast.success(`Đã nhận diện ${parsedData.length} nhân sự!`);
@@ -1041,14 +1274,28 @@ export default function PersonnelPage() {
       for (const item of bulkImportData) {
         const existingIndex = updatedState.findIndex(d => String(d.ma_so_nhan_vien).toLowerCase() === String(item.ma_so_nhan_vien).toLowerCase());
         if (existingIndex >= 0) {
+          // NGUYÊN TẮC: CẬP NHẬT NHÂN SỰ ĐÃ TỒN TẠI
+          // Chỉ cập nhật các trường ĐƯỢC CUNG CẤP TRONG EXCEL (khác undefined và khác '')
+          // Các trường trống trong Excel SẼ GIỮ NGUYÊN 100% GIÁ TRỊ CŨ TRONG CSDL
           const mergedData: any = { ...updatedState[existingIndex] };
-          Object.keys(item).forEach(key => { if (item[key] !== undefined && item[key] !== '') { mergedData[key] = item[key]; } });
-          mergedData.trang_thai = 'Đang làm việc'; mergedData.ngay_nghi_viec = null;
+          Object.keys(item).forEach(key => {
+            if (item[key] !== undefined && item[key] !== null && item[key] !== '') {
+              mergedData[key] = item[key];
+            }
+          });
+          mergedData.trang_thai = mergedData.trang_thai || 'Đang làm việc';
           await apiService.save(mergedData, 'update', 'ns_dich_vu');
           updatedState[existingIndex] = mergedData; updateCount++;
         } else {
-          const newData = { ...item, id: `NS-${Date.now()}-${Math.floor(Math.random() * 1000)}`, trang_thai: 'Đang làm việc' };
-          if (!newData.gioi_tinh) newData.gioi_tinh = 'Nam';
+          // NGUYÊN TẮC: TẠO MỚI NHÂN SỰ CHƯA TỒN TẠI
+          const newData = {
+            phan_loai: 'Nhân viên',
+            gioi_tinh: 'Nam',
+            trang_thai: 'Đang làm việc',
+            ...item,
+            id: `NS-${Date.now()}-${Math.floor(Math.random() * 1000)}`
+          };
+          if (!newData.id_don_vi && selectedUnitFilter) newData.id_don_vi = selectedUnitFilter;
           await apiService.save(newData, 'create', 'ns_dich_vu');
           updatedState.push(newData); createCount++;
         }
@@ -1065,14 +1312,9 @@ export default function PersonnelPage() {
     setModal(prev => ({ ...prev, formData: { ...prev.formData, [name]: value } }));
   };
 
-  //🟢 PHẦN 3: GIAO DIỆN BỘ LỌC VÀ TAB DANH SÁCH (info)
-
-  // =================================================================================
-  // 🟢 LOGIC NÚT COPY EMAIL TỔNG HỢP (Gộp nút Copy, Lọc kết hợp)
-  // =================================================================================
   const [isCopyEmailDropdownOpen, setIsCopyEmailDropdownOpen] = useState(false);
   const [selectedNgach, setSelectedNgach] = useState<string[]>([]);
-  const [selectedDiaDiem, setSelectedDiaDiem] = useState<string[]>([]); 
+  const [selectedDiaDiem, setSelectedDiaDiem] = useState<string[]>([]);
 
   const availableNgachLuong = useMemo(() => {
     const activeStaff = filteredPersonnel.filter(p => p.trang_thai !== 'Đã nghỉ việc');
@@ -1086,17 +1328,16 @@ export default function PersonnelPage() {
     return Array.from(new Set(locationList)).sort();
   }, [filteredPersonnel]);
 
-  // Xử lý Copy các Nút tĩnh (Lãnh đạo, PT NS...)
   const handleCopyTargetEmails = (type: string) => {
     const activeStaff = filteredPersonnel.filter(p => p.trang_thai !== 'Đã nghỉ việc');
     let targetPersonnel: any[] = [];
-    
+
     if (type === 'lanh_dao') {
       targetPersonnel = activeStaff.filter(p => p.phan_loai === 'Lãnh đạo' && String(p.chuc_vu).trim() === 'Tổng Giám đốc');
     } else if (type === 'pt_qtvp') {
-      targetPersonnel = activeStaff.filter(p => 
-        p.phan_loai === 'PT QTVP & ASĐS' || 
-        p.phan_loai === 'PT QTVT & ASĐS' || 
+      targetPersonnel = activeStaff.filter(p =>
+        p.phan_loai === 'PT QTVP & ASĐS' ||
+        p.phan_loai === 'PT QTVT & ASĐS' ||
         p.phan_loai === 'PT DVHT KD'
       );
     } else if (type === 'pt_ns') {
@@ -1104,27 +1345,24 @@ export default function PersonnelPage() {
     }
 
     const emails = targetPersonnel.map(p => p.email?.trim()).filter(Boolean);
-    
+
     if (emails.length === 0) toast.warning('Không tìm thấy email hợp lệ nào cho nhóm này!');
     else { navigator.clipboard.writeText(emails.join('; ')); toast.success(`Đã copy ${emails.length} email!`); }
-    
-    setIsCopyEmailDropdownOpen(false); 
-    setSelectedNgach([]); 
-    setSelectedDiaDiem([]); 
+
+    setIsCopyEmailDropdownOpen(false);
+    setSelectedNgach([]);
+    setSelectedDiaDiem([]);
   };
 
-  // 🟢 Hàm mới: Copy kết hợp nhiều tiêu chí (Ngạch VÀ Địa điểm)
   const handleCopyMultiCriteria = () => {
     if (selectedNgach.length === 0 && selectedDiaDiem.length === 0) return;
 
     const activeStaff = filteredPersonnel.filter(p => p.trang_thai !== 'Đã nghỉ việc');
 
-    // Thuật toán LỌC CHÉO
     const targetPersonnel = activeStaff.filter(p => {
       const loc = (p as any).dia_diem_lam_viec || (p as any).noi_lam_viec || '';
       const ngach = p.ngach_luong || '';
 
-      // Nếu có chọn tiêu chí thì bắt buộc phải khớp, nếu KHÔNG CHỌN thì mặc định coi như Pass (True)
       const passNgach = selectedNgach.length === 0 || selectedNgach.includes(ngach);
       const passDiaDiem = selectedDiaDiem.length === 0 || selectedDiaDiem.includes(loc);
 
@@ -1150,13 +1388,9 @@ export default function PersonnelPage() {
 
   if (loading) return <PageWithFilterSkeleton rows={8} />;
 
-  // 🟢 Tính toán giá trị lớn nhất để canh tỷ lệ Biểu đồ cột
-  const maxSeniority = Math.max(0, ...(Object.values(stats.seniority) as number[]));
-  const maxAge = Math.max(0, ...(Object.values(stats.ageGroups) as number[]));
-
   return (
     <div className="flex w-full max-w-full h-full bg-[#f4f7f9] overflow-hidden relative">
-      {isListCollapsed && (<button onClick={() => setIsListCollapsed(false)} className="hidden md:block absolute top-6 left-6 z-20 bg-white p-2.5 rounded-lg shadow-md border border-gray-200 text-[#05469B] hover:bg-blue-50 transition-all" title="Mở bộ lọc đơn vị"><PanelLeftOpen size={20} /></button>)}
+      {isListCollapsed && (<button onClick={() => setIsListCollapsed(false)} className="hidden md:block absolute top-6 left-6 z-50 bg-white p-2.5 rounded-lg shadow-md border border-gray-200 text-[#05469B] hover:bg-blue-50 transition-all" title="Mở bộ lọc đơn vị"><PanelLeftOpen size={20} /></button>)}
 
       <UnitFilterSidebar
         donViList={donViList}
@@ -1173,15 +1407,13 @@ export default function PersonnelPage() {
         allUnitsLabel="Tất cả Nhân sự Toàn quốc"
       />
 
-      {/* 🟢 NỘI DUNG CHÍNH (CỘT PHẢI) */}
       <div className="flex-1 min-w-0 max-w-full overflow-hidden p-4 sm:p-6 relative transition-all duration-300 flex flex-col">
-        {/* 🟢 KHU VỰC TIÊU ĐỀ & BỘ LỌC & TAB CỐ ĐỊNH (FIXED TOP SECTION) */}
         <div className="shrink-0 z-20 flex flex-col">
           <div className={`flex flex-col xl:flex-row justify-between items-start xl:items-center mb-6 gap-4 transition-all duration-300 ${isListCollapsed ? 'md:pl-10 lg:pl-0' : ''}`}>
             <div className="flex items-center gap-2.5">
               {isListCollapsed && (
-                <button 
-                  onClick={() => setIsListCollapsed(false)} 
+                <button
+                  onClick={() => setIsListCollapsed(false)}
                   className="md:hidden bg-white p-2 rounded-lg shadow-sm border border-gray-200 text-[#05469B] hover:bg-blue-50 transition-all flex items-center justify-center shrink-0"
                   title="Mở bộ lọc đơn vị"
                 >
@@ -1193,7 +1425,7 @@ export default function PersonnelPage() {
                 <p className="text-sm font-medium text-gray-500 mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
                   <span>Đang xem: <span className="text-emerald-600 font-bold">{selectedUnitName}</span> ({filteredPersonnel.length} nhân sự)</span>
                   {filteredPersonnel.length > 0 && (
-                    <button 
+                    <button
                       type="button"
                       onClick={() => handleSelectAll(!isAllSelected)}
                       className="text-xs text-[#05469B] hover:text-[#05469B]/80 font-extrabold underline transition-colors"
@@ -1204,24 +1436,21 @@ export default function PersonnelPage() {
                 </p>
               </div>
             </div>
-            
+
             {activeTab !== 'cuoc_di_dong' && (
               <div className="flex flex-col items-end gap-2 w-full xl:w-auto">
-                {/* HÀNG 1: TÌM KIẾM & NÚT TÍNH NĂNG */}
                 <div className="flex flex-wrap items-center justify-end gap-2 w-full relative z-30">
-                  {/* Ô Tìm kiếm */}
                   <div className="relative w-full sm:w-64">
                     <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
-                    <input 
-                      type="text" 
-                      placeholder="Tìm Mã NV, Họ Tên, Chức vụ..." 
-                      className="w-full pl-8 pr-3 py-1.5 bg-white border border-gray-200 rounded focus:ring-1 focus:ring-[#05469B] outline-none shadow-sm text-[11px] font-medium" 
-                      value={personnelSearchTerm} 
-                      onChange={(e) => setPersonnelSearchTerm(e.target.value)} 
+                    <input
+                      type="text"
+                      placeholder="Tìm Mã NV, Họ Tên, Chức vụ..."
+                      className="w-full pl-8 pr-3 py-1.5 bg-white border border-gray-200 rounded focus:ring-1 focus:ring-[#05469B] outline-none shadow-sm text-[11px] font-medium"
+                      value={personnelSearchTerm}
+                      onChange={(e) => setPersonnelSearchTerm(e.target.value)}
                     />
                   </div>
 
-                  {/* Nút Xóa bộ lọc nhanh nếu có lọc */}
                   {(filterPhongBan || filterKhoi || filterChucVu || filterPhanLoai) && (
                     <button
                       onClick={() => {
@@ -1240,18 +1469,28 @@ export default function PersonnelPage() {
                     </button>
                   )}
 
-                  {/* 🟢 NÚT "TÍNH NĂNG" DROPDOWN GỘP TẤT CẢ */}
+                  <button
+                    onClick={() => {
+                      loadData(true);
+                      toast.success('Đang đồng bộ dữ liệu mới nhất từ Supabase...');
+                    }}
+                    title="Đồng bộ / Tải lại dữ liệu mới nhất từ Supabase"
+                    disabled={loading}
+                    className="p-1.5 bg-white hover:bg-gray-50 text-gray-700 hover:text-[#05469B] rounded border border-gray-200 transition-all flex items-center justify-center shadow-sm h-[29.5px] w-[29.5px] cursor-pointer"
+                  >
+                    <RotateCcw size={14} className={loading ? 'animate-spin text-[#05469B]' : ''} />
+                  </button>
+
                   <div className="relative">
-                    <button 
+                    <button
                       onClick={() => {
                         setIsFeaturesDropdownOpen(!isFeaturesDropdownOpen);
                         setIsAddNewExpanded(false);
                       }}
-                      className={`px-4 py-1.5 rounded text-[11px] font-bold flex items-center gap-2 border transition-all shadow-sm whitespace-nowrap ${
-                        isFeaturesDropdownOpen || showAdvancedFilters
-                          ? 'bg-gradient-to-r from-[#05469B] to-[#0a5bc4] text-white border-[#05469B] shadow-md'
-                          : 'bg-white text-gray-800 border-gray-200 hover:bg-gray-50'
-                      }`}
+                      className={`px-4 py-1.5 rounded text-[11px] font-bold flex items-center gap-2 border transition-all shadow-sm whitespace-nowrap ${isFeaturesDropdownOpen || showAdvancedFilters
+                        ? 'bg-gradient-to-r from-[#05469B] to-[#0a5bc4] text-white border-[#05469B] shadow-md'
+                        : 'bg-white text-gray-800 border-gray-200 hover:bg-gray-50'
+                        }`}
                     >
                       <Sparkles size={15} className={isFeaturesDropdownOpen || showAdvancedFilters ? 'text-amber-300 animate-pulse' : 'text-[#05469B]'} />
                       <span>Tính năng</span>
@@ -1263,22 +1502,17 @@ export default function PersonnelPage() {
                       <ChevronDown size={13} className={`transition-transform duration-200 ${isFeaturesDropdownOpen ? 'rotate-180' : ''}`} />
                     </button>
 
-                    {/* MENU DROPDOWN TÍNH NĂNG */}
                     {isFeaturesDropdownOpen && (
                       <>
                         <div className="fixed inset-0 z-[40]" onClick={() => setIsFeaturesDropdownOpen(false)}></div>
-                        
                         <div className="absolute right-0 top-full mt-2 w-64 bg-white rounded-2xl shadow-2xl border border-gray-100 p-2 z-[50] flex flex-col gap-1 animate-in fade-in zoom-in-95 duration-200">
-                          
-                          {/* 1. Lọc nâng cao */}
-                          <button 
+                          <button
                             onClick={() => {
                               setShowAdvancedFilters(!showAdvancedFilters);
                               setIsFeaturesDropdownOpen(false);
                             }}
-                            className={`w-full text-left px-3 py-2.5 rounded-xl font-bold text-xs flex items-center justify-between transition-all ${
-                              showAdvancedFilters ? 'bg-amber-50 text-amber-800 border border-amber-200' : 'hover:bg-gray-50 text-gray-700'
-                            }`}
+                            className={`w-full text-left px-3 py-2.5 rounded-xl font-bold text-xs flex items-center justify-between transition-all ${showAdvancedFilters ? 'bg-amber-50 text-amber-800 border border-amber-200' : 'hover:bg-gray-50 text-gray-700'
+                              }`}
                           >
                             <div className="flex items-center gap-2.5">
                               <div className={`p-1.5 rounded-lg ${showAdvancedFilters ? 'bg-amber-500 text-white' : 'bg-blue-50 text-[#05469B]'}`}>
@@ -1295,9 +1529,8 @@ export default function PersonnelPage() {
                             )}
                           </button>
 
-                          {/* 2. Thêm Nhân Sự Mới */}
                           <div className="relative">
-                            <button 
+                            <button
                               onClick={() => setIsAddNewExpanded(!isAddNewExpanded)}
                               className="w-full text-left px-3 py-2.5 rounded-xl font-bold text-xs flex items-center justify-between hover:bg-gray-50 text-gray-700 transition-all"
                             >
@@ -1312,7 +1545,7 @@ export default function PersonnelPage() {
 
                             {isAddNewExpanded && (
                               <div className="pl-9 pr-2 py-1 flex flex-col gap-1 border-l-2 border-indigo-100 ml-5 my-1">
-                                <button 
+                                <button
                                   onClick={() => {
                                     openModal('create');
                                     setIsFeaturesDropdownOpen(false);
@@ -1321,7 +1554,7 @@ export default function PersonnelPage() {
                                 >
                                   <UserPlus size={13} /> Thêm từng đối tượng
                                 </button>
-                                <button 
+                                <button
                                   onClick={() => {
                                     setIsBulkImportOpen(true);
                                     setIsFeaturesDropdownOpen(false);
@@ -1334,9 +1567,8 @@ export default function PersonnelPage() {
                             )}
                           </div>
 
-                          {/* 3. Xuất danh bạ */}
                           <div className="border-t border-gray-100 pt-1 mt-1">
-                            <button 
+                            <button
                               onClick={() => {
                                 setIsExportModalOpen(true);
                                 setIsFeaturesDropdownOpen(false);
@@ -1350,9 +1582,8 @@ export default function PersonnelPage() {
                             </button>
                           </div>
 
-                          {/* 4. Copy email theo điều kiện */}
                           <div className="border-t border-gray-100 pt-1 mt-1">
-                            <button 
+                            <button
                               onClick={() => {
                                 setIsCopyEmailDropdownOpen(true);
                                 setIsFeaturesDropdownOpen(false);
@@ -1368,7 +1599,6 @@ export default function PersonnelPage() {
                               <ChevronRight size={14} className="text-gray-400" />
                             </button>
                           </div>
-
                         </div>
                       </>
                     )}
@@ -1378,7 +1608,6 @@ export default function PersonnelPage() {
             )}
           </div>
 
-          {/* 🟢 BỘ LỌC NÂNG CAO (BO PHAN, KHOI, CHUC VU, PHAN LOAI) */}
           {showAdvancedFilters && (
             <div className={`bg-white p-4 rounded-2xl border border-gray-200 shadow-sm mb-4 transition-all duration-300 animate-in fade-in slide-in-from-top-2 ${isListCollapsed ? 'md:ml-10 lg:ml-0' : ''}`}>
               <div className="flex items-center justify-between mb-3 pb-2 border-b border-gray-100">
@@ -1416,9 +1645,8 @@ export default function PersonnelPage() {
                   </button>
                 </div>
               </div>
-              
+
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                {/* Lọc theo Khối */}
                 <div>
                   <label className="block text-[11px] font-bold text-gray-600 mb-1 flex items-center gap-1.5">
                     <Layers size={13} className="text-purple-500" /> Khối ({availableFilterOptions.khoiList.length})
@@ -1438,9 +1666,9 @@ export default function PersonnelPage() {
                       ))}
                     </datalist>
                     {filterKhoi && (
-                      <button 
-                        type="button" 
-                        onClick={() => setFilterKhoi('')} 
+                      <button
+                        type="button"
+                        onClick={() => setFilterKhoi('')}
                         className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500 font-extrabold text-[10px] w-5 h-5 flex items-center justify-center rounded-full hover:bg-gray-100"
                       >
                         ✕
@@ -1449,7 +1677,6 @@ export default function PersonnelPage() {
                   </div>
                 </div>
 
-                {/* Lọc theo Bộ phận */}
                 <div>
                   <label className="block text-[11px] font-bold text-gray-600 mb-1 flex items-center gap-1.5">
                     <Building2 size={13} className="text-blue-500" /> Bộ phận ({availableFilterOptions.phongBanList.length})
@@ -1469,9 +1696,9 @@ export default function PersonnelPage() {
                       ))}
                     </datalist>
                     {filterPhongBan && (
-                      <button 
-                        type="button" 
-                        onClick={() => setFilterPhongBan('')} 
+                      <button
+                        type="button"
+                        onClick={() => setFilterPhongBan('')}
                         className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500 font-extrabold text-[10px] w-5 h-5 flex items-center justify-center rounded-full hover:bg-gray-100"
                       >
                         ✕
@@ -1480,7 +1707,6 @@ export default function PersonnelPage() {
                   </div>
                 </div>
 
-                {/* Lọc theo Chức danh */}
                 <div>
                   <label className="block text-[11px] font-bold text-gray-600 mb-1 flex items-center gap-1.5">
                     <Tag size={13} className="text-emerald-500" /> Chức danh ({availableFilterOptions.phanLoaiList.length})
@@ -1500,9 +1726,9 @@ export default function PersonnelPage() {
                       ))}
                     </datalist>
                     {filterPhanLoai && (
-                      <button 
-                        type="button" 
-                        onClick={() => setFilterPhanLoai('')} 
+                      <button
+                        type="button"
+                        onClick={() => setFilterPhanLoai('')}
                         className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500 font-extrabold text-[10px] w-5 h-5 flex items-center justify-center rounded-full hover:bg-gray-100"
                       >
                         ✕
@@ -1511,7 +1737,6 @@ export default function PersonnelPage() {
                   </div>
                 </div>
 
-                {/* Lọc theo Chức vụ */}
                 <div>
                   <label className="block text-[11px] font-bold text-gray-600 mb-1 flex items-center gap-1.5">
                     <Briefcase size={13} className="text-orange-500" /> Chức vụ ({availableFilterOptions.chucVuList.length})
@@ -1531,9 +1756,9 @@ export default function PersonnelPage() {
                       ))}
                     </datalist>
                     {filterChucVu && (
-                      <button 
-                        type="button" 
-                        onClick={() => setFilterChucVu('')} 
+                      <button
+                        type="button"
+                        onClick={() => setFilterChucVu('')}
                         className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500 font-extrabold text-[10px] w-5 h-5 flex items-center justify-center rounded-full hover:bg-gray-100"
                       >
                         ✕
@@ -1545,7 +1770,6 @@ export default function PersonnelPage() {
             </div>
           )}
 
-          {/* 🟢 KHU VỰC CHUYỂN TAB */}
           <div className={`border-b border-gray-200 mb-4 flex gap-6 px-1 transition-all duration-300 ${isListCollapsed ? 'md:ml-10 lg:ml-0' : ''} shrink-0`}>
             <button onClick={() => setActiveTab('info')} className={`py-3 text-sm font-black transition-colors relative flex items-center gap-2 ${activeTab === 'info' ? 'text-[#05469B]' : 'text-gray-400 hover:text-gray-700'}`}>
               <Users size={18} /> Danh sách Thông tin
@@ -1562,10 +1786,9 @@ export default function PersonnelPage() {
           </div>
         </div>
 
-        {/* 🟢 TAB THÔNG TIN */}
         {activeTab === 'info' && (
           <div className={`flex flex-col flex-1 min-h-0 overflow-hidden ${isListCollapsed ? 'md:ml-10 lg:ml-0' : ''}`}>
-            
+
             {selectedPersonnelIds.length > 0 && (
               <div className="mb-3 px-4 py-3 bg-[#f0fdf4] border border-emerald-200 rounded-xl flex items-center justify-between shadow-sm animate-in slide-in-from-top-2 duration-200">
                 <div className="flex items-center gap-2.5 text-[12.5px] font-bold text-emerald-800">
@@ -1573,14 +1796,14 @@ export default function PersonnelPage() {
                   <span>Đã chọn <span className="underline font-black text-emerald-700">{selectedPersonnelIds.length}</span> nhân sự từ danh sách</span>
                 </div>
                 <div className="flex gap-2">
-                  <button 
-                    onClick={handleExportSelectedExcel} 
+                  <button
+                    onClick={handleExportSelectedExcel}
                     className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] rounded-lg transition-colors flex items-center gap-1.5 shadow-sm"
                   >
                     <FileSpreadsheet size={13} /> Xuất Excel (Full thông tin)
                   </button>
-                  <button 
-                    onClick={() => setSelectedPersonnelIds([])} 
+                  <button
+                    onClick={() => setSelectedPersonnelIds([])}
                     className="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold text-[11px] rounded-lg transition-colors"
                   >
                     Hủy chọn
@@ -1589,18 +1812,17 @@ export default function PersonnelPage() {
               </div>
             )}
 
-            {/* VIEW TRÊN PC: BẢNG DỮ LIỆU CHÍNH */}
             <div className="hidden md:block bg-white rounded-xl shadow-sm border border-gray-200 w-full flex-1 min-h-0 overflow-auto custom-scrollbar">
               <table className="w-full min-w-[900px] table-fixed text-left border-collapse text-[11.5px]">
                 <thead className="sticky top-0 bg-[#f8fafc] z-10 text-[11.5px]">
                   <tr className="border-b border-gray-200 font-bold text-gray-600 uppercase tracking-wider">
                     {showSelectCheckboxes && (
                       <th className="py-2.5 px-3 w-[4%] text-center bg-[#f8fafc]">
-                        <input 
-                          type="checkbox" 
-                          checked={isAllSelected} 
-                          onChange={(e) => handleSelectAll(e.target.checked)} 
-                          className="w-4 h-4 text-[#05469B] rounded border-gray-300 focus:ring-[#05469B] cursor-pointer" 
+                        <input
+                          type="checkbox"
+                          checked={isAllSelected}
+                          onChange={(e) => handleSelectAll(e.target.checked)}
+                          className="w-4 h-4 text-[#05469B] rounded border-gray-300 focus:ring-[#05469B] cursor-pointer"
                         />
                       </th>
                     )}
@@ -1615,191 +1837,19 @@ export default function PersonnelPage() {
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {paginatedPersonnel.map((item: any) => (
-                    <tr key={item.id} className={`hover:bg-blue-50/50 transition-colors group ${item.trang_thai === 'Đã nghỉ việc' ? 'opacity-60 bg-gray-50' : ''}`}>
-                      {showSelectCheckboxes && (
-                        <td className="py-2.5 px-3 text-center align-middle">
-                          <input 
-                            type="checkbox" 
-                            checked={selectedPersonnelIds.includes(item.id)} 
-                            onChange={(e) => handleSelectRow(item.id, e.target.checked)} 
-                            className="w-4 h-4 text-[#05469B] rounded border-gray-300 focus:ring-[#05469B] cursor-pointer" 
-                          />
-                        </td>
-                      )}
-                      <td className="py-2.5 px-3 font-semibold text-gray-800 whitespace-nowrap text-[11px] align-middle text-left">{item.ma_so_nhan_vien}</td>
-                      <td className="py-2.5 px-3 align-middle text-left">
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-8 h-8 rounded-full overflow-hidden bg-gray-100 border border-gray-200 flex items-center justify-center shrink-0">
-                            {item.hinh_anh ? <img src={getDirectImageLink(item.hinh_anh)} alt="" className="w-full h-full object-cover" /> : <UserIcon size={14} className="text-gray-400" />}
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <p className="font-bold text-[#05469B] leading-snug text-[13px] truncate" title={item.ho_ten}>{item.ho_ten}</p>
-                            {item.trang_thai === 'Đã nghỉ việc' && <span className="text-[9px] font-bold text-red-600 bg-red-100 px-1.5 py-0.5 rounded uppercase mt-0.5 inline-block">Đã nghỉ việc</span>}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="py-2.5 px-3 align-middle text-left">
-                        <div className="flex flex-col justify-center">
-                          <p className="font-bold text-gray-800 text-[12px] leading-snug truncate" title={item.chuc_vu}>{item.chuc_vu || '---'}</p>
-                          {((item.phong_ban && item.phong_ban !== '-' && item.phong_ban !== 'Chưa phân bộ' && item.phong_ban !== 'Chưa có') || (item.khoi && item.khoi !== '-' && item.khoi !== 'Chưa có')) && (
-                            <div className="flex items-center gap-1 mt-0.5 overflow-hidden whitespace-nowrap">
-                              {item.phong_ban && item.phong_ban !== '-' && item.phong_ban !== 'Chưa phân bộ' && item.phong_ban !== 'Chưa có' && (
-                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-700 border border-slate-200 shadow-2xs truncate max-w-[140px]" title={`Bộ phận: ${item.phong_ban}`}>
-                                  BP: {item.phong_ban}
-                                </span>
-                              )}
-                              {item.khoi && item.khoi !== '-' && item.khoi !== 'Chưa có' && (
-                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-100 shadow-2xs truncate max-w-[140px]" title={`Khối: ${item.khoi}`}>
-                                  {String(item.khoi).startsWith('Khối') ? item.khoi : `Khối: ${item.khoi}`}
-                                </span>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      </td>
-                      <td className="py-2.5 px-3 text-[11.5px] font-medium text-gray-700 leading-normal align-middle text-left">{donViMap[String(item.id_don_vi)] || item.id_don_vi || '-'}</td>
-                      <td className="py-2.5 px-3 whitespace-nowrap align-middle text-left">
-                        <div className="flex flex-col gap-1 text-[11px]">
-                          {item.sdt_cong_ty && <a href={`tel:${String(item.sdt_cong_ty).replace(/\D/g, '')}`} className="font-bold text-[#05469B] hover:underline flex items-center gap-1 w-fit"><Phone size={11} className="text-blue-400" /> {formatPhoneNumber(item.sdt_cong_ty)}</a>}
-                          {item.sdt_ca_nhan && (
-                            hasRule('NS_HIDE_SENSITIVE') ? (
-                              <span className="text-gray-400 font-medium flex items-center gap-1 w-fit"><Lock size={11} className="text-gray-300"/> ***</span>
-                            ) : (
-                              <a href={`tel:${String(item.sdt_ca_nhan).replace(/\D/g, '')}`} className="font-bold text-emerald-500 hover:underline flex items-center gap-1 w-fit"><Phone size={11} className="text-emerald-400" /> {formatPhoneNumber(item.sdt_ca_nhan)}</a>
-                            )
-                          )}
-                          {!item.sdt_cong_ty && !item.sdt_ca_nhan && <span className="text-gray-400 font-medium">---</span>}
-                        </div>
-                      </td>
-                      <td className="py-2.5 px-3 text-[11.5px] font-medium text-emerald-600 whitespace-nowrap align-middle text-left">
-                        <span className={`rounded-md inline-block px-1.5 py-0.5 border ${item.trang_thai === 'Đã nghỉ việc' ? 'bg-gray-100 text-gray-500 border-gray-200' : 'bg-emerald-50/50 border-emerald-100'}`}>{calculateSeniority(item.ngay_nhan_vien, item.trang_thai || 'Đang làm việc', item.ngay_nghi_viec || '')}</span>
-                      </td>
-                      <td className="py-2.5 px-3 align-middle text-center">
-                        <div className="flex items-center justify-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button onClick={() => handleView(item)} className="p-1.5 text-indigo-600 hover:bg-indigo-100 rounded-md transition-colors" title="Xem chi tiết"><Eye className="w-3.5 h-3.5" /></button>
-                          {item.trang_thai !== 'Đã nghỉ việc' && (
-                            <>
-                              <button onClick={() => handleDuplicate(item)} className="p-1.5 text-emerald-600 hover:bg-emerald-100 rounded-md transition-colors" title="Nhân bản (Tạo hồ sơ kiêm nhiệm)"><Copy className="w-3.5 h-3.5" /></button>
-                              <button onClick={() => openModal('update', item)} className="p-1.5 text-blue-600 hover:bg-blue-100 rounded-md transition-colors" title="Sửa"><Edit className="w-3.5 h-3.5" /></button>
-                              <button onClick={() => handleOffboardClick(item)} className="p-1.5 text-orange-600 hover:bg-orange-100 rounded-md transition-colors border border-transparent hover:border-orange-200" title="Chốt nghỉ việc (Thu hồi tài sản)"><LogOut className="w-3.5 h-3.5" /></button>
-                            </>
-                          )}
-                          {item.trang_thai === 'Đã nghỉ việc' && (
-                            <>
-                              <button onClick={() => { setPersonnelToRehire(item); setIsRehireModalOpen(true); }} className="p-1.5 text-emerald-600 hover:bg-emerald-100 rounded-md transition-colors" title="Vào làm lại"><RotateCcw className="w-3.5 h-3.5" /></button>
-                              <button onClick={() => { setItemToDelete(item.id); setIsConfirmOpen(true); }} className="p-1.5 text-red-600 hover:bg-red-100 rounded-md transition-colors" title="Xóa vĩnh viễn"><Trash2 className="w-3.5 h-3.5" /></button>
-                            </>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
+                    <PersonnelDesktopRow key={item.id} item={item} props={{ showSelectCheckboxes, selectedPersonnelIds, handleSelectRow, donViMap, hasRule, handleView, handleDuplicate, openModal, handleOffboardClick, setPersonnelToRehire, setIsRehireModalOpen, setItemToDelete, setIsConfirmOpen, calculateSeniority }} />
                   ))}
                 </tbody>
               </table>
             </div>
 
-            {/* 🟢 VIEW TRÊN MOBILE: THẺ CARD DỌC */}
             <div className="block md:hidden flex-1 min-h-0 overflow-y-auto pb-4 space-y-4 custom-scrollbar">
               {paginatedPersonnel.length === 0 ? (
                 <div className="bg-white p-8 rounded-2xl border border-gray-200 text-center text-gray-400 italic">Không tìm thấy nhân sự.</div>
               ) : (
-                paginatedPersonnel.map((item: any) => {
-                  const seniorityStr = calculateSeniority(item.ngay_nhan_vien, item.trang_thai || 'Đang làm việc', item.ngay_nghi_viec || '');
-                  return (
-                    <div 
-                      key={item.id} 
-                      className={`p-4 bg-white rounded-2xl border border-gray-100 shadow-sm relative flex flex-col gap-3 transition-all ${item.trang_thai === 'Đã nghỉ việc' ? 'opacity-70 bg-gray-50' : ''}`}
-                    >
-                      {/* Header Card: Avatar + Name + ID + Status */}
-                      <div className="flex items-center gap-3 pb-2.5 border-b border-gray-100">
-                        {showSelectCheckboxes && (
-                          <input 
-                            type="checkbox" 
-                            checked={selectedPersonnelIds.includes(item.id)} 
-                            onChange={(e) => handleSelectRow(item.id, e.target.checked)} 
-                            className="w-4 h-4 text-[#05469B] rounded border-gray-300 focus:ring-[#05469B] shrink-0 cursor-pointer" 
-                          />
-                        )}
-                        <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-100 border border-gray-200 flex items-center justify-center shrink-0">
-                          {item.hinh_anh ? <img src={getDirectImageLink(item.hinh_anh)} alt="" className="w-full h-full object-cover" /> : <UserIcon size={16} className="text-gray-400" />}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center justify-between gap-1">
-                            <span className="font-semibold text-gray-500 text-[10px]">ID: {item.ma_so_nhan_vien}</span>
-                            {item.trang_thai === 'Đã nghỉ việc' ? (
-                              <span className="text-[9px] font-black text-red-600 bg-red-50 border border-red-100 px-1.5 py-0.5 rounded uppercase">Đã nghỉ việc</span>
-                            ) : (
-                              <span className="text-[9px] font-black text-emerald-600 bg-emerald-50 border border-emerald-100 px-1.5 py-0.5 rounded uppercase">Đang làm việc</span>
-                            )}
-                          </div>
-                          <h4 className="font-extrabold text-[#05469B] text-sm leading-snug truncate mt-0.5">{item.ho_ten}</h4>
-                        </div>
-                      </div>
-
-                      {/* Body Card: Details */}
-                      <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-xs">
-                        <div className="col-span-2">
-                          <p className="text-[10px] font-bold text-gray-400 uppercase">Chức vụ &amp; Bộ phận</p>
-                          <p className="font-bold text-gray-800 leading-normal truncate">{item.chuc_vu || '---'}</p>
-                          {((item.phong_ban && item.phong_ban !== '-' && item.phong_ban !== 'Chưa phân bộ' && item.phong_ban !== 'Chưa có') || (item.khoi && item.khoi !== '-' && item.khoi !== 'Chưa có')) && (
-                            <div className="flex items-center gap-1.5 mt-1">
-                              {item.phong_ban && item.phong_ban !== '-' && item.phong_ban !== 'Chưa phân bộ' && item.phong_ban !== 'Chưa có' && (
-                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-semibold bg-slate-100 text-slate-700 border border-slate-200">
-                                  BP: {item.phong_ban}
-                                </span>
-                              )}
-                              {item.khoi && item.khoi !== '-' && item.khoi !== 'Chưa có' && (
-                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-100">
-                                  {String(item.khoi).startsWith('Khối') ? item.khoi : `Khối: ${item.khoi}`}
-                                </span>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                        <div className="col-span-2">
-                          <p className="text-[10px] font-bold text-gray-400 uppercase">Đơn vị quản lý</p>
-                          <p className="font-medium text-gray-700 leading-normal truncate">{donViMap[String(item.id_don_vi)] || item.id_don_vi || '-'}</p>
-                        </div>
-                        <div>
-                          <p className="text-[10px] font-bold text-gray-400 uppercase">Điện thoại</p>
-                          <div className="flex flex-col gap-1 mt-1">
-                            {item.sdt_cong_ty && <a href={`tel:${String(item.sdt_cong_ty).replace(/\D/g, '')}`} className="font-bold text-[#05469B] hover:underline flex items-center gap-1 text-[11px]"><Phone size={11} className="text-blue-400 shrink-0" /> {formatPhoneNumber(item.sdt_cong_ty)}</a>}
-                            {item.sdt_ca_nhan && (
-                              hasRule('NS_HIDE_SENSITIVE') ? (
-                                <span className="text-gray-400 font-medium flex items-center gap-1 text-[11px]"><Lock size={11} className="text-gray-300 shrink-0"/> ***</span>
-                              ) : (
-                                <a href={`tel:${String(item.sdt_ca_nhan).replace(/\D/g, '')}`} className="font-bold text-emerald-600 hover:underline flex items-center gap-1 text-[11px]"><Phone size={11} className="text-emerald-400 shrink-0" /> {formatPhoneNumber(item.sdt_ca_nhan)}</a>
-                              )
-                            )}
-                            {!item.sdt_cong_ty && !item.sdt_ca_nhan && <span className="text-gray-400 font-medium">---</span>}
-                          </div>
-                        </div>
-                        <div>
-                          <p className="text-[10px] font-bold text-gray-400 uppercase">Thâm niên</p>
-                          <span className="mt-1 inline-block text-[11px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">{seniorityStr}</span>
-                        </div>
-                      </div>
-
-                      {/* Footer Card: Actions */}
-                      <div className="flex items-center justify-end gap-1.5 pt-3 border-t border-gray-100 mt-1">
-                        <button onClick={() => handleView(item)} className="p-1.5 text-indigo-600 bg-indigo-50 border border-indigo-100 hover:bg-indigo-100 rounded-lg transition-colors flex items-center gap-1 text-[11px] font-bold shadow-2xs" title="Xem chi tiết"><Eye className="w-3.5 h-3.5" /> Xem</button>
-                        {item.trang_thai !== 'Đã nghỉ việc' && (
-                          <>
-                            <button onClick={() => handleDuplicate(item)} className="p-1.5 text-emerald-600 bg-emerald-50 border border-emerald-100 hover:bg-emerald-100 rounded-lg transition-colors flex items-center gap-1 text-[11px] font-bold shadow-2xs" title="Kiêm nhiệm"><Copy className="w-3.5 h-3.5" /> Kiêm nhiệm</button>
-                            <button onClick={() => openModal('update', item)} className="p-1.5 text-blue-600 bg-blue-50 border border-blue-100 hover:bg-blue-100 rounded-lg transition-colors flex items-center gap-1 text-[11px] font-bold shadow-2xs" title="Sửa"><Edit className="w-3.5 h-3.5" /> Sửa</button>
-                            <button onClick={() => handleOffboardClick(item)} className="p-1.5 text-orange-600 bg-orange-50 border border-orange-200 hover:bg-orange-100 rounded-lg transition-colors flex items-center gap-1 text-[11px] font-bold shadow-2xs" title="Nghỉ việc"><LogOut className="w-3.5 h-3.5" /> Nghỉ việc</button>
-                          </>
-                        )}
-                        {item.trang_thai === 'Đã nghỉ việc' && (
-                          <>
-                            <button onClick={() => { setPersonnelToRehire(item); setIsRehireModalOpen(true); }} className="p-1.5 text-emerald-600 bg-emerald-50 border border-emerald-100 hover:bg-emerald-100 rounded-lg transition-colors flex items-center gap-1 text-[11px] font-bold shadow-2xs" title="Vào làm lại"><RotateCcw className="w-3.5 h-3.5" /> Làm lại</button>
-                            <button onClick={() => { setItemToDelete(item.id); setIsConfirmOpen(true); }} className="p-1.5 text-red-600 bg-red-50 border border-red-100 hover:bg-red-100 rounded-lg transition-colors flex items-center gap-1 text-[11px] font-bold shadow-2xs" title="Xóa vĩnh viễn"><Trash2 className="w-3.5 h-3.5" /> Xóa</button>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })
+                paginatedPersonnel.map((item: any) => (
+                  <PersonnelMobileCard key={item.id} item={item} props={{ showSelectCheckboxes, selectedPersonnelIds, handleSelectRow, donViMap, hasRule, handleView, handleDuplicate, openModal, handleOffboardClick, setPersonnelToRehire, setIsRehireModalOpen, setItemToDelete, setIsConfirmOpen, calculateSeniority }} />
+                ))
               )}
             </div>
 
@@ -1824,26 +1874,26 @@ export default function PersonnelPage() {
 
           return (
             <div className={`flex-1 min-h-0 overflow-y-auto custom-scrollbar transition-all duration-300 ${isListCollapsed ? 'md:ml-10 lg:ml-0' : ''}`}>
-              
+
               {/* DÒNG 1: 4 CHỈ SỐ KPI */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shrink-0"><Users size={24}/></div>
+                <div className="bg-white p-5 rounded-xl border border-blue-200 shadow-sm flex items-center gap-4 transition-all hover:shadow-md hover:border-blue-500">
+                  <div className="w-12 h-12 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shrink-0 border border-blue-200"><Users size={24} /></div>
                   <div><p className="text-[11px] text-gray-500 font-bold uppercase tracking-wider mb-1">Đang làm việc</p><p className="text-3xl font-black text-gray-800 leading-none">{stats.total}</p></div>
                 </div>
-                <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0"><TrendingUp size={24}/></div>
+                <div className="bg-white p-5 rounded-xl border border-emerald-200 shadow-sm flex items-center gap-4 transition-all hover:shadow-md hover:border-emerald-500">
+                  <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0 border border-emerald-250"><TrendingUp size={24} /></div>
                   <div><p className="text-[11px] text-gray-500 font-bold uppercase tracking-wider mb-1">Nhận việc Tháng {stats.currentMonth + 1}</p><p className="text-3xl font-black text-emerald-600 leading-none">{stats.newThisMonth}</p></div>
                 </div>
-                <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center shrink-0"><ShieldCheck size={24}/></div>
+                <div className="bg-white p-5 rounded-xl border border-orange-200 shadow-sm flex items-center gap-4 transition-all hover:shadow-md hover:border-orange-500">
+                  <div className="w-12 h-12 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center shrink-0 border border-orange-200"><ShieldCheck size={24} /></div>
                   <div>
                     <p className="text-[11px] text-gray-500 font-bold uppercase tracking-wider mb-1" title="Số được đào tạo ATVSLĐ / Tổng số NV">Đã Đào tạo ATVSLĐ / Tổng</p>
                     <p className="text-3xl font-black text-orange-600 leading-none">{stats.atvsldTrained} <span className="text-lg text-gray-400">/ {stats.total}</span></p>
                   </div>
                 </div>
-                <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-full bg-pink-100 text-pink-500 flex items-center justify-center shrink-0"><Cake size={24}/></div>
+                <div className="bg-white p-5 rounded-xl border border-pink-200 shadow-sm flex items-center gap-4 transition-all hover:shadow-md hover:border-pink-500">
+                  <div className="w-12 h-12 rounded-full bg-pink-100 text-pink-500 flex items-center justify-center shrink-0 border border-pink-200"><Cake size={24} /></div>
                   <div><p className="text-[11px] text-gray-500 font-bold uppercase tracking-wider mb-1">Sinh nhật Tháng {stats.currentMonth + 1}</p><p className="text-3xl font-black text-pink-500 leading-none">{stats.birthdays.length}</p></div>
                 </div>
               </div>
@@ -1852,7 +1902,7 @@ export default function PersonnelPage() {
               <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden mb-6">
                 <div className="p-3 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
                   <div>
-                    <h3 className="font-bold text-gray-800 flex items-center gap-2 mb-0.5 text-sm"><FileSpreadsheet size={18} className="text-[#05469B]"/> Bảng Thống kê BV/Đón tiếp & PVHC</h3>
+                    <h3 className="font-bold text-gray-800 flex items-center gap-2 mb-0.5 text-sm"><FileSpreadsheet size={18} className="text-[#05469B]" /> Bảng Thống kê Bảo vệ ,Đón tiếp & Phục vụ hậu cần</h3>
                     <p className="text-[10px] text-gray-500">Bảng đã được khóa cứng chiều ngang (table-fixed) vừa khít màn hình.</p>
                   </div>
                 </div>
@@ -1863,17 +1913,17 @@ export default function PersonnelPage() {
                       <tr className="bg-[#fff2cc] font-black text-[#002060]">
                         {/* Chia tỷ lệ cột: Cột đầu 24%, 2 khối giữa mỗi khối 30%, Tổng 16% */}
                         <th className="py-2.5 px-2 border border-gray-300 w-[24%] text-[12px]" rowSpan={2}>BỘ PHẬN / PHÂN LOẠI</th>
-                        <th className="py-2.5 px-2 border border-gray-300 w-[30%] text-[12px]" colSpan={3}>BV / ĐÓN TIẾP KH</th>
-                        <th className="py-2.5 px-2 border border-gray-300 w-[30%] text-[12px]" colSpan={3}>PV HÀNH CHÍNH</th>
-                        <th className="py-2.5 px-2 border border-gray-300 w-[16%] text-[12px]" rowSpan={2}>TỔNG<br/>CỘNG</th>
+                        <th className="py-2.5 px-2 border border-gray-300 w-[30%] text-[12px]" colSpan={3}>BV, ĐÓN TIẾP KH</th>
+                        <th className="py-2.5 px-2 border border-gray-300 w-[30%] text-[12px]" colSpan={3}>PV HẬU CẦN</th>
+                        <th className="py-2.5 px-2 border border-gray-300 w-[16%] text-[12px]" rowSpan={2}>TỔNG<br />CỘNG</th>
                       </tr>
                       <tr className="bg-[#fff2cc] font-black text-[#002060] leading-tight text-[11px]">
                         <th className="py-2 px-1 border border-gray-300 break-words">NV</th>
-                        <th className="py-2 px-1 border border-gray-300 break-words">T.Trưởng<br/>T.Phó</th>
-                        <th className="py-2 px-1 border border-gray-300 text-emerald-700 break-words">Cộng<br/>BV</th>
+                        <th className="py-2 px-1 border border-gray-300 break-words">T.Trưởng<br />T.Phó</th>
+                        <th className="py-2 px-1 border border-gray-300 text-emerald-700 break-words">Cộng<br />BV</th>
                         <th className="py-2 px-1 border border-gray-300 break-words">NV</th>
-                        <th className="py-2 px-1 border border-gray-300 break-words">T.Trưởng<br/>T.Phó</th>
-                        <th className="py-2 px-1 border border-gray-300 text-blue-700 break-words">Cộng<br/>HC</th>
+                        <th className="py-2 px-1 border border-gray-300 break-words">T.Trưởng<br />T.Phó</th>
+                        <th className="py-2 px-1 border border-gray-300 text-blue-700 break-words">Cộng<br />HC</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -2004,7 +2054,7 @@ export default function PersonnelPage() {
               <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden mb-6">
                 <div className="p-3 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
                   <div>
-                    <h3 className="font-bold text-gray-800 flex items-center gap-2 mb-0.5 text-sm"><Briefcase size={18} className="text-[#05469B]"/> Cơ cấu Lực lượng theo Bộ phận & Cấp bậc</h3>
+                    <h3 className="font-bold text-gray-800 flex items-center gap-2 mb-0.5 text-sm"><Briefcase size={18} className="text-[#05469B]" /> Tổng hợp nhân sự theo Bộ phận & Cấp bậc</h3>
                     <p className="text-[10px] text-gray-500">Bảng đã được khóa cứng chiều ngang (table-fixed) vừa khít màn hình.</p>
                   </div>
                 </div>
@@ -2041,7 +2091,7 @@ export default function PersonnelPage() {
                             <td className="py-2 px-2.5 border-r border-gray-200 text-left font-bold text-gray-700 bg-white sticky left-0 z-10 leading-tight text-[12px]">
                               {row}
                             </td>
-                            
+
                             {deptTabStats.groupedColumns.map((group) => (
                               group.activeRoles.map(col => {
                                 const val = deptTabStats.deptMap[row][col];
@@ -2084,7 +2134,7 @@ export default function PersonnelPage() {
                               </td>
                             ))
                           ))}
-                           <td className="p-1.5 border-l border-red-200 text-[12px] font-black text-white bg-red-500 shadow-inner">
+                          <td className="p-1.5 border-l border-red-200 text-[12px] font-black text-white bg-red-500 shadow-inner">
                             {deptTabStats.grandTotal > 0 ? (
                               <button onClick={() => setClickStaffListModal({ isOpen: true, title: 'TỔNG NHÂN SỰ TOÀN HỆ THỐNG', list: deptTabStats.grandTotalList })} className="w-full h-full py-1 hover:bg-red-600 text-white font-bold transition-colors text-center cursor-pointer">
                                 {deptTabStats.grandTotal}
@@ -2101,21 +2151,21 @@ export default function PersonnelPage() {
               {/* DÒNG 3: CÁC BIỂU ĐỒ (Giới tính, Thâm niên, Độ tuổi) */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
                 <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-center">
-                  <h3 className="font-bold text-gray-800 mb-6 flex items-center gap-2"><PieChartIcon size={18} className="text-[#05469B]"/> Cơ cấu Giới tính</h3>
+                  <h3 className="font-bold text-gray-800 mb-6 flex items-center gap-2"><PieChartIcon size={18} className="text-[#05469B]" /> Cơ cấu Giới tính</h3>
                   <div>
                     <div className="flex justify-between mb-2 text-sm font-bold">
-                      <span className="text-[#05469B] flex items-center gap-1">Nam: {stats.male} ({stats.total > 0 ? Math.round(stats.male/stats.total*100) : 0}%)</span>
-                      <span className="text-pink-500 flex items-center gap-1">({stats.total > 0 ? Math.round(stats.female/stats.total*100) : 0}%) {stats.female} :Nữ</span>
+                      <span className="text-[#05469B] flex items-center gap-1">Nam: {stats.male} ({stats.total > 0 ? Math.round(stats.male / stats.total * 100) : 0}%)</span>
+                      <span className="text-pink-500 flex items-center gap-1">({stats.total > 0 ? Math.round(stats.female / stats.total * 100) : 0}%) {stats.female} :Nữ</span>
                     </div>
                     <div className="w-full h-8 bg-gray-100 rounded-full overflow-hidden flex shadow-inner">
-                      <div className="h-full bg-[#05469B] transition-all duration-1000" style={{ width: `${stats.total > 0 ? (stats.male/stats.total)*100 : 0}%` }}></div>
-                      <div className="h-full bg-pink-400 transition-all duration-1000" style={{ width: `${stats.total > 0 ? (stats.female/stats.total)*100 : 0}%` }}></div>
+                      <div className="h-full bg-[#05469B] transition-all duration-1000" style={{ width: `${stats.total > 0 ? (stats.male / stats.total) * 100 : 0}%` }}></div>
+                      <div className="h-full bg-pink-400 transition-all duration-1000" style={{ width: `${stats.total > 0 ? (stats.female / stats.total) * 100 : 0}%` }}></div>
                     </div>
                   </div>
                 </div>
 
                 <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-                  <h3 className="font-bold text-gray-800 mb-6 flex items-center gap-2"><BarChart3 size={18} className="text-[#05469B]"/> Thâm niên công tác</h3>
+                  <h3 className="font-bold text-gray-800 mb-6 flex items-center gap-2"><BarChart3 size={18} className="text-[#05469B]" /> Thâm niên công tác</h3>
                   <div className="flex items-end justify-around h-32 pt-4 border-b border-gray-200">
                     {Object.entries(stats.seniority).map(([label, count]: any) => {
                       const heightPercent = maxSeniority > 0 ? Math.max((count / maxSeniority) * 100, count > 0 ? 5 : 0) : 0;
@@ -2133,7 +2183,7 @@ export default function PersonnelPage() {
                 </div>
 
                 <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-                  <h3 className="font-bold text-gray-800 mb-6 flex items-center gap-2"><Users size={18} className="text-[#05469B]"/> Phân bổ Độ tuổi</h3>
+                  <h3 className="font-bold text-gray-800 mb-6 flex items-center gap-2"><Users size={18} className="text-[#05469B]" /> Phân bổ Độ tuổi</h3>
                   <div className="flex items-end justify-around h-32 pt-4 border-b border-gray-200">
                     {Object.entries(stats.ageGroups).map(([label, count]: any) => {
                       const heightPercent = maxAge > 0 ? Math.max((count / maxAge) * 100, count > 0 ? 5 : 0) : 0;
@@ -2154,11 +2204,11 @@ export default function PersonnelPage() {
               {/* DÒNG 4: DANH SÁCH SINH NHẬT TRONG THÁNG */}
               <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden mb-8">
                 <div className="p-5 border-b border-gray-100 bg-pink-50/30">
-                  <h3 className="font-bold text-gray-800 flex items-center gap-2"><Cake size={18} className="text-pink-500"/> Danh sách Sinh nhật trong tháng {stats.currentMonth + 1}</h3>
+                  <h3 className="font-bold text-gray-800 flex items-center gap-2"><Cake size={18} className="text-pink-500" /> Danh sách Sinh nhật trong tháng {stats.currentMonth + 1}</h3>
                 </div>
                 <div className="p-0 max-h-64 overflow-y-auto custom-scrollbar">
                   {stats.birthdays.length === 0 ? (
-                    <div className="p-8 text-center text-gray-400"><Cake size={32} className="mx-auto mb-2 opacity-30"/> Không có nhân sự nào sinh tháng này.</div>
+                    <div className="p-8 text-center text-gray-400"><Cake size={32} className="mx-auto mb-2 opacity-30" /> Không có nhân sự nào sinh tháng này.</div>
                   ) : (
                     <table className="w-full text-left text-sm">
                       <tbody className="divide-y divide-gray-100">
@@ -2194,7 +2244,7 @@ export default function PersonnelPage() {
       </div>
 
       {/* 🟢 TẤT CẢ CÁC MODALS BÊN DƯỚI */}
-      
+
       {/* 🟢 MODAL COPY EMAIL THEO ĐIỀU KIỆN */}
       {isCopyEmailDropdownOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
@@ -2204,7 +2254,7 @@ export default function PersonnelPage() {
               <div className="flex items-center gap-2 font-bold text-base">
                 <Copy size={18} /> Copy Email Theo Điều Kiện
               </div>
-              <button 
+              <button
                 onClick={() => { setIsCopyEmailDropdownOpen(false); setSelectedNgach([]); setSelectedDiaDiem([]); }}
                 className="p-1.5 hover:bg-white/20 rounded-lg transition-colors text-white"
               >
@@ -2274,16 +2324,16 @@ export default function PersonnelPage() {
             {/* Footer Modal */}
             {(availableNgachLuong.length > 0 || availableDiaDiem.length > 0) && (
               <div className="p-4 bg-gray-50 border-t border-gray-200 flex flex-col gap-2 shrink-0">
-                <button 
-                  onClick={handleCopyMultiCriteria} 
-                  disabled={selectedNgach.length === 0 && selectedDiaDiem.length === 0} 
+                <button
+                  onClick={handleCopyMultiCriteria}
+                  disabled={selectedNgach.length === 0 && selectedDiaDiem.length === 0}
                   className="w-full py-2.5 bg-gradient-to-r from-[#05469B] to-[#0a5bc4] text-white rounded-xl font-black text-sm flex items-center justify-center gap-2 hover:opacity-95 transition-all disabled:opacity-50 disabled:from-gray-400 disabled:to-gray-500 shadow-md"
                 >
-                  <Copy size={16}/> Lọc & Copy Danh sách Email
+                  <Copy size={16} /> Lọc & Copy Danh sách Email
                 </button>
                 {(selectedNgach.length > 0 || selectedDiaDiem.length > 0) && (
                   <p className="text-center text-[11px] text-gray-500 font-semibold leading-tight">
-                    Đang chọn: {selectedNgach.length > 0 ? `${selectedNgach.length} ngạch` : ''} 
+                    Đang chọn: {selectedNgach.length > 0 ? `${selectedNgach.length} ngạch` : ''}
                     {selectedNgach.length > 0 && selectedDiaDiem.length > 0 ? ' & ' : ''}
                     {selectedDiaDiem.length > 0 ? `${selectedDiaDiem.length} địa điểm` : ''}
                   </p>
@@ -2293,13 +2343,13 @@ export default function PersonnelPage() {
           </div>
         </div>
       )}
-      
+
       {isExportModalOpen && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 animate-in zoom-in duration-200">
             <div className="flex justify-between items-start mb-4">
-              <h3 className="text-xl font-black text-emerald-700 flex items-center gap-2"><FileSpreadsheet size={24}/> Xuất Excel Danh bạ</h3>
-              <button onClick={() => setIsExportModalOpen(false)} className="text-gray-400 hover:text-red-500 transition-colors"><X size={20}/></button>
+              <h3 className="text-xl font-black text-emerald-700 flex items-center gap-2"><FileSpreadsheet size={24} /> Xuất Excel Danh bạ</h3>
+              <button onClick={() => setIsExportModalOpen(false)} className="text-gray-400 hover:text-red-500 transition-colors"><X size={20} /></button>
             </div>
             <p className="text-sm text-gray-600 mb-6">Bạn muốn tải xuống danh bạ (Gồm Lãnh đạo & PT Dịch vụ Hỗ trợ) của khu vực nào?</p>
             <div className="flex flex-col gap-3 mb-6">
@@ -2310,7 +2360,7 @@ export default function PersonnelPage() {
             </div>
             <div className="flex gap-3">
               <button onClick={() => setIsExportModalOpen(false)} className="flex-1 py-3 bg-gray-100 text-gray-700 font-bold rounded-xl hover:bg-gray-200 transition-colors">Hủy</button>
-              <button onClick={handleExportExcel} className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 transition-colors text-white font-bold rounded-xl flex items-center justify-center gap-2 shadow-lg"><Download size={20}/> Tải File .XLS</button>
+              <button onClick={handleExportExcel} className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 transition-colors text-white font-bold rounded-xl flex items-center justify-center gap-2 shadow-lg"><Download size={20} /> Tải File .XLS</button>
             </div>
           </div>
         </div>
@@ -2321,15 +2371,51 @@ export default function PersonnelPage() {
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[90vh] animate-in zoom-in duration-200 overflow-hidden">
             <div className="bg-orange-500 text-white p-5 flex items-start justify-between">
               <div className="flex gap-4 items-center">
-                <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center shrink-0 border border-white/40"><LogOut size={24}/></div>
-                <div><h3 className="text-xl font-black mb-1">Xác nhận Nghỉ việc</h3><p className="text-orange-100 text-sm font-medium">{personnelToOffboard.ho_ten} - {personnelToOffboard.ma_so_nhan_vien}</p></div>
+                <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center shrink-0 border border-white/40"><LogOut size={24} /></div>
+                <div><h3 className="text-xl font-black mb-1">Điều chuyển / Nghỉ việc</h3><p className="text-orange-100 text-sm font-medium">{personnelToOffboard.ho_ten} - {personnelToOffboard.ma_so_nhan_vien}</p></div>
               </div>
-              <button onClick={() => setIsOffboardOpen(false)} className="text-orange-100 hover:text-white p-1 rounded-full"><X size={24}/></button>
+              <button onClick={() => setIsOffboardOpen(false)} className="text-orange-100 hover:text-white p-1 rounded-full"><X size={24} /></button>
             </div>
             <div className="p-6 overflow-y-auto custom-scrollbar">
+              <div className="mb-6 flex flex-col sm:flex-row gap-3">
+                <label className={`flex-1 border p-3 rounded-xl cursor-pointer font-bold flex flex-col items-center gap-2 transition-all ${transferType === 'INTERNAL' ? 'bg-blue-50 border-blue-500 text-blue-700' : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100'}`}>
+                  <input type="radio" name="transferType" value="INTERNAL" checked={transferType === 'INTERNAL'} onChange={() => setTransferType('INTERNAL')} className="hidden" />
+                  <Building2 size={20} /> Nội bộ
+                </label>
+                <label className={`flex-1 border p-3 rounded-xl cursor-pointer font-bold flex flex-col items-center gap-2 transition-all ${transferType === 'EXTERNAL' ? 'bg-indigo-50 border-indigo-500 text-indigo-700' : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100'}`}>
+                  <input type="radio" name="transferType" value="EXTERNAL" checked={transferType === 'EXTERNAL'} onChange={() => setTransferType('EXTERNAL')} className="hidden" />
+                  <Building2 size={20} /> Ra ngoài
+                </label>
+                <label className={`flex-1 border p-3 rounded-xl cursor-pointer font-bold flex flex-col items-center gap-2 transition-all ${transferType === 'OFFBOARD' ? 'bg-orange-50 border-orange-500 text-orange-700' : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100'}`}>
+                  <input type="radio" name="transferType" value="OFFBOARD" checked={transferType === 'OFFBOARD'} onChange={() => setTransferType('OFFBOARD')} className="hidden" />
+                  <LogOut size={20} /> Nghỉ việc
+                </label>
+              </div>
+
+              {transferType === 'INTERNAL' && (
+                <div className="mb-6">
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Chọn Đơn vị mới *</label>
+                  <select value={transferInternalUnitId} onChange={e => setTransferInternalUnitId(e.target.value)} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white shadow-sm font-medium" style={{ fontFamily: 'monospace, sans-serif' }}>
+                    <option value="">-- Chọn đơn vị đích --</option>
+                    {buildHierarchicalOptions(donViList).map(({ unit, prefix }) => (
+                      <option key={unit.id} value={unit.id} className="font-normal text-gray-700">
+                        {prefix}{getUnitEmoji(unit.loai_hinh)} {unit.ten_don_vi}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {transferType === 'EXTERNAL' && (
+                <div className="mb-6">
+                  <label className="block text-sm font-bold text-gray-700 mb-1">Tên đơn vị / Công ty ngoài *</label>
+                  <input type="text" value={transferExternalUnitName} onChange={e => setTransferExternalUnitName(e.target.value)} placeholder="Nhập tên đơn vị chuyển đến..." className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white shadow-sm font-medium" />
+                </div>
+              )}
+
               {personnelToOffboard.sdt_cong_ty && (
                 <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-xl flex gap-3 mb-4">
-                  <Phone className="text-yellow-600 shrink-0 w-6 h-6"/>
+                  <Phone className="text-yellow-600 shrink-0 w-6 h-6" />
                   <div><h4 className="font-black text-yellow-800 mb-1">CẢNH BÁO: Thu hồi SIM Công ty!</h4><p className="text-sm text-yellow-700 font-medium">Nhân sự này đang được cấp số điện thoại: <span className="font-black text-yellow-900">{formatPhoneNumber(personnelToOffboard.sdt_cong_ty)}</span>. Vui lòng yêu cầu bàn giao lại SIM công ty trước khi hoàn tất thủ tục nghỉ việc.</p></div>
                 </div>
               )}
@@ -2338,7 +2424,7 @@ export default function PersonnelPage() {
               ) : unreturnedAssets.length > 0 ? (
                 <div className="space-y-4">
                   <div className="bg-red-50 border border-red-200 p-4 rounded-xl flex gap-3">
-                    <AlertTriangle className="text-red-500 shrink-0 w-6 h-6"/>
+                    <AlertTriangle className="text-red-500 shrink-0 w-6 h-6" />
                     <div>
                       <h4 className="font-black text-red-700 mb-1">CẢNH BÁO: Nhân sự đang giữ Tài sản!</h4>
                       <p className="text-sm text-red-600 font-medium mb-3">Hệ thống phát hiện nhân sự này đang là người nhận cuối cùng của các tài sản dưới đây. Vui lòng thu hồi hoặc bàn giao trước khi cho nghỉ.</p>
@@ -2369,7 +2455,7 @@ export default function PersonnelPage() {
             </div>
             <div className="p-5 border-t border-gray-100 bg-gray-50 flex justify-end gap-3 shrink-0">
               <button onClick={() => setIsOffboardOpen(false)} className="px-6 py-2.5 bg-gray-200 text-gray-700 rounded-xl font-bold hover:bg-gray-300 transition-colors">Hủy bỏ</button>
-              <button onClick={confirmOffboard} disabled={submitting || (unreturnedAssets.length > 0 && !forceOffboard)} className="px-6 py-2.5 bg-orange-500 text-white rounded-xl font-bold flex items-center gap-2 hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-md">{submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <LogOut className="w-5 h-5" />} Xác nhận Đã nghỉ việc</button>
+              <button onClick={confirmOffboard} disabled={submitting || (unreturnedAssets.length > 0 && !forceOffboard)} className="px-6 py-2.5 bg-orange-500 text-white rounded-xl font-bold flex items-center gap-2 hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-md">{submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <LogOut className="w-5 h-5" />} Xác nhận thực hiện</button>
             </div>
           </div>
         </div>
@@ -2385,7 +2471,7 @@ export default function PersonnelPage() {
             </div>
             <div className="p-4 sm:p-6 overflow-y-auto space-y-6 custom-scrollbar">
               <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 sm:gap-6 border-b border-gray-100 pb-6 text-center sm:text-left relative">
-                {viewData.trang_thai === 'Đã nghỉ việc' && (<div className="absolute top-0 right-0 bg-red-100 text-red-700 font-black px-3 py-1 rounded border border-red-200 flex items-center gap-1"><LogOut size={16}/> ĐÃ NGHỈ VIỆC</div>)}
+                {viewData.trang_thai === 'Đã nghỉ việc' && (<div className="absolute top-0 right-0 bg-red-100 text-red-700 font-black px-3 py-1 rounded border border-red-200 flex items-center gap-1"><LogOut size={16} /> ĐÃ NGHỈ VIỆC</div>)}
                 <div className="w-24 h-24 sm:w-28 sm:h-32 rounded-2xl bg-blue-100 text-[#05469B] flex items-center justify-center text-4xl font-black shrink-0 border-4 border-white shadow-md overflow-hidden relative">
                   {viewData.hinh_anh ? (<img src={getDirectImageLink(viewData.hinh_anh)} alt={viewData.ho_ten} className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).src = 'https://via.placeholder.com/150?text=Lỗi+Ảnh'; }} />) : (viewData.ho_ten?.charAt(0).toUpperCase() || 'U')}
                 </div>
@@ -2395,21 +2481,21 @@ export default function PersonnelPage() {
                   </div>
                   <p className="text-lg font-bold text-[#05469B] mb-3">{viewData.chuc_vu}</p>
                   <div className="flex flex-col sm:flex-row flex-wrap justify-center sm:justify-start gap-3 sm:gap-4 text-sm text-gray-600 font-medium">
-                    {viewData.sdt_cong_ty && (<a href={`tel:${String(viewData.sdt_cong_ty).replace(/\D/g, '')}`} className="flex items-center justify-center sm:justify-start gap-1.5 bg-blue-50 px-2 py-1 rounded text-blue-800 border border-blue-100 hover:bg-blue-100 transition-colors"><Phone size={16} className="text-blue-500"/> SĐT Cty: <span className="font-bold">{formatPhoneNumber(viewData.sdt_cong_ty)}</span></a>)}
+                    {viewData.sdt_cong_ty && (<a href={`tel:${String(viewData.sdt_cong_ty).replace(/\D/g, '')}`} className="flex items-center justify-center sm:justify-start gap-1.5 bg-blue-50 px-2 py-1 rounded text-blue-800 border border-blue-100 hover:bg-blue-100 transition-colors"><Phone size={16} className="text-blue-500" /> SĐT Cty: <span className="font-bold">{formatPhoneNumber(viewData.sdt_cong_ty)}</span></a>)}
                     {viewData.sdt_ca_nhan && (
                       hasRule('NS_HIDE_SENSITIVE') ? (
-                        <span className="flex items-center justify-center sm:justify-start gap-1.5 bg-gray-50 px-2 py-1 rounded text-gray-500 border border-gray-200"><Lock size={16} className="text-gray-400"/> SĐT Cá nhân: <span className="font-bold">***</span></span>
+                        <span className="flex items-center justify-center sm:justify-start gap-1.5 bg-gray-50 px-2 py-1 rounded text-gray-500 border border-gray-200"><Lock size={16} className="text-gray-400" /> SĐT Cá nhân: <span className="font-bold">***</span></span>
                       ) : (
-                        <a href={`tel:${String(viewData.sdt_ca_nhan).replace(/\D/g, '')}`} className="flex items-center justify-center sm:justify-start gap-1.5 bg-emerald-50 px-2 py-1 rounded text-emerald-800 border border-emerald-200 hover:bg-emerald-100 transition-colors"><Phone size={16} className="text-emerald-500"/> SĐT Cá nhân: <span className="font-bold">{formatPhoneNumber(viewData.sdt_ca_nhan)}</span></a>
+                        <a href={`tel:${String(viewData.sdt_ca_nhan).replace(/\D/g, '')}`} className="flex items-center justify-center sm:justify-start gap-1.5 bg-emerald-50 px-2 py-1 rounded text-emerald-800 border border-emerald-200 hover:bg-emerald-100 transition-colors"><Phone size={16} className="text-emerald-500" /> SĐT Cá nhân: <span className="font-bold">{formatPhoneNumber(viewData.sdt_ca_nhan)}</span></a>
                       )
                     )}
-                    <span className="flex items-center justify-center sm:justify-start gap-1.5 mt-1 sm:mt-0"><Mail size={16} className="text-gray-400"/> {viewData.email || 'Chưa có Email'}</span>
+                    <span className="flex items-center justify-center sm:justify-start gap-1.5 mt-1 sm:mt-0"><Mail size={16} className="text-gray-400" /> {viewData.email || 'Chưa có Email'}</span>
                   </div>
                 </div>
               </div>
-              
+
               <div>
-                <h4 className="font-bold text-gray-800 mb-3 uppercase tracking-wider text-sm flex items-center gap-2"><Building2 size={18} className="text-[#05469B]"/> Thông tin Công tác</h4>
+                <h4 className="font-bold text-gray-800 mb-3 uppercase tracking-wider text-sm flex items-center gap-2"><Building2 size={18} className="text-[#05469B]" /> Thông tin Công tác</h4>
                 <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 bg-gray-50 p-4 rounded-xl border border-gray-200">
                   <div><p className="text-xs text-gray-500 uppercase font-bold mb-1">Đơn vị</p><p className="font-semibold text-gray-800 break-words">{donViMap[String(viewData.id_don_vi)] || viewData.id_don_vi || '---'}</p></div>
                   <div><p className="text-xs text-gray-500 uppercase font-bold mb-1">Bộ phận</p><p className="font-semibold text-gray-800">{viewData.phong_ban || '---'}</p></div>
@@ -2436,15 +2522,41 @@ export default function PersonnelPage() {
                     )}
                   </div>
                   {viewData.ngay_vao_lam_lai && (<div className="col-span-2 md:col-span-1"><p className="text-xs text-blue-500 uppercase font-bold mb-1">Vào làm lại</p><p className="font-semibold text-blue-600">{new Date(viewData.ngay_vao_lam_lai).toLocaleDateString('vi-VN')}</p></div>)}
+                  <div className="col-span-2 md:col-span-4 lg:col-span-5 h-px bg-gray-200 my-1"></div>
+                  <div><p className="text-xs text-gray-500 uppercase font-bold mb-1">Thẻ thang máy</p><p className="font-semibold text-gray-800">{viewData.the_thang === 'Yes' ? 'Có sử dụng' : 'Không'}</p></div>
+                  <div><p className="text-xs text-gray-500 uppercase font-bold mb-1">Thẻ gửi xe</p><p className="font-semibold text-gray-800">{viewData.the_xe === 'Yes' ? 'Có sử dụng' : 'Không'}</p></div>
+                  {viewData.the_xe === 'Yes' && (
+                    <>
+                      <div><p className="text-xs text-gray-500 uppercase font-bold mb-1">Hãng - Loại xe</p><p className="font-semibold text-gray-800">{viewData.hang_loai_xe || '---'}</p></div>
+                      <div><p className="text-xs text-gray-500 uppercase font-bold mb-1">Biển kiểm soát</p><p className="font-semibold font-mono tracking-wider text-gray-800">{viewData.bks || '---'}</p></div>
+                    </>
+                  )}
                 </div>
               </div>
-              
+
               {/* 🟢 HÀNG CÁ NHÂN & NGOẠI HÌNH (35%) + BIỂU ĐỒ CƯỚC (65%) */}
               <div className="flex flex-col lg:flex-row gap-6 items-stretch">
                 {/* Khối Cá nhân & Ngoại hình (35%) */}
                 <div className="lg:w-[35%] shrink-0 flex flex-col">
-                  <h4 className="font-bold text-gray-800 mb-3 uppercase tracking-wider text-sm flex items-center gap-2"><UserIcon size={18} className="text-orange-500"/> Cá nhân & Ngoại hình</h4>
+                  <h4 className="font-bold text-gray-800 mb-3 uppercase tracking-wider text-sm flex items-center gap-2"><UserIcon size={18} className="text-orange-500" /> Cá nhân & Ngoại hình</h4>
                   <div className="bg-orange-50/50 p-4 rounded-xl border border-orange-100 space-y-3 flex-1">
+                    <div className="flex flex-col sm:flex-row sm:justify-between border-b border-orange-100 pb-2 gap-1 sm:gap-4">
+                      <span className="text-gray-500 text-sm sm:w-20 shrink-0">CCCD:</span>
+                      {hasRule('NS_HIDE_SENSITIVE') ? (
+                        <span className="font-semibold text-gray-400 text-sm sm:text-right">***</span>
+                      ) : (
+                        <div className="flex items-center gap-1.5 sm:justify-end flex-1">
+                          <span className={`font-semibold ${showCCCD ? 'text-gray-800' : 'text-gray-400 tracking-widest mt-0.5'} text-sm`}>
+                            {showCCCD ? (viewData.cccd || '---') : '••••••••••••'}
+                          </span>
+                          {(viewData.cccd && viewData.cccd.trim() !== '') && (
+                            <button onClick={() => setShowCCCD(!showCCCD)} className="text-gray-400 hover:text-orange-500 transition-colors" title={showCCCD ? "Ẩn CCCD" : "Hiện CCCD"}>
+                              {showCCCD ? <EyeOff size={14} /> : <Eye size={14} />}
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
                     <div className="flex flex-col sm:flex-row sm:justify-between border-b border-orange-100 pb-2 gap-1 sm:gap-4"><span className="text-gray-500 text-sm sm:w-20 shrink-0">Giới tính:</span><span className="font-semibold text-gray-800 text-sm sm:text-right">{viewData.gioi_tinh || '---'}</span></div>
                     <div className="flex flex-col sm:flex-row sm:justify-between border-b border-orange-100 pb-2 gap-1 sm:gap-4"><span className="text-gray-500 text-sm sm:w-20 shrink-0">Năm sinh:</span><span className="font-semibold text-gray-800 text-sm sm:text-right">{viewData.nam_sinh ? new Date(viewData.nam_sinh).toLocaleDateString('vi-VN') : '---'} {viewData.tuoi && <span className="ml-2 text-orange-600 font-bold">({viewData.tuoi} tuổi)</span>}</span></div>
                     <div className="flex flex-col sm:flex-row sm:justify-between border-b border-orange-100 pb-2 gap-1 sm:gap-4"><span className="text-gray-500 text-sm sm:w-20 shrink-0">Trình độ:</span><span className="font-semibold text-gray-800 text-sm sm:text-right">{viewData.trinh_do_hoc_van || '---'}</span></div>
@@ -2476,7 +2588,7 @@ export default function PersonnelPage() {
                 {/* Khối Biểu đồ Cước (65%) */}
                 <div className="lg:w-[65%] flex-1 flex flex-col min-w-0">
                   <h4 className="font-bold text-gray-800 mb-3 uppercase tracking-wider text-sm flex items-center gap-2">
-                    <Phone size={18} className="text-[#05469B]"/> TỔNG HỢP CƯỚC ĐTDĐ
+                    <Phone size={18} className="text-[#05469B]" /> TỔNG HỢP CƯỚC ĐTDĐ
                   </h4>
                   <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-2xs flex-1 flex flex-col">
                     <PersonnelDetailCuocChart personnel={viewData} />
@@ -2486,12 +2598,12 @@ export default function PersonnelPage() {
 
               {/* 🟢 HÀNG GHI CHÚ (Chuyển xuống ngay bên dưới) */}
               <div>
-                <h4 className="font-bold text-gray-800 mb-3 uppercase tracking-wider text-sm flex items-center gap-2"><Info size={18} className="text-blue-500"/> Ghi chú khác</h4>
+                <h4 className="font-bold text-gray-800 mb-3 uppercase tracking-wider text-sm flex items-center gap-2"><Info size={18} className="text-blue-500" /> Ghi chú khác</h4>
                 <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100"><p className="text-sm font-semibold text-gray-800 whitespace-pre-wrap">{viewData.ghi_chu || 'Không có ghi chú.'}</p></div>
               </div>
-              
+
               <div>
-                <h4 className="font-bold text-gray-800 mb-3 uppercase tracking-wider text-sm flex items-center gap-2"><ShieldCheck size={18} className="text-emerald-500"/> Chứng chỉ / Kỹ năng</h4>
+                <h4 className="font-bold text-gray-800 mb-3 uppercase tracking-wider text-sm flex items-center gap-2"><ShieldCheck size={18} className="text-emerald-500" /> Chứng chỉ / Kỹ năng</h4>
                 <div className="flex flex-col gap-3">
                   {viewData.giay_phep_lai_xe && viewData.giay_phep_lai_xe !== 'Không có' && (
                     <div className="flex flex-wrap gap-2 items-center"><span className="text-sm font-bold text-gray-600 mr-1 shrink-0">Bằng lái xe:</span>{viewData.giay_phep_lai_xe.split(',').map((bang: string, idx: number) => (<span key={idx} className="px-2.5 py-1 bg-blue-100 text-[#05469B] font-black rounded-md text-xs border border-blue-200">Hạng {bang.trim()}</span>))}</div>
@@ -2506,31 +2618,30 @@ export default function PersonnelPage() {
               {viewData.cc_atvsld && (
                 <div className="mt-2 p-4 bg-emerald-50 rounded-xl border border-emerald-200 shadow-sm w-full flex flex-col gap-3">
                   <h5 className="font-bold text-emerald-800 text-sm border-b border-emerald-100 pb-2 flex items-center gap-2">
-                    <ShieldCheck size={18}/> Thông tin An toàn Vệ sinh Lao động (ATVSLĐ)
+                    <ShieldCheck size={18} /> Thông tin An toàn Vệ sinh Lao động (ATVSLĐ)
                   </h5>
                   <div className="flex flex-col gap-2 text-sm text-gray-700">
                     <p>
-                      <span className="text-gray-500 w-36 inline-block font-medium">Loại chứng nhận:</span> 
-                      <span className="font-bold text-gray-900">{viewData.chung_nhan || '---'}</span> 
-                      {viewData.nhom_doi_tuong && <span className="text-[#05469B] font-bold ml-1.5">(Nhóm {viewData.nhom_doi_tuong})</span>}
+                      <span className="text-gray-500 w-36 inline-block font-medium">Loại chứng nhận:</span>
+                      <span className="font-bold text-gray-900">{viewData.chung_nhan || '---'}</span>
+                      {viewData.nhom_doi_tuong && <span className="text-[#05469B] font-bold ml-1.5">({String(viewData.nhom_doi_tuong).includes('Nhóm') ? viewData.nhom_doi_tuong : `Nhóm ${viewData.nhom_doi_tuong}`})</span>}
                     </p>
                     <p>
-                      <span className="text-gray-500 w-36 inline-block font-medium">Khóa huấn luyện:</span> 
+                      <span className="text-gray-500 w-36 inline-block font-medium">Khóa huấn luyện:</span>
                       <span className="font-bold text-gray-900">
                         Từ ngày {viewData.huan_luyen_tu ? new Date(viewData.huan_luyen_tu).toLocaleDateString('vi-VN') : '...'} đến ngày {viewData.huan_luyen_den ? new Date(viewData.huan_luyen_den).toLocaleDateString('vi-VN') : '...'}
                       </span>
                     </p>
                     <p>
-                      <span className="text-gray-500 w-36 inline-block font-medium">Giá trị đến:</span> 
+                      <span className="text-gray-500 w-36 inline-block font-medium">Giá trị đến:</span>
                       <span className="font-black text-emerald-700 text-base">
-                        {viewData.gia_tri_den 
-                          ? new Date(viewData.gia_tri_den).toLocaleDateString('vi-VN') 
-                          : viewData.huan_luyen_den 
+                        {viewData.gia_tri_den
+                          ? new Date(viewData.gia_tri_den).toLocaleDateString('vi-VN')
+                          : viewData.huan_luyen_den
                             ? (() => {
-                                const d = new Date(viewData.huan_luyen_den);
-                                d.setFullYear(d.getFullYear() + (String(viewData.nhom_doi_tuong || '').includes('4') ? 1 : 2));
-                                return d.toLocaleDateString('vi-VN') + " (Tự tính tạm)";
-                              })()
+                              const calculated = calcGiaTriDen(viewData.huan_luyen_den, viewData.nhom_doi_tuong || '', chuKyList);
+                              return calculated ? new Date(calculated).toLocaleDateString('vi-VN') + " (Tự tính tạm)" : '...';
+                            })()
                             : '...'
                         }
                       </span>
@@ -2548,7 +2659,7 @@ export default function PersonnelPage() {
       )}
 
       {/* 🟢 MODAL THÊM MỚI / CHỈNH SỬA (Đã tách component) */}
-      <PersonnelModal 
+      <PersonnelModal
         isOpen={modal.isOpen}
         mode={modal.mode}
         formData={formData}
@@ -2565,12 +2676,12 @@ export default function PersonnelPage() {
       {isRehireModalOpen && personnelToRehire && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 animate-in zoom-in duration-200">
-            <h3 className="text-xl font-black text-[#05469B] mb-4 flex items-center gap-2"><RotateCcw size={24}/> Vào làm lại</h3>
+            <h3 className="text-xl font-black text-[#05469B] mb-4 flex items-center gap-2"><RotateCcw size={24} /> Vào làm lại</h3>
             <p className="text-sm text-gray-600 mb-6">Bạn đang thực hiện thủ tục cho nhân sự <span className="font-bold text-gray-800">{personnelToRehire.ho_ten}</span> quay trở lại làm việc.</p>
             <div className="mb-6"><label className="block text-xs font-bold text-gray-500 uppercase mb-2">Ngày vào làm lại chính thức</label><input type="date" value={rehireDate} onChange={(e) => setRehireDate(e.target.value)} className="w-full p-3 bg-blue-50 border border-blue-200 rounded-xl outline-none focus:ring-2 focus:ring-[#05469B] font-bold text-[#05469B]" /></div>
             <div className="flex gap-3">
               <button onClick={() => setIsRehireModalOpen(false)} className="flex-1 py-3 bg-gray-100 text-gray-700 font-bold rounded-xl hover:bg-gray-200 transition-colors">Hủy</button>
-              <button onClick={handleConfirmRehire} disabled={submitting} className="flex-1 py-3 bg-[#05469B] hover:bg-[#04367a] transition-colors text-white font-bold rounded-xl flex items-center justify-center gap-2 shadow-lg">{submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <CheckCheck size={20}/>} Xác nhận</button>
+              <button onClick={handleConfirmRehire} disabled={submitting} className="flex-1 py-3 bg-[#05469B] hover:bg-[#04367a] transition-colors text-white font-bold rounded-xl flex items-center justify-center gap-2 shadow-lg">{submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <CheckCheck size={20} />} Xác nhận</button>
             </div>
           </div>
         </div>
@@ -2594,16 +2705,48 @@ export default function PersonnelPage() {
         <div className="fixed inset-0 z-[90] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl flex flex-col max-h-[90vh] animate-in zoom-in duration-200">
             <div className="flex justify-between items-center p-5 border-b border-indigo-100 bg-indigo-50 rounded-t-2xl">
-              <h3 className="text-xl font-black text-indigo-800 flex items-center gap-2"><ClipboardPaste size={24}/> Dán Dữ Liệu Hàng Loạt</h3>
+              <h3 className="text-xl font-black text-indigo-800 flex items-center gap-2"><ClipboardPaste size={24} /> Dán Dữ Liệu Hàng Loạt</h3>
               <button onClick={() => setIsBulkImportOpen(false)} className="text-indigo-400 hover:text-red-500 rounded-full p-1.5 bg-white shadow-sm"><X size={24} /></button>
             </div>
             <div className="p-6 overflow-y-auto space-y-4 custom-scrollbar">
-              <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100 text-sm">
-                <p className="font-bold text-[#05469B] mb-1">Cấu trúc dán (Quét từ Cột 1 đến Cột 22, có hay không có Tiêu đề đều được):</p>
-                <p className="text-gray-700 text-[11px] leading-relaxed">
-                  Mã NV [Cột 2] | Họ tên [Cột 3] | Chức danh [Cột 4] | Bộ phận [Cột 5] | Chức vụ [Cột 9] | SĐT [Cột 10] | Giới tính [Cột 11] | Năm sinh [Cột 12] | Ngày làm [Cột 13] | SĐT phụ [Cột 14] | Email [Cột 15] | Ngạch [Cột 16] | Nhóm ATVSLĐ [Cột 17] | HL Từ [Cột 18] | HL Đến [Cột 19] | Giá trị đến [Cột 20] <span className="font-bold text-indigo-700">| Khối [Cột 21] | Địa điểm LV [Cột 22]</span>
-                </p>
-                <p className="mt-2 text-indigo-600 font-bold text-xs">✓ Tự động gán vào: {selectedUnitName} (Bỏ trống sẽ giữ nguyên dữ liệu cũ)</p>
+              <div className="bg-indigo-50/50 p-5 rounded-2xl border border-indigo-100 space-y-3">
+                <div className="flex items-center gap-1.5 text-xs text-indigo-800 font-bold">
+                  <Info size={15} className="shrink-0 text-indigo-600" />
+                  <span>Cấu trúc dán (Quét từ Cột 1 đến 27, có hay không có Tiêu đề đều được):</span>
+                </div>
+                <div className="flex flex-wrap gap-2 text-[11px]">
+                  <span className="px-2.5 py-1 rounded-lg bg-white border border-indigo-200 text-gray-500 font-medium">1. Số TT</span>
+                  <span className="px-2.5 py-1 rounded-lg bg-white border border-indigo-300 text-indigo-800 font-bold">2. Mã NV *</span>
+                  <span className="px-2.5 py-1 rounded-lg bg-white border border-indigo-300 text-indigo-800 font-bold">3. Họ tên *</span>
+                  <span className="px-2.5 py-1 rounded-lg bg-white border border-indigo-300 text-indigo-800 font-bold">4. Chức danh *</span>
+                  <span className="px-2.5 py-1 rounded-lg bg-white border border-indigo-200 text-gray-700 font-medium">5. Bộ phận</span>
+                  <span className="px-2.5 py-1 rounded-lg bg-white border border-indigo-200 text-gray-500 font-medium">6. Đơn vị</span>
+                  <span className="px-2.5 py-1 rounded-lg bg-white border border-indigo-200 text-gray-500 font-medium">7. Showroom</span>
+                  <span className="px-2.5 py-1 rounded-lg bg-white border border-indigo-200 text-gray-500 font-medium">8. Phía</span>
+                  <span className="px-2.5 py-1 rounded-lg bg-white border border-indigo-200 text-gray-700 font-medium">9. Phân loại</span>
+                  <span className="px-2.5 py-1 rounded-lg bg-white border border-indigo-200 text-gray-700 font-medium">10. SĐT Cty</span>
+                  <span className="px-2.5 py-1 rounded-lg bg-white border border-indigo-200 text-gray-700 font-medium">11. Giới tính</span>
+                  <span className="px-2.5 py-1 rounded-lg bg-white border border-indigo-200 text-gray-700 font-medium">12. Năm sinh</span>
+                  <span className="px-2.5 py-1 rounded-lg bg-white border border-indigo-200 text-gray-700 font-medium">13. Ngày làm</span>
+                  <span className="px-2.5 py-1 rounded-lg bg-white border border-indigo-200 text-gray-700 font-medium">14. SĐT CNhân</span>
+                  <span className="px-2.5 py-1 rounded-lg bg-white border border-indigo-200 text-gray-700 font-medium">15. Email</span>
+                  <span className="px-2.5 py-1 rounded-lg bg-white border border-indigo-200 text-gray-700 font-medium">16. Ngạch</span>
+                  <span className="px-2.5 py-1 rounded-lg bg-indigo-50 border border-indigo-300 text-indigo-900 font-bold shadow-xs">17. Nhóm ATVSLĐ</span>
+                  <span className="px-2.5 py-1 rounded-lg bg-white border border-indigo-200 text-gray-700 font-medium">18. HL Từ</span>
+                  <span className="px-2.5 py-1 rounded-lg bg-white border border-indigo-200 text-gray-700 font-medium">19. HL Đến</span>
+                  <span className="px-2.5 py-1 rounded-lg bg-white border border-indigo-200 text-gray-700 font-medium">20. Giá trị đến</span>
+                  <span className="px-2.5 py-1 rounded-lg bg-white border border-indigo-300 text-indigo-800 font-bold">21. Khối</span>
+                  <span className="px-2.5 py-1 rounded-lg bg-white border border-indigo-300 text-indigo-800 font-bold">22. Địa điểm LV</span>
+                  <span className="px-2.5 py-1 rounded-lg bg-white border border-indigo-300 text-indigo-800 font-bold">23. CCCD</span>
+                  <span className="px-2.5 py-1 rounded-lg bg-white border border-indigo-300 text-indigo-800 font-bold">24. Thẻ thang</span>
+                  <span className="px-2.5 py-1 rounded-lg bg-white border border-indigo-300 text-indigo-800 font-bold">25. Thẻ xe</span>
+                  <span className="px-2.5 py-1 rounded-lg bg-white border border-indigo-300 text-indigo-800 font-bold">26. Hãng Loại xe</span>
+                  <span className="px-2.5 py-1 rounded-lg bg-white border border-indigo-300 text-indigo-800 font-bold">27. Biển kiểm soát</span>
+                </div>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between text-xs pt-1 gap-2">
+                  <span className="text-emerald-600 font-black flex items-center gap-1">✓ Hệ thống tự động gán vào đơn vị: {selectedUnitName}</span>
+                  <span className="text-gray-400 italic">Chú ý: Các cột 6, 7, 8 trong bảng Excel cần được giữ nguyên (để trống) để đảm bảo đúng thứ tự dán.</span>
+                </div>
               </div>
               <textarea value={bulkImportText} onChange={handlePasteBulkData} disabled={isAnalyzingBulk} placeholder="Ctrl+V bảng Excel vào đây..." className="w-full h-32 p-3 text-sm border-2 border-dashed border-indigo-300 rounded-xl outline-none focus:border-indigo-500 bg-white resize-none"></textarea>
               {isAnalyzingBulk && <div className="text-center py-4"><Loader2 className="animate-spin inline mr-2" /> Đang xử lý...</div>}
@@ -2624,7 +2767,7 @@ export default function PersonnelPage() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100">
-                        {bulkImportData.map((item, idx) => (
+                        {bulkImportData.slice(0, 20).map((item, idx) => (
                           <tr key={idx} className="hover:bg-blue-50/50">
                             <td className="p-3 font-bold text-[#05469B]">{item.ma_so_nhan_vien}</td>
                             <td className="p-3">{item.ho_ten}</td>
@@ -2638,6 +2781,11 @@ export default function PersonnelPage() {
                       </tbody>
                     </table>
                   </div>
+                  {bulkImportData.length > 20 && (
+                    <div className="text-center text-sm text-gray-500 mt-2 font-medium italic">
+                      ... và {bulkImportData.length - 20} nhân sự khác (chỉ hiển thị xem trước 20 dòng để tối ưu tốc độ)
+                    </div>
+                  )}
                 </div>
               )}
             </div>

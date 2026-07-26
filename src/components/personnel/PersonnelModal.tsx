@@ -104,10 +104,10 @@ export default function PersonnelModal({
     if (isOpen && formData.cc_atvsld) {
       const nhom = String(formData.nhom_doi_tuong || '');
       let certName = '';
-      if (nhom === '1' || nhom === '2') certName = 'Giấy chứng nhận huấn luyện ATVSLĐ';
-      else if (nhom === '3') certName = 'Thẻ An toàn lao động';
-      else if (nhom === '4') certName = 'Quyết định Công nhận Kết quả Huấn luyện ATVSLĐ';
-      else if (nhom === '6') certName = 'Giấy chứng nhận huấn luyện ATVSLĐ';
+      if (nhom === 'Nhóm 1' || nhom === 'Nhóm 2') certName = 'Giấy chứng nhận huấn luyện ATVSLĐ';
+      else if (nhom === 'Nhóm 3') certName = 'Thẻ An toàn lao động';
+      else if (nhom === 'Nhóm 4') certName = 'Quyết định Công nhận Kết quả Huấn luyện ATVSLĐ';
+      else if (nhom === 'Nhóm 6') certName = 'Giấy chứng nhận huấn luyện ATVSLĐ';
 
       if (formData.chung_nhan !== certName) {
         setFormData(prev => ({ ...prev, chung_nhan: certName }));
@@ -157,7 +157,8 @@ export default function PersonnelModal({
       'KD xe Thương mại & Xuất khẩu',
       'KD DVPT',
       'NVQT Chuyên ngành',
-      'NVQT Cơ bản'
+      'NVQT Cơ bản',
+      'Nghiệp vụ'
     ];
     const current = String(formData.khoi || '').trim();
     if (current && !base.includes(current)) {
@@ -200,8 +201,8 @@ export default function PersonnelModal({
                 <div className="w-2 h-6 bg-[#05469B] rounded-full"></div>
                 Thông tin cá nhân
               </h4>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                {/* Dòng 1: Mã NV - Họ và Tên - Giới tính */}
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                {/* Dòng 1: Mã NV - Họ và Tên - CCCD - Giới tính */}
                 <div>
                   <label className="block text-xs font-bold text-gray-700 mb-1">Mã NV *</label>
                   <input type="text" required name="ma_so_nhan_vien" value={formData.ma_so_nhan_vien || ''} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" />
@@ -209,6 +210,10 @@ export default function PersonnelModal({
                 <div className="md:col-span-2">
                   <label className="block text-xs font-bold text-gray-700 mb-1">Họ và Tên *</label>
                   <input type="text" required name="ho_ten" value={formData.ho_ten || ''} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">CCCD</label>
+                  <input type="text" name="cccd" value={formData.cccd || ''} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" placeholder="Số CCCD" />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-gray-700 mb-1">Giới tính</label>
@@ -239,7 +244,7 @@ export default function PersonnelModal({
                     placeholder="09xx xxx xxx"
                   />
                 </div>
-                <div>
+                <div className="md:col-span-2">
                   <label className="block text-xs font-bold text-[#05469B] mb-1">SĐT Công ty (SIM cấp)</label>
                   <input
                     type="tel"
@@ -267,7 +272,7 @@ export default function PersonnelModal({
                 </div>
 
                 {/* Dòng 3: Email - Link ảnh Đại diện (Google Drive) */}
-                <div className="md:col-span-1">
+                <div className="md:col-span-2">
                   <label className="block text-xs font-bold text-gray-700 mb-1">Email</label>
                   <input type="email" name="email" value={formData.email || ''} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" />
                 </div>
@@ -441,8 +446,82 @@ export default function PersonnelModal({
                   </div>
 
                   {/* Dòng 4: Trạng thái làm việc (25%) - Ngày nghỉ việc (25%) */}
-                  <div><label className="block text-xs font-bold text-gray-700 mb-1">Trạng thái làm việc</label><select name="trang_thai" value={formData.trang_thai || 'Đang làm việc'} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]"><option value="Đang làm việc">Đang làm việc</option><option value="Đã thôi việc">Đã thôi việc</option></select></div>
-                  <div><label className="block text-xs font-bold text-gray-700 mb-1">Ngày nghỉ việc</label><input type="date" name="ngay_nghi_viec" value={formData.ngay_nghi_viec ? formData.ngay_nghi_viec.split('T')[0] : ''} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" /></div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">Trạng thái làm việc</label>
+                    <select
+                      name="trang_thai"
+                      value={formData.trang_thai || 'Đang làm việc'}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setFormData(prev => {
+                          const updated = { ...prev, trang_thai: val };
+                          if (val === 'Đang làm việc') {
+                            updated.ngay_nghi_viec = null;
+                          }
+                          return updated;
+                        });
+                      }}
+                      className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]"
+                    >
+                      <option value="Đang làm việc">Đang làm việc</option>
+                      <option value="Đã thôi việc">Đã thôi việc</option>
+                    </select>
+                  </div>
+                  {formData.trang_thai === 'Đã thôi việc' && (
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 mb-1">Ngày nghỉ việc</label>
+                      <input
+                        type="date"
+                        name="ngay_nghi_viec"
+                        value={formData.ngay_nghi_viec ? formData.ngay_nghi_viec.split('T')[0] : ''}
+                        onChange={handleInputChange}
+                        className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]"
+                      />
+                    </div>
+                  )}
+
+                  {/* Dòng 5: Thẻ thang - Thẻ xe - Hãng Loại xe - BKS */}
+                  <div className="col-span-1 md:col-span-4 border-t border-gray-100 mt-2 pt-4">
+                    <h5 className="font-bold text-[#05469B] mb-3 text-sm">Thông tin Tài sản & Thẻ (Tòa nhà / Bãi giữ xe)</h5>
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1">Thẻ thang máy</label>
+                        <select name="the_thang" value={formData.the_thang || 'No'} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]">
+                          <option value="No">Không có</option>
+                          <option value="Yes">Có sử dụng</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1">Thẻ gửi xe</label>
+                        <select name="the_xe" value={formData.the_xe || 'No'} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]">
+                          <option value="No">Không có</option>
+                          <option value="Yes">Có sử dụng</option>
+                        </select>
+                      </div>
+                      {formData.the_xe === 'Yes' && (
+                        <>
+                          <div>
+                            <label className="block text-xs font-bold text-gray-700 mb-1">Hãng - Loại xe</label>
+                            <input type="text" name="hang_loai_xe" value={formData.hang_loai_xe || ''} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" placeholder="VD: Honda Airblade" />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-bold text-gray-700 mb-1">Biển Kiểm Soát (BKS)</label>
+                            <input 
+                              type="text" 
+                              name="bks" 
+                              value={formData.bks || ''} 
+                              onChange={(e) => {
+                                const val = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+                                setFormData(prev => ({ ...prev, bks: val }));
+                              }} 
+                              className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] uppercase font-mono tracking-wider font-bold" 
+                              placeholder="VD: 59A11234" 
+                            />
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

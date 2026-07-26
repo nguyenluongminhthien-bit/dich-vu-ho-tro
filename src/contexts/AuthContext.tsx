@@ -94,14 +94,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       apiService.setCurrentUser(mappedUser as unknown as User);
       apiService.writeLog('ĐĂNG NHẬP', 'Truy cập hệ thống');
 
-      // Tải ngầm
+      // Chỉ preload danh mục đơn vị cơ bản ngầm (nhẹ) nếu cần, tránh tải ồ ạt toàn bộ bảng nhân sự, an ninh, pháp nhân
       setTimeout(() => {
-        apiService.getDonVi().catch(()=>{});
-        apiService.getPersonnel().catch(()=>{});
-        apiService.getAnNinh().catch(()=>{});
-        apiService.getPhapNhan().catch(()=>{});
-        if (apiService.getPhongHop) apiService.getPhongHop().catch(()=>{});
-      }, 500);
+        apiService.getDonVi().catch(() => {});
+      }, 300);
 
     } catch (error) {
       console.error("Login Error:", error);

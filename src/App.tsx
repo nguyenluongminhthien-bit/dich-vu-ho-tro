@@ -31,7 +31,7 @@ interface TabContainerProps {
   children: React.ReactNode;
 }
 
-function TabContainer({ active, children }: TabContainerProps) {
+const TabContainer = React.memo(function TabContainer({ active, children }: TabContainerProps) {
   const [hasBeenVisited, setHasBeenVisited] = useState(false);
 
   useEffect(() => {
@@ -43,13 +43,13 @@ function TabContainer({ active, children }: TabContainerProps) {
   if (!hasBeenVisited) return null;
 
   return (
-    <div className={`absolute inset-0 transition-opacity duration-200 ${active ? 'opacity-100 z-10' : 'opacity-0 pointer-events-none -z-10'}`}>
+    <div className={`absolute inset-0 transition-opacity duration-150 ${active ? 'opacity-100 z-10 block' : 'opacity-0 pointer-events-none -z-10 hidden'}`}>
       <React.Suspense fallback={<PageLoadingFallback />}>
         {children}
       </React.Suspense>
     </div>
   );
-}
+});
 
 function AppContent() {
   const { user, checkPermission } = useAuth();

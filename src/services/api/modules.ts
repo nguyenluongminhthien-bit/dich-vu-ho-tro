@@ -5,24 +5,24 @@ import { writeLog } from './logs';
 import { getLocalRecords, saveLocalRecord, deleteLocalRecord } from './localStore';
 
 // Helper wrapper cho tất cả GET requests có chế độ fallback
-async function getWithFallback<T>(tableName: string): Promise<T[]> {
+async function getWithFallback<T>(tableName: string, forceRefresh = false): Promise<T[]> {
   if (API_MODE === 'MOCK') {
     return getLocalRecords(tableName) as T[];
   }
   try {
-    return await fetchWithCache(tableName) as T[];
+    return await fetchWithCache(tableName, forceRefresh) as T[];
   } catch (err) {
     console.warn(`⚠️ Không thể tải dữ liệu bảng ${tableName} từ Supabase. Tự động dùng dữ liệu offline Local!`);
     return getLocalRecords(tableName) as T[];
   }
 }
 
-export const getPersonnel = () => getWithFallback<Personnel>('ns_dich_vu');
-export const getDonVi = () => getWithFallback<DonVi>('dm_don_vi');
+export const getPersonnel = (forceRefresh = false) => getWithFallback<Personnel>('ns_dich_vu', forceRefresh);
+export const getDonVi = (forceRefresh = false) => getWithFallback<DonVi>('dm_don_vi', forceRefresh);
 export const getAnNinh = () => getWithFallback<any>('hs_an_ninh');
 export const getXe = () => getWithFallback<any>('ts_xe');
 export const getChiPhiXe = () => getWithFallback<any>('cp_hoat_dong_xe');
-export const getPhapNhan = () => getWithFallback<any>('dm_phap_nhan');
+export const getPhapNhan = (forceRefresh = false) => getWithFallback<any>('dm_phap_nhan', forceRefresh);
 export const getPhongHop = () => getWithFallback<any>('dm_phong_hop');
 export const getQuyDinh = () => getWithFallback<any>('qd_qt');
 export const getThietBi = () => getWithFallback<any>('ts_thiet_bi');
@@ -37,6 +37,11 @@ export const getUsers = () => getWithFallback<User>('config_users');
 export const getLogs = () => getWithFallback<SysLog>('sys_logs');
 export const getThueBao   = () => getWithFallback<ThueBao>('dm_thue_bao');
 export const getCuocThang = () => getWithFallback<CuocThang>('cp_cuoc_thang');
+export const getKhoaHuanLuyen = () => getWithFallback<any>('hs_khoa_huan_luyen');
+export const getHocVienKhoaHuanLuyen = () => getWithFallback<any>('hs_hoc_vien_khoa_huan_luyen');
+export const getChuKyATVSLD = (forceRefresh = false) => getWithFallback<any>('dm_chu_ky_atvsld', forceRefresh);
+export const getThietBiNghiemNgat = () => getWithFallback<any>('ts_thiet_bi_nghiem_ngat');
+export const getKiemDinhTBNN = () => getWithFallback<any>('nk_kiem_dinh_tbnn');
 
 // Helper làm sạch payload trước khi gửi lên Supabase (loại bỏ trường UI-only, rỗng "" -> null)
 function sanitizePayload(item: Record<string, any>, isUpdate: boolean = false): Record<string, any> {

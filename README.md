@@ -1,150 +1,203 @@
-# 🏢 HỆ THỐNG QUẢN LÝ DỊCH VỤ HỖ TRỢ - THACO AUTO (ERP MINI)
+# 🏢 HỆ THỐNG QUẢN TRỊ VĂN PHÒNG & AN SINH ĐỜI SỐNG (QTVP-ASDS) - THACO AUTO
 
-Tài liệu này tổng hợp toàn bộ thông tin kiến trúc, quy định nghiệp vụ cốt lõi, cơ chế phân quyền, quy chuẩn kỹ thuật và hướng dẫn vận hành của hệ thống **Quản lý Dịch vụ Hỗ trợ - THACO AUTO**.
+Tài liệu này cung cấp bức tranh toàn cảnh 100% về kiến trúc, tất cả 12 phân hệ nghiệp vụ, cơ chế phân quyền, nguyên tắc tối ưu hiệu năng và giải thích cấu trúc file dự án **QTVP-ASDS**.
 
 ---
 
 ## 1. TỔNG QUAN HỆ THỐNG & CÔNG NGHỆ (SYSTEM OVERVIEW & TECH STACK)
 
-### 1.1. Mục tiêu & Kiến trúc
-* **Mục tiêu:** Số hóa, chuẩn hóa và quản trị tập trung tổng thể Hành chính - Nhân sự - Tài sản - PCCC - ATVSLĐ cho hệ thống Đơn vị / Showroom / Điểm bán hàng trên toàn quốc.
-* **Mô hình kiến trúc:** JAMstack (Client-side React + Backend-as-a-Service Supabase).
-* **Đặc tính cốt lõi:** Quản trị phân quyền theo dữ liệu phân cấp dạng cây (Hierarchy-based Access Control) kết hợp vai trò (Role-based Access Control).
+### 1.1. Mục tiêu Hệ thống
+* **Mục tiêu:** Số hóa, chuẩn hóa và quản trị tập trung toàn bộ các mảng nghiệp vụ: **Hành chính - Nhân sự - Tài sản - Xe - Thiết bị - PCCC - ATVSLĐ - An ninh Bảo vệ - Văn bản - Báo cáo** cho toàn bộ hệ thống Đơn vị / Công ty Tỉnh thành / Showroom / Điểm bán hàng của THACO AUTO trên toàn quốc.
+* **Mô hình kiến trúc:** Single Page Application (SPA) React + TypeScript kết hợp Supabase REST API & Smart Two-Layer Cache.
+* **Cơ chế phân quyền:** Quản trị phân quyền dựa trên cây dữ liệu đệ quy (Hierarchy-based Access Control) kết hợp vai trò người dùng (Role-based Access Control).
 
 ### 1.2. Công nghệ sử dụng (Tech Stack)
-* **Frontend:** React 18 (Vite), TypeScript (Strict Typing).
-* **Styling & UI:** Vanilla CSS, Tailwind CSS v3, Lucide React Icons.
-* **Backend & Database:** Supabase (PostgreSQL RLS, Authentication JWT, Storage).
-* **Xử lý Dữ liệu/Excel:** `xlsx` (SheetJS) hỗ trợ xuất báo cáo & import dữ liệu hàng loạt.
+* **Core Frontend:** React 19, TypeScript 5.8 (Strict Type Checking), Vite 6.
+* **Giao diện & Biểu tượng:** Tailwind CSS v4, Lucide React Icons, Motion (Framer Motion).
+* **Mã QR & Tiện ích:** `qrcode.react`, `html5-qrcode` (Quét & tạo mã QR tài sản).
+* **Backend & Database:** Supabase (PostgreSQL Database, REST API, Row Level Security).
+* **Xuất Báo cáo & Excel:** Xuất file Excel HTML/XML đa sheet hỗ trợ tiếng Việt có dấu.
 
 ---
 
-## 2. CẤU TRÚC THƯ MỤC & PHÂN VÙNG CHỨC NĂNG (PROJECT STRUCTURE)
+## 2. BẢN ĐỒ TẤT CẢ 12 PHÂN HỆ NGHIỆP VỤ (MODULE SITEMAP)
 
-Dự án được tổ chức theo mô hình **Feature-based** kết hợp **Layer-based** nhằm tối ưu hóa khả năng bảo trì và mở rộng:
+Hệ thống bao gồm 12 phân hệ chính được tích hợp liền mạch trên thanh Sidebar bên trái:
 
 ```text
-src/
-├── components/       # Các thành phần UI dùng chung & Modals nghiệp vụ
-├── constants/        # Hằng số toàn hệ thống (Chứng chỉ, mẫu báo cáo, cấu hình...)
-├── contexts/         # Quản lý State toàn cục (Authentication...)
-├── hooks/            # Custom React Hooks dùng chung (Phân quyền, tính toán cây đơn vị...)
-├── pages/            # Các trang tính năng chính (Dashboard, Personnel, Document, Report...)
-├── services/         # Tương tác Cơ sở dữ liệu (Supabase API Gateway)
-├── types/            # Định nghĩa kiểu dữ liệu TypeScript
-└── utils/            # Thư viện hàm tiện ích hỗ trợ (Formatters, Hierarchy...)
+QTVP-ASDS App
+├── 📊 01. Tổng quan (Dashboard)
+├── 🏢 02. Đơn vị & Sơ đồ tổ chức (Departments)
+├── 👥 03. Quản lý Nhân sự & Cước Di động (Personnel)
+├── 🧯 04. Quản lý PCCC & CNCH (Fire Safety)
+├── 🛡️ 05. Quản lý ATVSLĐ & Thiết bị Nghiêm ngặt (ATVSLĐ)
+├── 🚗 06. Quản lý Xe & Chi phí Vận hành (Vehicles)
+├── 💻 07. Quản lý Trang thiết bị & QR Code (Equipments)
+├── 📄 08. Quản lý Văn bản & Thông báo (Documents)
+├── 📜 09. Quản lý Quy định & Quy trình (Policies)
+├── 📊 10. Báo cáo Tổng hợp & Custom Builder (Reports)
+├── 👤 11. Quản lý Tài khoản (Accounts)
+└── 📜 12. Nhật ký Hệ thống (System Logs)
 ```
 
-### Chi tiết chức năng từng phân vùng:
-| Phân mục lõi | Thư mục con / File khóa | Vai trò & Chức năng nghiệp vụ |
+---
+
+### 🟢 CHI TIẾT TÍNH NĂNG TỪNG PHÂN HỆ
+
+#### 📊 01. Phân hệ Tổng quan (DashboardPage.tsx)
+- **Hệ thống Thẻ KPI**: Hiển thị tổng số nhân sự, đơn vị, xe, thiết bị, tình hình PCCC và ATVSLĐ thuộc phạm vi quản lý.
+- **Biểu đồ Nhân sự (PersonnelDoughnutChart.tsx)**: Phân tích cơ cấu nhân sự theo phân loại, thâm niên, độ tuổi và giới tính.
+- **Bảng Cảnh báo Hạn (ExpiryAlertPanel.tsx)**: Tự động gom nhóm các đối tượng Sắp hết hạn / Quá hạn (Biên bản kiểm định thiết bị nghiêm ngặt, Chứng chỉ ATVSLĐ, Bảo hiểm chay nổ PCCC, Bơm sạc bình PCCC, Kiểm định xe...).
+- **Tùy chỉnh Dashboard (DashboardCustomizerModal.tsx)**: Cho phép bật/tắt và sắp xếp các widget theo sở thích cá nhân.
+
+#### 🏢 02. Phân hệ Đơn vị & Sơ đồ Tổ chức (DepartmentPage.tsx)
+- **Cấu trúc Cây Đơn vị đệ quy**: Quản lý cấp quan hệ cha-con từ Văn phòng Điều hành -> Công ty Tỉnh thành -> Showroom / Điểm bán hàng.
+- **Quản lý Pháp nhân (PnModal.tsx)**: Lưu giữ thông tin Mã số thuế, tên công ty, địa chỉ xuất hóa đơn, giấy phép kinh doanh.
+- **Quản lý Phòng họp (PhModal.tsx)**: Quản lý vị trí, sức chứa, thiết bị trình chiếu, thiết bị họp online, layout bàn ghế.
+- **Tích hợp các Sub-modal nghiệp vụ**: Nhật ký An ninh bảo vệ (SecurityModal), Phục vụ hành chính (PvhcModal), PCCC (PcccModal), ATVSLĐ (AtvsldModal), PCTT (PcttModal).
+
+#### 👥 03. Phân hệ Quản lý Nhân sự & Cước Di động (PersonnelPage.tsx)
+- **Hồ sơ Nhân sự 360°**: Quản lý đầy đủ mã nhân viên, họ tên, chức danh, bộ phận, khối, ngạch lương, thâm niên, ngày nhận việc, CCCD, thông tin xe cá nhân, bằng cấp chứng chỉ (ANBV, PCCC, CNCH, Sơ cấp cứu, Võ thuật, GPLX, Tin học, Ngoại ngữ...).
+- **Quản lý Thuê bao & Cước di động (`CuocDiDongTab.tsx`)**: 
+  - Quản lý danh mục số thuê bao công ty cấp cho nhân sự/bộ phận.
+  - Theo dõi lịch sử người sử dụng thuê bao (`lich_su_nsd`).
+  - Quản lý chi tiết chi phí cước tháng phát sinh (`cp_cuoc_thang`), so sánh với snapshot định mức, hiển thị biểu đồ biến động cước (`PersonnelDetailCuocChart.tsx`, `ThueBaoDetailCuocChart.tsx`).
+- **Thao tác Nghiệp vụ Nâng cao**: Tạo hồ sơ kiêm nhiệm (`handleDuplicate`), Điều chuyển / Nghỉ việc (`handleOffboardClick` - tự động kiểm tra tài sản chưa trả), Vào làm lại (`handleConfirmRehire`).
+- **Nhập Dán Excel Hàng Loạt (Paste Import)**: Cho phép copy-paste toàn bộ bảng Excel vào phần mềm. 
+  - *Quy tắc bảo toàn dữ liệu*: Bắt buộc MSNV và Họ tên. Đối với nhân sự đã tồn tại, các cột để trống trong file Excel sẽ **GIỮ NGUYÊN 100% dữ liệu cũ trong CSDL**, không bị ghi đè hay nhảy chức danh.
+
+#### 🧯 04. Phân hệ Quản lý PCCC & CNCH (FireSafetyPage.tsx)
+- **Hồ sơ Đội PCCC cơ sở**: Số lượng đội viên, khả năng huy động ban ngày/ban đêm, phương án PCCC, hotline khẩn cấp (PCCC, UBND, Công an, Điện lực, Cấp nước, Y tế).
+- **Quản lý Tài sản PCCC (TS_PCCC)**: Danh mục bình chữa cháy, hệ thống báo cháy, vách tường, dụng cụ CNCH.
+- **Cảnh báo Lịch Bơm Sạc & Bảo hiểm**: Hệ thống cảnh báo tự động ngày đến hạn bơm sạc bình chữa cháy và ngày hết hạn bảo hiểm cháy nổ bắt buộc.
+
+#### 🛡️ 05. Phân hệ Quản lý ATVSLĐ & Thiết bị Nghiêm ngặt (AtvsldPage.tsx)
+- **Tab 1: Hồ sơ Báo cáo Cơ sở (`HoSoTab.tsx`)**: Tự động tổng hợp số liệu huấn luyện các Nhóm 1-6 và thiết bị nghiêm ngặt từ database mà không cần nhập tay.
+- **Tab 2: Kế hoạch Đào tạo đợt tới (`KeHoachTab.tsx`)**: Quét và phân loại tự động nhân sự thành 4 diện: *Chưa học*, *Quá hạn*, *Sắp hết hạn (<60 ngày)*, *An toàn*. Hỗ trợ xuất danh sách Excel theo mẫu.
+- **Tab 3: Khóa học Huấn luyện (`KhoaHocTab.tsx`)**: Quản lý các đợt đào tạo, nhập danh sách học viên qua dán Excel. Hỗ trợ **Đồng bộ chứng chỉ ngầm (Background Batch Sync)** cập nhật ngược về hồ sơ nhân sự theo lô (batch size 15).
+- **Tab 4: Thiết bị yêu cầu Nghiêm ngặt về ATLĐ (`StrictEquipmentTab.tsx`)**:
+  - Quản lý danh mục thiết bị có yêu cầu nghiêm ngặt (xe nâng, nồi hơi, thang máy, bình chịu áp lực...).
+  - Quản lý nhật ký/lịch sử kiểm định (`nk_kiem_dinh_tbnn`), đơn vị kiểm định, chi phí, link biên bản PDF.
+  - Cảnh báo thời hạn kiểm định qua huy hiệu màu chuẩn: *Đỏ (Quá hạn)*, *Cam (Dưới 30 ngày)*, *Vàng (Dưới 60 ngày)*, *Xanh (An toàn)*.
+
+#### 🚗 06. Phân hệ Quản lý Xe & Chi phí Vận hành (VehiclePage.tsx)
+- **Master Tài sản Xe (TS_Xe)**: Quản lý biển số, loại phương tiện, hiệu xe, số khung, số máy, năm sản xuất, hình thức sở hữu, GPS, hiện trạng.
+- **Nhật ký Chi phí Vận hành (CP_HoatDongXe)**: Theo dõi số km, số lít nhiên liệu, chi phí nhiên liệu, cầu đường bến bãi, rửa xe, bảo dưỡng sửa chữa, khấu hao theo từng tháng/năm.
+
+#### 💻 07. Phân hệ Quản lý Trang thiết bị & QR Code (EquipmentPage.tsx)
+- **Master Thiết bị CNTT & Văn phòng**: Quản lý mã tài sản, tên thiết bị, nhóm, thông số kỹ thuật (CPU, RAM, SSD, VGA, màn hình...), hạn bảo hành, nhà cung cấp.
+- **Nhật ký Thiết bị (NhatKyThietBi)**: Ghi nhận lịch sử bàn giao người sử dụng, phòng ban quản lý, lịch sử sửa chữa, nâng cấp, báo hỏng, chi phí.
+- **Deep Link & Quét mã QR**: Tạo mã QR tài sản (`qrcode.react`), hỗ trợ quét mã QR qua camera (`html5-qrcode`) hoặc truy cập thẳng qua URL `/?tab=equipment&qr=MÃ_TÀI_SẢN` để mở ngay chi tiết thiết bị.
+
+#### 📄 08. Phân hệ Quản lý Văn bản & Thông báo (DocumentPage.tsx)
+- **Phân loại Văn bản**: Quản lý văn bản đến/đi, thông báo, quyết định, quy định.
+- **Phân quyền thao tác**:
+  - Chỉ đơn vị ban hành hoặc HO Admin mới có quyền Sửa/Xóa văn bản đó.
+  - Các đơn vị khác chỉ có quyền Xem (Read-only).
+- **Auto-fill Người lấy số**: Nhập mã nhân viên tự động điền Họ tên và Bộ phận lấy số.
+
+#### 📜 09. Phân hệ Quản lý Quy định & Quy trình (PolicyPage.tsx)
+- Lưu trữ, phân loại và tra cứu các quy định hành chính, quy trình làm việc chuẩn áp dụng trong toàn hệ thống.
+
+#### 📊 10. Phân hệ Báo cáo Tổng hợp & Custom Builder (ReportPage.tsx)
+- **Mẫu báo cáo Cấu trúc Đơn vị (`ReportList.tsx`)**: Tổng hợp sơ đồ và thông tin liên hệ đơn vị.
+- **Mẫu báo cáo Pháp nhân Hóa đơn**: Tổng hợp mã số thuế và tên công ty xuất hóa đơn.
+- **Mẫu báo cáo Khảo sát An ninh Bảo vệ 13 mục**: Cho phép xuất file Excel đa Worksheet (mỗi đơn vị/showroom 1 Sheet) theo đúng chuẩn khảo sát AN-BV.
+- **Trình dựng Báo cáo Tùy chỉnh (`CustomReportBuilder.tsx`)**: Cho phép chọn bảng dữ liệu, chọn cột hiển thị, thiết lập bộ lọc và xuất file Excel theo ý muốn.
+
+#### 👤 11. Phân hệ Quản lý Tài khoản (AccountPage.tsx)
+- **Quản lý Người dùng**: Tạo mới, cập nhật thông tin tài khoản, cấp lại mật khẩu.
+- **Phân quyền chi tiết (Granular Permissions)**: Phân quyền theo Cây đơn vị (`id_don_vi`) và Phân quyền Module thanh menu (`quyen_truy_cap`).
+
+#### 📜 12. Phân hệ Nhật ký Hệ thống (LogPage.tsx)
+- **Ghi vết Tự động (SysLog)**: Tự động lưu vết lịch sử Đăng nhập, Đăng xuất, Thêm mới, Cập nhật, Xóa bản ghi của tất cả người dùng kèm thời gian và IP/thông tin thao tác.
+
+---
+
+## 3. KIẾN TRÚC KỸ THUẬT & TỐI ƯU HIỆU NĂNG (PERFORMANCE ARCHITECTURE)
+
+### 3.1. Bộ Đệm 2 Tầng Thông Minh (Smart Two-Layer Cache)
+Nằm trong [src/services/api/cache.ts](file:///g:/My%20Drive/Web%20app/APP_QTVP.ASDS/src/services/api/cache.ts):
+1. **Layer 1 - In-Memory Cache**: Trả về dữ liệu siêu tốc (<1ms) trong phiên làm việc đối với các bảng chưa hết hạn TTL (5 phút).
+2. **Layer 2 - Persistent LocalStorage Cache**: Lưu bản nạp dữ liệu offline.
+   - *Cơ chế an toàn*: Tự động bắt lỗi `QuotaExceededError` khi `localStorage` chạm ngưỡng 5MB, tự động dọn dẹp cache cũ và hạ cấp mượt mà xuống In-Memory cache mà không làm đơ/crash ứng dụng.
+
+### 3.2. Quản lý Render DOM Thông Minh (TabContainer Optimization)
+Trong [src/App.tsx](file:///g:/My%20Drive/Web%20app/APP_QTVP.ASDS/src/App.tsx):
+- Sử dụng `React.memo` cho `TabContainer`.
+- Khi chuyển đổi tab, các tab không active sẽ được gán thuộc tính `hidden` (`display: none`), ngắt hoàn toàn pipeline tính toán Layout/Paint/Compositing của trình duyệt giúp chuyển tab nhẹ và cuộn trang mượt mà.
+
+### 3.3. Thuật Toán Tra Cứu Map O(1)
+Trong [src/pages/PersonnelPage.tsx](file:///g:/My%20Drive/Web%20app/APP_QTVP.ASDS/src/pages/PersonnelPage.tsx):
+- Thay thế tìm kiếm mảng đệ quy O(N) `.find()` trong các hàm tra cứu tên đơn vị bằng `donViLookupMap` dạng `Map<string, DonVi>` cho tốc độ tra cứu O(1), tối ưu cho bảng dữ liệu chứa hàng ngàn nhân sự.
+
+---
+
+## 4. GIẢI THÍCH CẤU TRÚC FILE DỰ ÁN (HÌNH 1 VS HÌNH 2)
+
+Dưới đây là giải thích chi tiết lý do vì sao phiên bản gốc (Hình 1) chỉ có các file cơ bản, và phiên bản hiện tại (Hình 2) phát sinh thêm một số file ngoài thư mục root:
+
+```text
+📁 Cấu trúc Thư mục Root
+├── 📂 dist/                      # [Có ở cả 2 hình] Chứa sản phẩm đã build (HTML, JS, CSS)
+├── 📂 node_modules/              # [Mới ở Hình 2] Thư mục chứa thư viện npm (phát sinh khi chạy npm install)
+├── 📂 public/                    # [Có ở cả 2 hình] Chứa tài nguyên tĩnh (favicon, logo)
+├── 📂 src/                       # [Có ở cả 2 hình] Thư mục chứa 100% mã nguồn React TypeScript
+├── 📄 .gitignore                 # [Mới ở Hình 2] File cấu hình Git loại trừ các thư mục rác (dist, node_modules)
+├── 📄 ARCHITECTURE.md            # [Mới ở Hình 2] Tài liệu mô tả kiến trúc module ATVSLĐ & Thiết bị nghiêm ngặt
+├── 📄 deptTabStats_restored.ts   # [Mới ở Hình 2] File nháp tạm khôi phục code (đã loại trừ khỏi build)
+├── 📄 find_stats.cjs             # [Mới ở Hình 2] Script công cụ hỗ trợ tìm kiếm code nội bộ
+├── 📄 find_stats.js              # [Mới ở Hình 2] Script công cụ hỗ trợ tìm kiếm code nội bộ
+├── 📄 search_results.txt         # [Mới ở Hình 2] File văn bản lưu kết quả xuất ra từ script tìm kiếm
+├── 📄 index.html                 # [Có ở cả 2 hình] File HTML gốc của ứng dụng React SPA
+├── 📄 metadata.json              # [Có ở cả 2 hình] File thông tin cấu hình dự án
+├── 📄 package.json               # [Có ở cả 2 hình] File khai báo danh sách thư viện phụ thuộc
+├── 📄 package-lock.json          # [Có ở cả 2 hình] File khóa phiên bản chính xác của các gói npm
+├── 📄 README.md                  # [Có ở cả 2 hình] Tài liệu hướng dẫn sử dụng và kiến trúc này
+├── 📄 tsconfig.json              # [Có ở cả 2 hình] File cấu hình trình biên dịch TypeScript (đã chỉnh include src)
+└── 📄 vite.config.ts             # [Có ở cả 2 hình] File cấu hình đóng gói Vite (đã chỉnh emptyOutDir: false)
+```
+
+### 💡 Bảng so sánh & Giải thích nguyên nhân phát sinh:
+
+| File / Thư mục phát sinh | Nguyên nhân xuất hiện | Chức năng & Vai trò |
 | :--- | :--- | :--- |
-| **`components/`** | `dashboard/` | Chứa các widgets Dashboard được modul hóa: `PersonnelDoughnutChart`, `ExpiryAlertPanel`, `KpiSection`. |
-| | `report/` | Bộ lọc cấu hình báo cáo động `ReportFilterBar`, bảng xem trước `ReportPreviewTable`, trình tạo mẫu báo cáo. |
-| | `department/`, `personnel/` | Modals nghiệp vụ quản trị sơ đồ tổ chức, cơ cấu phòng ban và hồ sơ nhân viên. |
-| | `ui/` | Các component nguyên tử dùng chung: `CustomAutocomplete`, `Pagination`, `UnitFilterSidebar`. |
-| **`constants/`** | `certificates.ts`, `reportTemplates.ts` | Quy hoạch danh sách chứng chỉ nghiệp vụ và cấu hình các mẫu báo cáo chuẩn hệ thống. |
-| **`contexts/`** | `AuthContext.tsx` | Quản lý phiên đăng nhập và phân quyền truy cập thông qua giải mã token JWT (`user_metadata`). |
-| **`hooks/`** | `useAllowedUnits.ts` | Tính toán phạm vi truy cập danh sách Đơn vị đệ quy (`Allowed Unit IDs`). |
-| **`pages/`** | *Các Module chính* | Màn hình nghiệp vụ: `DashboardPage`, `PersonnelPage`, `DocumentPage`, `ReportPage`, `AccountPage`, `LogPage`... |
-| **`services/`** | `api.ts` | Cổng kết nối duy nhất tương tác và thực hiện các tác vụ CRUD với cơ sở dữ liệu Supabase. |
-| **`utils/`** | `hierarchy.ts`, `formatters.ts` | Xử lý cấu trúc cây đơn vị (`getAllSubordinateIds`), định dạng ngày tháng, số điện thoại, tiền tệ chuẩn hóa. |
+| **`node_modules/`** | Phát sinh khi thực hiện chạy lệnh `npm install` hoặc khởi chạy môi trường dev. | Chứa toàn bộ bộ mã nguồn của các thư viện dependency (React, Vite, Tailwind, Supabase...). |
+| **`.gitignore`** | Được khởi tạo để quản lý phiên bản mã nguồn Git. | Khai báo danh sách file/folder không cần đẩy lên kho lưu trữ code (như `node_modules`, `dist`). |
+| **`ARCHITECTURE.md`** | Được viết thêm trong giai đoạn thiết kế tính năng ATVSLĐ & Thiết bị nghiêm ngặt. | Tài liệu ghi chép kiến trúc cơ sở dữ liệu Supabase cho module ATVSLĐ. |
+| **`deptTabStats_restored.ts`** | File nháp phát sinh trong phiên khôi phục đoạn tính toán thống kê phòng ban cũ. | File code nháp ngoài root (đã được cấu hình loại trừ khỏi dự án trong `tsconfig.json`). |
+| **`find_stats.cjs` / `.js`** | Script nhỏ bằng Node.js được tạo ra để tìm kiếm code. | Công cụ phụ trợ quét và định vị đoạn code tính toán trong dự án. |
+| **`search_results.txt`** | File kết quả do script tìm kiếm xuất ra. | File lưu nhật ký văn bản kết quả tìm kiếm. |
 
 ---
 
-## 3. CƠ CHẾ PHÂN QUYỀN TRUY CẬP & THAO TÁC (AUTHORIZATION & PERMISSION MODEL)
+## 5. HƯỚNG DẪN CÀI ĐẶT & VẬN HÀNH (OPERATIONAL GUIDE)
 
-Hệ thống kiểm soát hiển thị và tác vụ dựa trên định danh người dùng từ token JWT (`user_metadata`) kết hợp với cây đơn vị đệ quy (`useAllowedUnits`).
+### 5.1. Chạy trên máy Cục bộ (Local Development)
+1. Cài đặt các thư viện phụ thuộc:
+   ```bash
+   npm install
+   ```
+2. Chạy Server phát triển tại cổng 3000:
+   ```bash
+   npm run dev
+   ```
+3. Truy cập trình duyệt tại địa chỉ: [http://127.0.0.1:3000/](http://127.0.0.1:3000/) hoặc [http://localhost:3000/](http://localhost:3000/)
 
-### 3.1. Quản trị Toàn quốc (HO Admin / Master View)
-* **Định danh:** Tài khoản có quyền `ADMIN` và `id_don_vi` thuộc nhóm `ALL`, `HO`, `DV_HO` hoặc cấp Quản trị Toàn quốc.
-* **Quyền hạn:**
-  * Xem và quản lý toàn bộ dữ liệu trên toàn hệ thống (Tất cả Đơn vị, Showroom, Điểm bán hàng).
-  * Toàn quyền Ban hành, Sửa, Xóa mọi Văn bản - Thông báo.
-  * Truy cập đầy đủ nhóm **Hệ thống** trên Sidebar: **Báo cáo**, **Tài khoản**, **Nhật ký Log**.
-
-### 3.2. Tài khoản cấp Đơn vị (Unit Account / Unit Admin / User)
-
-#### A. Phân hệ Văn bản - Thông báo (`DocumentPage.tsx`)
-* **Quyền xem:** Xem được văn bản do Đơn vị mình ban hành, các Đơn vị trực thuộc cấp dưới ban hành, và các văn bản có Phạm vi áp dụng `*` (Toàn hệ thống).
-* **Quyền Sửa / Xóa (`canEditOrDeleteDocument`):**
-  * **Chỉ được Sửa / Xóa** các văn bản do **chính Đơn vị mình** ban hành (`document.id_don_vi === user.id_don_vi`).
-  * **CẤM Sửa / Xóa** đối với các văn bản do HO ban hành (Phạm vi `*`) hoặc văn bản thuộc Đơn vị khác (luôn hiển thị ở chế độ Read-Only).
-
-#### B. Phân hệ Báo cáo Tổng hợp (`ReportPage.tsx` & Module `BaoCao`)
-* **Cấp quyền theo Module:** Quản lý trong form **Cập nhật tài khoản -> Phân quyền Module (Thanh Menu)** với checkbox **📑 Báo cáo Tổng hợp (`BaoCao`)**. Khi được cấp quyền, mục Báo cáo sẽ hiển thị trên Sidebar.
-* **Phạm vi dữ liệu:** Tự động giới hạn dữ liệu báo cáo trong phạm vi Đơn vị của tài khoản và các Đơn vị trực thuộc cấp dưới.
-* **3 Mẫu Báo cáo chuẩn thuộc nhóm HỆ THỐNG:**
-  1. **Tổng hợp thông tin liên hệ Đơn vị (`system_donvi_structure`):**
-     * **Chọn Đơn vị (`unit_multi`):** Hiển thị danh sách các Đơn vị cấp cha (`THACO AUTO`, `Phân Phối THACO AUTO`, Tổng công ty, Công ty Tỉnh thành...), tự động lọc bỏ Showroom/Điểm bán hàng để dropdown gọn gàng đúng chuẩn.
-     * **Chọn loại hình (`multiselect`):** Giao diện dạng ô tick (checkbox đa chọn), chỉ chắt lọc hiển thị 3 loại hình chính: **Văn phòng**, **Công ty Tỉnh thành**, **Showroom** (tự động ẩn các loại hình phụ khác).
-  2. **Báo cáo Thông tin pháp nhân theo Quản trị (`system_donvi_billing`):** Tổng hợp mã số thuế, tên pháp nhân, địa chỉ xuất hóa đơn.
-  3. **Báo cáo Khảo sát An ninh Bảo vệ (`system_security_report`):**
-     * Cho phép xem trước tổng quan cơ sở vật chất, diện tích, quy mô, số cổng, hệ thống camera trên giao diện Web.
-     * Khi xuất Excel, tự động sinh từng Worksheet ứng với từng Đơn vị/Showroom theo đúng định dạng khảo sát AN-BV chuẩn 13 mục chi tiết.
-
-#### C. Phân hệ Tổng quan (`DashboardPage.tsx`)
-* **Phạm vi số liệu & cảnh báo:** Tài khoản Đơn vị chỉ nhìn thấy các chỉ số KPI, thống kê nhân sự, và **Cảnh báo hạn kiểm định / chứng chỉ / PCCC / ATVSLĐ** của **Đơn vị mình và các Showroom/Điểm bán hàng trực thuộc** (`currentSubordinateIds`).
-* Không hiển thị cảnh báo toàn hệ thống của các Đơn vị khác ngoài phạm vi quản lý.
-
-#### D. Phân hệ Quản lý Tài khoản (`AccountPage.tsx`)
-* **Quyền xem (`visibleAccounts`):** Luôn xem được tài khoản của chính mình và danh sách tài khoản thuộc các đơn vị trực thuộc cấp dưới.
-* **Quyền Cấp mới / Cập nhật:**
-  * Khi cấp mới tài khoản: Danh sách *Đơn vị quản lý* bị giới hạn trong nhánh trực thuộc, không thể nâng quyền lên HO Admin.
-  * Khi tự cập nhật tài khoản chính mình: Được phép sửa họ tên và đổi mật khẩu; các trường *Đơn vị quản lý* và *Cấp độ thao tác* tự động bị khóa (`disabled`).
+### 5.2. Kiểm tra Cú pháp & Đóng gói Production
+1. Kiểm tra linter & kiểu dữ liệu TypeScript (Strict mode):
+   ```bash
+   cmd.exe /c "npx tsc --noEmit"
+   ```
+2. Đóng gói sản phẩm sản xuất (Output xuất ra thư mục `dist/`):
+   ```bash
+   cmd.exe /c "npx vite build"
+   ```
 
 ---
 
-## 4. QUY CHUẨN NGHIỆP VỤ & HIỂN THỊ DỮ LIỆU (UX/UI CONVENTIONS)
+## 6. NGUYÊN TẮC PHÁT TRIỂN & BẢO TRÌ DÀNH CHO AI / DEVELOPERS
 
-1. **Dữ liệu thực tế (Data-Driven Filtering):**
-   * Các bộ lọc như **Năm ban hành**, **Đơn vị ban hành**, **Loại văn bản** được tự động quét và khởi tạo từ dữ liệu thực tế hiện có trong database, không hiển thị cứng các giá trị rỗng hoặc không tồn tại.
-2. **Chuẩn hóa nhãn "Chọn tất cả":**
-   * Khi bộ lọc cho phép chọn nhiều đối tượng (Checkbox multi-select), nhãn chọn tất cả tuân thủ định dạng chuẩn:
-     ```text
-     Chọn tất cả (<số_lượng>) <theo_chủ_thể>
-     ```
-     *Ví dụ: `Chọn tất cả (10) năm`, `Chọn tất cả (21) Đơn vị`.*
-3. **Bộ lọc Đơn vị ban hành:**
-   * Ưu tiên hiển thị danh sách **Công ty mẹ / Đơn vị chính**, không hiển thị tràn lan các Showroom hay Kho con không có chức năng ban hành văn bản độc lập.
-4. **Tìm kiếm Tiếng Việt thông minh (Accent-Insensitive Search):**
-   * Hỗ trợ tìm kiếm linh hoạt trên toàn bộ hệ thống: gõ **có dấu** hoặc **không dấu** đều định vị chính xác bản ghi.
-5. **Auto-fill & Liên kết thông minh:**
-   * **Hồ sơ nhân sự:** Tự động sinh `Ngày nhận việc` từ `Mã Nhân viên`. Hỗ trợ import Excel qua Clipboard.
-   * **Văn bản - Thông báo:** Dòng thông tin phụ trợ chia tỷ lệ chuẩn **20% - 40% - 40%** (MSNV - Người lấy số - Bộ phận lấy số). Nhập/chọn MSNV tự động điền Họ tên và Bộ phận làm việc.
-6. **Định dạng dữ liệu chuẩn Việt Nam:**
-   * **Số điện thoại:** Block `4-3-3` (Ví dụ: `0901 234 567`).
-   * **Tiền tệ:** Phân cách hàng nghìn bằng dấu cách (Ví dụ: `15 000 000`).
-
----
-
-## 5. QUY CHUẨN KỸ THUẬT & AN TOÀN LẬP TRÌNH REACT (DEVELOPMENT STANDARDS)
-
-* **Chống lặp vô hạn (Infinite Recursion Protection):**
-  * Khi duyệt cây phân cấp Đơn vị (`getAllSubordinateIds`, `renderUnitTree`), luôn sử dụng `Set<string>` để kiểm tra các node đã thăm (`visited`) và giới hạn độ sâu đệ quy (`maxDepth = 20`) để ngăn chặn treo trình duyệt khi cấu trúc cha-con bị lặp vòng.
-* **Hooks React & Memoization:**
-  * Luôn memoize các bộ lọc và dữ liệu phái sinh bằng `useMemo` và `useCallback`, import chuẩn xác từ `'react'`.
-* **So sánh ID chuẩn hóa:**
-  * Sử dụng `String(id).trim()` trong toàn bộ các phép so sánh ID giữa Đơn vị và Tài khoản để loại bỏ lỗi bất đồng bộ giữa kiểu số (`number`) và chuỗi (`string`).
-
----
-
-## 6. HƯỚNG DẪN SỬ DỤNG HỆ THỐNG CHO NGƯỜI DÙNG (USER MANUAL)
-
-1. **Đăng nhập & Điều hướng:**
-   * Sử dụng tài khoản được cấp để đăng nhập. Hệ thống tự động nhận diện cấp quyền và hiển thị các menu tương ứng trên Sidebar bên trái.
-2. **Khai thác module Văn bản - Thông báo:**
-   * Tải lên văn bản mới kèm số văn bản tự động hoặc nhập thủ công.
-   * Lọc nhanh theo đơn vị ban hành, năm ban hành hoặc từ khóa.
-3. **Khai thác module Báo cáo Tổng hợp:**
-   * Vào **Hệ thống -> Báo cáo**, chọn mẫu báo cáo mong muốn (ví dụ: *Tổng hợp thông tin liên hệ Đơn vị*).
-   * Tích chọn bộ lọc **Chọn Đơn vị** hoặc **Chọn loại hình** (Văn phòng, Công ty Tỉnh thành, Showroom), sau đó nhấn **Xem trước** hoặc **Xuất Excel**.
-4. **Khai thác module Tổng quan & Cảnh báo:**
-   * Theo dõi các thẻ KPI và danh sách cảnh báo chứng chỉ/thiết bị sắp hết hạn trực tiếp trên màn hình chính.
-
----
-
-## 7. HƯỚNG DẪN DÀNH CHO AI / LẬP TRÌNH VIÊN (DEVELOPER / AI INSTRUCTIONS)
-
-Mỗi khi bắt đầu một phiên phát triển mới với AI Coding Assistant, hãy thực hiện theo thứ tự sau:
-1. Gửi toàn bộ nội dung file `README.md` này kèm lời nhắc: *"Đây là bản đồ kiến trúc và quy chuẩn hệ thống ERP MINI, hãy đọc kỹ trước khi coding."*
-2. Cung cấp file `.tsx` / `.ts` cần thao tác cùng mô tả rõ ràng yêu cầu nghiệp vụ.
+> ⚠️ **2 NGUYÊN TẮC LÀM VIỆC BẮT BUỘC KHI CẬP NHẬT CODE:**
+> 1. **Nguyên tắc 1 (Trình bày tóm tắt trước khi code)**: Trước bất kỳ lần sửa đổi mã nguồn nào, phải lập bản tóm tắt phương án triển khai rõ ràng, người dùng xem và bấm **Đồng ý** thì mới được phép ghi code.
+> 2. **Nguyên tắc 2 (Không tự ý bỏ / thay thế tính năng)**: Tuyệt đối không tự ý xóa bỏ hoặc thay thế bất kỳ tính năng, liên kết hay trường dữ liệu nào. Nếu bắt buộc phải thay đổi, phải giải thích lý do và có sự đồng ý của người dùng mới được triển khai.

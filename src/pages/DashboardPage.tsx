@@ -9,15 +9,15 @@ import ExpiryAlert from '../components/ExpiryAlert';
 import { useAllowedUnits } from '../hooks/useAllowedUnits';
 import UnitFilterSidebar from '../components/ui/UnitFilterSidebar';
 
-import { 
+import {
   Building2, MapPin, ChevronDown, ChevronRight, PanelLeftClose, PanelLeftOpen,
   Search, Loader2, Filter, LayoutDashboard, Users, MonitorSmartphone,
   Flame, AlertTriangle, Activity, Briefcase, BellRing, FileText, ShieldAlert, ShieldCheck, Video, Tag, Car,
   Cake, Calendar, Star, Settings
 } from 'lucide-react';
 
-import { buildHierarchicalOptions, sortDonViByThuTu, groupParentUnits } from '../utils/hierarchy'; 
-import DashboardCustomizerModal, { WidgetConfig } from '../components/dashboard/DashboardCustomizerModal'; 
+import { buildHierarchicalOptions, sortDonViByThuTu, groupParentUnits } from '../utils/hierarchy';
+import DashboardCustomizerModal, { WidgetConfig } from '../components/dashboard/DashboardCustomizerModal';
 import PersonnelDoughnutChart from '../components/dashboard/PersonnelDoughnutChart';
 import ExpiryAlertPanel from '../components/dashboard/ExpiryAlertPanel';
 import KpiSection from '../components/dashboard/KpiSection';
@@ -26,10 +26,10 @@ import KpiSection from '../components/dashboard/KpiSection';
 const extractDateAndAddDuration = (durationRaw: any, startDateRaw: any): Date | null => {
   const baseDate = parseDateStrict(startDateRaw);
   if (!baseDate) return null;
-  
+
   let monthsToAdd = 0;
   const s = String(durationRaw).toLowerCase().trim();
-  
+
   if (/^\d+$/.test(s)) {
     monthsToAdd = parseInt(s, 10);
   } else {
@@ -38,7 +38,7 @@ const extractDateAndAddDuration = (durationRaw: any, startDateRaw: any): Date | 
     if (monthMatch) monthsToAdd = parseInt(monthMatch[1], 10);
     else if (yearMatch) monthsToAdd = parseInt(yearMatch[1], 10) * 12;
   }
-  
+
   if (monthsToAdd > 0) {
     baseDate.setMonth(baseDate.getMonth() + monthsToAdd);
   }
@@ -53,7 +53,7 @@ function DocumentBarChart({ data, maxCount }: { data: { name: string; count: num
     <div className="flex-1 overflow-y-auto custom-scrollbar w-full space-y-3 pr-1 py-1 h-full">
       {data.length === 0 ? (
         <div className="h-full flex flex-col items-center justify-center text-gray-400 py-16">
-          <FileText size={44} className="mb-3 opacity-30 text-gray-400"/>
+          <FileText size={44} className="mb-3 opacity-30 text-gray-400" />
           <p className="font-bold text-sm">Chưa có dữ liệu</p>
         </div>
       ) : (
@@ -66,8 +66,8 @@ function DocumentBarChart({ data, maxCount }: { data: { name: string; count: num
                 <span className="font-black text-[#05469B] bg-blue-50 px-2 py-0.5 rounded text-[10px] border border-blue-100/50">{item.count} VB</span>
               </div>
               <div className="w-full h-2.5 bg-gray-100 rounded-full overflow-hidden relative shadow-inner">
-                <div 
-                  className="h-full bg-gradient-to-r from-blue-300 to-[#05469B] rounded-full transition-all duration-1000 ease-out" 
+                <div
+                  className="h-full bg-gradient-to-r from-blue-300 to-[#05469B] rounded-full transition-all duration-1000 ease-out"
                   style={{ width: `${widthPct}%` }}
                 ></div>
               </div>
@@ -96,7 +96,7 @@ function AssetSegmentedChart({ data }: { data: AssetGroupData[] }) {
     <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-5 h-full">
       {data.length === 0 ? (
         <div className="h-full flex flex-col items-center justify-center text-gray-400">
-          <MonitorSmartphone size={40} className="mb-2 opacity-55"/>
+          <MonitorSmartphone size={40} className="mb-2 opacity-55" />
           <p className="font-medium text-sm">Chưa có dữ liệu tài sản.</p>
         </div>
       ) : (
@@ -106,42 +106,42 @@ function AssetSegmentedChart({ data }: { data: AssetGroupData[] }) {
               <span className="font-bold text-gray-700 truncate pr-2" title={item.name}>{item.name}</span>
               <span className="font-black text-[#05469B] shrink-0 text-xs bg-blue-50 px-2 py-0.5 rounded border border-blue-100/50">Tổng: {item.total}</span>
             </div>
-            
+
             <div className="flex h-3 w-full bg-gray-100 rounded-full overflow-hidden relative shadow-inner">
               {item.dangSuDung > 0 && (
-                <div 
+                <div
                   className={`bg-emerald-500 cursor-help transition-all duration-300 ${hoveredSegment?.groupIdx === gIdx && hoveredSegment?.status === 'use' ? 'brightness-110 scale-y-110 shadow-md' : ''}`}
-                  style={{ width: `${(item.dangSuDung/item.total)*100}%` }}
+                  style={{ width: `${(item.dangSuDung / item.total) * 100}%` }}
                   onMouseEnter={() => setHoveredSegment({ groupIdx: gIdx, status: 'use', count: item.dangSuDung })}
                   onMouseLeave={() => setHoveredSegment(null)}
                 ></div>
               )}
               {item.luuKho > 0 && (
-                <div 
+                <div
                   className={`bg-blue-400 cursor-help transition-all duration-300 ${hoveredSegment?.groupIdx === gIdx && hoveredSegment?.status === 'store' ? 'brightness-110 scale-y-110 shadow-md' : ''}`}
-                  style={{ width: `${(item.luuKho/item.total)*100}%` }}
+                  style={{ width: `${(item.luuKho / item.total) * 100}%` }}
                   onMouseEnter={() => setHoveredSegment({ groupIdx: gIdx, status: 'store', count: item.luuKho })}
                   onMouseLeave={() => setHoveredSegment(null)}
                 ></div>
               )}
               {item.suaChua > 0 && (
-                <div 
+                <div
                   className={`bg-orange-400 cursor-help transition-all duration-300 ${hoveredSegment?.groupIdx === gIdx && hoveredSegment?.status === 'repair' ? 'brightness-110 scale-y-110 shadow-md' : ''}`}
-                  style={{ width: `${(item.suaChua/item.total)*100}%` }}
+                  style={{ width: `${(item.suaChua / item.total) * 100}%` }}
                   onMouseEnter={() => setHoveredSegment({ groupIdx: gIdx, status: 'repair', count: item.suaChua })}
                   onMouseLeave={() => setHoveredSegment(null)}
                 ></div>
               )}
               {item.thanhLy > 0 && (
-                <div 
+                <div
                   className={`bg-red-500 cursor-help transition-all duration-300 ${hoveredSegment?.groupIdx === gIdx && hoveredSegment?.status === 'liquid' ? 'brightness-110 scale-y-110 shadow-md' : ''}`}
-                  style={{ width: `${(item.thanhLy/item.total)*100}%` }}
+                  style={{ width: `${(item.thanhLy / item.total) * 100}%` }}
                   onMouseEnter={() => setHoveredSegment({ groupIdx: gIdx, status: 'liquid', count: item.thanhLy })}
                   onMouseLeave={() => setHoveredSegment(null)}
                 ></div>
               )}
             </div>
-            
+
             {hoveredSegment?.groupIdx === gIdx && (
               <div className="absolute right-0 top-6 bg-slate-800 text-white text-[10px] font-bold px-2 py-1 rounded shadow-lg pointer-events-none z-20 animate-in fade-in slide-in-from-top-1 duration-100 border border-slate-700">
                 {hoveredSegment.status === 'use' && `🟢 Đang sử dụng: ${hoveredSegment.count}`}
@@ -199,7 +199,7 @@ function VehicleFleetChart({ vehicles }: { vehicles: TS_Xe[] }) {
         </div>
         <div className="text-right">
           <p className="text-[10px] font-bold text-gray-500 dark:text-slate-400 uppercase">Đang hoạt động tốt</p>
-          <p className="text-xl font-black text-emerald-600 dark:text-emerald-400">{totalActive} <span className="text-xs font-normal text-gray-600 dark:text-slate-300">({((totalActive/totalVehicles)*100).toFixed(0)}%)</span></p>
+          <p className="text-xl font-black text-emerald-600 dark:text-emerald-400">{totalActive} <span className="text-xs font-normal text-gray-600 dark:text-slate-300">({((totalActive / totalVehicles) * 100).toFixed(0)}%)</span></p>
         </div>
       </div>
 
@@ -214,9 +214,9 @@ function VehicleFleetChart({ vehicles }: { vehicles: TS_Xe[] }) {
                 <span className="text-gray-600 dark:text-slate-300 font-bold">{item.count} xe <span className="text-[10px] text-gray-400">({pct}%)</span></span>
               </div>
               <div className="w-full bg-gray-100 dark:bg-slate-700 rounded-full h-2 overflow-hidden flex">
-                <div 
-                  className="bg-gradient-to-r from-[#05469B] to-blue-500 h-full rounded-full transition-all duration-500" 
-                  style={{ width: `${pct}%` }} 
+                <div
+                  className="bg-gradient-to-r from-[#05469B] to-blue-500 h-full rounded-full transition-all duration-500"
+                  style={{ width: `${pct}%` }}
                 />
               </div>
             </div>
@@ -243,17 +243,17 @@ const DEFAULT_WIDGETS: WidgetConfig[] = [
 export default function DashboardPage() {
   const { user } = useAuth();
   const [donViList, setDonViList] = useState<DonVi[]>([]);
-  
+
   // Dữ liệu thô từ APIs
   const [nsData, setNsData] = useState<Personnel[]>([]);
   const [tbData, setTbData] = useState<ThietBi[]>([]);
-  const [tsPcccData, setTsPcccData] = useState<any[]>([]); 
-  const [vbData, setVbData] = useState<any[]>([]); 
-  const [anNinhData, setAnNinhData] = useState<any[]>([]); 
+  const [tsPcccData, setTsPcccData] = useState<any[]>([]);
+  const [vbData, setVbData] = useState<any[]>([]);
+  const [anNinhData, setAnNinhData] = useState<any[]>([]);
   const [xeData, setXeData] = useState<TS_Xe[]>([]);
   const [atvsldData, setAtvsldData] = useState<any[]>([]);
   const [pcccData, setPcccData] = useState<any[]>([]);
-  
+
   const [loading, setLoading] = useState(true);
 
   // --- SLICER STATES ---
@@ -261,7 +261,7 @@ export default function DashboardPage() {
   const [unitSearchTerm, setUnitSearchTerm] = useState('');
   const [selectedUnitFilter, setSelectedUnitFilter] = useState<string | null>(null);
   const [expandedParents, setExpandedParents] = useState<string[]>([]);
-  
+
   const currentYear = new Date().getFullYear();
   const [docYear, setDocYear] = useState<number>(currentYear);
 
@@ -281,7 +281,7 @@ export default function DashboardPage() {
         const merged = [...parsed, ...DEFAULT_WIDGETS.filter(w => !ids.has(w.id))];
         return merged;
       }
-    } catch (e) {}
+    } catch (e) { }
     return DEFAULT_WIDGETS;
   });
 
@@ -428,11 +428,11 @@ export default function DashboardPage() {
         }
       });
     };
-    
+
     Array.from(matchedIds).forEach(id => addChildren(id));
     return baseUnits.filter(item => matchedIds.has(item.id));
   }, [donViList, unitSearchTerm, allowedDonViIds]);
-  
+
   const parentUnits = useMemo(() => filteredUnits.filter(item => item.cap_quan_ly === 'HO' || !item.cap_quan_ly), [filteredUnits]);
   const getChildUnits = (parentId: string) => sortDonViByThuTu(filteredUnits.filter(item => item.cap_quan_ly === parentId));
 
@@ -449,8 +449,8 @@ export default function DashboardPage() {
 
     return (
       <div key={parent.id} className={level === 1 ? "mb-1" : "mt-1"}>
-        <button 
-          onClick={() => { setSelectedUnitFilter(parent.id); if (children.length > 0) toggleParent(parent.id); }} 
+        <button
+          onClick={() => { setSelectedUnitFilter(parent.id); if (children.length > 0) toggleParent(parent.id); }}
           className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold transition-colors ${selectedUnitFilter === parent.id ? 'bg-[#05469B] text-white shadow-md' : 'text-gray-700 hover:bg-gray-100'} ${isParentDimmed ? 'opacity-50' : ''}`}
         >
           {children.length > 0 ? (isExpanded ? <ChevronDown size={16} className="shrink-0" /> : <ChevronRight size={16} className="shrink-0" />) : <div className="w-4 shrink-0" />}
@@ -485,7 +485,7 @@ export default function DashboardPage() {
   // 🟢 TÍNH TOÁN DỮ LIỆU NHÂN SỰ CHO WIDGET GỘP TRÊN CÙNG
   const { widgetStats, staffRolesStats } = useMemo(() => {
     const totalUnits = donViList.filter(dv => currentSubordinateIds.includes(dv.id) && dv.id !== selectedUnitFilter && isCountableUnit(dv)).length || 0;
-    
+
     let totalStaff = 0;
     let dvht = 0;
     let bv = 0;
@@ -501,9 +501,9 @@ export default function DashboardPage() {
       }
     });
 
-    return { 
-      widgetStats: { totalUnits, totalStaff }, 
-      staffRolesStats: { dvht, bv, pvhc } 
+    return {
+      widgetStats: { totalUnits, totalStaff },
+      staffRolesStats: { dvht, bv, pvhc }
     };
   }, [currentSubordinateIds, donViList, nsData, selectedUnitFilter]);
 
@@ -520,7 +520,7 @@ export default function DashboardPage() {
           return dv ? isCountableUnit(dv) : false;
         }).length;
         return { id: u.id, name: u.ten_don_vi, count: activeSubCount };
-      }).sort((a, b) => b.count - a.count); 
+      }).sort((a, b) => b.count - a.count);
     };
     return { nam: processScale(activeNam), bac: processScale(activeBac) };
   }, [ctttNamUnits, ctttBacUnits, currentSubordinateIds, donViList]);
@@ -532,7 +532,7 @@ export default function DashboardPage() {
   const pcccWarningsGrouped = useMemo(() => {
     const groups: Record<string, any> = {};
     const today = new Date();
-    today.setHours(0,0,0,0);
+    today.setHours(0, 0, 0, 0);
 
     tsPcccData.forEach(eq => {
       if (currentSubordinateIds.includes(eq.id_don_vi)) {
@@ -540,21 +540,21 @@ export default function DashboardPage() {
         if (expDate) {
           const diffTime = expDate.getTime() - today.getTime();
           const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-          
+
           if (diffDays <= 30) {
             const unitName = donViMap[eq.id_don_vi] || eq.id_don_vi;
             const dateStr = expDate.toLocaleDateString('vi-VN');
             const key = `${unitName}_${dateStr}`;
-            
-            if(!groups[key]) {
+
+            if (!groups[key]) {
               groups[key] = {
                 unitName,
                 dateStr,
                 daysLeft: diffDays,
-                items: {} 
+                items: {}
               };
             }
-            
+
             const itemName = eq.loai_thiet_bi || 'Thiết bị';
             groups[key].items[itemName] = (groups[key].items[itemName] || 0) + 1;
           }
@@ -570,14 +570,14 @@ export default function DashboardPage() {
     anNinhData.forEach(an => {
       if (currentSubordinateIds.includes(an.id_don_vi)) {
         // Lấy Tổng SL
-        const tongCam = parseInt(String(an.sl_camera || 0).replace(/\D/g,''), 10) || 0;
+        const tongCam = parseInt(String(an.sl_camera || 0).replace(/\D/g, ''), 10) || 0;
         // Lấy SL Hư Hỏng
-        const camHu = parseInt(String(an.camera_hu || 0).replace(/\D/g,''), 10) || 0; 
+        const camHu = parseInt(String(an.camera_hu || 0).replace(/\D/g, ''), 10) || 0;
         // Lấy SL Đang Hoạt Động
-        const camHD = parseInt(String(an.camera_hoat_dong || 0).replace(/\D/g,''), 10) || (tongCam > 0 ? tongCam - camHu : 0);
-        
+        const camHD = parseInt(String(an.camera_hoat_dong || 0).replace(/\D/g, ''), 10) || (tongCam > 0 ? tongCam - camHu : 0);
+
         const lyDoHu = an.ly_do_camera_hu || 'Chưa cập nhật lý do';
-        
+
         if (tongCam > 0 || camHu > 0 || camHD > 0) {
           list.push({
             unitName: donViMap[an.id_don_vi] || an.id_don_vi,
@@ -597,21 +597,21 @@ export default function DashboardPage() {
   const anNinhStatsList = useMemo(() => {
     const list: any[] = [];
     const today = new Date();
-    today.setHours(0,0,0,0);
+    today.setHours(0, 0, 0, 0);
 
     anNinhData.forEach(an => {
       if (currentSubordinateIds.includes(an.id_don_vi) && an.ncc_dich_vu && String(an.ncc_dich_vu).trim() !== '') {
         let expDate = null;
         const directExpRaw = an.ngay_het_han || an.ngay_het_han_hd || an.ngay_ket_thuc || an.ngay_kt;
-        
+
         if (directExpRaw) {
-           expDate = parseDateStrict(directExpRaw);
+          expDate = parseDateStrict(directExpRaw);
         }
 
         if (!expDate) {
-           const durationRaw = an.han_hop_dong || an.han_hd || an.thoi_han_hd || an.thoi_gian_hd || an.thoi_han || an.thoi_gian_luu || ''; 
-           const startRaw = an.ngay_ky_hd || an.ngay_cd || an.ngay_ky || an.ngay_bat_dau || '';
-           expDate = extractDateAndAddDuration(durationRaw, startRaw);
+          const durationRaw = an.han_hop_dong || an.han_hd || an.thoi_han_hd || an.thoi_gian_hd || an.thoi_han || an.thoi_gian_luu || '';
+          const startRaw = an.ngay_ky_hd || an.ngay_cd || an.ngay_ky || an.ngay_bat_dau || '';
+          expDate = extractDateAndAddDuration(durationRaw, startRaw);
         }
 
         let diffDays = null;
@@ -667,7 +667,7 @@ export default function DashboardPage() {
 
   const docChartData = useMemo(() => {
     const deptDocCounts: Record<string, number> = {};
-    
+
     vbData.forEach(vb => {
       if (currentSubordinateIds.includes(vb.id_don_vi) && String(vb.phan_loai || '').toLowerCase().includes('thông báo')) {
         const d = parseDateStrict(vb.ngay_ban_hanh);
@@ -681,7 +681,7 @@ export default function DashboardPage() {
     const sortedData = Object.keys(deptDocCounts)
       .map(key => ({ name: key, count: deptDocCounts[key] }))
       .sort((a, b) => b.count - a.count)
-      .slice(0, 10); 
+      .slice(0, 10);
 
     const maxCount = sortedData.length > 0 ? sortedData[0].count : 1;
     return { data: sortedData, maxCount };
@@ -689,21 +689,21 @@ export default function DashboardPage() {
 
   const assetChartData = useMemo(() => {
     const groupStats: Record<string, { total: number, dangSuDung: number, luuKho: number, suaChua: number, thanhLy: number }> = {};
-    
+
     tbData.filter(tb => currentSubordinateIds.includes(tb.id_don_vi)).forEach(tb => {
       const groupName = tb.nhom_thiet_bi || 'Chưa phân nhóm';
       const tt = String(tb.tinh_trang || '').toLowerCase();
-      
+
       if (!groupStats[groupName]) { groupStats[groupName] = { total: 0, dangSuDung: 0, luuKho: 0, suaChua: 0, thanhLy: 0 }; }
       groupStats[groupName].total++;
-      
-      if (tt.includes('đang sử dụng')) { groupStats[groupName].dangSuDung++; } 
-      else if (tt.includes('sửa chữa')) { groupStats[groupName].suaChua++; } 
-      else if (tt.includes('thanh lý') || tt.includes('hỏng')) { groupStats[groupName].thanhLy++; } 
+
+      if (tt.includes('đang sử dụng')) { groupStats[groupName].dangSuDung++; }
+      else if (tt.includes('sửa chữa')) { groupStats[groupName].suaChua++; }
+      else if (tt.includes('thanh lý') || tt.includes('hỏng')) { groupStats[groupName].thanhLy++; }
       else { groupStats[groupName].luuKho++; }
     });
 
-    return Object.keys(groupStats).map(key => ({ name: key, ...groupStats[key] })).sort((a, b) => b.total - a.total); 
+    return Object.keys(groupStats).map(key => ({ name: key, ...groupStats[key] })).sort((a, b) => b.total - a.total);
   }, [tbData, currentSubordinateIds]);
 
   // 🟢 TRUNG TÂM THÔNG BÁO (NOTIFICATION HUB)
@@ -756,7 +756,7 @@ export default function DashboardPage() {
       // Hạn bảo hành (Chỉ cảnh báo khi sắp hết hạn trong 30 ngày, bỏ qua thiết bị đã hết bảo hành)
       const d = parseDate(tb.han_bao_hanh);
       if (d) {
-        d.setHours(0,0,0,0);
+        d.setHours(0, 0, 0, 0);
         const diff = Math.ceil((d.getTime() - today.getTime()) / 86400000);
         if (diff >= 0 && diff <= WARNING_DAYS) {
           list.push({
@@ -779,7 +779,7 @@ export default function DashboardPage() {
         const nextCheckMonths = Math.max(Math.ceil((diffMonths || 1) / 6) * 6, 6);
         const nextCheckDate = new Date(pDate);
         nextCheckDate.setMonth(pDate.getMonth() + nextCheckMonths);
-        nextCheckDate.setHours(0,0,0,0);
+        nextCheckDate.setHours(0, 0, 0, 0);
 
         const diff = Math.ceil((nextCheckDate.getTime() - today.getTime()) / 86400000);
         if (diff >= 0 && diff <= WARNING_DAYS) {
@@ -814,7 +814,7 @@ export default function DashboardPage() {
       }
 
       if (expDate) {
-        expDate.setHours(0,0,0,0);
+        expDate.setHours(0, 0, 0, 0);
         const diff = Math.ceil((expDate.getTime() - today.getTime()) / 86400000);
         if (diff <= WARNING_DAYS) {
           list.push({
@@ -834,12 +834,12 @@ export default function DashboardPage() {
     // An toàn lao động đơn vị & KSK đơn vị
     atvsldData.forEach((at: any) => {
       if (!currentSubordinateIds.includes(at.id_don_vi)) return;
-      
+
       const checkAtvsldDate = (dateStr: any, typeLabel: string, intervalYears = 1) => {
         const d = parseDate(dateStr);
         if (!d) return;
         d.setFullYear(d.getFullYear() + intervalYears);
-        d.setHours(0,0,0,0);
+        d.setHours(0, 0, 0, 0);
         const diff = Math.ceil((d.getTime() - today.getTime()) / 86400000);
         if (diff <= WARNING_DAYS) {
           list.push({
@@ -865,7 +865,7 @@ export default function DashboardPage() {
 
       const bhDate = parseDate(p.ngay_het_han_bh);
       if (bhDate) {
-        bhDate.setHours(0,0,0,0);
+        bhDate.setHours(0, 0, 0, 0);
         const diff = Math.ceil((bhDate.getTime() - today.getTime()) / 86400000);
         if (diff <= WARNING_DAYS) {
           list.push({
@@ -884,7 +884,7 @@ export default function DashboardPage() {
       const dtDate = parseDate(p.ngay_dien_tap);
       if (dtDate) {
         dtDate.setFullYear(dtDate.getFullYear() + 1);
-        dtDate.setHours(0,0,0,0);
+        dtDate.setHours(0, 0, 0, 0);
         const diff = Math.ceil((dtDate.getTime() - today.getTime()) / 86400000);
         if (diff <= WARNING_DAYS) {
           list.push({
@@ -907,7 +907,7 @@ export default function DashboardPage() {
 
       let expDate = parseDate(a.ngay_het_han || a.ngay_het_han_hd || a.ngay_ket_thuc || a.ngay_kt);
       if (!expDate) {
-        const durationRaw = a.han_hop_dong || a.han_hd || a.thoi_han_hd || a.thoi_gian_hd || a.thoi_han || a.thoi_gian_luu || ''; 
+        const durationRaw = a.han_hop_dong || a.han_hd || a.thoi_han_hd || a.thoi_gian_hd || a.thoi_han || a.thoi_gian_luu || '';
         const startRaw = a.ngay_ky_hd || a.ngay_cd || a.ngay_ky || a.ngay_bat_dau || '';
         const baseDate = parseDate(startRaw);
         if (baseDate) {
@@ -1022,7 +1022,7 @@ export default function DashboardPage() {
     return notifications.filter(n => n.category === activeNotifTab);
   }, [notifications, activeNotifTab]);
 
-    // --- RENDERING CHUNG CHO WIDGET (DÙNG CHO VÙNG GHIM VÀ VÙNG THƯỜNG) ---
+  // --- RENDERING CHUNG CHO WIDGET (DÙNG CHO VÙNG GHIM VÀ VÙNG THƯỜNG) ---
   const renderCustomWidgetCard = (widget: WidgetConfig) => {
     if (!widget.visible) return null;
 
@@ -1047,7 +1047,7 @@ export default function DashboardPage() {
       case 'chart_personnel':
         return (
           <div key={widget.id} className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm flex flex-col h-[480px] hover:shadow-md transition-all">
-            {renderHeader('Cơ cấu Nhân sự', 'Phân bố nhân sự theo nghiệp vụ', <Briefcase size={20} />)}
+            {renderHeader('Cơ cấu Nhân sự (chưa đầy đủ)', 'Phân bố nhân sự theo nghiệp vụ', <Briefcase size={20} />)}
             <div className="flex-1 w-full h-full min-h-0 overflow-hidden">
               <PersonnelDoughnutChart data={staffChartData.data} />
             </div>
@@ -1058,13 +1058,13 @@ export default function DashboardPage() {
         return (
           <div key={widget.id} className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm flex flex-col h-[480px] hover:shadow-md transition-all">
             <div className="mb-4 shrink-0 border-b border-gray-100 dark:border-slate-700 pb-3">
-              <h3 className="text-base font-black text-[#05469B] dark:text-blue-400 flex items-center gap-2"><BellRing size={20}/> Văn bản - Thông báo</h3>
+              <h3 className="text-base font-black text-[#05469B] dark:text-blue-400 flex items-center gap-2"><BellRing size={20} /> Văn bản - Thông báo</h3>
               <p className="text-[11px] font-bold text-gray-400 dark:text-slate-400 mt-1">Phòng ban ban hành nhiều nhất</p>
               <div className="mt-2.5 flex items-center gap-2">
                 <span className="text-[11px] font-bold text-gray-500 dark:text-slate-400">Lọc năm ban hành:</span>
-                <select 
-                  value={docYear} 
-                  onChange={(e) => setDocYear(Number(e.target.value))} 
+                <select
+                  value={docYear}
+                  onChange={(e) => setDocYear(Number(e.target.value))}
                   className="bg-blue-50 dark:bg-slate-700 text-[#05469B] dark:text-blue-300 text-xs font-bold py-1 px-3 rounded-xl outline-none border border-blue-100 dark:border-slate-600 cursor-pointer shadow-sm"
                 >
                   {[currentYear, currentYear - 1, currentYear - 2, currentYear - 3, currentYear - 4].map(y => <option key={y} value={y}>Năm {y}</option>)}
@@ -1099,7 +1099,7 @@ export default function DashboardPage() {
             <div className="bg-red-50/50 dark:bg-red-950/30 p-4 border-b border-red-100 dark:border-slate-700 flex items-start justify-between shrink-0">
               <div>
                 <h3 className="font-black text-red-800 dark:text-red-300 text-xs uppercase tracking-wider flex items-center gap-2">
-                  <AlertTriangle className="text-red-600 dark:text-red-400 shrink-0 animate-bounce" size={18}/> Hạn Nạp/Sạc Thiết bị PCCC
+                  <AlertTriangle className="text-red-600 dark:text-red-400 shrink-0 animate-bounce" size={18} /> Hạn Nạp/Sạc Thiết bị PCCC
                 </h3>
                 <p className="text-[11px] font-bold text-red-600/70 dark:text-red-400/70 mt-1">Danh sách thiết bị PCCC sắp hoặc đã quá hạn kiểm định</p>
               </div>
@@ -1108,7 +1108,7 @@ export default function DashboardPage() {
             <div className="p-0 overflow-x-auto flex-1 max-h-[350px] custom-scrollbar">
               {pcccWarningsGrouped.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-gray-400 py-16">
-                  <Flame size={44} className="mb-3 opacity-30 text-emerald-500"/>
+                  <Flame size={44} className="mb-3 opacity-30 text-emerald-500" />
                   <p className="font-bold text-sm text-emerald-600">Tất cả thiết bị đều an toàn</p>
                 </div>
               ) : (
@@ -1150,7 +1150,7 @@ export default function DashboardPage() {
             <div className="bg-indigo-50/50 dark:bg-indigo-950/30 p-4 border-b border-indigo-100 dark:border-slate-700 flex items-start justify-between shrink-0">
               <div>
                 <h3 className="font-black text-indigo-800 dark:text-indigo-300 text-xs uppercase tracking-wider flex items-center gap-2">
-                  <Video className="text-indigo-600 dark:text-indigo-400 shrink-0" size={18}/> Hệ thống Camera Giám sát
+                  <Video className="text-indigo-600 dark:text-indigo-400 shrink-0" size={18} /> Hệ thống Camera Giám sát
                 </h3>
                 <p className="text-[11px] font-bold text-indigo-600/70 dark:text-indigo-400/70 mt-1">Tình trạng hoạt động và cảnh báo lỗi camera toàn hệ thống</p>
               </div>
@@ -1159,7 +1159,7 @@ export default function DashboardPage() {
             <div className="p-0 overflow-x-auto flex-1 max-h-[350px] custom-scrollbar">
               {cameraStatsList.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-gray-400 py-16">
-                  <MonitorSmartphone size={44} className="mb-3 opacity-30 text-gray-400"/>
+                  <MonitorSmartphone size={44} className="mb-3 opacity-30 text-gray-400" />
                   <p className="font-bold text-sm text-gray-500">Chưa có dữ liệu hệ thống Camera</p>
                 </div>
               ) : (
@@ -1206,7 +1206,7 @@ export default function DashboardPage() {
             <div className="bg-blue-50/50 dark:bg-blue-950/30 p-4 border-b border-blue-100 dark:border-slate-700 flex items-start justify-between shrink-0">
               <div>
                 <h3 className="font-black text-blue-800 dark:text-blue-300 text-xs uppercase tracking-wider flex items-center gap-2">
-                  <ShieldCheck className="text-blue-600 dark:text-blue-400 shrink-0" size={18}/> Hợp đồng thuê Bảo vệ
+                  <ShieldCheck className="text-blue-600 dark:text-blue-400 shrink-0" size={18} /> Hợp đồng thuê Bảo vệ
                 </h3>
                 <p className="text-[11px] font-bold text-blue-600/70 dark:text-blue-400/70 mt-1">Quản lý các hợp đồng dịch vụ an ninh và chi phí bảo vệ</p>
               </div>
@@ -1215,7 +1215,7 @@ export default function DashboardPage() {
             <div className="p-0 overflow-x-auto flex-1 max-h-[350px] custom-scrollbar">
               {anNinhStatsList.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-gray-400 py-16">
-                  <ShieldAlert size={44} className="mb-3 opacity-30 text-gray-400"/>
+                  <ShieldAlert size={44} className="mb-3 opacity-30 text-gray-400" />
                   <p className="font-bold text-sm text-gray-500">Không có đơn vị thuê dịch vụ ngoài</p>
                 </div>
               ) : (
@@ -1231,7 +1231,7 @@ export default function DashboardPage() {
                     {anNinhStatsList.map((stat, idx) => {
                       const isWarning = stat.daysLeft !== null && stat.daysLeft <= 30;
                       const tooltipText = `Đơn vị cung cấp dịch vụ bảo vệ ngoài: ${stat.provider}\nTổng chi phí thuê: ${stat.cost}`;
-                      
+
                       return (
                         <tr key={idx} className={`transition-colors cursor-help ${isWarning ? 'hover:bg-red-50/30 dark:hover:bg-red-950/30' : 'hover:bg-blue-50/30 dark:hover:bg-slate-700/30'}`} title={tooltipText}>
                           <td className="p-3 font-bold text-[#05469B] dark:text-blue-400 text-xs truncate max-w-[120px]" title={tooltipText}>{stat.unitName}</td>
@@ -1276,8 +1276,8 @@ export default function DashboardPage() {
   return (
     <div className="flex w-full max-w-full h-full bg-[#f8fafc] overflow-hidden relative">
       {isListCollapsed && (
-        <button 
-          onClick={() => setIsListCollapsed(false)} 
+        <button
+          onClick={() => setIsListCollapsed(false)}
           className="hidden md:block absolute top-6 left-6 z-20 bg-white p-2.5 rounded-xl shadow-md border border-gray-200 text-[#05469B] hover:bg-blue-50 transition-all hover:scale-105"
         >
           <PanelLeftOpen size={20} />
@@ -1301,13 +1301,13 @@ export default function DashboardPage() {
       />
 
       <div className="flex-1 min-w-0 max-w-full overflow-y-auto p-4 sm:p-6 lg:p-8 relative transition-all duration-300">
-        
+
         {/* Header Dashboard */}
         <div className={`flex flex-col lg:flex-row justify-between items-start lg:items-center mb-8 gap-4 transition-all duration-300 ${isListCollapsed ? 'md:pl-10 lg:pl-0' : ''}`}>
           <div className="flex items-center gap-2.5">
             {isListCollapsed && (
-              <button 
-                onClick={() => setIsListCollapsed(false)} 
+              <button
+                onClick={() => setIsListCollapsed(false)}
                 className="lg:hidden bg-white p-2 rounded-xl shadow-md border border-gray-200 text-[#05469B] hover:bg-blue-50 transition-all flex items-center justify-center shrink-0"
                 title="Mở bộ lọc đơn vị"
               >
@@ -1317,7 +1317,7 @@ export default function DashboardPage() {
             <div>
               <h1 className="text-2xl sm:text-3xl font-black text-[#05469B] dark:text-blue-400 flex items-center gap-2.5 tracking-tight"><LayoutDashboard size={32} /> Tổng Quan Hệ Thống</h1>
               <p className="text-gray-500 dark:text-slate-400 font-medium mt-1 flex items-center gap-2 text-sm">
-                Đang phân tích dữ liệu: 
+                Đang phân tích dữ liệu:
                 <span className="px-3 py-1 bg-blue-50 dark:bg-slate-800 text-[#05469B] dark:text-blue-300 border border-blue-100 dark:border-slate-700 rounded-lg font-bold text-xs shadow-sm">
                   {selectedUnitName}
                 </span>
@@ -1348,13 +1348,13 @@ export default function DashboardPage() {
               <div className="bg-gradient-to-r from-amber-50/80 via-white to-amber-50/80 dark:from-slate-800/80 dark:via-slate-800 dark:to-slate-800/80 p-5 rounded-3xl border border-amber-200/80 dark:border-amber-700/60 shadow-md mb-8 animate-in fade-in">
                 <div className="flex items-center justify-between mb-5 pb-3 border-b border-amber-200/60 dark:border-slate-700">
                   <div className="flex items-center gap-2.5">
-                    <span className="p-2 bg-amber-400 text-white rounded-xl shadow-sm"><Star size={20} className="fill-current animate-spin-slow"/></span>
+                    <span className="p-2 bg-amber-400 text-white rounded-xl shadow-sm"><Star size={20} className="fill-current animate-spin-slow" /></span>
                     <div>
                       <h2 className="text-base font-black text-amber-900 dark:text-amber-300 tracking-wide uppercase">Biểu đồ & Số liệu Ưu tiên đã Ghim</h2>
                       <p className="text-xs font-bold text-amber-700/80 dark:text-amber-400/80">Hiển thị tức thì các Widget theo đúng chuyên môn quản lý của bạn</p>
                     </div>
                   </div>
-                  <button 
+                  <button
                     onClick={() => setIsCustomizerOpen(true)}
                     className="text-xs font-bold text-amber-800 dark:text-amber-300 hover:underline flex items-center gap-1"
                   >
@@ -1393,11 +1393,11 @@ export default function DashboardPage() {
 
             {/* VÙNG 1.5: QUY MÔ HỆ THỐNG THEO MIỀN */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              
+
               {/* Showroom Miền Nam */}
               <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex flex-col hover:shadow-md transition-shadow">
                 <div className="flex justify-between items-center mb-5 border-b border-gray-50 pb-3">
-                  <h3 className="text-sm font-black text-orange-600 uppercase tracking-wider flex items-center gap-2"><MapPin size={18}/> Quy mô CTTT Phía Nam</h3>
+                  <h3 className="text-sm font-black text-orange-600 uppercase tracking-wider flex items-center gap-2"><MapPin size={18} /> Quy mô CTTT Phía Nam</h3>
                   <span className="text-xs font-bold text-gray-400">Số cơ sở trực thuộc</span>
                 </div>
                 <div className="flex-1 overflow-y-auto max-h-[220px] custom-scrollbar pr-2 space-y-3.5">
@@ -1424,7 +1424,7 @@ export default function DashboardPage() {
               {/* Showroom Miền Bắc */}
               <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex flex-col hover:shadow-md transition-shadow">
                 <div className="flex justify-between items-center mb-5 border-b border-gray-50 pb-3">
-                  <h3 className="text-sm font-black text-emerald-600 uppercase tracking-wider flex items-center gap-2"><MapPin size={18}/> Quy mô CTTT Phía Bắc</h3>
+                  <h3 className="text-sm font-black text-emerald-600 uppercase tracking-wider flex items-center gap-2"><MapPin size={18} /> Quy mô CTTT Phía Bắc</h3>
                   <span className="text-xs font-bold text-gray-400">Số cơ sở trực thuộc</span>
                 </div>
                 <div className="flex-1 overflow-y-auto max-h-[220px] custom-scrollbar pr-2 space-y-3.5">
