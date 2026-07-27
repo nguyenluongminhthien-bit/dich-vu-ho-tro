@@ -207,6 +207,11 @@ Dưới đây là giải thích chi tiết lý do vì sao phiên bản gốc (H�
 > ⚠️ **2 NGUYÊN TẮC LÀM VIỆC BẮT BUỘC KHI CẬP NHẬT CODE:**
 > 1. **Nguyên tắc 1 (Trình bày tóm tắt trước khi code)**: Trước bất kỳ lần sửa đổi mã nguồn nào, phải lập bản tóm tắt phương án triển khai rõ ràng, người dùng xem và bấm **Đồng ý** thì mới được phép ghi code.
 > 2. **Nguyên tắc 2 (Không tự ý bỏ / thay thế tính năng)**: Tuyệt đối không tự ý xóa bỏ hoặc thay thế bất kỳ tính năng, liên kết hay trường dữ liệu nào. Nếu bắt buộc phải thay đổi, phải giải thích lý do và có sự đồng ý của người dùng mới được triển khai.
+> 3. **Nguyên tắc 3 (Đồng bộ tài liệu bắt buộc)**: Sau khi hoàn thành bất kỳ thay đổi code nào (thêm/sửa/xóa tính năng, đổi bảng Supabase, thêm file mới...), AI PHẢI tự đề xuất nội dung cần cập nhật vào ĐÚNG 1 trong 2 file:
+>    - Thay đổi thuộc về **nghiệp vụ/tính năng người dùng thấy được** (tab mới, quy tắc nhập liệu mới, cách vận hành...) → cập nhật `README.md` (mục 2 tương ứng phân hệ, hoặc mục 7 nếu là vấn đề kỹ thuật cần lưu ý).
+>    - Thay đổi thuộc về **cấu trúc code** (file mới, đổi tên bảng Supabase, đổi luồng gọi API, nợ kỹ thuật mới phát sinh...) → cập nhật `ARCHITECTURE.md` mục 3 (bảng ánh xạ) hoặc mục 7 (nợ kỹ thuật).
+>    - Nếu thay đổi ảnh hưởng cả 2 khía cạnh, phải đề xuất cập nhật CẢ 2 file.
+>    - AI không tự ý sửa file tài liệu — chỉ đề xuất nội dung, chờ bạn duyệt rồi mới ghi.
 
 ---
 
