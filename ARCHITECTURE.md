@@ -36,7 +36,7 @@ src/
 │       ├── localStore.ts          # CRUD giả lập khi ở chế độ MOCK/offline
 │       └── mockData.ts            # Dữ liệu mẫu cho MOCK mode
 ├── utils/
-│   ├── hierarchy.ts               # Cây đơn vị, emoji cấp bậc, getAllSubordinateIds()
+│   ├── hierarchy.ts               # Cây đơn vị, emoji cấp bậc, getAllSubordinateIds(), getDefaultUnitId()
 │   ├── formatters.ts              # formatCurrency, formatPhoneNumber, getDirectImageLink...
 │   ├── expiryStatus.ts            # Tính trạng thái hạn (CẢNH BÁO/QUÁ HẠN...)
 │   ├── atvsld.ts                  # getChungNhanByNhom(), calcGiaTriDen() — công thức hạn ATVSLĐ
@@ -46,7 +46,7 @@ src/
 │   └── toast.ts
 ├── pages/                         # 12 trang chính, ánh xạ ở mục 3
 └── components/
-    ├── ui/                        # Badge, Button, Modal, Pagination, CustomAutocomplete, PasteImportModal, UnitFilterSidebar
+    ├── ui/                        # Badge, Button, Modal, Pagination, CustomAutocomplete, PasteImportModal, UnitFilterSidebar, LineTabs
     ├── common/                    # EmptyState, TablePaginationFooter
     ├── dashboard/                 # KpiSection, ExpiryAlertPanel, PersonnelDoughnutChart, DashboardCustomizerModal
     ├── department/                # 7 Modal theo từng phân hệ hồ sơ đơn vị (mục 3)
@@ -61,12 +61,12 @@ src/
 |---|---|---|---|---|
 | Tổng quan (`dashboard`) | `DashboardPage.tsx` (1486 dòng) | `KpiSection`, `ExpiryAlertPanel`, `PersonnelDoughnutChart`, `DashboardCustomizerModal` | đọc `dm_don_vi`, `ns_dich_vu`, `ts_thiet_bi` (tổng hợp, không ghi) | ✅ |
 | Thông tin Công ty (`departments`) | `DepartmentPage.tsx` (2437 dòng — **file lớn nhất theo page**) | `SecurityModal`, `PcccModal`, `AtvsldModal`, `PcttModal`, `PvhcModal`, `PnModal`, `PhModal`, `PersonnelCard` | `dm_don_vi`, `hs_an_ninh`, `hs_pccc`+`ts_pccc`, `hs_an_toan_lao_dong`, `hs_pctt`, `hs_pvhc`, `dm_phap_nhan`, `dm_phong_hop` | ✅ |
-| Nhân sự (`personnel`) | `PersonnelPage.tsx` (2851 dòng) | `PersonnelModal`; module con **Cước ĐTDĐ**: `CuocDiDongTab.tsx` (3366 dòng — **file lớn nhất toàn repo**), `ThueBaoCuocHistorySection`, `BatchCostEntryModal`, `PersonnelDetailCuocChart`, `ThueBaoDetailCuocChart` | `ns_dich_vu` (hồ sơ NS); Cước ĐTDĐ dùng `dm_thue_bao` + `cp_cuoc_thang` | ✅ |
+| Nhân sự (`personnel`) | `PersonnelPage.tsx` (2868 dòng) | `PersonnelModal`, component `LineTabs.tsx`; module con **Cước ĐTDĐ**: `CuocDiDongTab.tsx` (3366 dòng — **file lớn nhất toàn repo**), `ThueBaoCuocHistorySection`, `BatchCostEntryModal`, `PersonnelDetailCuocChart`, `ThueBaoDetailCuocChart` | `ns_dich_vu` (hồ sơ NS); Cước ĐTDĐ dùng `dm_thue_bao` + `cp_cuoc_thang` | ✅ |
 | An toàn PCCC (`firesafety`) | `FireSafetyPage.tsx` (1117 dòng) | dùng chung `PcccModal` (ở `components/department/`) | `hs_pccc`, `ts_pccc` | ✅ |
-| ATVSLĐ (`atvsld`) | `AtvsldPage.tsx` (663 dòng) — có 4 tab cấp 1: `hoso`, `daotao` (2 tab con `kehoach`/`khoahoc`), `thietbi`, `khamsuckhoe` | `HoSoTab.tsx`, `KeHoachTab.tsx`, `KhoaHocTab.tsx` (975 dòng), `StrictEquipmentTab.tsx` (996 dòng), modal `AtvsldModal` | `hs_an_toan_lao_dong` (hồ sơ), `hs_khoa_huan_luyen`+`hs_hoc_vien_khoa_huan_luyen` (khóa học), `ts_thiet_bi_nghiem_ngat`+`nk_kiem_dinh_tbnn` (thiết bị nghiêm ngặt), `dm_chu_ky_atvsld` (định nghĩa, chưa thấy nơi ghi/đọc trực tiếp — kiểm tra lại) | 🔧 Tab `khamsuckhoe` **CHƯA XÂY** — hiện chỉ là khung placeholder "sắp cập nhật" (xem mục 7) |
+| ATVSLĐ (`atvsld`) | `AtvsldPage.tsx` (676 dòng) — có 4 tab cấp 1: `hoso`, `daotao` (2 tab con `kehoach`/`khoahoc`), `thietbi`, `khamsuckhoe` | `HoSoTab.tsx`, `KeHoachTab.tsx`, `KhoaHocTab.tsx` (975 dòng), `StrictEquipmentTab.tsx` (996 dòng), modal `AtvsldModal`, component `LineTabs.tsx` | `hs_an_toan_lao_dong` (hồ sơ), `hs_khoa_huan_luyen`+`hs_hoc_vien_khoa_huan_luyen` (khóa học), `ts_thiet_bi_nghiem_ngat`+`nk_kiem_dinh_tbnn` (thiết bị nghiêm ngặt), `dm_chu_ky_atvsld` (định nghĩa, chưa thấy nơi ghi/đọc trực tiếp — kiểm tra lại) | 🔧 Tab `khamsuckhoe` **CHƯA XÂY** — hiện chỉ là khung placeholder "sắp cập nhật" (xem mục 7) |
 | Phương tiện (`vehicles`) | `VehiclePage.tsx` (1380 dòng) | — | `ts_xe`, `cp_hoat_dong_xe` | ✅ |
 | Tài sản-Thiết bị (`equipments`) | `EquipmentPage.tsx` (1623 dòng) | — | `ts_thiet_bi`, `nk_thiet_bi` (nhật ký thiết bị) | ✅ |
-| Tài liệu (`documents`) | `DocumentPage.tsx` (1634 dòng) | `PasteImportModal` (import Excel/paste) | `vb_tb` | ✅ |
+| Tài liệu (`documents`) | `DocumentPage.tsx` (1674 dòng) | Các component con hiển thị bảng theo tab nằm trong `src/components/document/` (`AllDocTable.tsx`, `ThongBaoTable.tsx`, `QuyetDinhTable.tsx`, `CongVanDenTable.tsx`, `CongVanDiTable.tsx`, `ToTrinhTable.tsx`), file helper `documentHelpers.ts`, component `LineTabs.tsx`. | `vb_tb` | ✅ |
 | Quy định (`policies`) | `PolicyPage.tsx` (557 dòng) | — | `qd_qt` | ✅ |
 | Báo cáo (`reports`) | `ReportPage.tsx` (699 dòng) | `CustomReportBuilder`, `ReportConfigPanel`, `ReportFilterBar`, `ReportList`, `ReportPreviewTable` | đọc tổng hợp nhiều bảng (`hs_an_ninh`, `dm_don_vi`, `ns_dich_vu`, `dm_phap_nhan`, `vb_tb`), không ghi | ✅ |
 | Tài khoản (`accounts`) | `AccountPage.tsx` (516 dòng) | — | `config_users` | ✅ |
@@ -92,6 +92,7 @@ src/
 - `checkPermission('TênNhóm')` (dùng trong `Sidebar.tsx`) quyết định nhóm menu nào hiển thị: `TongQuan`, `CongTy`, v.v.
 - `utils/hierarchy.ts` → `getAllSubordinateIds()`: đệ quy tìm đơn vị con/cháu cho user có `id_don_vi` cụ thể.
 - ADMIN hoặc `id_don_vi` thuộc `HO`/`ALL`/chứa "TOÀN QUỐC" → xem toàn hệ thống.
+- `utils/hierarchy.ts` → `getDefaultUnitId()`: tính đơn vị mặc định khi tải trang (THACO AUTO đối với Admin/Toàn quyền, Đơn vị mẹ quản lý cấp tỉnh/thành đối với tài khoản showroom/con).
 
 ## 7. NỢ KỸ THUẬT / VẤN ĐỀ ĐÃ XÁC MINH TRONG CODE
 

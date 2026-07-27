@@ -219,8 +219,15 @@ Dưới đây là giải thích chi tiết lý do vì sao phiên bản gốc (H�
 
 > Mục này được thêm sau khi quét toàn bộ 81 file `.ts/.tsx` thật trong `src/` (không suy đoán). Xem chi tiết bảng ánh xạ Tính năng ↔ File ↔ Bảng Supabase đầy đủ tại `ARCHITECTURE.md`.
 
+- **Cơ chế xác định Đơn vị mặc định khi truy cập hệ thống**: Tự động chọn đơn vị mặc định khi truy cập bất kỳ phân hệ nào qua hàm `getDefaultUnitId(user, donViList)` trong `src/utils/hierarchy.ts`. Tài khoản Admin/Toàn quyền sẽ hiển thị mặc định đơn vị **THACO AUTO**, tài khoản thường (Showroom, điểm bán lẻ) sẽ hiển thị **Đơn vị mẹ quản lý** (Công ty tỉnh thành) của tài khoản đó.
 - **Tab "Khám sức khỏe & Bệnh nghề nghiệp"** (mục 2, phân hệ 05) mới là khung giao diện placeholder, chưa có dữ liệu — xem mục 2 phía trên.
 - **`utils/logger.ts` và `utils/logger.tsx` bị trùng lặp**: cả 2 file cùng export hàm `generateDiffLog()`. Cần xác định file nào thực sự đang được import ở nơi khác trong dự án và xóa file thừa để tránh nhầm lẫn khi bảo trì.
 - **Bảng `dm_chu_ky_atvsld`**: có hàm đọc `getChuKyATVSLD()` khai báo sẵn trong `services/api/modules.ts`, nhưng không tìm thấy nơi nào trong `pages/` hoặc `components/` gọi hàm này — cần kiểm tra lại thủ công (có thể là bảng chưa nối vào UI, hoặc đã đổi tên biến ở nơi khác).
 - **`services/api/client.ts`** chứa `SUPABASE_ANON_KEY` hardcode trực tiếp trong source. Đây là anon key public (được bảo vệ bởi Row Level Security phía Supabase) nên không phải lỗi bảo mật nghiêm trọng, nhưng nên cân nhắc chuyển sang biến môi trường (`.env` + `import.meta.env` của Vite) để thuận tiện đổi giữa môi trường dev/production.
 - **2 file lớn nhất hệ thống** (ứng viên hàng đầu nếu cần tách nhỏ để dễ bảo trì): `components/personnel/CuocDiDongTab.tsx` (3.366 dòng) và `pages/PersonnelPage.tsx` (2.851 dòng).
+
+#### 📄 08. Phân hệ Quản lý Văn bản & Thông báo (DocumentPage.tsx)
+- **Line Tab chuyển đổi mượt mà (LineTabs.tsx)**: Phân hệ chuyển đổi giữa các loại văn bản sử dụng component dùng chung `LineTabs.tsx` với hiệu ứng trượt gạch chân mượt mà bằng Framer Motion, đồng bộ thiết kế không đóng khung thống nhất.
+- **Cấp số hiệu tự động (Auto-numbering)**: Tích hợp checkbox "Số tự động" cạnh ô Số hiệu giúp tự động tính toán số hiệu tiếp theo dạng `[số]/[năm]/[loại]-[đơn vị]` dựa trên phân loại, đơn vị ban hành, năm hiện hành và viết tắt chức danh người ký.
+- **Cấu trúc Component hóa (Modular architecture)**: Tách mã nguồn hiển thị bảng dữ liệu của từng loại văn bản thành các file `.tsx` riêng biệt (`AllDocTable`, `ThongBaoTable`, `QuyetDinhTable`, `CongVanDenTable`, `CongVanDiTable`, `ToTrinhTable`) giúp dễ bảo trì và tối ưu cột hiển thị riêng cho mỗi loại.
+- **Copy nhanh Thông tin phản hồi**: Hỗ trợ nút sao chép thông tin phản hồi định dạng chuẩn bên cạnh mục Ban hành trong bảng Chi tiết Văn bản để phản hồi ngay cho người xin cấp số (bao gồm Số hiệu, Nội dung, Ngày ban hành, Người phê duyệt, Nhân sự & Bộ phận trình).
