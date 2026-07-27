@@ -1,4 +1,4 @@
-# 🏢 HỆ THỐNG QUẢN TRỊ VĂN PHÒNG & AN SINH ĐỜI SỐNG (QTVP-ASDS) - THACO AUTO
+# 🏢 HỆ THỐNG QUẢN TRỊ VĂN PHÒNG & AN SINH ĐỜI SỐNG (QTVP-ASDS)
 
 Tài liệu này cung cấp bức tranh toàn cảnh 100% về kiến trúc, tất cả 12 phân hệ nghiệp vụ, cơ chế phân quyền, nguyên tắc tối ưu hiệu năng và giải thích cấu trúc file dự án **QTVP-ASDS**.
 
@@ -7,7 +7,7 @@ Tài liệu này cung cấp bức tranh toàn cảnh 100% về kiến trúc, t�
 ## 1. TỔNG QUAN HỆ THỐNG & CÔNG NGHỆ (SYSTEM OVERVIEW & TECH STACK)
 
 ### 1.1. Mục tiêu Hệ thống
-* **Mục tiêu:** Số hóa, chuẩn hóa và quản trị tập trung toàn bộ các mảng nghiệp vụ: **Hành chính - Nhân sự - Tài sản - Xe - Thiết bị - PCCC - ATVSLĐ - An ninh Bảo vệ - Văn bản - Báo cáo** cho toàn bộ hệ thống Đơn vị / Công ty Tỉnh thành / Showroom / Điểm bán hàng của THACO AUTO trên toàn quốc.
+* **Mục tiêu:** Số hóa, chuẩn hóa và quản trị tập trung toàn bộ các mảng nghiệp vụ: **QTVP&ASĐS - Nhân sự - Tài sản - Xe - Thiết bị - PCCC - ATVSLĐ - An ninh Bảo vệ - VTLT - Báo cáo** cho hệ thống Đơn vị Công ty Tỉnh thành/Showroom/Điểm bán hàng trực thuộc trên toàn quốc.
 * **Mô hình kiến trúc:** Single Page Application (SPA) React + TypeScript kết hợp Supabase REST API & Smart Two-Layer Cache.
 * **Cơ chế phân quyền:** Quản trị phân quyền dựa trên cây dữ liệu đệ quy (Hierarchy-based Access Control) kết hợp vai trò người dùng (Role-based Access Control).
 
@@ -58,12 +58,12 @@ QTVP-ASDS App
 
 #### 👥 03. Phân hệ Quản lý Nhân sự & Cước Di động (PersonnelPage.tsx)
 - **Hồ sơ Nhân sự 360°**: Quản lý đầy đủ mã nhân viên, họ tên, chức danh, bộ phận, khối, ngạch lương, thâm niên, ngày nhận việc, CCCD, thông tin xe cá nhân, bằng cấp chứng chỉ (ANBV, PCCC, CNCH, Sơ cấp cứu, Võ thuật, GPLX, Tin học, Ngoại ngữ...).
-- **Quản lý Thuê bao & Cước di động (`CuocDiDongTab.tsx`)**: 
+- **Quản lý Thuê bao & Cước di động (`CuocDiDongTab.tsx`)**:
   - Quản lý danh mục số thuê bao công ty cấp cho nhân sự/bộ phận.
   - Theo dõi lịch sử người sử dụng thuê bao (`lich_su_nsd`).
   - Quản lý chi tiết chi phí cước tháng phát sinh (`cp_cuoc_thang`), so sánh với snapshot định mức, hiển thị biểu đồ biến động cước (`PersonnelDetailCuocChart.tsx`, `ThueBaoDetailCuocChart.tsx`).
 - **Thao tác Nghiệp vụ Nâng cao**: Tạo hồ sơ kiêm nhiệm (`handleDuplicate`), Điều chuyển / Nghỉ việc (`handleOffboardClick` - tự động kiểm tra tài sản chưa trả), Vào làm lại (`handleConfirmRehire`).
-- **Nhập Dán Excel Hàng Loạt (Paste Import)**: Cho phép copy-paste toàn bộ bảng Excel vào phần mềm. 
+- **Nhập Dán Excel Hàng Loạt (Paste Import)**: Cho phép copy-paste toàn bộ bảng Excel vào phần mềm.
   - *Quy tắc bảo toàn dữ liệu*: Bắt buộc MSNV và Họ tên. Đối với nhân sự đã tồn tại, các cột để trống trong file Excel sẽ **GIỮ NGUYÊN 100% dữ liệu cũ trong CSDL**, không bị ghi đè hay nhảy chức danh.
 
 #### 🧯 04. Phân hệ Quản lý PCCC & CNCH (FireSafetyPage.tsx)
@@ -79,6 +79,7 @@ QTVP-ASDS App
   - Quản lý danh mục thiết bị có yêu cầu nghiêm ngặt (xe nâng, nồi hơi, thang máy, bình chịu áp lực...).
   - Quản lý nhật ký/lịch sử kiểm định (`nk_kiem_dinh_tbnn`), đơn vị kiểm định, chi phí, link biên bản PDF.
   - Cảnh báo thời hạn kiểm định qua huy hiệu màu chuẩn: *Đỏ (Quá hạn)*, *Cam (Dưới 30 ngày)*, *Vàng (Dưới 60 ngày)*, *Xanh (An toàn)*.
+- **⚠️ Tab 5: Khám sức khỏe & Bệnh nghề nghiệp — MỚI XÁC MINH (chưa có trong tài liệu gốc):** Đã có khung giao diện (`activeTab === 'khamsuckhoe'`) hiển thị thông báo "đang được lên kế hoạch phát triển", nhưng **CHƯA có bảng dữ liệu Supabase, chưa có component riêng, chưa nhập liệu được**. Đây là phân hệ thứ 5 thực tế trong module ATVSLĐ, cần bổ sung khi triển khai.
 
 #### 🚗 06. Phân hệ Quản lý Xe & Chi phí Vận hành (VehiclePage.tsx)
 - **Master Tài sản Xe (TS_Xe)**: Quản lý biển số, loại phương tiện, hiệu xe, số khung, số máy, năm sản xuất, hình thức sở hữu, GPS, hiện trạng.
@@ -117,19 +118,24 @@ QTVP-ASDS App
 ## 3. KIẾN TRÚC KỸ THUẬT & TỐI ƯU HIỆU NĂNG (PERFORMANCE ARCHITECTURE)
 
 ### 3.1. Bộ Đệm 2 Tầng Thông Minh (Smart Two-Layer Cache)
-Nằm trong [src/services/api/cache.ts](file:///g:/My%20Drive/Web%20app/APP_QTVP.ASDS/src/services/api/cache.ts):
+Nằm trong `src/services/api/cache.ts`:
 1. **Layer 1 - In-Memory Cache**: Trả về dữ liệu siêu tốc (<1ms) trong phiên làm việc đối với các bảng chưa hết hạn TTL (5 phút).
 2. **Layer 2 - Persistent LocalStorage Cache**: Lưu bản nạp dữ liệu offline.
    - *Cơ chế an toàn*: Tự động bắt lỗi `QuotaExceededError` khi `localStorage` chạm ngưỡng 5MB, tự động dọn dẹp cache cũ và hạ cấp mượt mà xuống In-Memory cache mà không làm đơ/crash ứng dụng.
 
 ### 3.2. Quản lý Render DOM Thông Minh (TabContainer Optimization)
-Trong [src/App.tsx](file:///g:/My%20Drive/Web%20app/APP_QTVP.ASDS/src/App.tsx):
+Trong `src/App.tsx`:
 - Sử dụng `React.memo` cho `TabContainer`.
 - Khi chuyển đổi tab, các tab không active sẽ được gán thuộc tính `hidden` (`display: none`), ngắt hoàn toàn pipeline tính toán Layout/Paint/Compositing của trình duyệt giúp chuyển tab nhẹ và cuộn trang mượt mà.
 
 ### 3.3. Thuật Toán Tra Cứu Map O(1)
-Trong [src/pages/PersonnelPage.tsx](file:///g:/My%20Drive/Web%20app/APP_QTVP.ASDS/src/pages/PersonnelPage.tsx):
+Trong `src/pages/PersonnelPage.tsx`:
 - Thay thế tìm kiếm mảng đệ quy O(N) `.find()` trong các hàm tra cứu tên đơn vị bằng `donViLookupMap` dạng `Map<string, DonVi>` cho tốc độ tra cứu O(1), tối ưu cho bảng dữ liệu chứa hàng ngàn nhân sự.
+
+### 3.4. Cổng ghi dữ liệu duy nhất (đã xác minh trực tiếp trong `services/api/modules.ts`)
+- Toàn bộ thao tác **Đọc** đi qua các hàm `getX()` (VD `getPersonnel()`, `getThietBi()`...), có cơ chế fallback tự động sang dữ liệu offline (`getLocalRecords`) nếu Supabase lỗi.
+- Toàn bộ thao tác **Ghi/Sửa** bắt buộc qua `apiService.save(data, action, tableName)` — hàm tự làm sạch payload, tự sinh `id`, và tự gọi `invalidateCache()` + `writeLog()` (ghi Audit log). Không được gọi thẳng Supabase REST trong component.
+- Toàn bộ thao tác **Xóa** qua `apiService.deleteRecord(id, tableName)`.
 
 ---
 
@@ -144,7 +150,7 @@ Dưới đây là giải thích chi tiết lý do vì sao phiên bản gốc (H�
 ├── 📂 public/                    # [Có ở cả 2 hình] Chứa tài nguyên tĩnh (favicon, logo)
 ├── 📂 src/                       # [Có ở cả 2 hình] Thư mục chứa 100% mã nguồn React TypeScript
 ├── 📄 .gitignore                 # [Mới ở Hình 2] File cấu hình Git loại trừ các thư mục rác (dist, node_modules)
-├── 📄 ARCHITECTURE.md            # [Mới ở Hình 2] Tài liệu mô tả kiến trúc module ATVSLĐ & Thiết bị nghiêm ngặt
+├── 📄 ARCHITECTURE.md            # [Mới ở Hình 2] Tài liệu mô tả kiến trúc mã nguồn dành cho AI/Developer
 ├── 📄 deptTabStats_restored.ts   # [Mới ở Hình 2] File nháp tạm khôi phục code (đã loại trừ khỏi build)
 ├── 📄 find_stats.cjs             # [Mới ở Hình 2] Script công cụ hỗ trợ tìm kiếm code nội bộ
 ├── 📄 find_stats.js              # [Mới ở Hình 2] Script công cụ hỗ trợ tìm kiếm code nội bộ
@@ -153,7 +159,7 @@ Dưới đây là giải thích chi tiết lý do vì sao phiên bản gốc (H�
 ├── 📄 metadata.json              # [Có ở cả 2 hình] File thông tin cấu hình dự án
 ├── 📄 package.json               # [Có ở cả 2 hình] File khai báo danh sách thư viện phụ thuộc
 ├── 📄 package-lock.json          # [Có ở cả 2 hình] File khóa phiên bản chính xác của các gói npm
-├── 📄 README.md                  # [Có ở cả 2 hình] Tài liệu hướng dẫn sử dụng và kiến trúc này
+├── 📄 README.md                  # [Có ở cả 2 hình] Tài liệu hướng dẫn sử dụng và tổng quan nghiệp vụ này
 ├── 📄 tsconfig.json              # [Có ở cả 2 hình] File cấu hình trình biên dịch TypeScript (đã chỉnh include src)
 └── 📄 vite.config.ts             # [Có ở cả 2 hình] File cấu hình đóng gói Vite (đã chỉnh emptyOutDir: false)
 ```
@@ -164,7 +170,7 @@ Dưới đây là giải thích chi tiết lý do vì sao phiên bản gốc (H�
 | :--- | :--- | :--- |
 | **`node_modules/`** | Phát sinh khi thực hiện chạy lệnh `npm install` hoặc khởi chạy môi trường dev. | Chứa toàn bộ bộ mã nguồn của các thư viện dependency (React, Vite, Tailwind, Supabase...). |
 | **`.gitignore`** | Được khởi tạo để quản lý phiên bản mã nguồn Git. | Khai báo danh sách file/folder không cần đẩy lên kho lưu trữ code (như `node_modules`, `dist`). |
-| **`ARCHITECTURE.md`** | Được viết thêm trong giai đoạn thiết kế tính năng ATVSLĐ & Thiết bị nghiêm ngặt. | Tài liệu ghi chép kiến trúc cơ sở dữ liệu Supabase cho module ATVSLĐ. |
+| **`ARCHITECTURE.md`** | Tài liệu kỹ thuật dành riêng cho AI/Developer đọc trước khi sửa code. | Bản đồ kiến trúc mã nguồn, bảng ánh xạ Tính năng ↔ File ↔ Bảng Supabase, quy ước code, nợ kỹ thuật. |
 | **`deptTabStats_restored.ts`** | File nháp phát sinh trong phiên khôi phục đoạn tính toán thống kê phòng ban cũ. | File code nháp ngoài root (đã được cấu hình loại trừ khỏi dự án trong `tsconfig.json`). |
 | **`find_stats.cjs` / `.js`** | Script nhỏ bằng Node.js được tạo ra để tìm kiếm code. | Công cụ phụ trợ quét và định vị đoạn code tính toán trong dự án. |
 | **`search_results.txt`** | File kết quả do script tìm kiếm xuất ra. | File lưu nhật ký văn bản kết quả tìm kiếm. |
@@ -187,11 +193,11 @@ Dưới đây là giải thích chi tiết lý do vì sao phiên bản gốc (H�
 ### 5.2. Kiểm tra Cú pháp & Đóng gói Production
 1. Kiểm tra linter & kiểu dữ liệu TypeScript (Strict mode):
    ```bash
-   cmd.exe /c "npx tsc --noEmit"
+   npx tsc --noEmit
    ```
 2. Đóng gói sản phẩm sản xuất (Output xuất ra thư mục `dist/`):
    ```bash
-   cmd.exe /c "npx vite build"
+   npx vite build
    ```
 
 ---
@@ -201,3 +207,15 @@ Dưới đây là giải thích chi tiết lý do vì sao phiên bản gốc (H�
 > ⚠️ **2 NGUYÊN TẮC LÀM VIỆC BẮT BUỘC KHI CẬP NHẬT CODE:**
 > 1. **Nguyên tắc 1 (Trình bày tóm tắt trước khi code)**: Trước bất kỳ lần sửa đổi mã nguồn nào, phải lập bản tóm tắt phương án triển khai rõ ràng, người dùng xem và bấm **Đồng ý** thì mới được phép ghi code.
 > 2. **Nguyên tắc 2 (Không tự ý bỏ / thay thế tính năng)**: Tuyệt đối không tự ý xóa bỏ hoặc thay thế bất kỳ tính năng, liên kết hay trường dữ liệu nào. Nếu bắt buộc phải thay đổi, phải giải thích lý do và có sự đồng ý của người dùng mới được triển khai.
+
+---
+
+## 7. VẤN ĐỀ KỸ THUẬT ĐÃ XÁC MINH TRỰC TIẾP TRONG CODE (cập nhật mới nhất)
+
+> Mục này được thêm sau khi quét toàn bộ 81 file `.ts/.tsx` thật trong `src/` (không suy đoán). Xem chi tiết bảng ánh xạ Tính năng ↔ File ↔ Bảng Supabase đầy đủ tại `ARCHITECTURE.md`.
+
+- **Tab "Khám sức khỏe & Bệnh nghề nghiệp"** (mục 2, phân hệ 05) mới là khung giao diện placeholder, chưa có dữ liệu — xem mục 2 phía trên.
+- **`utils/logger.ts` và `utils/logger.tsx` bị trùng lặp**: cả 2 file cùng export hàm `generateDiffLog()`. Cần xác định file nào thực sự đang được import ở nơi khác trong dự án và xóa file thừa để tránh nhầm lẫn khi bảo trì.
+- **Bảng `dm_chu_ky_atvsld`**: có hàm đọc `getChuKyATVSLD()` khai báo sẵn trong `services/api/modules.ts`, nhưng không tìm thấy nơi nào trong `pages/` hoặc `components/` gọi hàm này — cần kiểm tra lại thủ công (có thể là bảng chưa nối vào UI, hoặc đã đổi tên biến ở nơi khác).
+- **`services/api/client.ts`** chứa `SUPABASE_ANON_KEY` hardcode trực tiếp trong source. Đây là anon key public (được bảo vệ bởi Row Level Security phía Supabase) nên không phải lỗi bảo mật nghiêm trọng, nhưng nên cân nhắc chuyển sang biến môi trường (`.env` + `import.meta.env` của Vite) để thuận tiện đổi giữa môi trường dev/production.
+- **2 file lớn nhất hệ thống** (ứng viên hàng đầu nếu cần tách nhỏ để dễ bảo trì): `components/personnel/CuocDiDongTab.tsx` (3.366 dòng) và `pages/PersonnelPage.tsx` (2.851 dòng).
