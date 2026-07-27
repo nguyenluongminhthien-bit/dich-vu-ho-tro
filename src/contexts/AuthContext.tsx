@@ -1,0 +1,155 @@
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { apiService } from '../services/api';
+import { User } from '../types';
+
+interface AppUser {
+  id: string;
+  user_name: string;
+  ho_ten: string;
+  id_don_vi: string;
+  quyen: string; 
+  quyen_truy_cap?: string; 
+  quyen_chi_tiet?: string;
+}
+
+interface AuthContextType {
+  user: AppUser | null;
+  login: (username: string, pass: string, remember?: boolean) => Promise<void>;
+  logout: () => void;
+  checkPermission: (moduleId: string) => boolean;
+}
+
+const AuthContext = createContext<AuthContextType | null>(null);
+
+export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
+  const [user, setUser] = useState<AppUser | null>(null);
+
+  useEffect(() => {
+    const storedUser = localStorage.getItem('authUser') || sessionStorage.getItem('authUser');
+    if (storedUser) {
+      const parsedUser = JSON.parse(storedUser);
+      setUser(parsedUser);
+      
+      // Đồng bộ thông tin user xuống apiService
+      apiService.setCurrentUser({
+        id: parsedUser.id,
+        user_name: parsedUser.user_name,
+        ho_ten: parsedUser.ho_ten,
+        id_don_vi: parsedUser.id_don_vi,
+        quyen: parsedUser.quyen,
+        quyen_truy_cap: parsedUser.quyen_truy_cap
+      } as User);
+    }
+  }, []);
+
+  const login = async (username: string, pass: string, remember: boolean = false) => {
+    try {
+      const responseData = await apiService.login(username, pass);
+      
+      if (!responseData) throw new Error("Không nhận được dữ liệu từ máy chủ.");
+      
+      let userData: any = null;
+      if (responseData.data) {
+        userData = responseData.data; 
+      } else if (Array.isArray(responseData)) {
+        userData = responseData[0];   
+      } else {
+        userData = responseData;      
+      }
+
+      if (!userData) throw new Error("Dữ liệu tài khoản bị trống.");
+
+      // 🟢 1. PHÂN LỌC QUYỀN TRUY CẬP (NHẬN TRỰC TIẾP TỪ DATABASE)
+      const rawRole = String(userData.quyen || userData.NhomQuyen || userData.role || 'USER').trim();
+
+      // 🟢 2. QUYẾT ĐỊNH ID_DON_VI (Chỉ duy nhất ADMIN mới được ép thành 'ALL')
+      let finalIdDonVi = '';
+      if (rawRole.toUpperCase() === 'ADMIN') {
+        finalIdDonVi = 'ALL';
+      } else {
+        finalIdDonVi = String(userData.id_don_vi || userData.ID_DonVi || userData.idDonVi || 'UNKNOWN').trim();
+      }
+
+      // 🟢 3. CHUẨN HÓA THÔNG TIN NGƯỜI DÙNG (Bao gồm cả Cột Truy Cập)
+      const mappedUser: AppUser = {
+        id: String(userData.id || userData.ID_User || 'Unknown'),
+        user_name: String(userData.user_name || userData.Username || userData.username || username),
+        ho_ten: String(userData.ho_ten || userData.HoTen || userData.hoTen || 'Người dùng'),
+        id_don_vi: finalIdDonVi,
+        quyen: rawRole, // Lấy chuẩn chữ viewer_hanche
+        quyen_truy_cap: String(userData.quyen_truy_cap || ''),
+        quyen_chi_tiet: String(userData.quyen_chi_tiet || '')
+      };
+
+      // Lưu User vào state và LocalStorage/SessionStorage tùy chọn
+      setUser(mappedUser);
+      if (remember) {
+        localStorage.setItem('authUser', JSON.stringify(mappedUser));
+        sessionStorage.removeItem('authUser');
+      } else {
+        sessionStorage.setItem('authUser', JSON.stringify(mappedUser));
+        localStorage.removeItem('authUser');
+      }
+      
+      apiService.setCurrentUser(mappedUser as unknown as User);
+      apiService.writeLog('ĐĂNG NHẬP', 'Truy cập hệ thống');
+
+      // Chỉ preload danh mục đơn vị cơ bản ngầm (nhẹ) nếu cần, tránh tải ồ ạt toàn bộ bảng nhân sự, an ninh, pháp nhân
+      setTimeout(() => {
+        apiService.getDonVi().catch(() => {});
+      }, 300);
+
+    } catch (error) {
+      console.error("Login Error:", error);
+      throw error; 
+    }
+  };
+
+  const logout = () => {
+    apiService.writeLog('ĐĂNG XUẤT', 'Thoát hệ thống');
+    setTimeout(() => {
+      setUser(null);
+      localStorage.removeItem('authUser');
+      sessionStorage.removeItem('authUser');
+      apiService.setCurrentUser(null);
+      window.location.reload();
+    }, 500);
+  };
+
+  const checkPermission = (moduleId: string) => {
+    if (!user) return false;
+    const quyenUpper = String(user.quyen || '').toUpperCase();
+    const quyenTruyCap = String(user.quyen_truy_cap || '').trim();
+
+    // 1. ADMIN hoặc ALL thì luôn có toàn quyền
+    if (quyenUpper === 'ADMIN' || quyenTruyCap.includes('ALL')) {
+      return true;
+    }
+
+    // 2. Nếu quyen_truy_cap rỗng (tài khoản mặc định chưa bị giới hạn riêng) -> cho phép truy cập module
+    if (!quyenTruyCap && String(user.quyen).toLowerCase() !== 'viewer_hanche') {
+      return true;
+    }
+
+    // 3. Tương thích ngược: Nếu tài khoản có trọn bộ 9 module cũ trước khi có BaoCao -> tự động mở BaoCao
+    const legacyModules = ['TongQuan', 'CongTy', 'NhanSu', 'PCCC', 'ATVSLD', 'Xe', 'ThietBi', 'VanBan', 'QuyDinh'];
+    const isLegacyFullAccess = legacyModules.every(m => quyenTruyCap.includes(m));
+    if (moduleId === 'BaoCao' && isLegacyFullAccess) {
+      return true;
+    }
+
+    return quyenTruyCap.includes(moduleId);
+  };
+
+  return (
+    <AuthContext.Provider value={{ user, login, logout, checkPermission }}>
+      {children}
+    </AuthContext.Provider>
+  );
+};
+
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) throw new Error('useAuth must be used within an AuthProvider');
+  return context;
+};
