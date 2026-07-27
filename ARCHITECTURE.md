@@ -1,202 +1,110 @@
-# 🏗️ KIẾN TRÚC MÃ NGUỒN TSX & DỰ ÁN QTVP-ASDS
+# 📑 ARCHITECTURE.md — BẢN ĐỒ HỆ THỐNG QTVP-ASDS (dành cho AI)
 
-Tài liệu này quy hoạch toàn bộ kiến trúc mã nguồn TypeScript React (`.tsx` & `.ts`), sơ đồ phân cấp Component, các Layer xử lý dữ liệu và luồng giao tiếp giữa các phân hệ trong hệ thống **QTVP-ASDS**.
+> File này được dựng lại bằng cách quét trực tiếp 81 file `.ts/.tsx` thật trong repo (không suy đoán từ tên file). Nguồn xác thực: export chính của từng file + tên bảng Supabase thực sự được gọi (`services/api/modules.ts`, `apiService.save(...)`).
+> **Quy tắc bắt buộc:** Mỗi khi thêm/sửa 1 tính năng, PHẢI cập nhật bảng mục 3 trong cùng lần commit.
 
 ---
 
-## 1. TỔNG QUAN CẤU TRÚC THƯ MỤC MÃ NGUỒN (`src/`)
+## 1. TỔNG QUAN
 
-```text
+- **Kiến trúc:** JAMstack — React (Vite, TS) + Supabase (PostgreSQL, REST trực tiếp qua `fetch`, KHÔNG dùng Supabase JS client).
+- **Chế độ vận hành:** `API_MODE` ở `services/api/client.ts` chọn `'SUPABASE'` hoặc `'MOCK'` (fallback đọc `localStorage` qua `services/api/localStore.ts` khi mất kết nối — xem mục 6).
+- **Phân quyền:** Kết hợp Role (`ADMIN` / `viewer_hanche` / khác) + phân cấp đơn vị (`id_don_vi`), lấy từ `user_metadata` Supabase Auth.
+
+## 2. CẤU TRÚC THƯ MỤC THẬT (đã xác minh từng file)
+
+```
 src/
-├── App.tsx                     # Component gốc điều hướng Tab, Code Splitting & Deep Link
-├── main.tsx                    # File khởi chạy ứng dụng (Entry Point)
-├── index.css                   # System CSS, Tailwind Tokens, Dark Mode PII Styles
-│
-├── components/                 # TẦNG COMPONENT (Giao diện & Modals)
-│   ├── atvsld/                 # Components phân hệ ATVSLĐ & Thiết bị nghiêm ngặt
-│   ├── common/                 # Components dùng chung chuẩn hóa (EmptyState, TablePagination)
-│   ├── dashboard/              # Widgets trang Tổng quan (Chart, KPI, Alert Panel)
-│   ├── department/             # Modals phòng ban (Pháp nhân, Phòng họp, An ninh, PCCC...)
-│   ├── personnel/              # Components Nhân sự & Phân hệ Cước di động
-│   ├── report/                 # Trình dựng báo cáo động & Preview Table
-│   ├── ui/                     # UI Primitives (Button, Modal, Autocomplete, Sidebar Filter)
-│   ├── ExpiryAlert.tsx         # Banner cảnh báo thời hạn khẩn cấp
-│   ├── ExpiryBadge.tsx         # Huy hiệu trạng thái thời hạn (Quá hạn, Sắp hết, An toàn)
-│   ├── Sidebar.tsx             # Thanh Menu điều hướng bên trái
-│   └── SkeletonLoader.tsx      # Khung xương chờ tải dữ liệu (Loading Skeletons)
-│
-├── constants/                  # TẦNG HẰNG SỐ & MẪU DỮ LIỆU
-│   ├── certificates.ts         # Danh mục loại chứng chỉ & bằng cấp nghiệp vụ
-│   └── reportTemplates.ts      # Cấu hình các mẫu báo cáo chuẩn hệ thống
-│
-├── contexts/                   # TẦNG STATE TOÀN CỤC
-│   └── AuthContext.tsx         # Quản lý phiên Đăng nhập & Phân quyền Module (checkPermission)
-│
-├── hooks/                      # TẦNG CUSTOM HOOKS
-│   ├── useAllowedUnits.ts      # Tính toán danh sách Đơn vị đệ quy được phép truy cập
-│   └── useDebounce.ts          # Chống giật lag khi gõ phím tìm kiếm thời gian thực
-│
-├── pages/                      # TẦNG TRANG PHÂN HỆ NGHIỆP VỤ (12 MODULES)
-│   ├── AccountPage.tsx         # [11] Quản lý Tài khoản & Phân quyền
-│   ├── AtvsldPage.tsx          # [05] Quản lý ATVSLĐ & Thiết bị Nghiêm ngặt
-│   ├── DashboardPage.tsx       # [01] Trang Tổng quan KPI & Biểu đồ
-│   ├── DepartmentPage.tsx      # [02] Quản lý Đơn vị & Sơ đồ Tổ chức
-│   ├── DocumentPage.tsx        # [08] Quản lý Văn bản & Thông báo
-│   ├── EquipmentPage.tsx       # [07] Quản lý Trang thiết bị & Mã QR
-│   ├── FireSafetyPage.tsx      # [04] Quản lý PCCC & Cứu nạn Cứu hộ
-│   ├── LogPage.tsx             # [12] Nhật ký Hệ thống (Audit Logs)
-│   ├── LoginPage.tsx           # Trang Đăng nhập hệ thống
-│   ├── PersonnelPage.tsx       # [03] Quản lý Nhân sự & Cước Di động
-│   ├── PolicyPage.tsx          # [09] Quản lý Quy định & Quy trình
-│   ├── ReportPage.tsx          # [10] Báo cáo Tổng hợp & Custom Builder
-│   └── VehiclePage.tsx         # [06] Quản lý Xe & Chi phí Vận hành
-│
-├── services/                   # TẦNG GIAO TIẾP DỮ LIỆU (SUPABASE REST API & CACHE)
-│   ├── api/
-│   │   ├── auth.ts             # Xử lý API Đăng nhập
-│   │   ├── cache.ts            # Bộ đệm 2 tầng (In-Memory + LocalStorage Quota Safe)
-│   │   ├── client.ts           # Cấu hình Supabase REST Endpoint & Headers
-│   │   ├── localStore.ts       # CSDL LocalStorage dự phòng (Mock Mode)
-│   │   ├── logs.ts             # Tác vụ ghi vết nhật ký tự động (writeLog)
-│   │   ├── mockData.ts         # Bộ dữ liệu mẫu ban đầu
-│   │   └── modules.ts          # Lớp giao tiếp CRUD các bảng Supabase
-│   └── api.ts                  # Export tập trung cổng giao tiếp apiService
-│
-├── types/                      # TẦNG ĐỊNH NGHĨA KIỂU DỮ LIỆU TYPESCRIPT
-│   └── index.ts                # TypeScript Interfaces (Personnel, DonVi, TS_Xe, VB_TB...)
-│
-└── utils/                      # TẦNG THƯ VIỆN TIỆN ÍCH (HELPERS)
-    ├── atvsld.ts               # Thuật toán tính toán chu kỳ chứng chỉ ATVSLĐ
-    ├── expiryStatus.ts         # Tính toán số ngày còn lại & mức độ cảnh báo thời hạn
-    ├── exportExcel.ts          # Xuất báo cáo Khảo sát An ninh & Danh bạ Lãnh đạo
-    ├── exportReports.ts        # Xuất file Excel HTML/XML đa worksheet
-    ├── formatters.ts           # Format số điện thoại, tiền tệ, ngày tháng tiếng Việt
-    ├── hierarchy.ts            # Xử lý cấu trúc Cây Đơn vị đệ quy & Sắp xếp thứ tự
-    ├── logger.ts               # Helper ghi log console & audit
-    ├── mathEvaluator.ts        # Bộ tính toán công thức báo cáo động
-    └── toast.ts                # Thông báo Pop-up hệ thống (Toast Alerts)
+├── App.tsx                      # Router nội bộ theo state activeTab (không dùng react-router)
+├── main.tsx
+├── contexts/AuthContext.tsx      # AuthProvider + useAuth(), checkPermission()
+├── hooks/
+│   ├── useAllowedUnits.ts        # Tính danh sách đơn vị user được xem
+│   └── useDebounce.ts
+├── types/index.ts                # Toàn bộ interface dữ liệu (502 dòng)
+├── constants/
+│   ├── certificates.ts
+│   └── reportTemplates.ts        # Định nghĩa mẫu báo cáo cho ReportPage
+├── services/
+│   ├── api.ts                    # Re-export apiService (entry point duy nhất pages dùng)
+│   └── api/
+│       ├── client.ts             # SUPABASE_URL, ANON_KEY, HEADERS, API_MODE
+│       ├── cache.ts               # TABLE_MAP, resolveTable(), cache 5 phút, CACHE_DEPENDENCIES
+│       ├── modules.ts             # Toàn bộ hàm getX() theo từng bảng + save()/deleteRecord()
+│       ├── auth.ts                # setCurrentUser, quản lý session
+│       ├── logs.ts                # writeLog() ghi Audit log
+│       ├── localStore.ts          # CRUD giả lập khi ở chế độ MOCK/offline
+│       └── mockData.ts            # Dữ liệu mẫu cho MOCK mode
+├── utils/
+│   ├── hierarchy.ts               # Cây đơn vị, emoji cấp bậc, getAllSubordinateIds()
+│   ├── formatters.ts              # formatCurrency, formatPhoneNumber, getDirectImageLink...
+│   ├── expiryStatus.ts            # Tính trạng thái hạn (CẢNH BÁO/QUÁ HẠN...)
+│   ├── atvsld.ts                  # getChungNhanByNhom(), calcGiaTriDen() — công thức hạn ATVSLĐ
+│   ├── exportExcel.ts / exportReports.ts
+│   ├── mathEvaluator.ts           # safeEvalMath() — tính công thức nhập tay
+│   ├── logger.ts / logger.tsx     # ⚠️ TRÙNG LẶP — 2 file cùng export generateDiffLog(), cần dọn
+│   └── toast.ts
+├── pages/                         # 12 trang chính, ánh xạ ở mục 3
+└── components/
+    ├── ui/                        # Badge, Button, Modal, Pagination, CustomAutocomplete, PasteImportModal, UnitFilterSidebar
+    ├── common/                    # EmptyState, TablePaginationFooter
+    ├── dashboard/                 # KpiSection, ExpiryAlertPanel, PersonnelDoughnutChart, DashboardCustomizerModal
+    ├── department/                # 7 Modal theo từng phân hệ hồ sơ đơn vị (mục 3)
+    ├── personnel/                 # Cụm Cước ĐTDĐ + PersonnelModal (mục 3)
+    ├── atvsld/                    # 4 Tab con của AtvsldPage (mục 3)
+    └── report/                    # CustomReportBuilder + 4 component phụ trợ báo cáo
 ```
 
----
+## 3. BẢNG ÁNH XẠ TÍNH NĂNG ↔ FILE ↔ BẢNG SUPABASE (xác thực từ code)
 
-## 2. SƠ ĐỒ PHÂN CẤP COMPONENT (`COMPONENT HIERARCHY`)
+| Menu Sidebar (tab id) | Page chính | Component/Modal con | Bảng Supabase thật | Trạng thái |
+|---|---|---|---|---|
+| Tổng quan (`dashboard`) | `DashboardPage.tsx` (1486 dòng) | `KpiSection`, `ExpiryAlertPanel`, `PersonnelDoughnutChart`, `DashboardCustomizerModal` | đọc `dm_don_vi`, `ns_dich_vu`, `ts_thiet_bi` (tổng hợp, không ghi) | ✅ |
+| Thông tin Công ty (`departments`) | `DepartmentPage.tsx` (2437 dòng — **file lớn nhất theo page**) | `SecurityModal`, `PcccModal`, `AtvsldModal`, `PcttModal`, `PvhcModal`, `PnModal`, `PhModal`, `PersonnelCard` | `dm_don_vi`, `hs_an_ninh`, `hs_pccc`+`ts_pccc`, `hs_an_toan_lao_dong`, `hs_pctt`, `hs_pvhc`, `dm_phap_nhan`, `dm_phong_hop` | ✅ |
+| Nhân sự (`personnel`) | `PersonnelPage.tsx` (2851 dòng) | `PersonnelModal`; module con **Cước ĐTDĐ**: `CuocDiDongTab.tsx` (3366 dòng — **file lớn nhất toàn repo**), `ThueBaoCuocHistorySection`, `BatchCostEntryModal`, `PersonnelDetailCuocChart`, `ThueBaoDetailCuocChart` | `ns_dich_vu` (hồ sơ NS); Cước ĐTDĐ dùng `dm_thue_bao` + `cp_cuoc_thang` | ✅ |
+| An toàn PCCC (`firesafety`) | `FireSafetyPage.tsx` (1117 dòng) | dùng chung `PcccModal` (ở `components/department/`) | `hs_pccc`, `ts_pccc` | ✅ |
+| ATVSLĐ (`atvsld`) | `AtvsldPage.tsx` (663 dòng) — có 4 tab cấp 1: `hoso`, `daotao` (2 tab con `kehoach`/`khoahoc`), `thietbi`, `khamsuckhoe` | `HoSoTab.tsx`, `KeHoachTab.tsx`, `KhoaHocTab.tsx` (975 dòng), `StrictEquipmentTab.tsx` (996 dòng), modal `AtvsldModal` | `hs_an_toan_lao_dong` (hồ sơ), `hs_khoa_huan_luyen`+`hs_hoc_vien_khoa_huan_luyen` (khóa học), `ts_thiet_bi_nghiem_ngat`+`nk_kiem_dinh_tbnn` (thiết bị nghiêm ngặt), `dm_chu_ky_atvsld` (định nghĩa, chưa thấy nơi ghi/đọc trực tiếp — kiểm tra lại) | 🔧 Tab `khamsuckhoe` **CHƯA XÂY** — hiện chỉ là khung placeholder "sắp cập nhật" (xem mục 7) |
+| Phương tiện (`vehicles`) | `VehiclePage.tsx` (1380 dòng) | — | `ts_xe`, `cp_hoat_dong_xe` | ✅ |
+| Tài sản-Thiết bị (`equipments`) | `EquipmentPage.tsx` (1623 dòng) | — | `ts_thiet_bi`, `nk_thiet_bi` (nhật ký thiết bị) | ✅ |
+| Tài liệu (`documents`) | `DocumentPage.tsx` (1634 dòng) | `PasteImportModal` (import Excel/paste) | `vb_tb` | ✅ |
+| Quy định (`policies`) | `PolicyPage.tsx` (557 dòng) | — | `qd_qt` | ✅ |
+| Báo cáo (`reports`) | `ReportPage.tsx` (699 dòng) | `CustomReportBuilder`, `ReportConfigPanel`, `ReportFilterBar`, `ReportList`, `ReportPreviewTable` | đọc tổng hợp nhiều bảng (`hs_an_ninh`, `dm_don_vi`, `ns_dich_vu`, `dm_phap_nhan`, `vb_tb`), không ghi | ✅ |
+| Tài khoản (`accounts`) | `AccountPage.tsx` (516 dòng) | — | `config_users` | ✅ |
+| Nhật ký (`logs`) | `LogPage.tsx` (146 dòng) | — | `sys_logs` (ghi qua `writeLog()` ở mọi `save()`/`deleteRecord()`) | ✅ |
+| Đăng nhập | `LoginPage.tsx` (131 dòng) | `AuthContext.tsx` | Supabase Auth | ✅ |
 
-### 2.1. Component Gốc (`App.tsx`)
-- **Vai trò:** Trung tâm điều phối ứng dụng.
-- **Cơ chế Code Splitting:** Lazy-load 12 trang Module chính qua `React.lazy` và `React.Suspense` để tối ưu thời gian nạp trang đầu.
-- **Tối ưu TabContainer:** Bọc từng trang phân hệ bằng `TabContainer` được tối ưu hóa với `React.memo` và class `hidden` (`display: none`) nhằm ngắt pipeline tính toán Render của trình duyệt đối với các tab đang ẩn.
-- **Xử lý Deep Link:** Nhận dạng tham số URL quét mã QR `/?tab=equipment&qr=MÃ_TÀI_SẢN` để mở ngay chi tiết thiết bị.
+> **Cách dùng bảng này:** Tìm theo tên menu hiển thị trên Sidebar → biết ngay Page, Modal/Tab con, và bảng dữ liệu thật liên quan.
 
----
+## 4. TOÀN BỘ 25 BẢNG SUPABASE THẬT (từ `services/api/modules.ts`)
 
-### 2.2. Chi tiết Kiến trúc từng Trang Phân hệ (`pages/`) & Sub-components
+`ns_dich_vu`, `dm_don_vi`, `hs_an_ninh`, `ts_xe`, `cp_hoat_dong_xe`, `dm_phap_nhan`, `dm_phong_hop`, `qd_qt`, `ts_thiet_bi`, `nk_thiet_bi`, `vb_tb`, `hs_pvhc`, `hs_an_toan_lao_dong`, `hs_pctt`, `hs_pccc`, `ts_pccc`, `config_users`, `sys_logs`, `dm_thue_bao`, `cp_cuoc_thang`, `hs_khoa_huan_luyen`, `hs_hoc_vien_khoa_huan_luyen`, `dm_chu_ky_atvsld`, `ts_thiet_bi_nghiem_ngat`, `nk_kiem_dinh_tbnn`.
 
-#### 1. `DashboardPage.tsx` (Trang Tổng quan)
-- **Tệp con tích hợp:**
-  - `KpiSection.tsx`: Thẻ chỉ số tổng quan.
-  - `PersonnelDoughnutChart.tsx`: Biểu đồ cơ cấu nhân sự.
-  - `ExpiryAlertPanel.tsx`: Khung danh sách cảnh báo đến hạn.
-  - `DashboardCustomizerModal.tsx`: Pop-up bật/tắt hiển thị widget.
+## 5. GATEWAY GHI DỮ LIỆU (xác thực từ `modules.ts`)
 
-#### 2. `DepartmentPage.tsx` (Quản lý Đơn vị & Sơ đồ Tổ chức)
-- **Modals nghiệp vụ đi kèm:**
-  - `PnModal.tsx`: Form thêm/sửa thông tin Pháp nhân & MST xuất hóa đơn.
-  - `PhModal.tsx`: Form quản lý thiết bị & sức chứa Phòng họp.
-  - `PvhcModal.tsx`: Form cập nhật thông tin Phục vụ Hành chính.
-  - `SecurityModal.tsx`: Khung khảo sát & nhật ký An ninh Bảo vệ.
-  - `PcccModal.tsx`: Khung hồ sơ thiết bị & phương án PCCC.
-  - `AtvsldModal.tsx`: Form báo cáo ATVSLĐ đơn vị.
-  - `PcttModal.tsx`: Form phương án Phòng chống Thiên tai.
-  - `PersonnelCard.tsx`: Card hiển thị nhân sự phụ trách gọn đẹp.
+- **Đọc:** mỗi bảng có 1 hàm riêng `getX()` trong `modules.ts`, gọi `getWithFallback(tableName)` → ưu tiên `fetchWithCache` (Supabase), lỗi thì tự chuyển sang `getLocalRecords()` (offline).
+- **Ghi:** DUY NHẤT qua `apiService.save(data, action, tableName)` — action là `'create'` hoặc `'update'`. Hàm tự sinh `id` dạng `{2 ký tự đầu bảng}{timestamp}{random}` khi tạo mới, tự làm sạch payload (`sanitizePayload`: bỏ field UI-only, `""` → `null`).
+- **Xóa:** `apiService.deleteRecord(id, tableName)`.
+- Mọi `save`/`deleteRecord` tự động gọi `invalidateCache()` + `writeLog()` — KHÔNG được gọi thẳng `fetch()` tới Supabase trong page, nếu không sẽ mất cache-invalidation và audit log.
 
-#### 3. `PersonnelPage.tsx` (Quản lý Nhân sự & Cước Di động)
-- **Sub-components & Modals đi kèm:**
-  - `CuocDiDongTab.tsx`: Tab quản lý danh mục thuê bao công ty & chi phí cước tháng.
-  - `PersonnelDetailCuocChart.tsx`: Biểu đồ lịch sử cước cá nhân.
-  - `ThueBaoDetailCuocChart.tsx`: Biểu đồ lịch sử cước thuê bao.
-  - `ThueBaoCuocHistorySection.tsx`: Bảng lịch sử luân chuyển người dùng thuê bao.
-  - `PersonnelModal.tsx`: Drawer form cập nhật 360° thông tin hồ sơ nhân viên.
-  - `UnitFilterSidebar.tsx`: Sidebar chọn cây đơn vị trực thuộc.
-  - `TablePaginationFooter.tsx`: Thanh phân trang mượt mà.
+## 6. CƠ CHẾ PHÂN QUYỀN
 
-#### 4. `AtvsldPage.tsx` (Quản lý ATVSLĐ & Thiết bị Nghiêm ngặt)
-- **Tabs trực thuộc:**
-  - `HoSoTab.tsx`: Báo cáo tự động tình hình ATVSLĐ các đơn vị.
-  - `KeHoachTab.tsx`: Lập kế hoạch đào tạo đợt tới cho 4 diện nhân sự.
-  - `KhoaHocTab.tsx`: Quản lý khóa học & đồng bộ chứng chỉ ngầm (Background Batch Sync).
-  - `StrictEquipmentTab.tsx`: Quản lý danh mục thiết bị có yêu cầu nghiêm ngặt về ATLĐ & nhật ký kiểm định.
+- `AuthContext.tsx`: đọc `user_metadata` (JWT Supabase) → `quyen` (`ADMIN`/`viewer_hanche`/khác) + `id_don_vi`.
+- `checkPermission('TênNhóm')` (dùng trong `Sidebar.tsx`) quyết định nhóm menu nào hiển thị: `TongQuan`, `CongTy`, v.v.
+- `utils/hierarchy.ts` → `getAllSubordinateIds()`: đệ quy tìm đơn vị con/cháu cho user có `id_don_vi` cụ thể.
+- ADMIN hoặc `id_don_vi` thuộc `HO`/`ALL`/chứa "TOÀN QUỐC" → xem toàn hệ thống.
 
-#### 5. `EquipmentPage.tsx` (Quản lý Trang thiết bị & QR Code)
-- **Thành phần đi kèm:**
-  - Tích hợp thư viện `qrcode.react` (Tạo mã QR) & `html5-qrcode` (Quét QR qua Camera).
-  - Modal xem chi tiết nhật ký bàn giao/sửa chữa thiết bị.
+## 7. NỢ KỸ THUẬT / VẤN ĐỀ ĐÃ XÁC MINH TRONG CODE
 
-#### 6. `VehiclePage.tsx` (Quản lý Xe & Chi phí Vận hành)
-- Bảng danh mục xe master & Form nhật ký chi phí nhiên liệu, rửa xe, bảo dưỡng, khấu hao tháng.
+- [ ] **`utils/logger.ts` và `utils/logger.tsx` trùng nhau** — cả 2 cùng export `generateDiffLog()`. Cần xác định file nào đang thực sự được import và xóa file còn lại.
+- [ ] Tab **"Khám sức khỏe & Bệnh nghề nghiệp"** trong `AtvsldPage.tsx` mới chỉ là khung placeholder (dòng ~624), CHƯA có bảng Supabase, CHƯA có component riêng — cần tạo `SucKhoeTab.tsx` + bảng mới nếu muốn triển khai.
+- [ ] Bảng `dm_chu_ky_atvsld` có hàm `getChuKyATVSLD()` trong `modules.ts` nhưng KHÔNG tìm thấy nơi nào trong `components/`/`pages/` gọi hàm này hoặc dùng chuỗi `'dm_chu_ky_atvsld'` trực tiếp — khả năng là bảng chưa được nối vào UI, hoặc đã lệch tên biến. Cần kiểm tra lại thủ công trước khi phát triển thêm module ATVSLĐ.
+- [ ] `AtvsldPage.tsx` đã refactor tab (`HoSoTab`, `KeHoachTab`, `KhoaHocTab`, `StrictEquipmentTab`) nhưng bản thân `AtvsldPage.tsx` vẫn còn 663 dòng logic dùng chung (state, modal, hàm `getRegionName`) — có thể tách tiếp nếu muốn gọn hơn.
+- [ ] `PersonnelPage.tsx` (2851 dòng) và `CuocDiDongTab.tsx` (3366 dòng) là 2 file lớn nhất hệ thống — ứng viên hàng đầu để tách nhỏ nếu tiếp tục mở rộng module Cước ĐTDĐ.
+- [ ] `services/api/client.ts` chứa `SUPABASE_ANON_KEY` hardcode trực tiếp trong source — đây là anon key public (được bảo vệ bởi RLS ở phía Supabase) nên không phải lỗi bảo mật nghiêm trọng, nhưng nên chuyển sang biến môi trường (`.env` + Vite `import.meta.env`) để dễ đổi giữa môi trường dev/prod sau này.
 
-#### 7. `FireSafetyPage.tsx` (Quản lý PCCC & CNCH)
-- Bảng quản lý đội PCCC cơ sở, danh mục tài sản PCCC, hotline khẩn cấp và cảnh báo hạn bơm sạc/bảo hiểm.
+## 8. PROMPT MẪU KHI LÀM VIỆC VỚI AI
 
-#### 8. `DocumentPage.tsx` (Quản lý Văn bản & Thông báo)
-- Quản lý văn bản đến/đi, tự động cấp số văn bản, khóa quyền Sửa/Xóa đối với văn bản do đơn vị khác ban hành.
-
-#### 9. `ReportPage.tsx` (Báo cáo Tổng hợp & Custom Builder)
-- **Sub-components:**
-  - `ReportList.tsx`: Thư viện các mẫu báo cáo chuẩn.
-  - `ReportFilterBar.tsx`: Toolbar thiết lập bộ lọc động.
-  - `ReportPreviewTable.tsx`: Bảng xem trước dữ liệu trước khi xuất Excel.
-  - `CustomReportBuilder.tsx`: Trình dựng báo cáo ad-hoc theo ý muốn.
-
-#### 10. `AccountPage.tsx` (Quản lý Tài khoản)
-- Form cấp tài khoản mới, phân quyền theo cây đơn vị và phân quyền module menu (`quyen_truy_cap`).
-
-#### 11. `LogPage.tsx` (Nhật ký Hệ thống)
-- Bảng xem nhật ký audit log các thao tác Đăng nhập, Đăng xuất, Thêm, Sửa, Xóa.
-
-#### 12. `PolicyPage.tsx` (Quản lý Quy định & Quy trình)
-- Danh mục tra cứu các quy trình hành chính chuẩn.
-
----
-
-### 2.3. Các Components Dùng Chung Chế Bản (`common/` & `ui/`)
-- `EmptyState.tsx`: Hiển thị thông điệp hình ảnh khi bảng trống hoặc không tìm thấy kết quả lọc.
-- `TablePaginationFooter.tsx`: Thanh phân trang mượt mà hỗ trợ tùy chọn 10, 20, 50, 100 dòng/trang.
-- `PasteImportModal.tsx`: Dialog hỗ trợ dán trực tiếp bảng từ Excel qua Clipboard.
-- `CustomAutocomplete.tsx`: Ô chọn dữ liệu có tính năng gõ tìm kiếm thông minh.
-- `UnitFilterSidebar.tsx`: Khung chọn danh sách cây đơn vị dạng nhánh xòe/gập.
-
----
-
-## 3. LUỒNG DỮ LIỆU & BỘ ĐỆM 2 TẦNG (`SERVICES LAYER`)
-
-```text
-React Pages / Components
-         │
-         ▼
-    apiService (src/services/api/index.ts)
-         │
-         ├───────────────────────────┐
-         ▼                           ▼
-fetchWithCache()              save() / deleteRecord()
-(src/services/api/cache.ts)    (src/services/api/modules.ts)
-         │                           │
-  ┌──────┴──────┐                    ▼
-  │             │              invalidateCache()
-  ▼             ▼             (Xóa cache liên quan)
-Layer 1       Layer 2                │
-In-Memory    LocalStorage            ▼
-  Cache        Persistent       Supabase REST API
- (<1ms)       (Quota Safe)   (https://...supabase.co)
-```
-
-1. **Khi Đọc (`GET`)**: Gọi `fetchWithCache()`. Hệ thống ưu tiên đọc từ **Layer 1 (RAM)** -> nếu hết hạn đọc **Layer 2 (LocalStorage)** -> nếu không có mới bắn request tới **Supabase REST API**.
-2. **Khi Ghi (`POST/PATCH/DELETE`)**: Gọi `save()` hoặc `deleteRecord()`. Sau khi Supabase phản hồi thành công, hệ thống tự động chạy `invalidateCache()` để xóa bộ đệm của bảng đó và các bảng liên quan (Dependencies), đảm bảo dữ liệu hiển thị luôn chính xác nhất.
-3. **An toàn Bộ nhớ LocalStorage**: Hàm `setPersistentCache` tự động xử lý ngoại lệ `QuotaExceededError` khi bộ nhớ `localStorage` chạm ngưỡng 5MB, giúp ứng dụng tự động dọn dẹp cache cũ và tiếp tục chạy mượt trên RAM.
-
----
-
-## 4. QUY TRÌNH PHÁT TRIỂN & BẢO TRÌ
-
-1. Tất cả các file `.tsx` giao diện phải đặt trong `src/pages/` hoặc `src/components/`.
-2. Khi thêm trường dữ liệu mới vào CSDL Supabase, cần cập nhật tương ứng vào `src/types/index.ts`.
-3. Tuân thủ **2 Nguyên tắc làm việc**: Tóm tắt phương án trước khi code & Không tự ý xóa bỏ/thay thế tính năng khi chưa được sự đồng ý từ người dùng.
+1. Dán `ARCHITECTURE.md` kèm: *"Đây là bản đồ kiến trúc hệ thống, đọc kỹ trước khi làm."*
+2. Tra bảng mục 3 theo tên menu để biết đúng Page/Component/Bảng dữ liệu cần đụng vào.
+3. Gửi kèm các file `.tsx` liên quan.
+4. Sau khi AI hoàn thành, yêu cầu: *"Đề xuất nội dung cần cập nhật vào bảng mục 3 và mục 7 (nợ kỹ thuật)."*
