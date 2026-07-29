@@ -55,30 +55,30 @@ export default function LoginPage() {
     <div className="min-h-screen bg-[#f4f7f9] flex items-center justify-center p-4">
       <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden border border-gray-100">
         <div className="bg-gradient-to-r from-[#05469B] to-[#032a5e] p-8 text-center shadow-inner">
-          <h1 className="text-[27px] leading-[33px] font-black text-white tracking-widest font-sans">QUẢN TRỊ VĂN PHÒNG & AN SINH ĐỜI SỐNG</h1>
+          <h1 className="text-[27px] leading-[33px] font-black text-white tracking-widest font-sans">QUẢN TRỊ VĂN PHÒNG</h1>
           <p className="text-blue-200 mt-2 text-sm uppercase tracking-wider font-semibold">Hệ thống Quản lý Nội bộ</p>
         </div>
-        
+
         <form onSubmit={handleSubmit} className="p-8 space-y-6">
           {error && (
             <div className="bg-red-50 text-red-600 p-4 rounded-xl text-sm flex items-start gap-3 border border-red-100 animate-in fade-in">
-              <AlertCircle size={20} className="shrink-0 mt-0.5" /> 
+              <AlertCircle size={20} className="shrink-0 mt-0.5" />
               <p className="font-medium">{error}</p>
             </div>
           )}
-          
+
           <div className="space-y-5">
             <div>
               <label className="block text-xs font-bold text-gray-600 mb-2 uppercase tracking-wide">Tên đăng nhập</label>
               <div className="relative">
                 <User className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-                <input 
-                  type="text" 
-                  required 
-                  value={username} 
-                  onChange={(e) => setUsername(e.target.value)} 
-                  className="w-full pl-11 pr-4 py-3 bg-[#FFFFF0] border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#05469B] outline-none transition-all font-medium text-gray-800" 
-                  placeholder="VD: admin@thaco.com.vn" 
+                <input
+                  type="text"
+                  required
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  className="w-full pl-11 pr-4 py-3 bg-[#FFFFF0] border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#05469B] outline-none transition-all font-medium text-gray-800"
+                  placeholder="VD: admin@thaco.com.vn"
                 />
               </div>
             </div>
@@ -87,13 +87,13 @@ export default function LoginPage() {
               <label className="block text-xs font-bold text-gray-600 mb-2 uppercase tracking-wide">Mật khẩu</label>
               <div className="relative">
                 <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-                <input 
-                  type={showPassword ? "text" : "password"} 
-                  required 
-                  value={password} 
-                  onChange={(e) => setPassword(e.target.value)} 
-                  className="w-full pl-11 pr-11 py-3 bg-[#FFFFF0] border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#05469B] outline-none transition-all font-medium text-gray-800" 
-                  placeholder="••••••••" 
+                <input
+                  type={showPassword ? "text" : "password"}
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full pl-11 pr-11 py-3 bg-[#FFFFF0] border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#05469B] outline-none transition-all font-medium text-gray-800"
+                  placeholder="••••••••"
                 />
                 <button
                   type="button"
@@ -109,11 +109,11 @@ export default function LoginPage() {
           <div className="flex items-center justify-between pt-1">
             <label className="flex items-center gap-2.5 cursor-pointer group">
               <div className="relative flex items-center justify-center">
-                <input 
-                  type="checkbox" 
+                <input
+                  type="checkbox"
                   checked={rememberMe}
                   onChange={(e) => setRememberMe(e.target.checked)}
-                  className="w-5 h-5 border-2 border-gray-300 rounded text-[#05469B] focus:ring-[#05469B] focus:ring-offset-0 transition-all cursor-pointer peer" 
+                  className="w-5 h-5 border-2 border-gray-300 rounded text-[#05469B] focus:ring-[#05469B] focus:ring-offset-0 transition-all cursor-pointer peer"
                 />
               </div>
               <span className="text-sm font-semibold text-gray-600 group-hover:text-[#05469B] transition-colors select-none">
