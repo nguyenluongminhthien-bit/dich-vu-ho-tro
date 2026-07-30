@@ -1,7 +1,7 @@
-{/*🟢 PHẦN 1: TỪ ĐẦU FILE ĐẾN HẾT KHAI BÁO STATE CƠ BẢN*/}
+{/*🟢 PHẦN 1: TỪ ĐẦU FILE ĐẾN HẾT KHAI BÁO STATE CƠ BẢN*/ }
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { 
-  HardHat, Search, Edit, Trash2, AlertCircle, Loader2, ShieldCheck, 
+import {
+  HardHat, Search, Edit, Trash2, AlertCircle, Loader2, ShieldCheck,
   Building2, MapPin, PanelLeftClose, PanelLeftOpen, ChevronRight, ChevronDown, Plus,
   FileText, Users, Settings, Link as LinkIcon, CheckCircle2, XCircle,
   FileSpreadsheet, Download, AlertTriangle, CheckCheck, HelpCircle, ChevronLeft,
@@ -28,14 +28,14 @@ import { toUnaccented, stripAccents } from '../utils/formatters';
 // Hàm dò tìm Tên Vùng Miền (Dành cho chức năng Xuất Excel)
 const getRegionName = (unitId: string, allUnits: DonVi[]): string => {
   const getAncestors = (id: string): string[] => {
-     const u = allUnits.find(d => d.id === id);
-     if (!u || !u.cap_quan_ly || u.cap_quan_ly === 'HO') return [id];
-     return [id, ...getAncestors(u.cap_quan_ly)];
+    const u = allUnits.find(d => d.id === id);
+    if (!u || !u.cap_quan_ly || u.cap_quan_ly === 'HO') return [id];
+    return [id, ...getAncestors(u.cap_quan_ly)];
   };
   const ancestors = getAncestors(unitId);
   const isBac = allUnits.filter(item => item.cap_quan_ly === 'HO' && toUnaccented(item.ten_don_vi).includes('bac')).map(u => u.id);
   const isNam = allUnits.filter(item => item.cap_quan_ly === 'HO' && toUnaccented(item.ten_don_vi).includes('nam')).map(u => u.id);
-  
+
   if (ancestors.some(id => isBac.includes(id))) return 'Phía Bắc';
   if (ancestors.some(id => isNam.includes(id))) return 'Phía Nam';
   return 'VPĐH / Khác';
@@ -44,7 +44,7 @@ const getRegionName = (unitId: string, allUnits: DonVi[]): string => {
 
 
 export default function AtvsldPage() {
-  const { user } = useAuth(); 
+  const { user } = useAuth();
 
   const [donViData, setDonViList] = useState<DonVi[]>([]);
   const [atvsldData, setAtvsldData] = useState<any[]>([]);
@@ -55,12 +55,12 @@ export default function AtvsldPage() {
   const [thietBiData, setThietBiData] = useState<any[]>([]);
   const [kiemDinhData, setKiemDinhData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  
+
   const [isListCollapsed, setIsListCollapsed] = useState(false);
   const [selectedUnitFilter, setSelectedUnitFilter] = useState<string | null>(null);
   const [unitSearchTerm, setUnitSearchTerm] = useState('');
   const [expandedParents, setExpandedParents] = useState<string[]>([]);
-  
+
   // 🟢 STATE CHUYỂN TAB CẤP 1 VÀ CẤP 2
   const [activeTab, setActiveTab] = useState<'hoso' | 'daotao' | 'thietbi' | 'khamsuckhoe'>('hoso');
   const [activeSubTab, setActiveSubTab] = useState<'kehoach' | 'khoahoc'>('kehoach');
@@ -148,7 +148,7 @@ export default function AtvsldPage() {
     return [selectedUnitFilter, ...subIds];
   }, [selectedUnitFilter, donViData]);
 
-{/*🟢 PHẦN 2: LOGIC XỬ LÝ DỮ LIỆU & XUẤT EXCEL KẾ HOẠCH*/}
+  {/*🟢 PHẦN 2: LOGIC XỬ LÝ DỮ LIỆU & XUẤT EXCEL KẾ HOẠCH*/ }
   // =======================================================================
   // 🟢 LOGIC TAB 1: QUẢN LÝ HỒ SƠ ATVSLĐ (BÁO CÁO CƠ SỞ)
   // =======================================================================
@@ -170,13 +170,15 @@ export default function AtvsldPage() {
 
   const stats = useMemo(() => {
     let totalThietBi = 0, totalLoi = 0, totalTaiNan = 0, totalNhanSuHL = 0;
-    
+
     const activeUnitIds = new Set(filteredData.map(item => item.id_don_vi));
 
     // 1. Tính tổng nhân sự huấn luyện đạt
     hocVienData.forEach(hv => {
       if (hv.id_don_vi && activeUnitIds.has(hv.id_don_vi)) {
-        const isDat = String(hv.ket_qua || '').trim().toLowerCase().includes('đạt') || String(hv.ket_qua || '').trim().toLowerCase().includes('dat');
+        // SỬA LỖI: So khớp CHÍNH XÁC và chuẩn hóa NFC để tránh dùng includes() gây nhận nhầm trạng thái "chưa đạt"
+        const kqNormalized = String(hv.ket_qua || '').trim().toLowerCase().normalize('NFC');
+        const isDat = kqNormalized === 'đạt' || kqNormalized === 'dat';
         if (isDat) {
           totalNhanSuHL++;
         }
@@ -187,12 +189,12 @@ export default function AtvsldPage() {
     thietBiData.forEach(tb => {
       if (activeUnitIds.has(tb.id_don_vi) && tb.tinh_trang === 'Đang sử dụng') {
         totalThietBi++;
-        
+
         // Tìm lượt kiểm định gần nhất
         const inspections = kiemDinhData
           .filter(kd => kd.id_thiet_bi === tb.id)
           .sort((a, b) => new Date(b.ngay_kiem_dinh).getTime() - new Date(a.ngay_kiem_dinh).getTime());
-        
+
         if (inspections.length > 0) {
           const status = getExpiryStatus(inspections[0].han_kiem_dinh);
           if (status.level === 'expired') {
@@ -301,7 +303,7 @@ export default function AtvsldPage() {
   const filteredSafetyList = useMemo(() => {
     return processedSafetyPersonnel.filter(p => {
       const cleanSearch = stripAccents(safetySearchTerm);
-      const matchSearch = safetySearchTerm === '' || 
+      const matchSearch = safetySearchTerm === '' ||
         stripAccents(p.ma_so_nhan_vien || '').includes(cleanSearch) ||
         stripAccents(p.ho_ten || '').includes(cleanSearch) ||
         stripAccents(p.chuc_vu || '').includes(cleanSearch);
@@ -336,12 +338,12 @@ export default function AtvsldPage() {
 
   // Xử lý Checkbox xuất danh sách
   const handleSelectAllSafety = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.checked) { setSelectedSafetyIds(paginatedSafetyList.map(p => p.id)); } 
+    if (e.target.checked) { setSelectedSafetyIds(paginatedSafetyList.map(p => p.id)); }
     else { setSelectedSafetyIds([]); }
   };
 
   const handleSelectSafetyRow = (id: string, checked: boolean) => {
-    if (checked) { setSelectedSafetyIds(prev => [...prev, id]); } 
+    if (checked) { setSelectedSafetyIds(prev => [...prev, id]); }
     else { setSelectedSafetyIds(prev => prev.filter(item => item !== id)); }
   };
 
@@ -438,13 +440,13 @@ export default function AtvsldPage() {
     URL.revokeObjectURL(url);
   };
 
-  {/*🟢 PHẦN 3: GIAO DIỆN CHUNG & TAB HỒ SƠ ATVSLĐ CƠ SỞ*/}
+  {/*🟢 PHẦN 3: GIAO DIỆN CHUNG & TAB HỒ SƠ ATVSLĐ CƠ SỞ*/ }
 
   if (loading) return <div className="flex items-center justify-center h-full"><Loader2 className="w-8 h-8 animate-spin text-emerald-600" /></div>;
 
   return (
     <div className="flex w-full max-w-full h-full bg-[#f4f7f9] overflow-hidden relative">
-      
+
 
       {/* CỘT TRÁI: BỘ LỌC ĐƠN VỊ ĐỒNG BỘ */}
       <UnitFilterSidebar
@@ -459,21 +461,21 @@ export default function AtvsldPage() {
         isListCollapsed={isListCollapsed}
         setIsListCollapsed={setIsListCollapsed}
         themeColor="emerald"
-        allUnitsLabel="Tất cả Cơ sở Toàn quốc"
+        allUnitsLabel="Tất cả Đơn vị trực thuộc"
       />
 
       {/* 🟢 CỘT PHẢI: NỘI DUNG CHÍNH */}
       <div className="flex-1 min-w-0 max-w-full overflow-y-auto px-4 sm:px-6 pb-4 sm:pb-6 relative transition-all duration-300 custom-scrollbar flex flex-col">
-        
+
         {/* 🟢 KHU VỰC TIÊU ĐỀ, TABS & THẺ THỐNG KÊ CỐ ĐỊNH KHI CUỘN (STICKY HEADER) */}
         <div className={`sticky top-0 z-20 bg-gray-50 dark:bg-gray-900 pt-4 sm:pt-6 pb-4 border-b border-gray-200/80 dark:border-gray-800 transition-all duration-300 ${isListCollapsed ? 'md:pl-10 lg:pl-0' : ''} shrink-0 mb-6 shadow-2xs`}>
-          
+
           {/* 1. Header tiêu đề + Tìm kiếm + Nút Thêm */}
           <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center mb-5 gap-4">
             <div className="flex items-center gap-2.5">
               {isListCollapsed && (
-                <button 
-                  onClick={() => setIsListCollapsed(false)} 
+                <button
+                  onClick={() => setIsListCollapsed(false)}
                   className="bg-white p-2 rounded-lg shadow-sm border border-gray-200 text-emerald-700 hover:bg-emerald-50 transition-all flex items-center justify-center shrink-0"
                   title="Mở bộ lọc đơn vị"
                 >
@@ -485,25 +487,25 @@ export default function AtvsldPage() {
                 <p className="text-sm font-medium text-gray-500 mt-1">Đang xem: <span className="text-emerald-600 font-bold">{selectedUnitName}</span></p>
               </div>
             </div>
-            
+
             <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
               {activeTab === 'hoso' && (
                 <div className="relative w-full sm:w-72">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-                  <input 
-                    type="text" 
-                    placeholder="Tìm tên cơ sở, người phụ trách..." 
-                    className="w-full pl-9 pr-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none shadow-xs text-xs font-semibold" 
-                    value={searchTerm} 
-                    onChange={(e) => setSearchTerm(e.target.value)} 
+                  <input
+                    type="text"
+                    placeholder="Tìm tên cơ sở, người phụ trách..."
+                    className="w-full pl-9 pr-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none shadow-xs text-xs font-semibold"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
                   />
                 </div>
               )}
 
               {user?.quyen === 'ADMIN' && activeTab === 'hoso' && (
-                <button 
+                <button
                   type="button"
-                  onClick={() => openModal(selectedUnitFilter || '')} 
+                  onClick={() => openModal(selectedUnitFilter || '')}
                   className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-md transition-all whitespace-nowrap cursor-pointer"
                 >
                   <Plus className="w-4 h-4" />
@@ -527,23 +529,21 @@ export default function AtvsldPage() {
           {/* Sub-navigation Cấp 2 (Chỉ xuất hiện khi chọn Tab Đào tạo ATVSLĐ) */}
           {activeTab === 'daotao' && (
             <div className="flex gap-4 mb-5 border-b border-gray-150/50 pb-2 px-1">
-              <button 
-                onClick={() => setActiveSubTab('kehoach')} 
-                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                  activeSubTab === 'kehoach' 
-                    ? 'bg-lime-600 text-white shadow-sm border border-lime-600' 
+              <button
+                onClick={() => setActiveSubTab('kehoach')}
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeSubTab === 'kehoach'
+                    ? 'bg-lime-600 text-white shadow-sm border border-lime-600'
                     : 'bg-white text-gray-500 border border-gray-250 hover:bg-gray-50 hover:text-gray-700'
-                }`}
+                  }`}
               >
                 Kế hoạch đào tạo đợt tới
               </button>
-              <button 
-                onClick={() => setActiveSubTab('khoahoc')} 
-                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                  activeSubTab === 'khoahoc' 
-                    ? 'bg-lime-600 text-white shadow-sm border border-lime-600' 
+              <button
+                onClick={() => setActiveSubTab('khoahoc')}
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeSubTab === 'khoahoc'
+                    ? 'bg-lime-600 text-white shadow-sm border border-lime-600'
                     : 'bg-white text-gray-500 border border-gray-250 hover:bg-gray-50 hover:text-gray-700'
-                }`}
+                  }`}
               >
                 Khóa học huấn luyện
               </button>
@@ -554,19 +554,19 @@ export default function AtvsldPage() {
           {activeTab === 'hoso' && (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 w-full">
               <div className="bg-white p-3.5 rounded-xl border border-emerald-200 shadow-xs flex items-center gap-3.5 transition-all hover:shadow-md hover:border-emerald-500">
-                <div className="w-11 h-11 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 border border-emerald-100"><Building2 size={20}/></div>
+                <div className="w-11 h-11 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 border border-emerald-100"><Building2 size={20} /></div>
                 <div><p className="text-[10px] font-bold text-gray-500 uppercase">Cơ sở khai báo</p><p className="text-xl font-black text-emerald-700">{filteredData.length}</p></div>
               </div>
               <div className="bg-white p-3.5 rounded-xl border border-emerald-200 shadow-xs flex items-center gap-3.5 transition-all hover:shadow-md hover:border-emerald-500">
-                <div className="w-11 h-11 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 border border-emerald-100"><ShieldCheck size={20}/></div>
+                <div className="w-11 h-11 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 border border-emerald-100"><ShieldCheck size={20} /></div>
                 <div><p className="text-[10px] font-bold text-gray-500 uppercase">Nhân sự Huấn Luyện</p><p className="text-xl font-black text-emerald-700">{stats.totalNhanSuHL}</p></div>
               </div>
               <div className={`p-3.5 rounded-xl border shadow-xs flex items-center gap-3.5 transition-all hover:shadow-md cursor-pointer ${stats.totalLoi > 0 ? 'border-orange-200 bg-orange-50/10 hover:border-orange-500 animate-pulse' : 'border-gray-300 bg-white hover:border-gray-500'}`} onClick={() => setActiveTab('thietbi')}>
-                <div className={`w-11 h-11 rounded-full flex items-center justify-center shrink-0 ${stats.totalLoi > 0 ? 'bg-orange-100 text-orange-600' : 'bg-gray-100 text-gray-500'}`}><AlertCircle size={20}/></div>
+                <div className={`w-11 h-11 rounded-full flex items-center justify-center shrink-0 ${stats.totalLoi > 0 ? 'bg-orange-100 text-orange-600' : 'bg-gray-100 text-gray-500'}`}><AlertCircle size={20} /></div>
                 <div><p className={`text-[10px] font-bold uppercase ${stats.totalLoi > 0 ? 'text-orange-600' : 'text-gray-500'}`}>TB Nghiêm ngặt (Quá hạn)</p><p className={`text-xl font-black ${stats.totalLoi > 0 ? 'text-orange-700' : 'text-gray-700'}`}>{stats.totalThietBi} <span className="text-xs text-red-500 font-bold">{stats.totalLoi > 0 ? `(${stats.totalLoi} Lỗi)` : ''}</span></p></div>
               </div>
               <div className={`p-3.5 rounded-xl border shadow-xs flex items-center gap-3.5 transition-all hover:shadow-md ${stats.totalTaiNan > 0 ? 'border-red-200 bg-red-50/10 hover:border-red-500' : 'border-gray-300 bg-white hover:border-gray-500'}`}>
-                <div className={`w-11 h-11 rounded-full flex items-center justify-center shrink-0 ${stats.totalTaiNan > 0 ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-gray-500'}`}><HardHat size={20}/></div>
+                <div className={`w-11 h-11 rounded-full flex items-center justify-center shrink-0 ${stats.totalTaiNan > 0 ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-gray-500'}`}><HardHat size={20} /></div>
                 <div><p className={`text-[10px] font-bold uppercase ${stats.totalTaiNan > 0 ? 'text-red-600' : 'text-gray-500'}`}>Tai nạn LĐ (Năm)</p><p className={`text-xl font-black ${stats.totalTaiNan > 0 ? 'text-red-700' : 'text-gray-700'}`}>{stats.totalTaiNan} Vụ</p></div>
               </div>
             </div>
@@ -617,8 +617,8 @@ export default function AtvsldPage() {
         )}
 
         {activeTab === 'daotao' && activeSubTab === 'khoahoc' && (
-          <KhoaHocTab 
-            onReloadData={loadData} 
+          <KhoaHocTab
+            onReloadData={loadData}
             selectedUnitFilter={selectedUnitFilter}
             allowedDonViIds={allowedDonViIds}
           />

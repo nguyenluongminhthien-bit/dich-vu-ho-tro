@@ -1429,7 +1429,7 @@ export default function PersonnelPage() {
         isListCollapsed={isListCollapsed}
         setIsListCollapsed={setIsListCollapsed}
         themeColor="blue"
-        allUnitsLabel="Tất cả Nhân sự Toàn quốc"
+        allUnitsLabel="Tất cả Nhân sự trực thuộc"
       />
 
       <div className="flex-1 min-w-0 max-w-full overflow-hidden p-4 sm:p-6 relative transition-all duration-300 flex flex-col">

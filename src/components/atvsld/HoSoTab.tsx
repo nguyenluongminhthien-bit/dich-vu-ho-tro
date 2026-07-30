@@ -77,10 +77,11 @@ export default function HoSoTab({
 
                 if (groupStudents.length > 0) {
                   const total = groupStudents.length;
-                  const dat = groupStudents.filter(hv => 
-                    String(hv.ket_qua || '').trim().toLowerCase().includes('đạt') || 
-                    String(hv.ket_qua || '').trim().toLowerCase().includes('dat')
-                  ).length;
+                  const dat = groupStudents.filter(hv => {
+                    // SỬA LỖI: So khớp CHÍNH XÁC và chuẩn hóa NFC để tránh dùng includes() gây nhận nhầm trạng thái "chưa đạt"
+                    const kqNormalized = String(hv.ket_qua || '').trim().toLowerCase().normalize('NFC');
+                    return kqNormalized === 'đạt' || kqNormalized === 'dat';
+                  }).length;
                   const khong_dat = total - dat;
 
                   hlStats[g] = { total, dat, khong_dat };

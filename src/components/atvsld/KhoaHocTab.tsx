@@ -10,7 +10,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { DonVi, Personnel, KhoaHuanLuyen, HocVienKhoaHuanLuyen, ChuKyATVSLD } from '../../types';
 import PasteImportModal, { ColumnMapItem } from '../ui/PasteImportModal';
 import { getChungNhanByNhom, calcGiaTriDen } from '../../utils/atvsld';
-import { getAllSubordinateIds } from '../../utils/hierarchy';
+import { getAllSubordinateIds, buildHierarchicalOptions, getUnitEmoji } from '../../utils/hierarchy';
 
 interface KhoaHocTabProps {
   onReloadData?: () => void;
@@ -93,13 +93,20 @@ export default function KhoaHocTab({ onReloadData, selectedUnitFilter, allowedDo
   const filteredKhoaHoc = useMemo(() => {
     return khoaHocList.filter(kh => {
       const search = searchTerm.toLowerCase();
-      return (
+      const matchesSearch = (
         kh.ten_khoa_hoc.toLowerCase().includes(search) ||
         (kh.don_vi_dao_tao || '').toLowerCase().includes(search) ||
         (kh.dia_diem || '').toLowerCase().includes(search)
       );
+
+      // Bộ lọc theo đơn vị đã chọn (hỗ trợ hiển thị dữ liệu cũ chưa có id_don_vi)
+      const matchesUnit = !selectedUnitFilter || 
+        !kh.id_don_vi || 
+        activeUnitSubordinates.includes(kh.id_don_vi);
+
+      return matchesSearch && matchesUnit;
     });
-  }, [khoaHocList, searchTerm]);
+  }, [khoaHocList, searchTerm, selectedUnitFilter, activeUnitSubordinates]);
 
   // Học viên thuộc khóa học hiện tại
   const currentHocVienList = useMemo(() => {
@@ -128,8 +135,9 @@ export default function KhoaHocTab({ onReloadData, selectedUnitFilter, allowedDo
     let failCount = 0;
     
     hocVienList.forEach(hv => {
-      const kq = String(hv.ket_qua || '').trim().toLowerCase();
-      if (kq.includes('đạt') || kq.includes('dat')) {
+      // SỬA LỖI: So khớp CHÍNH XÁC và chuẩn hóa NFC để tránh dùng includes() gây nhận nhầm trạng thái "chưa đạt"
+      const kq = String(hv.ket_qua || '').trim().toLowerCase().normalize('NFC');
+      if (kq === 'đạt' || kq === 'dat') {
         datCount++;
       } else if (kq) {
         failCount++;
@@ -152,7 +160,8 @@ export default function KhoaHocTab({ onReloadData, selectedUnitFilter, allowedDo
       trang_thai: 'Dự kiến',
       ghi_chu: '',
       ho_so: '',
-      link_ho_so: ''
+      link_ho_so: '',
+      id_don_vi: selectedUnitFilter || undefined // Tự động gán đơn vị hiện tại khi tạo mới
     });
     setIsEditModalOpen(true);
   };
@@ -194,15 +203,20 @@ export default function KhoaHocTab({ onReloadData, selectedUnitFilter, allowedDo
     if (!deleteTargetId || !confirmType) return;
     try {
       if (confirmType === 'KHOA_HOC') {
+        const hvInCourse = hocVienList.filter(item => item.id_khoa_hoc === deleteTargetId);
         await apiService.delete(deleteTargetId, 'hs_khoa_huan_luyen');
         setKhoaHocList(prev => prev.filter(item => item.id !== deleteTargetId));
         setHocVienList(prev => prev.filter(item => item.id_khoa_hoc !== deleteTargetId));
         if (selectedKhoaHoc?.id === deleteTargetId) {
           setSelectedKhoaHoc(null);
         }
+        if (hvInCourse.length > 0) {
+          await recalculateOshForPersonnel(hvInCourse.map(hv => ({ msnv: hv.msnv, id_don_vi: hv.id_don_vi })));
+        }
         toast.success('Đã xóa khóa học thành công!');
         onReloadData?.();
       } else if (confirmType === 'HOC_VIEN') {
+        const hvToDelete = hocVienList.find(item => item.id === deleteTargetId);
         await apiService.delete(deleteTargetId, 'hs_hoc_vien_khoa_huan_luyen');
         setHocVienList(prev => prev.filter(item => item.id !== deleteTargetId));
         
@@ -215,6 +229,9 @@ export default function KhoaHocTab({ onReloadData, selectedUnitFilter, allowedDo
           await apiService.save(updatedKhoa, 'update', 'hs_khoa_huan_luyen');
           setKhoaHocList(prev => prev.map(k => k.id === updatedKhoa.id ? updatedKhoa : k));
           setSelectedKhoaHoc(updatedKhoa);
+        }
+        if (hvToDelete) {
+          await recalculateOshForPersonnel([{ msnv: hvToDelete.msnv, id_don_vi: hvToDelete.id_don_vi }]);
         }
         toast.success('Đã xóa học viên khỏi khóa học!');
         onReloadData?.();
@@ -356,8 +373,121 @@ export default function KhoaHocTab({ onReloadData, selectedUnitFilter, allowedDo
       // Kích hoạt tiến trình đồng bộ ngược chạy nền (D.2)
       triggerBackgroundSync(toSaveArray);
 
+      const affectedRecalc: { msnv: string; id_don_vi: string | null }[] = [];
+      toSaveArray.forEach(newItem => {
+        const oldItem = existingInKhoa.find(e => e.msnv === newItem.msnv);
+        if (oldItem) {
+          const oldKq = String(oldItem.ket_qua || '').trim().toLowerCase().normalize('NFC');
+          const newKq = String(newItem.ket_qua || '').trim().toLowerCase().normalize('NFC');
+          const oldIsDat = oldKq === 'đạt' || oldKq === 'dat';
+          const newIsDat = newKq === 'đạt' || newKq === 'dat';
+          if (
+            !newIsDat ||
+            (newIsDat && oldIsDat && (
+              String(oldItem.nhom || '').trim() !== String(newItem.nhom || '').trim() ||
+              String(oldItem.thoi_gian_text || '').trim() !== String(newItem.thoi_gian_text || '').trim()
+            ))
+          ) {
+            affectedRecalc.push({ msnv: newItem.msnv, id_don_vi: newItem.id_don_vi });
+          }
+        }
+      });
+      if (affectedRecalc.length > 0) {
+        await recalculateOshForPersonnel(affectedRecalc);
+      }
+
     } catch (err) {
       toast.error('Lỗi khi nhập danh sách học viên.');
+    }
+  };
+
+  // Hàm tính toán lại trạng thái ATVSLĐ cho danh sách nhân viên bị ảnh hưởng (xóa học viên, xóa khóa, sửa kết quả)
+  const recalculateOshForPersonnel = async (affectedList: { msnv: string; id_don_vi: string | null }[]) => {
+    if (affectedList.length === 0) return;
+
+    // Lọc trùng theo msnv + id_don_vi
+    const uniqueKeys = new Set<string>();
+    const uniqueAffected = affectedList.filter(item => {
+      const key = `${item.msnv}_${item.id_don_vi || ''}`;
+      if (uniqueKeys.has(key)) return false;
+      uniqueKeys.add(key);
+      return true;
+    });
+
+    try {
+      // Load dữ liệu học viên và khóa học mới nhất từ database
+      const latestHvList: HocVienKhoaHuanLuyen[] = await apiService.getHocVienKhoaHuanLuyen().catch(() => []);
+      const latestKhList: KhoaHuanLuyen[] = await apiService.getKhoaHuanLuyen().catch(() => []);
+
+      const khMap = new Map<string, KhoaHuanLuyen>();
+      latestKhList.forEach(kh => khMap.set(kh.id, kh));
+
+      for (const item of uniqueAffected) {
+        // Tìm toàn bộ hồ sơ nhân sự khớp (chính + kiêm nhiệm)
+        const matchedPersons = personnelList.filter(p => 
+          p.ma_so_nhan_vien === item.msnv && 
+          (!item.id_don_vi || p.id_don_vi === item.id_don_vi)
+        );
+
+        if (matchedPersons.length === 0) continue;
+
+        // Tìm tất cả các khóa học "Đạt" khác của học viên này
+        const dats = latestHvList.filter(hv => {
+          if (hv.msnv !== item.msnv) return false;
+          if (item.id_don_vi && hv.id_don_vi !== item.id_don_vi) return false;
+          const kqNormalized = String(hv.ket_qua || '').trim().toLowerCase().normalize('NFC');
+          return kqNormalized === 'đạt' || kqNormalized === 'dat';
+        });
+
+        if (dats.length === 0) {
+          // Trường hợp A: không còn khóa học nào Đạt -> Reset trạng thái ATVSLĐ của mọi hồ sơ khớp về false/null
+          for (const person of matchedPersons) {
+            const updatedPerson = {
+              ...person,
+              cc_atvsld: false,
+              nhom_doi_tuong: null,
+              huan_luyen_tu: null,
+              huan_luyen_den: null,
+              gia_tri_den: null,
+              chung_nhan: null
+            };
+            await apiService.save(updatedPerson, 'update', 'ns_dich_vu');
+          }
+        } else {
+          // Trường hợp B: còn khóa học Đạt -> Sắp xếp chọn khóa học Đạt gần nhất theo ngày kết thúc khóa học
+          dats.sort((a, b) => {
+            const khA = khMap.get(a.id_khoa_hoc);
+            const khB = khMap.get(b.id_khoa_hoc);
+            const dateA = khA?.ngay_ket_thuc || khA?.ngay_bat_dau || '';
+            const dateB = khB?.ngay_ket_thuc || khB?.ngay_bat_dau || '';
+            return dateB.localeCompare(dateA); // Ngày kết thúc gần nhất lên đầu
+          });
+
+          const latestHv = dats[0];
+          const latestKh = khMap.get(latestHv.id_khoa_hoc);
+
+          const nhomDigits = String(latestHv.nhom || '').replace(/\D/g, '');
+          const nhom = nhomDigits || '3';
+          const huanLuyenDen = extractHuanLuyenDen(latestHv.thoi_gian_text, latestKh?.ngay_ket_thuc || new Date().toISOString().slice(0, 10));
+          const giaTriDen = calcGiaTriDen(huanLuyenDen, nhom, chuKyList);
+          const chungNhan = getChungNhanByNhom(nhom);
+
+          for (const person of matchedPersons) {
+            const updatedPerson = {
+              ...person,
+              cc_atvsld: true,
+              nhom_doi_tuong: nhom,
+              huan_luyen_tu: latestKh?.ngay_bat_dau || null,
+              huan_luyen_den: huanLuyenDen,
+              gia_tri_den: giaTriDen,
+              chung_nhan: chungNhan
+            };
+            await apiService.save(updatedPerson, 'update', 'ns_dich_vu');
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Lỗi tính toán lại trạng thái ATVSLĐ nhân sự:', err);
     }
   };
 
@@ -387,7 +517,9 @@ export default function KhoaHocTab({ onReloadData, selectedUnitFilter, allowedDo
     });
 
     const pendingSync = hvToSync.filter(hv => {
-      const isDat = String(hv.ket_qua || '').trim().toLowerCase().includes('đạt') || String(hv.ket_qua || '').trim().toLowerCase().includes('dat');
+      // SỬA LỖI: So khớp CHÍNH XÁC và chuẩn hóa NFC để tránh dùng includes() gây nhận nhầm trạng thái "chưa đạt"
+      const kqNormalized = String(hv.ket_qua || '').trim().toLowerCase().normalize('NFC');
+      const isDat = kqNormalized === 'đạt' || kqNormalized === 'dat';
       // Tìm theo key kết hợp hoặc fallback theo mã nhân viên nếu chưa được điền id_don_vi
       const key = hv.id_don_vi ? `${hv.msnv}_${hv.id_don_vi}` : '';
       const hasSystemPerson = key ? personnelMap.has(key) : personnelList.some(p => p.ma_so_nhan_vien === hv.msnv);
@@ -789,7 +921,9 @@ export default function KhoaHocTab({ onReloadData, selectedUnitFilter, allowedDo
                     </tr>
                   ) : (
                     filteredHocVien.map((hv, idx) => {
-                      const isDat = String(hv.ket_qua || '').trim().toLowerCase().includes('đạt') || String(hv.ket_qua || '').trim().toLowerCase().includes('dat');
+                      // SỬA LỖI: So khớp CHÍNH XÁC và chuẩn hóa NFC để tránh dùng includes() gây hiển thị sai trạng thái
+                      const kqNormalized = String(hv.ket_qua || '').trim().toLowerCase().normalize('NFC');
+                      const isDat = kqNormalized === 'đạt' || kqNormalized === 'dat';
                       return (
                         <tr key={hv.id} className="hover:bg-lime-50/20 transition-colors">
                           <td className="p-3 text-center text-gray-400 font-semibold">{hv.stt || (idx + 1)}</td>
@@ -890,6 +1024,23 @@ export default function KhoaHocTab({ onReloadData, selectedUnitFilter, allowedDo
                     placeholder="Ví dụ: Huấn luyện ATVSLĐ đợt 1 năm 2026"
                     className="w-full px-3 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-lime-500 text-sm font-semibold"
                   />
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-black text-gray-600 uppercase">Đơn vị áp dụng khóa học</label>
+                  <select
+                    value={currentKhoaHoc.id_don_vi || ''}
+                    onChange={e => setCurrentKhoaHoc({ ...currentKhoaHoc, id_don_vi: e.target.value || undefined })}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-lime-500 text-sm font-semibold text-gray-700 bg-white"
+                    style={{ fontFamily: 'monospace, sans-serif' }}
+                  >
+                    <option value="">-- Áp dụng cho tất cả cơ sở --</option>
+                    {buildHierarchicalOptions(donViList).map(({ unit, prefix }) => (
+                      <option key={unit.id} value={unit.id} className="font-normal text-gray-700">
+                        {prefix}{getUnitEmoji(unit.loai_hinh)} {unit.ten_don_vi}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div className="flex flex-col gap-1">

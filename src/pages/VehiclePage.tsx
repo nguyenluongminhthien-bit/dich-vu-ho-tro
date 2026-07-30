@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { 
-  Search, Plus, Edit, Trash2, X, AlertCircle, Loader2, Save, 
+import {
+  Search, Plus, Edit, Trash2, X, AlertCircle, Loader2, Save,
   Car, Building2, MapPin, ChevronDown, ChevronRight, ChevronLeft, PanelLeftClose, PanelLeftOpen,
   Receipt, Calendar, Info, Eye, BarChart3, Briefcase, AlertTriangle, ShieldCheck
 } from 'lucide-react';
@@ -25,7 +25,7 @@ const formatMonthYear = (dateStr: string) => {
   if (!dateStr) return '-';
   try {
     const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return dateStr.slice(0, 7); 
+    if (isNaN(d.getTime())) return dateStr.slice(0, 7);
     return `${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getFullYear()}`;
   } catch {
     return dateStr;
@@ -57,7 +57,7 @@ const getBrandBadgeStyle = (brandStr: string = '') => {
   if (b.includes('audi')) return 'bg-zinc-100 text-zinc-800 border border-zinc-300';
   if (b.includes('porsche')) return 'bg-amber-100 text-amber-900 border border-amber-300';
   if (b.includes('chevrolet')) return 'bg-stone-100 text-stone-800 border border-stone-300';
-  
+
   // Hash fallback cho các hãng xe khác
   const palettes = [
     'bg-teal-100 text-teal-800 border border-teal-300',
@@ -77,16 +77,16 @@ const getBrandBadgeStyle = (brandStr: string = '') => {
 const formatMathInput = (val: string | number | undefined | null) => {
   if (!val) return '';
   const str = String(val);
-  if (/[+\-*/()]/.test(str)) return str; 
-  return formatCurrency(str); 
+  if (/[+\-*/()]/.test(str)) return str;
+  return formatCurrency(str);
 };
 
 export default function VehiclePage() {
   const { user } = useAuth();
   const [donViList, setDonViList] = useState<DonVi[]>([]);
   const [xeData, setXeData] = useState<TS_Xe[]>([]);
-  const [chiPhiData, setChiPhiData] = useState<any[]>([]); 
-  
+  const [chiPhiData, setChiPhiData] = useState<any[]>([]);
+
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -116,17 +116,17 @@ export default function VehiclePage() {
   const [viewData, setViewData] = useState<TS_Xe & any | null>(null);
 
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
-  const [itemToDelete, setItemToDelete] = useState<{id: string, type: 'xe' | 'chiphi'} | null>(null);
+  const [itemToDelete, setItemToDelete] = useState<{ id: string, type: 'xe' | 'chiphi' } | null>(null);
 
-  const isCarModalOpen  = carModal.isOpen;
-  const modalMode       = carModal.mode;
-  const carFormData     = carModal.formData;
-  const setCarFormData  = (d: any) => setCarModal(p => ({ ...p, formData: typeof d === 'function' ? d(p.formData) : d }));
+  const isCarModalOpen = carModal.isOpen;
+  const modalMode = carModal.mode;
+  const carFormData = carModal.formData;
+  const setCarFormData = (d: any) => setCarModal(p => ({ ...p, formData: typeof d === 'function' ? d(p.formData) : d }));
 
-  const isCostModalOpen  = costModal.isOpen;
-  const costModalMode    = costModal.mode;
-  const costFormData     = costModal.formData;
-  const setCostFormData  = (d: any) => setCostModal(p => ({ ...p, formData: typeof d === 'function' ? d(p.formData) : d }));
+  const isCostModalOpen = costModal.isOpen;
+  const costModalMode = costModal.mode;
+  const costFormData = costModal.formData;
+  const setCostFormData = (d: any) => setCostModal(p => ({ ...p, formData: typeof d === 'function' ? d(p.formData) : d }));
 
   const loadData = async () => {
     setLoading(true); setError(null);
@@ -135,7 +135,7 @@ export default function VehiclePage() {
         apiService.getDonVi(), apiService.getXe(), apiService.getChiPhiXe()
       ]);
       setDonViList(dvResult || []); setXeData(xeResult || []); setChiPhiData(cpResult || []);
-    } catch (err: any) { setError(err.message || 'Lỗi tải dữ liệu.'); } 
+    } catch (err: any) { setError(err.message || 'Lỗi tải dữ liệu.'); }
     finally { setLoading(false); }
   };
 
@@ -190,7 +190,7 @@ export default function VehiclePage() {
         }
       });
     };
-    
+
     const initialMatches = Array.from(matchedIds);
     initialMatches.forEach(id => addChildren(id));
 
@@ -213,9 +213,9 @@ export default function VehiclePage() {
     }
     if (carSearchTerm) {
       const cleanSearch = stripAccents(carSearchTerm);
-      result = result.filter(item => 
-        stripAccents(item.bien_so || '').includes(cleanSearch) || 
-        stripAccents(item.hieu_xe || '').includes(cleanSearch) || 
+      result = result.filter(item =>
+        stripAccents(item.bien_so || '').includes(cleanSearch) ||
+        stripAccents(item.hieu_xe || '').includes(cleanSearch) ||
         stripAccents(item.loai_xe || '').includes(cleanSearch)
       );
     }
@@ -288,10 +288,10 @@ export default function VehiclePage() {
   const openCarModal = (mode: 'create' | 'update', item?: TS_Xe | any) => {
     setCarModal(prev => ({ ...prev, mode })); setPlateError(false);
     const defaultDonViId = user?.id_don_vi || (user as any)?.idDonVi;
-    if (item) { setCarFormData({ ...item }); } 
+    if (item) { setCarFormData({ ...item }); }
     else {
       setCarFormData({
-        id: '', id_don_vi: selectedUnitFilter || (defaultDonViId !== 'ALL' ? defaultDonViId : ''), muc_dich_su_dung: 'Xe công', ma_tai_san: '', don_vi_chu_so_huu: '', nguyen_gia: '', cp_thue_khau_hao: '', 
+        id: '', id_don_vi: selectedUnitFilter || (defaultDonViId !== 'ALL' ? defaultDonViId : ''), muc_dich_su_dung: 'Xe công', ma_tai_san: '', don_vi_chu_so_huu: '', nguyen_gia: '', cp_thue_khau_hao: '',
         bien_so: '', loai_phuong_tien: 'Ô tô du lịch', hieu_xe: '', loai_xe: '', phien_ban: '', mau_xe: '', nam_sx: '', nam_dk: '', so_khung: '', so_may: '',
         so_cho: '', loai_nhien_lieu: 'Xăng', dung_tich: '', cong_thuc_banh: '', hinh_thuc_so_huu: 'Sở hữu', gps: 'Có', hien_trang: 'Đang hoạt động', ghi_chu: '',
         // 🟢 CÁC CỘT HẠN NGÀY MỚI
@@ -305,7 +305,7 @@ export default function VehiclePage() {
     e.preventDefault();
     if (!carFormData.id_don_vi) return toast.warning("Vui lòng chọn Đơn vị quản lý!");
     if (!carFormData.hieu_xe) return toast.warning("Vui lòng chọn Hiệu xe!");
-    
+
     let finalData = { ...carFormData };
 
     // Xử lý giá trị rỗng thành null
@@ -325,16 +325,16 @@ export default function VehiclePage() {
 
       if (modalMode === 'create') setXeData(prev => [newCar, ...prev]);
       else setXeData(prev => prev.map(item => item.id === savedId ? newCar : item));
-      
-      setCarModal(prev => ({ ...prev, isOpen: false })); 
+
+      setCarModal(prev => ({ ...prev, isOpen: false }));
       if (modalMode === 'create') toast.success("Thêm mới phương tiện thành công!");
       else toast.success("Cập nhật thông tin xe thành công!");
 
-    } catch (err: any) { 
-      setError(err.message || 'Lỗi lưu dữ liệu Xe.'); 
+    } catch (err: any) {
+      setError(err.message || 'Lỗi lưu dữ liệu Xe.');
       toast.error(err.message || "Đã xảy ra lỗi khi lưu thông tin xe!");
-    } finally { 
-      setSubmitting(false); 
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -365,8 +365,8 @@ export default function VehiclePage() {
   const openCostModal = (car: TS_Xe) => {
     setSelectedCarForCost(car); setCostModal(prev => ({ ...prev, mode: 'create' }));
     setCostFormData({
-      id: '', thang_nam: new Date().toISOString().slice(0, 7), id_ts_xe: car.id, id_don_vi: car.id_don_vi, 
-      km_hien_tai: '', so_lit_nhien_lieu: '', cp_nhien_lieu: '', cp_cau_duong_ben_bai: '', cp_rua_xe: '', cp_bao_duong_sua_chua: '', cp_thue_khau_hao: '', 
+      id: '', thang_nam: new Date().toISOString().slice(0, 7), id_ts_xe: car.id, id_don_vi: car.id_don_vi,
+      km_hien_tai: '', so_lit_nhien_lieu: '', cp_nhien_lieu: '', cp_cau_duong_ben_bai: '', cp_rua_xe: '', cp_bao_duong_sua_chua: '', cp_thue_khau_hao: '',
       cp_dang_kiem: '', cp_bh_tnds: '', cp_bh_vc: '', ghi_chu: '' // 🟢 Thêm 3 cột chi phí
     });
     setCostModal(prev => ({ ...prev, isOpen: true }));
@@ -380,13 +380,13 @@ export default function VehiclePage() {
   const handleInputCostChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     let finalValue = value;
-    
-    if (name === 'km_hien_tai') { 
-      finalValue = value.replace(/\D/g, ''); 
+
+    if (name === 'km_hien_tai') {
+      finalValue = value.replace(/\D/g, '');
     } else if (['cp_nhien_lieu', 'cp_cau_duong_ben_bai', 'cp_rua_xe', 'cp_bao_duong_sua_chua', 'cp_thue_khau_hao', 'cp_dang_kiem', 'cp_bh_tnds', 'cp_bh_vc'].includes(name)) {
       finalValue = value.replace(/[^0-9+\-*/().\s]/g, '');
     }
-    
+
     setCostFormData(prev => ({ ...prev, [name]: finalValue }));
   };
 
@@ -405,7 +405,7 @@ export default function VehiclePage() {
     e.preventDefault(); setSubmitting(true); setError(null);
     try {
       let finalData = { ...costFormData };
-      
+
       // Xử lý tính toán công thức cho toàn bộ cột chi phí
       const costFields = ['cp_nhien_lieu', 'cp_cau_duong_ben_bai', 'cp_rua_xe', 'cp_bao_duong_sua_chua', 'cp_thue_khau_hao', 'cp_dang_kiem', 'cp_bh_tnds', 'cp_bh_vc'];
       costFields.forEach(field => {
@@ -425,27 +425,27 @@ export default function VehiclePage() {
       } else {
         setChiPhiData(prev => prev.map(item => getCostId(item) === finalData.id ? savedCost : item));
       }
-      
+
       setCostModal(prev => ({ ...prev, mode: 'create' }));
       setCostFormData({
-        id: '', thang_nam: costFormData.thang_nam, id_ts_xe: selectedCarForCost?.id || '', id_don_vi: selectedCarForCost?.id_don_vi || '', 
-        km_hien_tai: '', so_lit_nhien_lieu: '', cp_nhien_lieu: '', cp_cau_duong_ben_bai: '', cp_rua_xe: '', cp_bao_duong_sua_chua: '', cp_thue_khau_hao: '', 
+        id: '', thang_nam: costFormData.thang_nam, id_ts_xe: selectedCarForCost?.id || '', id_don_vi: selectedCarForCost?.id_don_vi || '',
+        km_hien_tai: '', so_lit_nhien_lieu: '', cp_nhien_lieu: '', cp_cau_duong_ben_bai: '', cp_rua_xe: '', cp_bao_duong_sua_chua: '', cp_thue_khau_hao: '',
         cp_dang_kiem: '', cp_bh_tnds: '', cp_bh_vc: '', ghi_chu: ''
       });
       toast.success(costModalMode === 'create' ? "Đã lưu chi phí!" : "Đã cập nhật chi phí!");
 
-    } catch (err: any) { 
-      setError(err.message || 'Lỗi lưu dữ liệu Chi phí.'); 
+    } catch (err: any) {
+      setError(err.message || 'Lỗi lưu dữ liệu Chi phí.');
       toast.error(err.message || "Đã xảy ra lỗi khi lưu chi phí xe!");
-    } finally { 
-      setSubmitting(false); 
+    } finally {
+      setSubmitting(false);
     }
   };
 
   const chartScale = useMemo(() => {
     if (viewHistoryCosts.length === 0) return { maxCP: 1, maxKm: 1 };
-    const costs = viewHistoryCosts.map(c => 
-      (Number(c.cp_nhien_lieu) || 0) + (Number(c.cp_cau_duong_ben_bai) || 0) + (Number(c.cp_rua_xe) || 0) + 
+    const costs = viewHistoryCosts.map(c =>
+      (Number(c.cp_nhien_lieu) || 0) + (Number(c.cp_cau_duong_ben_bai) || 0) + (Number(c.cp_rua_xe) || 0) +
       (Number(c.cp_bao_duong_sua_chua) || 0) + (Number(c.cp_thue_khau_hao) || 0) +
       (Number(c.cp_dang_kiem) || 0) + (Number(c.cp_bh_tnds) || 0) + (Number(c.cp_bh_vc) || 0)
     );
@@ -454,8 +454,8 @@ export default function VehiclePage() {
   }, [viewHistoryCosts]);
 
   const confirmDelete = async () => {
-    if (!itemToDelete) return; 
-    setSubmitting(true); 
+    if (!itemToDelete) return;
+    setSubmitting(true);
     setError(null);
     try {
       if (itemToDelete.type === 'xe') {
@@ -475,20 +475,20 @@ export default function VehiclePage() {
         setChiPhiData(prev => prev.filter(item => getCostId(item) !== itemToDelete.id));
         toast.success("Xóa chi phí hoạt động thành công!");
       }
-      setIsConfirmOpen(false); 
-      setItemToDelete(null); 
-    } catch (err: any) { 
-      setError(err.message || 'Lỗi xóa dữ liệu.'); 
+      setIsConfirmOpen(false);
+      setItemToDelete(null);
+    } catch (err: any) {
+      setError(err.message || 'Lỗi xóa dữ liệu.');
       toast.error(err.message || "Đã xảy ra lỗi khi xóa dữ liệu!");
-    } finally { 
-      setSubmitting(false); 
+    } finally {
+      setSubmitting(false);
     }
   };
 
   const getUnitFullName = (id: string) => {
     const unit = donViList.find(u => u.id === id);
     if (!unit) return '-';
-    
+
     const ancestors: string[] = [];
     let currParentId = unit.cap_quan_ly;
     let depth = 0;
@@ -509,8 +509,8 @@ export default function VehiclePage() {
     return unit.ten_don_vi;
   };
 
-    if (loading) return <PageWithFilterSkeleton rows={8} />;
-    return (
+  if (loading) return <PageWithFilterSkeleton rows={8} />;
+  return (
     <div className="flex w-full max-w-full h-full bg-[#f4f7f9] overflow-hidden relative">
       {isListCollapsed && (
         <button onClick={() => setIsListCollapsed(false)} className="hidden md:block absolute top-6 left-6 z-20 bg-white p-2.5 rounded-lg shadow-md border border-gray-200 text-[#05469B] hover:bg-blue-50 transition-all" title="Mở danh sách đơn vị"><PanelLeftOpen size={20} /></button>
@@ -528,19 +528,19 @@ export default function VehiclePage() {
         isListCollapsed={isListCollapsed}
         setIsListCollapsed={setIsListCollapsed}
         themeColor="blue"
-        allUnitsLabel="Tất cả Đội xe Toàn quốc"
+        allUnitsLabel="Tất cả xe Đơn vị trực thuộc"
       />
 
       {/* --- CỘT PHẢI (DANH SÁCH XE) --- */}
       <div className="flex-1 min-w-0 max-w-full overflow-hidden p-4 sm:p-6 relative transition-all duration-300 w-full flex flex-col">
-        
+
         {/* FIXED HEADER & WARNINGS */}
         <div className="shrink-0 flex flex-col z-10">
           <div className={`flex flex-col sm:flex-row justify-between items-center mb-6 gap-4 transition-all duration-300 ${isListCollapsed ? 'md:pl-10 lg:pl-0' : ''}`}>
             <div className="flex items-center gap-2.5 w-full sm:w-auto">
               {isListCollapsed && (
-                <button 
-                  onClick={() => setIsListCollapsed(false)} 
+                <button
+                  onClick={() => setIsListCollapsed(false)}
                   className="md:hidden bg-white p-2 rounded-lg shadow-sm border border-gray-200 text-[#05469B] hover:bg-blue-50 transition-all flex items-center justify-center shrink-0"
                   title="Mở bộ lọc đơn vị"
                 >
@@ -568,7 +568,7 @@ export default function VehiclePage() {
             <div className={`mb-6 transition-all duration-300 ${isListCollapsed ? 'md:pl-10 lg:pl-0' : ''}`}>
               <div className="bg-red-50 border border-red-200 rounded-xl overflow-hidden shadow-sm">
                 <div className="flex justify-between items-center p-3 sm:p-4">
-                  <div 
+                  <div
                     className="flex items-center gap-2 text-red-700 cursor-pointer flex-1"
                     onClick={() => setIsWarningOpen(!isWarningOpen)}
                   >
@@ -627,7 +627,7 @@ export default function VehiclePage() {
 
         {/* BẢNG DỮ LIỆU CHÍNH */}
         <div className={`flex flex-col flex-1 min-h-0 gap-4 transition-all duration-300 ${isListCollapsed ? 'md:ml-10 lg:ml-0' : ''}`}>
-          
+
           {/* BẢNG DỮ LIỆU PC */}
           <div className="hidden md:block bg-white rounded-xl shadow-sm border border-gray-200 w-full flex-1 min-h-0 overflow-auto custom-scrollbar">
             <table className="w-full table-fixed text-left border-collapse min-w-[1100px] text-[12px]">
@@ -640,7 +640,7 @@ export default function VehiclePage() {
                   <th className="py-3 px-3 w-[15%] bg-[#f8fafc]">Đơn vị quản lý</th>
                   <th className="py-3 px-3 w-[17%] bg-[#f8fafc]">Chi phí</th>
                   <th className="py-3 px-3 w-[10%] bg-[#f8fafc]">Tình trạng</th>
-                  <th className="py-3 px-3 text-center w-[15%] bg-[#f8fafc]">Thao tác</th> 
+                  <th className="py-3 px-3 text-center w-[15%] bg-[#f8fafc]">Thao tác</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
@@ -671,7 +671,7 @@ export default function VehiclePage() {
                         {(() => {
                           const unit = donViList.find(u => u.id === item.id_don_vi);
                           if (!unit) return <span className="text-gray-400 font-medium">---</span>;
-                          
+
                           const line1 = unit.ten_don_vi;
                           const ancestors: string[] = [];
                           let currParentId = unit.cap_quan_ly;
@@ -709,7 +709,7 @@ export default function VehiclePage() {
                           const costs = chiPhiData
                             .filter(cp => getCostCarId(cp) === item.id)
                             .sort((a, b) => String(a.thang_nam || '').localeCompare(String(b.thang_nam || '')));
-                          
+
                           if (costs.length === 0) {
                             return <span className="text-gray-400 text-[11px] italic">Chưa phát sinh</span>;
                           }
@@ -723,7 +723,7 @@ export default function VehiclePage() {
                           const sumCost = monthlyTotals.reduce((a, b) => a + b, 0);
                           const maxVal = Math.max(...monthlyTotals, 1);
                           const minVal = Math.min(...monthlyTotals, 0);
-                          
+
                           const n = monthlyTotals.length;
                           let points = '';
                           if (n === 1) {
@@ -775,7 +775,7 @@ export default function VehiclePage() {
                           <button onClick={() => openCostModal(item)} className="w-full py-1 bg-white border border-indigo-200 text-indigo-600 hover:bg-indigo-50 rounded text-[10.5px] font-bold transition-colors flex items-center justify-center gap-1 shadow-2xs leading-none">
                             <Receipt size={12} /> Chi phí
                           </button>
-                          
+
                           {/* Dòng 2: Xem - Sửa - Xóa */}
                           <div className="grid grid-cols-3 gap-1">
                             <button onClick={() => { setViewData(item); setIsViewModalOpen(true); }} className="py-1 bg-white border border-emerald-200 text-emerald-600 hover:bg-emerald-50 rounded flex items-center justify-center shadow-2xs transition-colors" title="Xem chi tiết">
@@ -784,7 +784,7 @@ export default function VehiclePage() {
                             <button onClick={() => openCarModal('update', item)} className="py-1 bg-white border border-blue-200 text-blue-600 hover:bg-blue-50 rounded flex items-center justify-center shadow-2xs transition-colors" title="Sửa">
                               <Edit size={12} />
                             </button>
-                            <button onClick={() => { setItemToDelete({id: item.id, type: 'xe'}); setIsConfirmOpen(true); }} className="py-1 bg-white border border-red-200 text-red-600 hover:bg-red-50 rounded flex items-center justify-center shadow-2xs transition-colors" title="Xóa">
+                            <button onClick={() => { setItemToDelete({ id: item.id, type: 'xe' }); setIsConfirmOpen(true); }} className="py-1 bg-white border border-red-200 text-red-600 hover:bg-red-50 rounded flex items-center justify-center shadow-2xs transition-colors" title="Xóa">
                               <Trash2 size={12} />
                             </button>
                           </div>
@@ -805,11 +805,11 @@ export default function VehiclePage() {
               paginatedCars.map((item) => {
                 const unit = donViList.find(u => u.id === item.id_don_vi);
                 const line1 = unit ? unit.ten_don_vi : '---';
-                
+
                 const costs = chiPhiData
                   .filter(cp => getCostCarId(cp) === item.id)
                   .sort((a, b) => String(a.thang_nam || '').localeCompare(String(b.thang_nam || '')));
-                
+
                 const monthlyTotals = costs.map(cost => {
                   const phikhac = (Number(cost.cp_thue_khau_hao) || 0) + (Number(cost.cp_dang_kiem) || 0) + (Number(cost.cp_bh_tnds) || 0) + (Number(cost.cp_bh_vc) || 0);
                   const total = (Number(cost.cp_nhien_lieu) || 0) + (Number(cost.cp_cau_duong_ben_bai) || 0) + (Number(cost.cp_rua_xe) || 0) + (Number(cost.cp_bao_duong_sua_chua) || 0) + phikhac;
@@ -819,7 +819,7 @@ export default function VehiclePage() {
                 const n = monthlyTotals.length;
 
                 return (
-                  <div 
+                  <div
                     key={item.id}
                     className="p-4 bg-white rounded-2xl border border-gray-100 shadow-sm relative flex flex-col gap-3 transition-all"
                   >
@@ -869,7 +869,7 @@ export default function VehiclePage() {
                       <div className="flex items-center gap-1.5">
                         <button onClick={() => { setViewData(item); setIsViewModalOpen(true); }} className="p-1.5 text-emerald-600 bg-emerald-50 border border-emerald-100 hover:bg-emerald-100 rounded-lg transition-colors flex items-center gap-1 text-[11px] font-bold shadow-2xs" title="Xem chi tiết"><Eye size={13} /> Xem</button>
                         <button onClick={() => openCarModal('update', item)} className="p-1.5 text-blue-600 bg-blue-50 border border-blue-100 hover:bg-blue-100 rounded-lg transition-colors flex items-center gap-1 text-[11px] font-bold shadow-2xs" title="Sửa"><Edit size={13} /> Sửa</button>
-                        <button onClick={() => { setItemToDelete({id: item.id, type: 'xe'}); setIsConfirmOpen(true); }} className="p-1.5 text-red-600 bg-red-50 border border-red-100 hover:bg-red-100 rounded-lg transition-colors flex items-center gap-1 text-[11px] font-bold shadow-2xs" title="Xóa"><Trash2 size={13} /> Xóa</button>
+                        <button onClick={() => { setItemToDelete({ id: item.id, type: 'xe' }); setIsConfirmOpen(true); }} className="p-1.5 text-red-600 bg-red-50 border border-red-100 hover:bg-red-100 rounded-lg transition-colors flex items-center gap-1 text-[11px] font-bold shadow-2xs" title="Xóa"><Trash2 size={13} /> Xóa</button>
                       </div>
                     </div>
                   </div>
@@ -899,133 +899,133 @@ export default function VehiclePage() {
         <div className="fixed inset-0 z-[999] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm transition-all">
           <div className="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl w-full max-h-[95vh] sm:max-h-[90vh] sm:max-w-5xl flex flex-col animate-in slide-in-from-bottom-4 sm:zoom-in duration-200 mt-auto sm:mt-0 overflow-hidden">
             <div className="flex justify-between p-4 sm:p-5 border-b border-gray-100 bg-gray-50 rounded-t-3xl sm:rounded-t-2xl shrink-0">
-              <h3 className="text-xl font-bold text-[#05469B] flex items-center gap-2"><Car size={24}/> {modalMode === 'create' ? 'Thêm Xe Mới' : 'Cập nhật Thông tin Xe'}</h3>
+              <h3 className="text-xl font-bold text-[#05469B] flex items-center gap-2"><Car size={24} /> {modalMode === 'create' ? 'Thêm Xe Mới' : 'Cập nhật Thông tin Xe'}</h3>
               <button onClick={() => setCarModal(prev => ({ ...prev, isOpen: false }))} disabled={submitting} className="text-gray-400 hover:text-red-500 rounded-full p-1.5 bg-white shadow-sm transition-colors"><X className="w-6 h-6" /></button>
             </div>
-            
+
             <form onSubmit={handleCarSave} className="flex flex-col flex-1 min-h-0 overflow-hidden">
               <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar bg-white">
-              
-              <div className="bg-blue-50/40 p-5 rounded-xl border border-blue-100">
-                <h4 className="font-bold text-[#05469B] mb-4 flex items-center gap-2"><div className="w-2 h-6 bg-[#05469B] rounded-full"></div> Hồ sơ Đăng ký & Sở hữu</h4>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-1">Biển Số *</label>
-                    <input type="text" required name="bien_so" value={carFormData.bien_so || ''} onChange={handleInputCarChange} placeholder="VD: 51H12345" className={`w-full p-2.5 border rounded-lg outline-none font-bold focus:ring-2 focus:ring-[#05469B] ${plateError ? 'border-red-500 bg-red-50 text-red-700' : 'border-gray-200 bg-[#FFFFF0] text-[#05469B]'}`} />
-                    {plateError && <p className="text-[10px] text-red-500 mt-1 font-bold animate-pulse">Lỗi: Gõ liền, không dấu cách/-/. !</p>}
-                  </div>
-                  
-                  <div className="md:col-span-2">
-                    <label className="block text-xs font-bold text-gray-700 mb-1">Đơn vị quản lý *</label>
-                    <select required name="id_don_vi" value={carFormData.id_don_vi || ''} onChange={handleInputCarChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" style={{ fontFamily: 'monospace, sans-serif' }}>
-                      <option value="">-- Chọn đơn vị --</option>
-                      {buildHierarchicalOptions(donViList.filter(dv => allowedDonViIds.includes(dv.id))).map(({ unit, prefix }) => (
-                        <option key={unit.id} value={unit.id} className="font-normal text-gray-700">
-                          {prefix}{getUnitEmoji(unit.loai_hinh)} {unit.ten_don_vi}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-1">Hình thức Sở hữu</label>
-                    <select name="hinh_thuc_so_huu" value={carFormData.hinh_thuc_so_huu || 'Sở hữu'} onChange={handleInputCarChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]">
-                      <option value="Sở hữu">Sở hữu</option>
-                      <option value="Quản lý sử dụng">Quản lý sử dụng</option>
-                      <option value="Thuê">Thuê</option>
-                    </select>
-                  </div>
 
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-1">Mục đích sử dụng</label>
-                    <select name="muc_dich_su_dung" value={carFormData.muc_dich_su_dung || 'Xe công'} onChange={handleInputCarChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] font-bold text-indigo-700 outline-none focus:ring-2 focus:ring-[#05469B]">
-                      <option value="Xe công">Xe công</option>
-                      <option value="Xe lái thử">Xe lái thử</option>
-                      <option value="Xe thay thế cho KH">Xe thay thế cho KH</option>
-                      <option value="Xe sửa chữa lưu động">Xe sửa chữa lưu động</option>
-                    </select>
-                  </div>
+                <div className="bg-blue-50/40 p-5 rounded-xl border border-blue-100">
+                  <h4 className="font-bold text-[#05469B] mb-4 flex items-center gap-2"><div className="w-2 h-6 bg-[#05469B] rounded-full"></div> Hồ sơ Đăng ký & Sở hữu</h4>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 mb-1">Biển Số *</label>
+                      <input type="text" required name="bien_so" value={carFormData.bien_so || ''} onChange={handleInputCarChange} placeholder="VD: 51H12345" className={`w-full p-2.5 border rounded-lg outline-none font-bold focus:ring-2 focus:ring-[#05469B] ${plateError ? 'border-red-500 bg-red-50 text-red-700' : 'border-gray-200 bg-[#FFFFF0] text-[#05469B]'}`} />
+                      {plateError && <p className="text-[10px] text-red-500 mt-1 font-bold animate-pulse">Lỗi: Gõ liền, không dấu cách/-/. !</p>}
+                    </div>
 
-                  <div><label className="block text-xs font-bold text-gray-700 mb-1">Mã Tài Sản (Kế toán)</label><input type="text" name="ma_tai_san" value={carFormData.ma_tai_san || ''} onChange={handleInputCarChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" /></div>
-                  <div className="md:col-span-2"><label className="block text-xs font-bold text-gray-700 mb-1">Đơn vị Đứng tên Cà vẹt (Chủ sở hữu)</label><input type="text" name="don_vi_chu_so_huu" value={carFormData.don_vi_chu_so_huu || ''} onChange={handleInputCarChange} placeholder="Tên công ty/cá nhân trên Giấy đăng ký xe" className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" /></div>
-                  
-                  <div className="md:col-span-2">
-                    <label className="block text-xs font-bold text-gray-700 mb-1">Nguyên giá (VNĐ)</label>
-                    <input type="text" name="nguyen_gia" value={formatCurrency(carFormData.nguyen_gia)} onChange={handleInputCarChange} placeholder="Giá trị mua xe ban đầu..." className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" />
+                    <div className="md:col-span-2">
+                      <label className="block text-xs font-bold text-gray-700 mb-1">Đơn vị quản lý *</label>
+                      <select required name="id_don_vi" value={carFormData.id_don_vi || ''} onChange={handleInputCarChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" style={{ fontFamily: 'monospace, sans-serif' }}>
+                        <option value="">-- Chọn đơn vị --</option>
+                        {buildHierarchicalOptions(donViList.filter(dv => allowedDonViIds.includes(dv.id))).map(({ unit, prefix }) => (
+                          <option key={unit.id} value={unit.id} className="font-normal text-gray-700">
+                            {prefix}{getUnitEmoji(unit.loai_hinh)} {unit.ten_don_vi}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 mb-1">Hình thức Sở hữu</label>
+                      <select name="hinh_thuc_so_huu" value={carFormData.hinh_thuc_so_huu || 'Sở hữu'} onChange={handleInputCarChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]">
+                        <option value="Sở hữu">Sở hữu</option>
+                        <option value="Quản lý sử dụng">Quản lý sử dụng</option>
+                        <option value="Thuê">Thuê</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 mb-1">Mục đích sử dụng</label>
+                      <select name="muc_dich_su_dung" value={carFormData.muc_dich_su_dung || 'Xe công'} onChange={handleInputCarChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] font-bold text-indigo-700 outline-none focus:ring-2 focus:ring-[#05469B]">
+                        <option value="Xe công">Xe công</option>
+                        <option value="Xe lái thử">Xe lái thử</option>
+                        <option value="Xe thay thế cho KH">Xe thay thế cho KH</option>
+                        <option value="Xe sửa chữa lưu động">Xe sửa chữa lưu động</option>
+                      </select>
+                    </div>
+
+                    <div><label className="block text-xs font-bold text-gray-700 mb-1">Mã Tài Sản (Kế toán)</label><input type="text" name="ma_tai_san" value={carFormData.ma_tai_san || ''} onChange={handleInputCarChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" /></div>
+                    <div className="md:col-span-2"><label className="block text-xs font-bold text-gray-700 mb-1">Đơn vị Đứng tên Cà vẹt (Chủ sở hữu)</label><input type="text" name="don_vi_chu_so_huu" value={carFormData.don_vi_chu_so_huu || ''} onChange={handleInputCarChange} placeholder="Tên công ty/cá nhân trên Giấy đăng ký xe" className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" /></div>
+
+                    <div className="md:col-span-2">
+                      <label className="block text-xs font-bold text-gray-700 mb-1">Nguyên giá (VNĐ)</label>
+                      <input type="text" name="nguyen_gia" value={formatCurrency(carFormData.nguyen_gia)} onChange={handleInputCarChange} placeholder="Giá trị mua xe ban đầu..." className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="block text-xs font-bold text-gray-700 mb-1">Chi phí Thuê / Khấu hao tháng (VNĐ)</label>
+                      <input type="text" name="cp_thue_khau_hao" value={formatCurrency(carFormData.cp_thue_khau_hao)} onChange={handleInputCarChange} placeholder="Chi phí cố định hàng tháng..." className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" />
+                    </div>
                   </div>
-                  <div className="md:col-span-2">
-                    <label className="block text-xs font-bold text-gray-700 mb-1">Chi phí Thuê / Khấu hao tháng (VNĐ)</label>
-                    <input type="text" name="cp_thue_khau_hao" value={formatCurrency(carFormData.cp_thue_khau_hao)} onChange={handleInputCarChange} placeholder="Chi phí cố định hàng tháng..." className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" />
+                </div>
+
+                {/* 🟢 KHỐI MỚI: HẠN PHÁP LÝ & BẢO HIỂM */}
+                <div className="bg-emerald-50/40 p-5 rounded-xl border border-emerald-100">
+                  <h4 className="font-bold text-emerald-800 mb-4 flex items-center gap-2"><div className="w-2 h-6 bg-emerald-600 rounded-full"></div> Hạn Pháp lý & Bảo hiểm</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 mb-1">Hạn Đăng kiểm</label>
+                      <input type="date" name="han_dang_kiem" value={carFormData.han_dang_kiem ? carFormData.han_dang_kiem.split('T')[0] : ''} onChange={handleInputCarChange} className="w-full p-2.5 border border-emerald-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-emerald-500 font-bold text-emerald-700" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 mb-1">Hạn Bảo hiểm TNDS</label>
+                      <input type="date" name="han_bh_tnds" value={carFormData.han_bh_tnds ? carFormData.han_bh_tnds.split('T')[0] : ''} onChange={handleInputCarChange} className="w-full p-2.5 border border-emerald-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-emerald-500 font-bold text-emerald-700" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 mb-1">Hạn Bảo hiểm Vật chất</label>
+                      <input type="date" name="han_bh_vc" value={carFormData.han_bh_vc ? carFormData.han_bh_vc.split('T')[0] : ''} onChange={handleInputCarChange} className="w-full p-2.5 border border-emerald-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-emerald-500 font-bold text-emerald-700" />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-gray-50 p-5 rounded-xl border border-gray-200">
+                  <h4 className="font-bold text-gray-800 mb-4 flex items-center gap-2"><div className="w-2 h-6 bg-gray-400 rounded-full"></div> Đặc điểm Kỹ thuật</h4>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 mb-1">Loại phương tiện</label>
+                      <select name="loai_phuong_tien" value={carFormData.loai_phuong_tien || 'Ô tô du lịch'} onChange={handleInputCarChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]">
+                        <option value="Ô tô du lịch">Ô tô du lịch</option>
+                        <option value="Ô tô tải">Ô tô tải</option>
+                        <option value="Xe máy">Xe máy</option>
+                        <option value="Xe chuyên dụng">Xe chuyên dụng</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 mb-1">Hiệu xe (Hãng) *</label>
+                      <select required name="hieu_xe" value={carFormData.hieu_xe || ''} onChange={handleInputCarChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] font-bold text-gray-800 outline-none focus:ring-2 focus:ring-[#05469B]">
+                        <option value="" className="font-normal text-gray-500">-- Chọn Hãng --</option>
+                        {['KIA', 'MAZDA', 'PEUGEOT', 'BMW', 'BMW MOTORAD', 'JEEP', 'RAM'].map(h => <option key={h} value={h}>{h}</option>)}
+                      </select>
+                    </div>
+                    <div><label className="block text-xs font-bold text-gray-700 mb-1">Loại xe *</label><input type="text" required name="loai_xe" value={carFormData.loai_xe || ''} onChange={handleInputCarChange} placeholder="VD: K3, CX-5..." className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" /></div>
+                    <div><label className="block text-xs font-bold text-gray-700 mb-1">Phiên bản</label><input type="text" name="phien_ban" value={carFormData.phien_ban || ''} onChange={handleInputCarChange} placeholder="VD: 2.0 Premium..." className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" /></div>
+
+                    <div><label className="block text-xs font-bold text-gray-700 mb-1">Năm SX</label><input type="text" name="nam_sx" value={carFormData.nam_sx || ''} onChange={handleInputCarChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" /></div>
+                    <div><label className="block text-xs font-bold text-gray-700 mb-1">Năm Đăng ký ban đầu</label><input type="text" name="nam_dk" value={carFormData.nam_dk || ''} onChange={handleInputCarChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" /></div>
+                    <div><label className="block text-xs font-bold text-gray-700 mb-1">Màu xe</label><input type="text" name="mau_xe" value={carFormData.mau_xe || ''} onChange={handleInputCarChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" /></div>
+                    <div><label className="block text-xs font-bold text-gray-700 mb-1">Số chỗ ngồi</label><input type="number" name="so_cho" value={carFormData.so_cho || ''} onChange={handleInputCarChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" /></div>
+
+                    <div><label className="block text-xs font-bold text-gray-700 mb-1">Số Khung</label><input type="text" name="so_khung" value={carFormData.so_khung || ''} onChange={handleInputCarChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" /></div>
+                    <div><label className="block text-xs font-bold text-gray-700 mb-1">Số Máy</label><input type="text" name="so_may" value={carFormData.so_may || ''} onChange={handleInputCarChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" /></div>
+
+                    <div><label className="block text-xs font-bold text-gray-700 mb-1">Loại Nhiên liệu</label><select name="loai_nhien_lieu" value={carFormData.loai_nhien_lieu || 'Xăng'} onChange={handleInputCarChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]"><option value="Xăng">Xăng</option><option value="Dầu Diesel">Dầu Diesel</option><option value="Điện">Điện</option><option value="Khác">Khác</option></select></div>
+                    <div><label className="block text-xs font-bold text-gray-700 mb-1">Dung tích</label><input type="text" name="dung_tich" value={carFormData.dung_tich || ''} onChange={handleInputCarChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" /></div>
+
+                    <div className="md:col-span-2"><label className="block text-xs font-bold text-gray-700 mb-1">Công thức bánh (Xe tải)</label><input type="text" name="cong_thuc_banh" value={carFormData.cong_thuc_banh || ''} onChange={handleInputCarChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" placeholder="VD: 4x2..." /></div>
+                  </div>
+                </div>
+
+                <div className="bg-orange-50/40 p-5 rounded-xl border border-orange-100">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <div><label className="block text-xs font-bold text-gray-700 mb-1">Định vị GPS</label><select name="gps" value={carFormData.gps || 'Có'} onChange={handleInputCarChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]"><option value="Có">Có</option><option value="Không">Không</option></select></div>
+                    <div><label className="block text-xs font-bold text-gray-700 mb-1">Hiện trạng</label><select name="hien_trang" value={carFormData.hien_trang || 'Đang hoạt động'} onChange={handleInputCarChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] font-bold text-[#05469B] outline-none focus:ring-2 focus:ring-[#05469B]"><option value="Đang hoạt động">Đang hoạt động</option><option value="Sửa chữa">Sửa chữa</option><option value="Ngừng hoạt động">Ngừng hoạt động</option><option value="Đã Thanh lý">Đã Thanh lý</option></select></div>
+                    <div className="md:col-span-2"><label className="block text-xs font-bold text-gray-700 mb-1">Ghi chú khác</label><textarea name="ghi_chu" value={carFormData.ghi_chu || ''} onChange={handleInputCarChange} rows={2} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] resize-none"></textarea></div>
                   </div>
                 </div>
               </div>
 
-              {/* 🟢 KHỐI MỚI: HẠN PHÁP LÝ & BẢO HIỂM */}
-              <div className="bg-emerald-50/40 p-5 rounded-xl border border-emerald-100">
-                <h4 className="font-bold text-emerald-800 mb-4 flex items-center gap-2"><div className="w-2 h-6 bg-emerald-600 rounded-full"></div> Hạn Pháp lý & Bảo hiểm</h4>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-1">Hạn Đăng kiểm</label>
-                    <input type="date" name="han_dang_kiem" value={carFormData.han_dang_kiem ? carFormData.han_dang_kiem.split('T')[0] : ''} onChange={handleInputCarChange} className="w-full p-2.5 border border-emerald-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-emerald-500 font-bold text-emerald-700" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-1">Hạn Bảo hiểm TNDS</label>
-                    <input type="date" name="han_bh_tnds" value={carFormData.han_bh_tnds ? carFormData.han_bh_tnds.split('T')[0] : ''} onChange={handleInputCarChange} className="w-full p-2.5 border border-emerald-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-emerald-500 font-bold text-emerald-700" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-1">Hạn Bảo hiểm Vật chất</label>
-                    <input type="date" name="han_bh_vc" value={carFormData.han_bh_vc ? carFormData.han_bh_vc.split('T')[0] : ''} onChange={handleInputCarChange} className="w-full p-2.5 border border-emerald-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-emerald-500 font-bold text-emerald-700" />
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-gray-50 p-5 rounded-xl border border-gray-200">
-                <h4 className="font-bold text-gray-800 mb-4 flex items-center gap-2"><div className="w-2 h-6 bg-gray-400 rounded-full"></div> Đặc điểm Kỹ thuật</h4>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-1">Loại phương tiện</label>
-                    <select name="loai_phuong_tien" value={carFormData.loai_phuong_tien || 'Ô tô du lịch'} onChange={handleInputCarChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]">
-                      <option value="Ô tô du lịch">Ô tô du lịch</option>
-                      <option value="Ô tô tải">Ô tô tải</option>
-                      <option value="Xe máy">Xe máy</option>
-                      <option value="Xe chuyên dụng">Xe chuyên dụng</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-1">Hiệu xe (Hãng) *</label>
-                    <select required name="hieu_xe" value={carFormData.hieu_xe || ''} onChange={handleInputCarChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] font-bold text-gray-800 outline-none focus:ring-2 focus:ring-[#05469B]">
-                      <option value="" className="font-normal text-gray-500">-- Chọn Hãng --</option>
-                      {['KIA', 'MAZDA', 'PEUGEOT', 'BMW', 'BMW MOTORAD', 'JEEP', 'RAM'].map(h => <option key={h} value={h}>{h}</option>)}
-                    </select>
-                  </div>
-                  <div><label className="block text-xs font-bold text-gray-700 mb-1">Loại xe *</label><input type="text" required name="loai_xe" value={carFormData.loai_xe || ''} onChange={handleInputCarChange} placeholder="VD: K3, CX-5..." className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" /></div>
-                  <div><label className="block text-xs font-bold text-gray-700 mb-1">Phiên bản</label><input type="text" name="phien_ban" value={carFormData.phien_ban || ''} onChange={handleInputCarChange} placeholder="VD: 2.0 Premium..." className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" /></div>
-                  
-                  <div><label className="block text-xs font-bold text-gray-700 mb-1">Năm SX</label><input type="text" name="nam_sx" value={carFormData.nam_sx || ''} onChange={handleInputCarChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" /></div>
-                  <div><label className="block text-xs font-bold text-gray-700 mb-1">Năm Đăng ký ban đầu</label><input type="text" name="nam_dk" value={carFormData.nam_dk || ''} onChange={handleInputCarChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" /></div>
-                  <div><label className="block text-xs font-bold text-gray-700 mb-1">Màu xe</label><input type="text" name="mau_xe" value={carFormData.mau_xe || ''} onChange={handleInputCarChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" /></div>
-                  <div><label className="block text-xs font-bold text-gray-700 mb-1">Số chỗ ngồi</label><input type="number" name="so_cho" value={carFormData.so_cho || ''} onChange={handleInputCarChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" /></div>
-                  
-                  <div><label className="block text-xs font-bold text-gray-700 mb-1">Số Khung</label><input type="text" name="so_khung" value={carFormData.so_khung || ''} onChange={handleInputCarChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" /></div>
-                  <div><label className="block text-xs font-bold text-gray-700 mb-1">Số Máy</label><input type="text" name="so_may" value={carFormData.so_may || ''} onChange={handleInputCarChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" /></div>
-                  
-                  <div><label className="block text-xs font-bold text-gray-700 mb-1">Loại Nhiên liệu</label><select name="loai_nhien_lieu" value={carFormData.loai_nhien_lieu || 'Xăng'} onChange={handleInputCarChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]"><option value="Xăng">Xăng</option><option value="Dầu Diesel">Dầu Diesel</option><option value="Điện">Điện</option><option value="Khác">Khác</option></select></div>
-                  <div><label className="block text-xs font-bold text-gray-700 mb-1">Dung tích</label><input type="text" name="dung_tich" value={carFormData.dung_tich || ''} onChange={handleInputCarChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" /></div>
-                  
-                  <div className="md:col-span-2"><label className="block text-xs font-bold text-gray-700 mb-1">Công thức bánh (Xe tải)</label><input type="text" name="cong_thuc_banh" value={carFormData.cong_thuc_banh || ''} onChange={handleInputCarChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" placeholder="VD: 4x2..." /></div>
-                </div>
-              </div>
-
-              <div className="bg-orange-50/40 p-5 rounded-xl border border-orange-100">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  <div><label className="block text-xs font-bold text-gray-700 mb-1">Định vị GPS</label><select name="gps" value={carFormData.gps || 'Có'} onChange={handleInputCarChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]"><option value="Có">Có</option><option value="Không">Không</option></select></div>
-                  <div><label className="block text-xs font-bold text-gray-700 mb-1">Hiện trạng</label><select name="hien_trang" value={carFormData.hien_trang || 'Đang hoạt động'} onChange={handleInputCarChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] font-bold text-[#05469B] outline-none focus:ring-2 focus:ring-[#05469B]"><option value="Đang hoạt động">Đang hoạt động</option><option value="Sửa chữa">Sửa chữa</option><option value="Ngừng hoạt động">Ngừng hoạt động</option><option value="Đã Thanh lý">Đã Thanh lý</option></select></div>
-                  <div className="md:col-span-2"><label className="block text-xs font-bold text-gray-700 mb-1">Ghi chú khác</label><textarea name="ghi_chu" value={carFormData.ghi_chu || ''} onChange={handleInputCarChange} rows={2} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] resize-none"></textarea></div>
-                </div>
-              </div>
-              </div>
-              
               {/* FOOTER */}
               <div className="p-5 border-t border-gray-100 flex justify-end gap-3 shrink-0 bg-white rounded-b-2xl">
                 <button type="button" onClick={() => setCarModal(prev => ({ ...prev, isOpen: false }))} className="px-8 py-3 bg-gray-100 text-gray-700 hover:bg-gray-200 rounded-xl font-bold transition-colors shadow-sm">Hủy</button>
@@ -1044,12 +1044,12 @@ export default function VehiclePage() {
         <div className="fixed inset-0 z-[999] flex items-end md:items-center justify-center p-0 md:p-4 bg-black/60 backdrop-blur-sm transition-all">
           <div className="bg-white rounded-t-3xl md:rounded-2xl shadow-2xl w-full max-h-[92vh] md:max-h-[90vh] md:max-w-4xl flex flex-col animate-in slide-in-from-bottom-4 md:zoom-in duration-200 overflow-hidden mt-auto md:mt-0">
             <div className="flex justify-between p-4 md:p-5 border-b border-gray-100 bg-[#05469B] rounded-t-3xl md:rounded-t-2xl shrink-0">
-              <h3 className="text-lg md:text-xl font-bold text-white flex items-center gap-2"><Car size={24}/> Chi tiết Thông tin & Hoạt động Xe</h3>
+              <h3 className="text-lg md:text-xl font-bold text-white flex items-center gap-2"><Car size={24} /> Chi tiết Thông tin & Hoạt động Xe</h3>
               <button onClick={() => setIsViewModalOpen(false)} className="text-blue-200 hover:text-white rounded-full p-1 transition-colors"><X className="w-6 h-6" /></button>
             </div>
-            
+
             <div className="p-4 md:p-6 overflow-y-auto flex-1 min-h-0 flex flex-col gap-5 md:gap-6 custom-scrollbar">
-              
+
               {/* Info Header */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 pb-5 md:pb-6 shrink-0">
                 <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-5">
@@ -1080,7 +1080,7 @@ export default function VehiclePage() {
                 <div><p className="text-xs text-gray-500 font-bold mb-1">Số Khung</p><p className="font-semibold text-gray-800">{viewData.so_khung || '-'}</p></div>
                 <div><p className="text-xs text-gray-500 font-bold mb-1">Số Máy</p><p className="font-semibold text-gray-800">{viewData.so_may || '-'}</p></div>
                 <div><p className="text-xs text-gray-500 font-bold mb-1">Định vị GPS</p><p className="font-semibold text-gray-800">{viewData.gps || '-'}</p></div>
-                
+
                 <div><p className="text-xs text-gray-500 font-bold mb-1">Năm Sản Xuất</p><p className="font-semibold text-gray-800">{viewData.nam_sx || '-'}</p></div>
                 <div><p className="text-xs text-gray-500 font-bold mb-1">Năm Đăng Ký Lần Đầu</p><p className="font-semibold text-gray-800">{viewData.nam_dk || '-'}</p></div>
                 <div><p className="text-xs text-gray-500 font-bold mb-1">Số Chỗ / Tải trọng</p><p className="font-semibold text-gray-800">{viewData.so_cho || '-'}</p></div>
@@ -1106,8 +1106,8 @@ export default function VehiclePage() {
               {/* Chart Section */}
               <div className="bg-white border border-gray-200 p-5 rounded-xl shadow-sm shrink-0">
                 <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-3 mb-6">
-                  <h4 className="font-bold text-gray-800 flex items-center gap-2"><BarChart3 size={18} className="text-[#05469B]"/> Thống kê Quãng đường & Chi phí</h4>
-                  
+                  <h4 className="font-bold text-gray-800 flex items-center gap-2"><BarChart3 size={18} className="text-[#05469B]" /> Thống kê Quãng đường & Chi phí</h4>
+
                   <div className="flex flex-wrap gap-3 text-[9px] font-bold uppercase tracking-wider">
                     <div className="flex items-center gap-1"><div className="w-4 h-1.5 bg-emerald-500 rounded-full"></div> <span>Số Km</span></div>
                     <div className="flex items-center gap-1"><div className="w-2.5 h-2.5 bg-blue-500 rounded-sm"></div> <span>Nhiên liệu</span></div>
@@ -1120,7 +1120,7 @@ export default function VehiclePage() {
 
                 {viewHistoryCosts.length === 0 ? (
                   <div className="text-center py-10 bg-white border border-dashed border-gray-300 rounded-xl text-gray-400">
-                    <Receipt className="mx-auto mb-2 opacity-50" size={32}/>
+                    <Receipt className="mx-auto mb-2 opacity-50" size={32} />
                     <p>Chưa có dữ liệu khai báo chi phí cho xe này.</p>
                   </div>
                 ) : (
@@ -1140,8 +1140,8 @@ export default function VehiclePage() {
                       <div className="absolute top-1/2 left-0 w-full border-t border-dashed border-gray-100 -z-10"></div>
 
                       <svg className="absolute inset-0 w-full h-full pointer-events-none z-20 overflow-visible" viewBox="0 0 100 100" preserveAspectRatio="none">
-                        <polyline 
-                          points={viewHistoryCosts.map((cost, idx) => `${(idx + 0.5) * (100 / viewHistoryCosts.length)},${100 - ((Number(cost.km_hien_tai) || 0) / chartScale.maxKm * 100)}`).join(' ')} 
+                        <polyline
+                          points={viewHistoryCosts.map((cost, idx) => `${(idx + 0.5) * (100 / viewHistoryCosts.length)},${100 - ((Number(cost.km_hien_tai) || 0) / chartScale.maxKm * 100)}`).join(' ')}
                           fill="none" stroke="#10b981" strokeWidth="2" strokeLinejoin="round" vectorEffect="non-scaling-stroke" strokeDasharray="4 4"
                         />
                       </svg>
@@ -1153,7 +1153,7 @@ export default function VehiclePage() {
                         const bd = Number(cost.cp_bao_duong_sua_chua) || 0;
                         // Gộp Khấu hao, Đăng kiểm, Bảo hiểm vào nhóm "Khác"
                         const khac = (Number(cost.cp_thue_khau_hao) || 0) + (Number(cost.cp_dang_kiem) || 0) + (Number(cost.cp_bh_tnds) || 0) + (Number(cost.cp_bh_vc) || 0);
-                        
+
                         const totalCP = nl + cd + rx + bd + khac;
                         const km = Number(cost.km_hien_tai) || 0;
 
@@ -1162,7 +1162,7 @@ export default function VehiclePage() {
                         const hRX = chartScale.maxCP > 0 ? (rx / chartScale.maxCP) * 100 : 0;
                         const hBD = chartScale.maxCP > 0 ? (bd / chartScale.maxCP) * 100 : 0;
                         const hKhac = chartScale.maxCP > 0 ? (khac / chartScale.maxCP) * 100 : 0;
-                        
+
                         const totalHeight = Math.max((totalCP / chartScale.maxCP) * 100, totalCP > 0 ? 2 : 0);
                         const costId = getCostId(cost) || `chart-${idx}`;
 
@@ -1177,7 +1177,7 @@ export default function VehiclePage() {
                               {hBD > 0 && <div style={{ height: `${(hBD / totalHeight) * 100}%` }} className="w-full bg-red-500"></div>}
                               {hNL > 0 && <div style={{ height: `${(hNL / totalHeight) * 100}%` }} className="w-full bg-blue-500"></div>}
                             </div>
-                            
+
                             <div className="absolute bottom-full mb-3 hidden group-hover:block bg-gray-900 text-white p-3 rounded-lg text-[10px] z-50 shadow-2xl whitespace-nowrap min-w-[160px] pointer-events-none">
                               <p className="font-bold text-gray-300 border-b border-gray-700 pb-1 mb-1.5 uppercase">Tháng {formatMonthYear(cost.thang_nam)}</p>
                               <div className="space-y-1 mb-2">
@@ -1194,7 +1194,7 @@ export default function VehiclePage() {
                         );
                       })}
                     </div>
-                    
+
                     <div className="w-full h-6 flex justify-between items-end">
                       {viewHistoryCosts.map((cost, idx) => {
                         const costId = getCostId(cost) || `label-${idx}`;
@@ -1222,7 +1222,7 @@ export default function VehiclePage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                      {viewHistoryCosts.slice().reverse().map((cost, idx) => { 
+                      {viewHistoryCosts.slice().reverse().map((cost, idx) => {
                         const phikhac = (Number(cost.cp_thue_khau_hao) || 0) + (Number(cost.cp_dang_kiem) || 0) + (Number(cost.cp_bh_tnds) || 0) + (Number(cost.cp_bh_vc) || 0);
                         const total = (Number(cost.cp_nhien_lieu) || 0) + (Number(cost.cp_cau_duong_ben_bai) || 0) + (Number(cost.cp_rua_xe) || 0) + (Number(cost.cp_bao_duong_sua_chua) || 0) + phikhac;
                         const costId = getCostId(cost) || `table-${idx}`;
@@ -1243,7 +1243,7 @@ export default function VehiclePage() {
               </div>
 
             </div>
-            
+
             <div className="p-4 sm:p-5 border-t border-gray-100 bg-gray-50 flex justify-end shrink-0 rounded-b-2xl">
               <button onClick={() => setIsViewModalOpen(false)} className="w-full sm:w-auto px-6 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold rounded-xl transition-colors">Đóng</button>
             </div>
@@ -1257,10 +1257,10 @@ export default function VehiclePage() {
         <div className="fixed inset-0 z-[999] flex items-center justify-end bg-black/60 backdrop-blur-sm">
           <div className="absolute inset-0" onClick={() => setCostModal(prev => ({ ...prev, isOpen: false }))}></div>
           <div className="bg-white shadow-2xl w-full max-w-md md:max-w-xl h-full flex flex-col animate-in slide-in-from-right duration-300 relative z-10">
-            
+
             <div className="p-5 border-b border-indigo-100 bg-indigo-600 text-white flex justify-between items-start shrink-0">
               <div className="flex-1 pr-4">
-                <h3 className="text-xl font-black flex items-center gap-2 mb-1.5"><Receipt size={20}/> Khai báo Chi phí</h3>
+                <h3 className="text-xl font-black flex items-center gap-2 mb-1.5"><Receipt size={20} /> Khai báo Chi phí</h3>
                 <p className="text-sm text-indigo-100 font-medium leading-relaxed">
                   <span className="text-white font-bold text-base tracking-wider">{selectedCarForCost.bien_so}</span>
                   <span className="mx-2 opacity-60">|</span>
@@ -1269,24 +1269,24 @@ export default function VehiclePage() {
                   {getUnitFullName(selectedCarForCost.id_don_vi)}
                 </p>
               </div>
-              <button onClick={() => setCostModal(prev => ({ ...prev, isOpen: false }))} className="text-indigo-200 hover:text-white bg-indigo-700/50 hover:bg-indigo-700 p-2 rounded-full transition-colors mt-1 shrink-0"><X size={20}/></button>
+              <button onClick={() => setCostModal(prev => ({ ...prev, isOpen: false }))} className="text-indigo-200 hover:text-white bg-indigo-700/50 hover:bg-indigo-700 p-2 rounded-full transition-colors mt-1 shrink-0"><X size={20} /></button>
             </div>
 
             <div className="flex-1 overflow-y-auto bg-gray-50 flex flex-col min-h-0 custom-scrollbar">
               <div className="p-5 bg-white border-b border-gray-200 shadow-sm z-10 shrink-0">
                 <div className="flex justify-between items-center mb-4">
-                  <h4 className="font-bold text-gray-800 text-sm uppercase tracking-wider flex items-center gap-1.5"><Calendar size={16} className="text-indigo-600"/> {costModalMode === 'create' ? 'Khai báo tháng mới' : 'Cập nhật tháng'}</h4>
+                  <h4 className="font-bold text-gray-800 text-sm uppercase tracking-wider flex items-center gap-1.5"><Calendar size={16} className="text-indigo-600" /> {costModalMode === 'create' ? 'Khai báo tháng mới' : 'Cập nhật tháng'}</h4>
                   {costModalMode === 'update' && (
-                    <button onClick={() => {setCostModal(prev => ({ ...prev, mode: 'create' })); setCostFormData({id: '', thang_nam: new Date().toISOString().slice(0, 7), id_ts_xe: selectedCarForCost.id, id_don_vi: selectedCarForCost.id_don_vi, km_hien_tai: '', so_lit_nhien_lieu: '', cp_nhien_lieu: '', cp_cau_duong_ben_bai: '', cp_rua_xe: '', cp_bao_duong_sua_chua: '', cp_thue_khau_hao: '', cp_dang_kiem: '', cp_bh_tnds: '', cp_bh_vc: '', ghi_chu: ''})}} className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1"><Plus size={14}/> Thêm mới</button>
+                    <button onClick={() => { setCostModal(prev => ({ ...prev, mode: 'create' })); setCostFormData({ id: '', thang_nam: new Date().toISOString().slice(0, 7), id_ts_xe: selectedCarForCost.id, id_don_vi: selectedCarForCost.id_don_vi, km_hien_tai: '', so_lit_nhien_lieu: '', cp_nhien_lieu: '', cp_cau_duong_ben_bai: '', cp_rua_xe: '', cp_bao_duong_sua_chua: '', cp_thue_khau_hao: '', cp_dang_kiem: '', cp_bh_tnds: '', cp_bh_vc: '', ghi_chu: '' }) }} className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1"><Plus size={14} /> Thêm mới</button>
                   )}
                 </div>
                 <form onSubmit={handleCostSave} className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="col-span-2"><label className="block text-xs font-bold text-gray-600 mb-1">Tháng khai báo *</label><input type="month" required name="thang_nam" value={costFormData.thang_nam || ''} onChange={handleInputCostChange} className="w-full p-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-[#FFFFF0] text-indigo-900 font-bold" /></div>
-                    
+
                     <div><label className="block text-xs font-bold text-gray-600 mb-1">Km hiện tại (Đồng hồ)</label><input type="text" name="km_hien_tai" value={formatCurrency(costFormData.km_hien_tai)} onChange={handleInputCostChange} className="w-full p-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-[#FFFFF0]" /></div>
                     <div><label className="block text-xs font-bold text-gray-600 mb-1">Số Lít nhiên liệu tiêu thụ</label><input type="number" name="so_lit_nhien_lieu" value={costFormData.so_lit_nhien_lieu || ''} onChange={handleInputCostChange} className="w-full p-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-[#FFFFF0]" /></div>
-                    
+
                     <div className="col-span-2 border-t border-gray-100 pt-3 mt-1"><p className="text-[10px] font-black uppercase text-indigo-600 tracking-wider">Chi phí Vận hành (Hỗ trợ nhập phép tính +, -, *, /)</p></div>
 
                     <div>
@@ -1305,7 +1305,7 @@ export default function VehiclePage() {
                       <label className="block text-[11px] font-bold text-gray-600 mb-1">Bảo dưỡng, sửa chữa</label>
                       <input type="text" name="cp_bao_duong_sua_chua" value={formatMathInput(costFormData.cp_bao_duong_sua_chua)} onChange={handleInputCostChange} onBlur={(e) => handleCostMathBlur('cp_bao_duong_sua_chua', e.target.value)} onKeyDown={(e) => handleCostMathKeyDown(e, 'cp_bao_duong_sua_chua')} className="w-full p-2 text-sm border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-[#FFFFF0]" />
                     </div>
-                    
+
                     <div className="col-span-2 border-t border-gray-100 pt-3 mt-1"><p className="text-[10px] font-black uppercase text-indigo-600 tracking-wider">Chi phí Pháp lý & Khấu hao</p></div>
 
                     {/* 🟢 3 CỘT CHI PHÍ MỚI */}
@@ -1325,7 +1325,7 @@ export default function VehiclePage() {
                       <label className="block text-[11px] font-bold text-gray-600 mb-1">Thuê ngoài / Khấu hao</label>
                       <input type="text" name="cp_thue_khau_hao" value={formatMathInput(costFormData.cp_thue_khau_hao)} onChange={handleInputCostChange} onBlur={(e) => handleCostMathBlur('cp_thue_khau_hao', e.target.value)} onKeyDown={(e) => handleCostMathKeyDown(e, 'cp_thue_khau_hao')} className="w-full p-2 text-sm border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-[#FFFFF0]" />
                     </div>
-                    
+
                     <div className="col-span-2"><label className="block text-[11px] font-bold text-gray-600 mb-1">Ghi chú (Nơi sửa chữa, lý do...)</label><textarea name="ghi_chu" value={costFormData.ghi_chu || ''} onChange={handleInputCostChange} rows={2} className="w-full p-2 text-sm border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-[#FFFFF0] resize-none"></textarea></div>
                   </div>
                   <button type="submit" disabled={submitting} className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg flex justify-center items-center gap-2 transition-colors shadow-md mt-2">
@@ -1338,7 +1338,7 @@ export default function VehiclePage() {
                 <h4 className="font-bold text-gray-500 text-xs uppercase tracking-wider mb-3">Lịch sử khai báo ({carCosts.length} tháng)</h4>
                 <div className="space-y-3">
                   {carCosts.length === 0 ? (
-                    <div className="text-center py-6 text-gray-400 bg-white rounded-xl border border-dashed border-gray-300"><Info className="mx-auto w-6 h-6 mb-2 opacity-50"/><p className="text-sm font-medium">Chưa có dữ liệu chi phí nào</p></div>
+                    <div className="text-center py-6 text-gray-400 bg-white rounded-xl border border-dashed border-gray-300"><Info className="mx-auto w-6 h-6 mb-2 opacity-50" /><p className="text-sm font-medium">Chưa có dữ liệu chi phí nào</p></div>
                   ) : (
                     carCosts.map((cost, idx) => {
                       const tongCP = (Number(cost.cp_nhien_lieu) || 0) + (Number(cost.cp_cau_duong_ben_bai) || 0) + (Number(cost.cp_rua_xe) || 0) + (Number(cost.cp_bao_duong_sua_chua) || 0) + (Number(cost.cp_thue_khau_hao) || 0) + (Number(cost.cp_dang_kiem) || 0) + (Number(cost.cp_bh_tnds) || 0) + (Number(cost.cp_bh_vc) || 0);
@@ -1348,8 +1348,8 @@ export default function VehiclePage() {
                           <div className="flex justify-between items-start mb-2">
                             <span className="font-black text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded text-sm">{formatMonthYear(cost.thang_nam)}</span>
                             <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <button onClick={() => editCost(cost)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded"><Edit size={14}/></button>
-                              <button onClick={() => {setItemToDelete({id: costId, type: 'chiphi'}); setIsConfirmOpen(true);}} className="p-1.5 text-red-600 hover:bg-red-50 rounded"><Trash2 size={14}/></button>
+                              <button onClick={() => editCost(cost)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded"><Edit size={14} /></button>
+                              <button onClick={() => { setItemToDelete({ id: costId, type: 'chiphi' }); setIsConfirmOpen(true); }} className="p-1.5 text-red-600 hover:bg-red-50 rounded"><Trash2 size={14} /></button>
                             </div>
                           </div>
                           <div className="grid grid-cols-2 gap-2 text-xs mb-2">
@@ -1357,7 +1357,7 @@ export default function VehiclePage() {
                             <div className="text-gray-500 text-right">Lít NL: <span className="font-semibold text-gray-800">{cost.so_lit_nhien_lieu} L</span></div>
                             <div className="text-gray-500">Nhiên liệu: <span className="font-semibold text-gray-800">{formatCurrency(cost.cp_nhien_lieu)}</span></div>
                             <div className="text-gray-500 text-right">Bảo dưỡng: <span className="font-semibold text-gray-800">{formatCurrency(cost.cp_bao_duong_sua_chua)}</span></div>
-                            <div className="text-gray-500 col-span-2 mt-1 pt-1 border-t border-gray-50">ĐK & Bảo hiểm: <span className="font-semibold text-emerald-600">{formatCurrency((Number(cost.cp_dang_kiem)||0) + (Number(cost.cp_bh_tnds)||0) + (Number(cost.cp_bh_vc)||0))}</span></div>
+                            <div className="text-gray-500 col-span-2 mt-1 pt-1 border-t border-gray-50">ĐK & Bảo hiểm: <span className="font-semibold text-emerald-600">{formatCurrency((Number(cost.cp_dang_kiem) || 0) + (Number(cost.cp_bh_tnds) || 0) + (Number(cost.cp_bh_vc) || 0))}</span></div>
                           </div>
                           <div className="flex justify-between items-center pt-2 border-t border-gray-100 mt-2">
                             <span className="text-xs font-bold text-gray-400">TỔNG CHI PHÍ:</span>
