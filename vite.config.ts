@@ -16,7 +16,12 @@ export default defineConfig(({mode}) => {
       },
     },
     build: {
-      emptyOutDir: false,
+      emptyOutDir: true,
+      rollupOptions: {
+        output: {
+          inlineDynamicImports: true,
+        },
+      },
     },
     server: {
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
