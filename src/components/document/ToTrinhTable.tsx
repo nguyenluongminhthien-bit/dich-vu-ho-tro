@@ -1,10 +1,10 @@
 import React from 'react';
-import { 
-  Calendar, Link as LinkIcon, Eye, Edit, Trash2, Loader2, FileText, Lock 
+import {
+  Calendar, Link as LinkIcon, Eye, Edit, Trash2, Loader2, FileText, Lock
 } from 'lucide-react';
 import { DocumentTableProps } from './types';
-import { 
-  isMatDocument, isNewDocument, normalizeSignerName, isReplacedStatus, isExpiredOrReplaced 
+import {
+  isMatDocument, isNewDocument, normalizeSignerName, isReplacedStatus, isExpiredOrReplaced
 } from '../../utils/documentHelpers';
 
 export const ToTrinhTable: React.FC<DocumentTableProps> = ({
@@ -30,8 +30,8 @@ export const ToTrinhTable: React.FC<DocumentTableProps> = ({
               <th className="py-3 px-3 w-36 bg-[#f8fafc]">Số tờ trình</th>
               <th className="py-3 px-3 w-[125px] bg-[#f8fafc]">Ngày Ban hành</th>
               <th className="py-3 px-3 min-w-[250px] bg-[#f8fafc]">Tiêu đề & Nội dung Tờ trình</th>
-              <th className="py-3 px-3 w-44 bg-[#f8fafc]">Nơi trình (Kính gửi)</th>
-              <th className="py-3 px-3 w-40 bg-[#f8fafc]">Bộ phận trình / Người ký</th>
+              <th className="py-3 px-3 w-44 bg-[#f8fafc]">Kính trình/gửi</th>
+              <th className="py-3 px-3 w-40 bg-[#f8fafc]">Người ký / Bộ phần trình</th>
               <th className="py-3 px-3 w-28 bg-[#f8fafc]">Hiệu lực</th>
               <th className="py-3 px-3 text-center w-28 bg-[#f8fafc]">Thao tác</th>
             </tr>
@@ -53,8 +53,8 @@ export const ToTrinhTable: React.FC<DocumentTableProps> = ({
               </tr>
             ) : (
               paginatedDocs.map((item) => (
-                <tr 
-                  key={item.id} 
+                <tr
+                  key={item.id}
                   className={`transition-all duration-200 group ${isExpiredOrReplaced(item.hieu_luc) ? 'bg-gray-50/80 opacity-60 hover:opacity-100 hover:bg-gray-100 grayscale-[20%]' : 'bg-white hover:bg-blue-50/50'}`}
                 >
                   <td className="py-2.5 px-3">
@@ -72,7 +72,7 @@ export const ToTrinhTable: React.FC<DocumentTableProps> = ({
                   </td>
                   <td className="py-2.5 px-3 text-xs font-medium text-gray-700">
                     <div className="flex items-center gap-1.5">
-                      <Calendar size={13} className="text-gray-400 shrink-0"/> 
+                      <Calendar size={13} className="text-gray-400 shrink-0" />
                       {item.ngay_ban_hanh ? new Date(item.ngay_ban_hanh).toLocaleDateString('vi-VN') : '-'}
                     </div>
                   </td>
@@ -81,7 +81,7 @@ export const ToTrinhTable: React.FC<DocumentTableProps> = ({
                     <p className="text-[11px] text-gray-500 line-clamp-1 mb-1.5">{item.noi_dung}</p>
                     {item.link_vb && (
                       <a href={item.link_vb} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-600 hover:underline hover:text-blue-800 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100">
-                        <LinkIcon size={10}/> File đính kèm
+                        <LinkIcon size={10} /> File đính kèm
                       </a>
                     )}
                   </td>
@@ -103,7 +103,7 @@ export const ToTrinhTable: React.FC<DocumentTableProps> = ({
                         onChange={(e) => handleQuickUpdateStatus(item, e.target.value)}
                         className={`w-full appearance-none pl-2 pr-5 py-1 rounded-md text-[10px] font-bold text-center border shadow-sm outline-none
                           ${!canEditOrDeleteDocument(item) ? 'cursor-not-allowed opacity-80 ' : 'cursor-pointer '}
-                          ${item.hieu_luc === 'Còn hiệu lực' ? 'bg-green-50 text-green-700 border-green-200' : 
+                          ${item.hieu_luc === 'Còn hiệu lực' ? 'bg-green-50 text-green-700 border-green-200' :
                             isReplacedStatus(item.hieu_luc) ? 'bg-orange-50 text-orange-700 border-orange-200' : 'bg-gray-100 text-gray-500 border-gray-300'}`}
                       >
                         <option value="Còn hiệu lực">Còn hiệu lực</option>
@@ -112,7 +112,7 @@ export const ToTrinhTable: React.FC<DocumentTableProps> = ({
                       </select>
                       {canEditOrDeleteDocument(item) && (
                         <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-1.5 text-gray-500">
-                          <svg className="fill-current h-3 w-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
+                          <svg className="fill-current h-3 w-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" /></svg>
                         </div>
                       )}
                     </div>
@@ -143,17 +143,17 @@ export const ToTrinhTable: React.FC<DocumentTableProps> = ({
           <div className="p-10 text-center text-gray-500"><FileText size={48} className="mx-auto text-gray-300 mb-4" /> Không tìm thấy tờ trình.</div>
         ) : (
           paginatedDocs.map((item) => (
-            <div 
-              key={item.id} 
+            <div
+              key={item.id}
               className={`p-4 rounded-2xl relative overflow-hidden active:scale-[0.98] transition-all duration-200
                 ${isExpiredOrReplaced(item.hieu_luc) ? 'bg-gray-50 border border-gray-200 opacity-60 grayscale-[20%]' : 'bg-white shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] border border-gray-100'}`}
             >
               <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${item.hieu_luc === 'Còn hiệu lực' ? 'bg-emerald-500' : isReplacedStatus(item.hieu_luc) ? 'bg-orange-400' : 'bg-gray-400'}`}></div>
-              
+
               <div className="flex justify-between items-start mb-2 pl-2">
                 <div className="flex items-center flex-wrap gap-1.5">
                   <span className="font-black text-[#05469B] bg-blue-50 px-2 py-0.5 rounded text-[10px] border border-blue-100">{item.so_hieu}</span>
-                  {isMatDocument(item.mat) && <span className="text-[9px] font-black text-red-600 bg-red-100 px-1.5 py-0.5 rounded flex items-center gap-0.5 border border-red-200"><Lock size={10}/> MẬT</span>}
+                  {isMatDocument(item.mat) && <span className="text-[9px] font-black text-red-600 bg-red-100 px-1.5 py-0.5 rounded flex items-center gap-0.5 border border-red-200"><Lock size={10} /> MẬT</span>}
                   {item.nghiep_vu && item.nghiep_vu.trim() !== '' && !/Chưa phân loại|Chưa PL|Trống/i.test(item.nghiep_vu.trim()) && (
                     <span className="text-[9px] font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded uppercase border border-indigo-100">{item.nghiep_vu}</span>
                   )}
@@ -176,7 +176,7 @@ export const ToTrinhTable: React.FC<DocumentTableProps> = ({
 
               <div className="pl-2 flex justify-between items-center text-[10px] text-gray-500 border-t border-gray-100 pt-3">
                 <span className="flex items-center gap-1 font-bold bg-gray-50 px-2 py-1 rounded">
-                  <Calendar size={12}/> 
+                  <Calendar size={12} />
                   {item.ngay_ban_hanh ? new Date(item.ngay_ban_hanh).toLocaleDateString('vi-VN') : '-'}
                 </span>
                 <span className="truncate max-w-[50%] font-semibold text-right text-[#05469B]">
@@ -192,7 +192,7 @@ export const ToTrinhTable: React.FC<DocumentTableProps> = ({
                         isReplacedStatus(item.hieu_luc) ? 'bg-orange-50 text-orange-700 border-orange-200' : 'bg-gray-100 text-gray-500 border-gray-300'}`}>
                       {isReplacedStatus(item.hieu_luc) ? 'Được thay thế bằng VB' : (item.hieu_luc || 'Còn hiệu lực')} (Chỉ xem)
                     </span>
-                    <button onClick={() => { setViewData(item); setIsViewModalOpen(true); }} className="px-4 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold rounded-lg flex justify-center items-center border border-emerald-200"><Eye size={14}/></button>
+                    <button onClick={() => { setViewData(item); setIsViewModalOpen(true); }} className="px-4 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold rounded-lg flex justify-center items-center border border-emerald-200"><Eye size={14} /></button>
                   </div>
                 ) : (
                   <>
@@ -207,9 +207,9 @@ export const ToTrinhTable: React.FC<DocumentTableProps> = ({
                       <option value="Hết hiệu lực">Hết hiệu lực</option>
                       <option value="Được thay thế bằng VB">Được thay thế bằng VB</option>
                     </select>
-                    <button onClick={() => { setViewData(item); setIsViewModalOpen(true); }} className="px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold rounded-lg flex justify-center items-center border border-emerald-200" title="Xem"><Eye size={14}/></button>
-                    <button onClick={() => openModal('update', item)} className="px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold rounded-lg flex justify-center items-center border border-blue-200" title="Sửa"><Edit size={14}/></button>
-                    <button onClick={() => handleDeleteClick(item.id)} className="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 font-bold rounded-lg flex justify-center items-center border border-red-200" title="Xóa"><Trash2 size={14}/></button>
+                    <button onClick={() => { setViewData(item); setIsViewModalOpen(true); }} className="px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold rounded-lg flex justify-center items-center border border-emerald-200" title="Xem"><Eye size={14} /></button>
+                    <button onClick={() => openModal('update', item)} className="px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold rounded-lg flex justify-center items-center border border-blue-200" title="Sửa"><Edit size={14} /></button>
+                    <button onClick={() => handleDeleteClick(item.id)} className="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 font-bold rounded-lg flex justify-center items-center border border-red-200" title="Xóa"><Trash2 size={14} /></button>
                   </>
                 )}
               </div>

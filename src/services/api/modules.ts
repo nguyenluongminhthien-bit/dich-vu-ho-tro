@@ -3,6 +3,8 @@ import { fetchWithCache, resolveTable, invalidateCache } from './cache';
 import { SUPABASE_URL, HEADERS, API_MODE } from './client';
 import { writeLog } from './logs';
 import { getLocalRecords, saveLocalRecord, deleteLocalRecord } from './localStore';
+import { currentUser } from './auth';
+import { getAllSubordinateIds } from '../../utils/hierarchy';
 
 // Helper wrapper cho tất cả GET requests có chế độ fallback
 async function getWithFallback<T>(tableName: string, forceRefresh = false): Promise<T[]> {
@@ -65,7 +67,37 @@ function sanitizePayload(item: Record<string, any>, isUpdate: boolean = false): 
   return cleaned;
 }
 
+// Helper kiểm tra phạm vi ghi (chặn thật việc ghi dữ liệu ngoài phạm vi đơn vị)
+async function checkUnitPermission(item: any, tableName: string) {
+  if (!currentUser || currentUser.quyen === 'ADMIN') return;
+
+  const targetIdDonVi = item?.id_don_vi;
+  if (targetIdDonVi === undefined || targetIdDonVi === null || String(targetIdDonVi).trim() === '') return;
+
+  const strTargetId = String(targetIdDonVi).trim();
+  const userIdDonVi = String(currentUser.id_don_vi || (currentUser as any).idDonVi || '').trim();
+  
+  if (!userIdDonVi || userIdDonVi === 'ALL' || userIdDonVi === 'HO' || userIdDonVi === 'DV_HO') return;
+
+  const allUnits = await getDonVi();
+  const subIds = getAllSubordinateIds(userIdDonVi, allUnits);
+  const allowedIds = new Set([userIdDonVi, ...subIds].map(id => String(id).trim()));
+
+  if (!allowedIds.has(strTargetId)) {
+    throw new Error(`Bạn không có quyền ghi dữ liệu cho đơn vị này (Mã ĐV: ${strTargetId}). Vui lòng liên hệ Quản trị viên nếu đây là nhầm lẫn.`);
+  }
+}
+
 export async function save(data: any, action: 'create' | 'update', tableName: string): Promise<any> {
+  // Thực hiện kiểm tra phạm vi ghi (Chặn thật ở Bước B)
+  if (Array.isArray(data)) {
+    for (const item of data) {
+      await checkUnitPermission(item, tableName);
+    }
+  } else {
+    await checkUnitPermission(data, tableName);
+  }
+
   if (API_MODE === 'MOCK') {
     return saveLocalRecord(data, action, tableName);
   }

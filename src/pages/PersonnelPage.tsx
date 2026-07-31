@@ -38,7 +38,7 @@ const extractStartDateFromMaNV = (maNV: string) => {
 const PersonnelDesktopRow = React.memo(({ item, props }: any) => {
   const { showSelectCheckboxes, selectedPersonnelIds, handleSelectRow, donViMap, hasRule, handleView, handleDuplicate, openModal, handleOffboardClick, setPersonnelToRehire, setIsRehireModalOpen, setItemToDelete, setIsConfirmOpen, calculateSeniority } = props;
   return (
-    <tr className={`hover:bg-blue-50/50 transition-colors group ${item.trang_thai === 'Đã nghỉ việc' ? 'opacity-60 bg-gray-50' : ''}`}>
+    <tr className={`hover:bg-blue-50/50 transition-colors group ${item.trang_thai === 'Đã nghỉ việc' || item.trang_thai === 'Đã điều chuyển' ? 'opacity-60 bg-gray-50' : ''}`}>
       {showSelectCheckboxes && (
         <td className="py-2.5 px-3 text-center align-middle">
           <input
@@ -58,6 +58,7 @@ const PersonnelDesktopRow = React.memo(({ item, props }: any) => {
           <div className="min-w-0 flex-1">
             <p className="font-bold text-[#05469B] leading-snug text-[13px] truncate" title={item.ho_ten}>{item.ho_ten}</p>
             {item.trang_thai === 'Đã nghỉ việc' && <span className="text-[9px] font-bold text-red-600 bg-red-100 px-1.5 py-0.5 rounded uppercase mt-0.5 inline-block">Đã nghỉ việc</span>}
+            {item.trang_thai === 'Đã điều chuyển' && <span className="text-[9px] font-bold text-indigo-600 bg-indigo-100 px-1.5 py-0.5 rounded uppercase mt-0.5 inline-block">Đã điều chuyển</span>}
           </div>
         </div>
       </td>
@@ -95,19 +96,19 @@ const PersonnelDesktopRow = React.memo(({ item, props }: any) => {
         </div>
       </td>
       <td className="py-2.5 px-3 text-[11.5px] font-medium text-emerald-600 whitespace-nowrap align-middle text-left">
-        <span className={`rounded-md inline-block px-1.5 py-0.5 border ${item.trang_thai === 'Đã nghỉ việc' ? 'bg-gray-100 text-gray-500 border-gray-200' : 'bg-emerald-50/50 border-emerald-100'}`}>{calculateSeniority(item.ngay_nhan_vien, item.trang_thai || 'Đang làm việc', item.ngay_nghi_viec || '')}</span>
+        <span className={`rounded-md inline-block px-1.5 py-0.5 border ${item.trang_thai === 'Đã nghỉ việc' || item.trang_thai === 'Đã điều chuyển' ? 'bg-gray-100 text-gray-500 border-gray-200' : 'bg-emerald-50/50 border-emerald-100'}`}>{calculateSeniority(item.ngay_nhan_vien, item.trang_thai || 'Đang làm việc', item.ngay_nghi_viec || '')}</span>
       </td>
       <td className="py-2.5 px-3 align-middle text-center">
         <div className="flex items-center justify-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
           <button onClick={() => handleView(item)} className="p-1.5 text-indigo-600 hover:bg-indigo-100 rounded-md transition-colors" title="Xem chi tiết"><Eye className="w-3.5 h-3.5" /></button>
-          {item.trang_thai !== 'Đã nghỉ việc' && (
+          {item.trang_thai !== 'Đã nghỉ việc' && item.trang_thai !== 'Đã điều chuyển' && (
             <>
               <button onClick={() => handleDuplicate(item)} className="p-1.5 text-emerald-600 hover:bg-emerald-100 rounded-md transition-colors" title="Nhân bản (Tạo hồ sơ kiêm nhiệm)"><Copy className="w-3.5 h-3.5" /></button>
               <button onClick={() => openModal('update', item)} className="p-1.5 text-blue-600 hover:bg-blue-100 rounded-md transition-colors" title="Sửa"><Edit className="w-3.5 h-3.5" /></button>
               <button onClick={() => handleOffboardClick(item)} className="p-1.5 text-orange-600 hover:bg-orange-100 rounded-md transition-colors border border-transparent hover:border-orange-200" title="Điều chuyển / Nghỉ việc"><LogOut className="w-3.5 h-3.5" /></button>
             </>
           )}
-          {item.trang_thai === 'Đã nghỉ việc' && (
+          {(item.trang_thai === 'Đã nghỉ việc' || item.trang_thai === 'Đã điều chuyển') && (
             <>
               <button onClick={() => { setPersonnelToRehire(item); setIsRehireModalOpen(true); }} className="p-1.5 text-emerald-600 hover:bg-emerald-100 rounded-md transition-colors" title="Vào làm lại"><RotateCcw className="w-3.5 h-3.5" /></button>
               <button onClick={() => { setItemToDelete(item.id); setIsConfirmOpen(true); }} className="p-1.5 text-red-600 hover:bg-red-100 rounded-md transition-colors" title="Xóa vĩnh viễn"><Trash2 className="w-3.5 h-3.5" /></button>
@@ -128,7 +129,7 @@ const PersonnelMobileCard = React.memo(({ item, props }: any) => {
   const { showSelectCheckboxes, selectedPersonnelIds, handleSelectRow, donViMap, hasRule, handleView, handleDuplicate, openModal, handleOffboardClick, setPersonnelToRehire, setIsRehireModalOpen, setItemToDelete, setIsConfirmOpen, calculateSeniority } = props;
   const seniorityStr = calculateSeniority(item.ngay_nhan_vien, item.trang_thai || 'Đang làm việc', item.ngay_nghi_viec || '');
   return (
-    <div className={`p-4 bg-white rounded-2xl border border-gray-100 shadow-sm relative flex flex-col gap-3 transition-all ${item.trang_thai === 'Đã nghỉ việc' ? 'opacity-70 bg-gray-50' : ''}`}>
+    <div className={`p-4 bg-white rounded-2xl border border-gray-100 shadow-sm relative flex flex-col gap-3 transition-all ${item.trang_thai === 'Đã nghỉ việc' || item.trang_thai === 'Đã điều chuyển' ? 'opacity-70 bg-gray-50' : ''}`}>
       <div className="flex items-center gap-3 pb-2.5 border-b border-gray-100">
         {showSelectCheckboxes && (
           <input
@@ -146,6 +147,8 @@ const PersonnelMobileCard = React.memo(({ item, props }: any) => {
             <span className="font-semibold text-gray-500 text-[10px]">ID: {item.ma_so_nhan_vien}</span>
             {item.trang_thai === 'Đã nghỉ việc' ? (
               <span className="text-[9px] font-black text-red-600 bg-red-50 border border-red-100 px-1.5 py-0.5 rounded uppercase">Đã nghỉ việc</span>
+            ) : item.trang_thai === 'Đã điều chuyển' ? (
+              <span className="text-[9px] font-black text-indigo-600 bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded uppercase">Đã điều chuyển</span>
             ) : (
               <span className="text-[9px] font-black text-emerald-600 bg-emerald-50 border border-emerald-100 px-1.5 py-0.5 rounded uppercase">Đang làm việc</span>
             )}
@@ -199,14 +202,14 @@ const PersonnelMobileCard = React.memo(({ item, props }: any) => {
 
       <div className="flex items-center justify-end gap-1.5 pt-3 border-t border-gray-100 mt-1">
         <button onClick={() => handleView(item)} className="p-1.5 text-indigo-600 bg-indigo-50 border border-indigo-100 hover:bg-indigo-100 rounded-lg transition-colors flex items-center gap-1 text-[11px] font-bold shadow-2xs" title="Xem chi tiết"><Eye className="w-3.5 h-3.5" /> Xem</button>
-        {item.trang_thai !== 'Đã nghỉ việc' && (
+        {item.trang_thai !== 'Đã nghỉ việc' && item.trang_thai !== 'Đã điều chuyển' && (
           <>
             <button onClick={() => handleDuplicate(item)} className="p-1.5 text-emerald-600 bg-emerald-50 border border-emerald-100 hover:bg-emerald-100 rounded-lg transition-colors flex items-center gap-1 text-[11px] font-bold shadow-2xs" title="Kiêm nhiệm"><Copy className="w-3.5 h-3.5" /> Kiêm nhiệm</button>
             <button onClick={() => openModal('update', item)} className="p-1.5 text-blue-600 bg-blue-50 border border-blue-100 hover:bg-blue-100 rounded-lg transition-colors flex items-center gap-1 text-[11px] font-bold shadow-2xs" title="Sửa"><Edit className="w-3.5 h-3.5" /> Sửa</button>
             <button onClick={() => handleOffboardClick(item)} className="p-1.5 text-orange-600 bg-orange-50 border border-orange-200 hover:bg-orange-100 rounded-lg transition-colors flex items-center gap-1 text-[11px] font-bold shadow-2xs" title="Điều chuyển / Nghỉ việc"><LogOut className="w-3.5 h-3.5" /> Chuyển/Nghỉ</button>
           </>
         )}
-        {item.trang_thai === 'Đã nghỉ việc' && (
+        {(item.trang_thai === 'Đã nghỉ việc' || item.trang_thai === 'Đã điều chuyển') && (
           <>
             <button onClick={() => { setPersonnelToRehire(item); setIsRehireModalOpen(true); }} className="p-1.5 text-emerald-600 bg-emerald-50 border border-emerald-100 hover:bg-emerald-100 rounded-lg transition-colors flex items-center gap-1 text-[11px] font-bold shadow-2xs" title="Vào làm lại"><RotateCcw className="w-3.5 h-3.5" /> Làm lại</button>
             <button onClick={() => { setItemToDelete(item.id); setIsConfirmOpen(true); }} className="p-1.5 text-red-600 bg-red-50 border border-red-100 hover:bg-red-100 rounded-lg transition-colors flex items-center gap-1 text-[11px] font-bold shadow-2xs" title="Xóa vĩnh viễn"><Trash2 className="w-3.5 h-3.5" /> Xóa</button>
@@ -376,7 +379,7 @@ export default function PersonnelPage() {
   const calculateSeniority = (startDate: string, trangThai: string, endDate: string) => {
     if (!startDate) return 'Chưa có';
     const start = new Date(startDate);
-    const end = (trangThai === 'Đã nghỉ việc' && endDate) ? new Date(endDate) : new Date();
+    const end = ((trangThai === 'Đã nghỉ việc' || trangThai === 'Đã điều chuyển') && endDate) ? new Date(endDate) : new Date();
     let years = end.getFullYear() - start.getFullYear();
     let months = end.getMonth() - start.getMonth();
     if (months < 0) { years--; months += 12; }
@@ -532,8 +535,10 @@ export default function PersonnelPage() {
     };
 
     return result.sort((a, b) => {
-      if (a.trang_thai === 'Đã nghỉ việc' && b.trang_thai !== 'Đã nghỉ việc') return 1;
-      if (a.trang_thai !== 'Đã nghỉ việc' && b.trang_thai === 'Đã nghỉ việc') return -1;
+      const isInactiveA = a.trang_thai === 'Đã nghỉ việc' || a.trang_thai === 'Đã điều chuyển';
+      const isInactiveB = b.trang_thai === 'Đã nghỉ việc' || b.trang_thai === 'Đã điều chuyển';
+      if (isInactiveA && !isInactiveB) return 1;
+      if (!isInactiveA && isInactiveB) return -1;
       const orderA = phanLoaiOrder[a.phan_loai || ''] || 99;
       const orderB = phanLoaiOrder[b.phan_loai || ''] || 99;
       if (orderA !== orderB) return orderA - orderB;
@@ -711,7 +716,7 @@ export default function PersonnelPage() {
   }, [selectedUnitFilter, donViList]);
 
   const uniqueActiveStaff = useMemo(() => {
-    const active = filteredPersonnel.filter(p => p.trang_thai !== 'Đã nghỉ việc');
+    const active = filteredPersonnel.filter(p => p.trang_thai !== 'Đã nghỉ việc' && p.trang_thai !== 'Đã điều chuyển');
     const seen = new Set<string>();
     const unique: any[] = [];
     const sortedActive = [...active].sort((a, b) => {
@@ -933,7 +938,7 @@ export default function PersonnelPage() {
   const handleCopyMail = (roleType: 'LD' | 'DVHT' | 'NS') => {
     let emails: string[] = [];
     filteredPersonnel.forEach(p => {
-      if (!p.email || p.trang_thai === 'Đã nghỉ việc') return;
+      if (!p.email || p.trang_thai === 'Đã nghỉ việc' || p.trang_thai === 'Đã điều chuyển') return;
       const chucVu = String(p.chuc_vu || '').toLowerCase();
       if (roleType === 'LD' && chucVu.includes('tổng giám đốc')) { emails.push(p.email); }
       else if (roleType === 'DVHT' && (chucVu.includes('dvht') || chucVu.includes('dịch vụ hỗ trợ'))) { emails.push(p.email); }
@@ -1071,7 +1076,18 @@ export default function PersonnelPage() {
     if (!personnelToRehire) return;
     setSubmitting(true);
     try {
-      const rehireData = { ...personnelToRehire, trang_thai: 'Đang làm việc', ngay_vao_lam_lai: rehireDate, ngay_nghi_viec: null };
+      let cleanGhiChu = personnelToRehire.ghi_chu || '';
+      if (personnelToRehire.trang_thai === 'Đã điều chuyển') {
+        cleanGhiChu = cleanGhiChu.replace(/^\[Đã điều chuyển ra ngoài:[^\]]*\]\s*/, '');
+      }
+
+      const rehireData = { 
+        ...personnelToRehire, 
+        trang_thai: 'Đang làm việc', 
+        ngay_vao_lam_lai: rehireDate, 
+        ngay_nghi_viec: null,
+        ghi_chu: cleanGhiChu
+      };
       await apiService.save(rehireData, "update", "ns_dich_vu");
       setData(prev => prev.map(item => item.id === personnelToRehire.id ? rehireData : item));
       setIsRehireModalOpen(false); setPersonnelToRehire(null);
@@ -1168,7 +1184,7 @@ export default function PersonnelPage() {
     unitsToExport.forEach(dv => {
       const phia = getRegion(dv.id); const tenDV = dv.ten_don_vi;
       const validIds = [dv.id, ...getAllSubordinateIds(dv.id, donViList)];
-      const unitStaff = data.filter(p => validIds.includes(p.id_don_vi) && p.trang_thai !== 'Đã nghỉ việc');
+      const unitStaff = data.filter(p => validIds.includes(p.id_don_vi) && p.trang_thai !== 'Đã nghỉ việc' && p.trang_thai !== 'Đã điều chuyển');
       const dvht = unitStaff.find(p => p.phan_loai === 'PT QTVP & ASĐS' || p.phan_loai === 'PT QTVT & ASĐS' || p.phan_loai === 'PT DVHT KD' || String(p.chuc_vu).toLowerCase().includes('dvht') || String(p.chuc_vu).toLowerCase().includes('qtvp')) || {};
       let tgd;
       const cleanTenDV = tenDV.trim().toUpperCase();
@@ -1382,7 +1398,7 @@ export default function PersonnelPage() {
   const handleCopyMultiCriteria = () => {
     if (selectedNgach.length === 0 && selectedDiaDiem.length === 0) return;
 
-    const activeStaff = filteredPersonnel.filter(p => p.trang_thai !== 'Đã nghỉ việc');
+    const activeStaff = filteredPersonnel.filter(p => p.trang_thai !== 'Đã nghỉ việc' && p.trang_thai !== 'Đã điều chuyển');
 
     const targetPersonnel = activeStaff.filter(p => {
       const loc = (p as any).dia_diem_lam_viec || (p as any).noi_lam_viec || '';
@@ -2492,6 +2508,7 @@ export default function PersonnelPage() {
             <div className="p-4 sm:p-6 overflow-y-auto space-y-6 custom-scrollbar">
               <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 sm:gap-6 border-b border-gray-100 pb-6 text-center sm:text-left relative">
                 {viewData.trang_thai === 'Đã nghỉ việc' && (<div className="absolute top-0 right-0 bg-red-100 text-red-700 font-black px-3 py-1 rounded border border-red-200 flex items-center gap-1"><LogOut size={16} /> ĐÃ NGHỈ VIỆC</div>)}
+                {viewData.trang_thai === 'Đã điều chuyển' && (<div className="absolute top-0 right-0 bg-indigo-100 text-indigo-700 font-black px-3 py-1 rounded border border-indigo-200 flex items-center gap-1"><LogOut size={16} /> ĐÃ ĐIỀU CHUYỂN</div>)}
                 <div className="w-24 h-24 sm:w-28 sm:h-32 rounded-2xl bg-blue-100 text-[#05469B] flex items-center justify-center text-4xl font-black shrink-0 border-4 border-white shadow-md overflow-hidden relative">
                   {viewData.hinh_anh ? (<img src={getDirectImageLink(viewData.hinh_anh)} alt={viewData.ho_ten} className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).src = 'https://via.placeholder.com/150?text=Lỗi+Ảnh'; }} />) : (viewData.ho_ten?.charAt(0).toUpperCase() || 'U')}
                 </div>
@@ -2523,7 +2540,22 @@ export default function PersonnelPage() {
                   <div><p className="text-xs text-gray-500 uppercase font-bold mb-1">Địa điểm LV</p><p className="font-semibold text-[#1e2939]">{viewData.dia_diem_lam_viec || '---'}</p></div>
                   <div><p className="text-xs text-gray-500 uppercase font-bold mb-1">Phân loại</p><p className="font-semibold text-gray-800">{viewData.phan_loai || '---'}</p></div>
                   <div><p className="text-xs text-gray-500 uppercase font-bold mb-1">Ngày nhận việc</p><p className="font-semibold text-gray-800">{viewData.ngay_nhan_vien ? new Date(viewData.ngay_nhan_vien).toLocaleDateString('vi-VN') : '---'}</p></div>
-                  {viewData.trang_thai === 'Đã nghỉ việc' ? (<div><p className="text-xs text-red-500 uppercase font-bold mb-1">Ngày nghỉ việc</p><p className="font-semibold text-red-600">{viewData.ngay_nghi_viec ? new Date(viewData.ngay_nghi_viec).toLocaleDateString('vi-VN') : '---'}</p></div>) : (<div><p className="text-xs text-gray-500 uppercase font-bold mb-1">Thâm niên</p><p className="font-semibold text-emerald-600">{calculateSeniority(viewData.ngay_nhan_vien, viewData.trang_thai || 'Đang làm việc', viewData.ngay_nghi_viec || '')}</p></div>)}
+                  {viewData.trang_thai === 'Đã nghỉ việc' ? (
+                    <div>
+                      <p className="text-xs text-red-500 uppercase font-bold mb-1">Ngày nghỉ việc</p>
+                      <p className="font-semibold text-red-600">{viewData.ngay_nghi_viec ? new Date(viewData.ngay_nghi_viec).toLocaleDateString('vi-VN') : '---'}</p>
+                    </div>
+                  ) : viewData.trang_thai === 'Đã điều chuyển' ? (
+                    <div>
+                      <p className="text-xs text-indigo-500 uppercase font-bold mb-1">Ngày điều chuyển</p>
+                      <p className="font-semibold text-indigo-600">{viewData.ngay_nghi_viec ? new Date(viewData.ngay_nghi_viec).toLocaleDateString('vi-VN') : '---'}</p>
+                    </div>
+                  ) : (
+                    <div>
+                      <p className="text-xs text-gray-500 uppercase font-bold mb-1">Thâm niên</p>
+                      <p className="font-semibold text-emerald-600">{calculateSeniority(viewData.ngay_nhan_vien, viewData.trang_thai || 'Đang làm việc', viewData.ngay_nghi_viec || '')}</p>
+                    </div>
+                  )}
                   <div>
                     <p className="text-xs text-gray-500 uppercase font-bold mb-1">Ngạch lương</p>
                     {hasRule('NS_HIDE_SENSITIVE') ? (

@@ -521,9 +521,26 @@ export default function DashboardPage() {
     };
   }, [currentSubordinateIds, donViList, nsData, selectedUnitFilter]);
 
+  const filteredVehicles = useMemo(() => {
+    return xeData.filter(v => currentSubordinateIds.includes(v.id_don_vi));
+  }, [xeData, currentSubordinateIds]);
+
   const companyScaleStats = useMemo(() => {
-    const activeNam = ctttNamUnits.filter(u => currentSubordinateIds.includes(u.id));
-    const activeBac = ctttBacUnits.filter(u => currentSubordinateIds.includes(u.id));
+    let activeNam: DonVi[] = [];
+    let activeBac: DonVi[] = [];
+
+    if (user?.quyen === 'ADMIN') {
+      activeNam = ctttNamUnits.filter(u => currentSubordinateIds.includes(u.id));
+      activeBac = ctttBacUnits.filter(u => currentSubordinateIds.includes(u.id));
+    } else {
+      // Đối với tài khoản USER (Quản trị viên đơn vị): lấy tất cả đơn vị thuộc quyền quản lý
+      const allowedUnits = donViList.filter(u => currentSubordinateIds.includes(u.id));
+      activeNam = allowedUnits.filter(u => String(u.phia || '').toLowerCase().includes('nam'));
+      activeBac = allowedUnits.filter(u => {
+        const phia = String(u.phia || '').toLowerCase();
+        return phia.includes('bắc') || (!phia.includes('nam') && !phia.includes('vpđh') && !String(u.loai_hinh || '').toLowerCase().includes('tổng công ty'));
+      });
+    }
 
     const processScale = (units: DonVi[]) => {
       return units.map(u => {
@@ -537,7 +554,7 @@ export default function DashboardPage() {
       }).sort((a, b) => b.count - a.count);
     };
     return { nam: processScale(activeNam), bac: processScale(activeBac) };
-  }, [ctttNamUnits, ctttBacUnits, currentSubordinateIds, donViList]);
+  }, [ctttNamUnits, ctttBacUnits, currentSubordinateIds, donViList, user]);
 
   const maxScaleNam = Math.max(...companyScaleStats.nam.map(i => i.count), 1);
   const maxScaleBac = Math.max(...companyScaleStats.bac.map(i => i.count), 1);
@@ -1053,7 +1070,7 @@ export default function DashboardPage() {
           <div key={widget.id} className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm flex flex-col h-[480px] hover:shadow-md transition-all">
             {renderHeader('Đội xe & Phương tiện', 'Cơ cấu hãng xe & trạng thái vận hành', <Car size={20} />)}
             <div className="flex-1 w-full h-full min-h-0 overflow-y-auto custom-scrollbar">
-              <VehicleFleetChart vehicles={xeData} />
+              <VehicleFleetChart vehicles={filteredVehicles} />
             </div>
           </div>
         );

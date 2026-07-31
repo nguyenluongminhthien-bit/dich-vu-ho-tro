@@ -17,7 +17,7 @@ interface PasteImportModalProps {
   title: string;
   columnMapping: ColumnMapItem[];
   // Cho phép bên ngoài truyền hàm kiểm tra để trả về lỗi (đỏ) hoặc cảnh báo (vàng)
-  onValidateRow?: (row: any) => { errors: Record<string, string>; warnings: Record<string, string> };
+  onValidateRow?: (row: any, allRows?: any[]) => { errors: Record<string, string>; warnings: Record<string, string> };
 }
 
 const getColMinWidth = (key: string): string => {
@@ -194,6 +194,7 @@ export default function PasteImportModal({
         const items: any[] = [];
         const statuses: { errors: Record<string, string>; warnings: Record<string, string> }[] = [];
 
+        // Vòng 1: Parse dữ liệu
         for (let i = startIndex; i < rawRows.length; i++) {
           const row = rawRows[i];
           // Bỏ qua dòng trống
@@ -211,8 +212,11 @@ export default function PasteImportModal({
               item[col.key] = rawVal;
             }
           });
+          items.push(item);
+        }
 
-          // Thực hiện validate cơ bản (required)
+        // Vòng 2: Chạy validate với danh sách đầy đủ
+        items.forEach(item => {
           const errors: Record<string, string> = {};
           const warnings: Record<string, string> = {};
 
@@ -228,16 +232,14 @@ export default function PasteImportModal({
             }
           });
 
-          // Validate tùy biến từ bên ngoài (ví dụ đối chiếu MSNV)
           if (onValidateRow) {
-            const customVal = onValidateRow(item);
+            const customVal = onValidateRow(item, items);
             Object.assign(errors, customVal.errors);
             Object.assign(warnings, customVal.warnings);
           }
 
-          items.push(item);
           statuses.push({ errors, warnings });
-        }
+        });
 
         setParsedData(items);
         setRowStatus(statuses);
@@ -259,35 +261,32 @@ export default function PasteImportModal({
       const updatedData = [...prev];
       updatedData[rowIndex] = { ...updatedData[rowIndex], [colKey]: newValue };
 
-      // Khởi tạo trạng thái validate mới cho dòng này
-      const status = { errors: {} as Record<string, string>, warnings: {} as Record<string, string> };
+      // Cập nhật lại validate cho toàn bộ các dòng khi có thay đổi ô
+      const newRowStatuses = updatedData.map(item => {
+        const status = { errors: {} as Record<string, string>, warnings: {} as Record<string, string> };
 
-      // Chạy validate bắt buộc & định dạng cơ bản
-      columnMapping.forEach(col => {
-        if (col.required && !updatedData[rowIndex][col.key]) {
-          status.errors[col.key] = `Cột "${col.label}" là bắt buộc.`;
-        }
-        if (col.type === 'date' && updatedData[rowIndex][col.key]) {
-          const d = new Date(updatedData[rowIndex][col.key]);
-          if (isNaN(d.getTime())) {
-            status.errors[col.key] = `Định dạng ngày không hợp lệ (cần dd/mm/yyyy).`;
+        columnMapping.forEach(col => {
+          if (col.required && !item[col.key]) {
+            status.errors[col.key] = `Cột "${col.label}" là bắt buộc.`;
           }
+          if (col.type === 'date' && item[col.key]) {
+            const d = new Date(item[col.key]);
+            if (isNaN(d.getTime())) {
+              status.errors[col.key] = `Định dạng ngày không hợp lệ (cần dd/mm/yyyy).`;
+            }
+          }
+        });
+
+        if (onValidateRow) {
+          const customVal = onValidateRow(item, updatedData);
+          Object.assign(status.errors, customVal.errors);
+          Object.assign(status.warnings, customVal.warnings);
         }
+
+        return status;
       });
 
-      // Chạy validate từ bên ngoài truyền vào
-      if (onValidateRow) {
-        const customVal = onValidateRow(updatedData[rowIndex]);
-        Object.assign(status.errors, customVal.errors);
-        Object.assign(status.warnings, customVal.warnings);
-      }
-
-      setRowStatus(prevStatus => {
-        const updatedStatus = [...prevStatus];
-        updatedStatus[rowIndex] = status;
-        return updatedStatus;
-      });
-
+      setRowStatus(newRowStatuses);
       return updatedData;
     });
   };

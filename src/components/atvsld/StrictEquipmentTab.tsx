@@ -203,8 +203,8 @@ export default function StrictEquipmentTab({
       if (isCreate && dataToSave.id) {
         setSelectedThietBiId(dataToSave.id);
       }
-    } catch (err) {
-      toast.error('Lỗi khi lưu thông tin thiết bị.');
+    } catch (err: any) {
+      toast.error(err.message || 'Lỗi khi lưu thông tin thiết bị.');
     } finally {
       setIsSubmitting(false);
     }
@@ -248,8 +248,8 @@ export default function StrictEquipmentTab({
       toast.success(isCreate ? 'Đã thêm nhật ký kiểm định!' : 'Đã sửa nhật ký kiểm định!');
       onReload();
       setIsEditKiemDinhOpen(false);
-    } catch (err) {
-      toast.error('Lỗi khi lưu nhật ký kiểm định.');
+    } catch (err: any) {
+      toast.error(err.message || 'Lỗi khi lưu nhật ký kiểm định.');
     } finally {
       setIsSubmitting(false);
     }
@@ -438,8 +438,8 @@ export default function StrictEquipmentTab({
       toast.success(`Nhập Excel thành công! Đã thêm mới ${newDevices.length} thiết bị và ${newInspections.length} lượt kiểm định.`);
       onReload();
       setIsPasteModalOpen(false);
-    } catch (err) {
-      toast.error('Gặp sự cố khi lưu dữ liệu import.');
+    } catch (err: any) {
+      toast.error(err.message || 'Gặp sự cố khi lưu dữ liệu import.');
     }
   };
 
@@ -531,7 +531,7 @@ export default function StrictEquipmentTab({
         </div>
         
         <div className="flex flex-wrap items-center gap-3">
-          {user?.quyen === 'ADMIN' && (
+          {(user?.quyen === 'ADMIN' || user?.quyen === 'USER') && (
             <>
               <button 
                 onClick={() => handleOpenEditThietBi()}
@@ -649,7 +649,7 @@ export default function StrictEquipmentTab({
               <div className="space-y-6">
                 {/* Master Info */}
                 <div className="bg-lime-50/40 p-4 rounded-xl border border-lime-100 relative">
-                  {user?.quyen === 'ADMIN' && (
+                  {(user?.quyen === 'ADMIN' || user?.quyen === 'USER') && (
                     <div className="absolute top-3 right-3 flex items-center gap-1.5">
                       <button 
                         onClick={() => handleOpenEditThietBi(selectedThietBi)}
@@ -687,7 +687,7 @@ export default function StrictEquipmentTab({
                 {/* Inspections Header */}
                 <div className="flex justify-between items-center border-b border-gray-150 pb-2 shrink-0">
                   <span className="text-[11px] font-black text-gray-500 uppercase">Lượt kiểm định ({selectedHistory.length})</span>
-                  {user?.quyen === 'ADMIN' && (
+                  {(user?.quyen === 'ADMIN' || user?.quyen === 'USER') && (
                     <button 
                       onClick={() => handleOpenEditKiemDinh()}
                       className="text-[11px] font-bold text-lime-700 bg-lime-50 hover:bg-lime-100 px-3 py-1 rounded-lg border border-lime-200 flex items-center gap-1 cursor-pointer"
@@ -712,7 +712,7 @@ export default function StrictEquipmentTab({
                           }`} />
                           
                           <div className="bg-gray-50 hover:bg-lime-50/20 p-3.5 rounded-xl border border-gray-150 relative transition-colors shadow-2xs">
-                            {user?.quyen === 'ADMIN' && (
+                            {(user?.quyen === 'ADMIN' || user?.quyen === 'USER') && (
                               <div className="absolute top-2.5 right-2.5 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                 <button 
                                   onClick={() => handleOpenEditKiemDinh(kd)}

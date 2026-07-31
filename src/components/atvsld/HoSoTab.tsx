@@ -39,7 +39,7 @@ export default function HoSoTab({
           <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-16 text-center text-gray-400">
             <Search size={48} className="mx-auto mb-4 text-lime-600"/>
             <p className="text-lg font-medium text-gray-500">Không tìm thấy hồ sơ an toàn lao động.</p>
-            {user?.quyen === 'ADMIN' && <p className="text-sm mt-1">Bấm nút "Thêm Báo cáo Cơ sở" để tạo mới.</p>}
+            {(user?.quyen === 'ADMIN' || user?.quyen === 'USER') && <p className="text-sm mt-1">Bấm nút "Thêm Báo cáo Cơ sở" để tạo mới.</p>}
           </div>
         ) : (
           <div className="space-y-6">
@@ -121,7 +121,7 @@ export default function HoSoTab({
                       </div>
                     </div>
 
-                    {user?.quyen === 'ADMIN' && (
+                    {(user?.quyen === 'ADMIN' || user?.quyen === 'USER') && (
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => onOpenModal(item.id_don_vi, item)}

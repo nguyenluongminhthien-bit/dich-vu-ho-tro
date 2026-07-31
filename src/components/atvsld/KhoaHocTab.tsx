@@ -187,8 +187,8 @@ export default function KhoaHocTab({ onReloadData, selectedUnitFilter, allowedDo
         toast.success('Đã cập nhật thông tin khóa học!');
       }
       setIsEditModalOpen(false);
-    } catch (err) {
-      toast.error('Lỗi lưu thông tin khóa học.');
+    } catch (err: any) {
+      toast.error(err.message || 'Lỗi lưu thông tin khóa học.');
     } finally {
       setIsSubmitting(false);
     }
@@ -265,13 +265,43 @@ export default function KhoaHocTab({ onReloadData, selectedUnitFilter, allowedDo
   ];
 
   // Hàm validate khi người dùng dán Excel
-  const handleValidateRow = (row: any) => {
+  const handleValidateRow = (row: any, allRows?: any[]) => {
     const errors: Record<string, string> = {};
     const warnings: Record<string, string> = {};
 
     const msnv = String(row.msnv || '').trim();
     if (msnv) {
-      // Chỉ tìm kiếm nhân sự thuộc đơn vị đang được lọc (activeUnitSubordinates)
+      // 1. Kiểm tra trùng lặp MSNV ngay trong cùng phiên dán Excel (Lỗi đỏ chặn lưu)
+      if (allRows) {
+        const duplicates = allRows.filter(r => String(r.msnv || '').trim() === msnv);
+        if (duplicates.length > 1) {
+          errors['msnv'] = 'Mã nhân viên bị trùng lặp trong danh sách dán.';
+        }
+      }
+
+      // 2. Cảnh báo cột Nhóm trống hoặc không parse được số (Cảnh báo vàng)
+      const nhomDigits = String(row.nhom || '').replace(/\D/g, '');
+      if (!nhomDigits) {
+        warnings['nhom'] = "Cột Nhóm trống/không hợp lệ, hệ thống sẽ mặc định Nhóm 3 — vui lòng kiểm tra lại.";
+      }
+
+      // 3. Cảnh báo cột Điểm Lý Thuyết không phải số (Cảnh báo vàng)
+      if (row.diem_ly_thuyet !== undefined && row.diem_ly_thuyet !== null) {
+        const ltVal = String(row.diem_ly_thuyet).trim();
+        if (ltVal !== '' && isNaN(Number(ltVal))) {
+          warnings['diem_ly_thuyet'] = "Giá trị điểm không hợp lệ, đã bỏ trống.";
+        }
+      }
+
+      // 4. Cảnh báo cột Điểm Thực Hành không phải số (Cảnh báo vàng)
+      if (row.diem_thuc_hanh !== undefined && row.diem_thuc_hanh !== null) {
+        const thVal = String(row.diem_thuc_hanh).trim();
+        if (thVal !== '' && isNaN(Number(thVal))) {
+          warnings['diem_thuc_hanh'] = "Giá trị điểm không hợp lệ, đã bỏ trống.";
+        }
+      }
+
+      // 5. Chỉ tìm kiếm nhân sự thuộc đơn vị đang được lọc (activeUnitSubordinates)
       const match = personnelList.find(p => p.ma_so_nhan_vien === msnv && activeUnitSubordinates.includes(p.id_don_vi));
       if (!match) {
         // Tìm thử trên toàn hệ thống để đưa ra cảnh báo chi tiết
@@ -396,8 +426,8 @@ export default function KhoaHocTab({ onReloadData, selectedUnitFilter, allowedDo
         await recalculateOshForPersonnel(affectedRecalc);
       }
 
-    } catch (err) {
-      toast.error('Lỗi khi nhập danh sách học viên.');
+    } catch (err: any) {
+      toast.error(err.message || 'Lỗi khi nhập danh sách học viên.');
     }
   };
 
@@ -710,7 +740,7 @@ export default function KhoaHocTab({ onReloadData, selectedUnitFilter, allowedDo
                 className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-xl outline-none text-xs font-semibold focus:ring-2 focus:ring-lime-500 bg-white"
               />
             </div>
-            {user?.quyen === 'ADMIN' && (
+            {(user?.quyen === 'ADMIN' || user?.quyen === 'USER') && (
               <button
                 onClick={() => handleOpenEditModal()}
                 className="w-full sm:w-auto flex items-center justify-center gap-2 bg-lime-600 hover:bg-lime-700 text-white font-bold text-xs px-4 py-2 rounded-xl shadow-md transition-all cursor-pointer"
@@ -808,7 +838,7 @@ export default function KhoaHocTab({ onReloadData, selectedUnitFilter, allowedDo
                           >
                             Học viên
                           </button>
-                          {user?.quyen === 'ADMIN' && (
+                          {(user?.quyen === 'ADMIN' || user?.quyen === 'USER') && (
                             <>
                               <button
                                 onClick={() => handleOpenEditModal(kh)}
@@ -858,7 +888,7 @@ export default function KhoaHocTab({ onReloadData, selectedUnitFilter, allowedDo
               </div>
             </div>
 
-            {user?.quyen === 'ADMIN' && (
+            {(user?.quyen === 'ADMIN' || user?.quyen === 'USER') && (
               <div className="flex flex-wrap gap-3 w-full sm:w-auto">
                 <button
                   onClick={handleManualSyncAll}
@@ -909,13 +939,13 @@ export default function KhoaHocTab({ onReloadData, selectedUnitFilter, allowedDo
                     <th className="p-3 text-center">Điểm (LT / TH)</th>
                     <th className="p-3 text-center">Kết quả</th>
                     <th className="p-3 text-center w-24">Đồng bộ</th>
-                    {user?.quyen === 'ADMIN' && <th className="p-3 text-center w-16">Xóa</th>}
+                    {(user?.quyen === 'ADMIN' || user?.quyen === 'USER') && <th className="p-3 text-center w-16">Xóa</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 bg-white">
                   {filteredHocVien.length === 0 ? (
                     <tr>
-                      <td colSpan={user?.quyen === 'ADMIN' ? 11 : 10} className="p-16 text-center text-gray-400 italic">
+                      <td colSpan={(user?.quyen === 'ADMIN' || user?.quyen === 'USER') ? 11 : 10} className="p-16 text-center text-gray-400 italic">
                         Chưa có dữ liệu học viên trong khóa học này. Bấm nút "Dán Excel Học viên" để nhập danh sách.
                       </td>
                     </tr>
@@ -976,7 +1006,7 @@ export default function KhoaHocTab({ onReloadData, selectedUnitFilter, allowedDo
                               <span className="text-gray-400 font-medium">Không hỗ trợ</span>
                             )}
                           </td>
-                          {user?.quyen === 'ADMIN' && (
+                          {(user?.quyen === 'ADMIN' || user?.quyen === 'USER') && (
                             <td className="p-3 text-center">
                               <button
                                 onClick={() => handleDeleteHocVien(hv.id)}

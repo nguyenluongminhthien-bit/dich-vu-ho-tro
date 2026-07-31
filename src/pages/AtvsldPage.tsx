@@ -502,7 +502,7 @@ export default function AtvsldPage() {
                 </div>
               )}
 
-              {user?.quyen === 'ADMIN' && activeTab === 'hoso' && (
+              {(user?.quyen === 'ADMIN' || user?.quyen === 'USER') && activeTab === 'hoso' && (
                 <button
                   type="button"
                   onClick={() => openModal(selectedUnitFilter || '')}
