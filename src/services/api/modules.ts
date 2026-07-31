@@ -67,6 +67,56 @@ function sanitizePayload(item: Record<string, any>, isUpdate: boolean = false): 
   return cleaned;
 }
 
+// Helper trích xuất tóm tắt ngắn gọn các trường định danh của bản ghi
+function extractRecordSummary(data: any, tableName: string): string {
+  if (!data) return '';
+  const parts: string[] = [];
+
+  const recordId = data.id || data.ID || data.ID_Xe || data.ID_User;
+  if (recordId) {
+    parts.push(`ID: ${recordId}`);
+  }
+
+  const table = tableName.toLowerCase();
+  
+  if (table.includes('ns_dich_vu')) {
+    if (data.ho_ten) parts.push(`Họ tên: ${data.ho_ten}`);
+    if (data.ma_so_nhan_vien) parts.push(`MSNV: ${data.ma_so_nhan_vien}`);
+  } else if (table.includes('ts_xe')) {
+    if (data.bien_so) parts.push(`Biển số: ${data.bien_so}`);
+    if (data.hieu_xe || data.loai_xe) parts.push(`Xe: ${[data.hieu_xe, data.loai_xe].filter(Boolean).join(' ')}`);
+  } else if (table.includes('ts_thiet_bi')) {
+    if (data.ten_thiet_bi) parts.push(`Tên TB: ${data.ten_thiet_bi}`);
+    if (data.ma_kiem_soat) parts.push(`Mã KS: ${data.ma_kiem_soat}`);
+  } else if (table.includes('vb_tb')) {
+    if (data.so_hieu) parts.push(`Số hiệu: ${data.so_hieu}`);
+    if (data.tieu_de) parts.push(`Tiêu đề: ${data.tieu_de}`);
+  } else if (table.includes('hs_khoa_huan_luyen')) {
+    if (data.ten_khoa_hoc) parts.push(`Khóa học: ${data.ten_khoa_hoc}`);
+  } else if (table.includes('hs_hoc_vien_khoa_huan_luyen')) {
+    if (data.ho_ten_nv) parts.push(`Học viên: ${data.ho_ten_nv}`);
+    if (data.msnv) parts.push(`MSNV: ${data.msnv}`);
+  } else if (table.includes('config_users')) {
+    if (data.user_name) parts.push(`Username: ${data.user_name}`);
+    if (data.ho_ten) parts.push(`Họ tên: ${data.ho_ten}`);
+  } else if (table.includes('hs_an_ninh')) {
+    if (data.nguoi_lien_he) parts.push(`Liên hệ: ${data.nguoi_lien_he}`);
+  } else if (table.includes('dm_don_vi')) {
+    if (data.ten_don_vi) parts.push(`Tên ĐV: ${data.ten_don_vi}`);
+  } else if (table.includes('dm_phap_nhan')) {
+    if (data.ten_phap_nhan) parts.push(`Pháp nhân: ${data.ten_phap_nhan}`);
+  }
+
+  if (parts.length <= 1) {
+    const commonName = data.ten || data.name || data.tieu_de || data.title || data.noi_dung;
+    if (commonName) {
+      parts.push(`Tên/Nội dung: ${String(commonName).substring(0, 50)}`);
+    }
+  }
+
+  return parts.join(' | ');
+}
+
 // Helper kiểm tra phạm vi ghi (chặn thật việc ghi dữ liệu ngoài phạm vi đơn vị)
 async function checkUnitPermission(item: any, tableName: string) {
   if (!currentUser || currentUser.quyen === 'ADMIN') return;
@@ -119,7 +169,15 @@ export async function save(data: any, action: 'create' | 'update', tableName: st
         throw new Error(`Lỗi Supabase: ${errText}`);
       }
       invalidateCache(realTableName);
-      void writeLog('CẬP NHẬT MẢNG', `Bảng: ${realTableName} | Lưu ${data.length} bản ghi`);
+      let arraySummary = '';
+      if (Array.isArray(data) && data.length > 0) {
+        const samples = data.slice(0, 3).map(item => {
+          const detail = extractRecordSummary(item, realTableName);
+          return `{${detail}}`;
+        }).join(', ');
+        arraySummary = ` | Chi tiết mẫu: [${samples}${data.length > 3 ? '...' : ''}]`;
+      }
+      void writeLog('CẬP NHẬT MẢNG', `Bảng: ${realTableName} | Lưu ${data.length} bản ghi${arraySummary}`);
       return response.json();
     }
 
@@ -160,7 +218,8 @@ export async function save(data: any, action: 'create' | 'update', tableName: st
     
     invalidateCache(realTableName);
     const tenHanhDong = action === 'create' ? 'THÊM MỚI' : 'CẬP NHẬT';
-    void writeLog(tenHanhDong, `Bảng: ${realTableName}`);
+    const detailSummary = extractRecordSummary(data, realTableName);
+    void writeLog(tenHanhDong, `Bảng: ${realTableName} | ${detailSummary}`);
 
     const resultData = await response.json();
     return Array.isArray(resultData) ? resultData[0] : resultData;

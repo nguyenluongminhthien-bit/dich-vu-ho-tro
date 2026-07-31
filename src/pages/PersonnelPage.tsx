@@ -268,6 +268,16 @@ export default function PersonnelPage() {
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<string | null>(null);
 
+  const [dupConfirmModal, setDupConfirmModal] = useState<{
+    isOpen: boolean;
+    dupInfo: { ho_ten: string; ten_don_vi: string; ma_so_nhan_vien: string } | null;
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    dupInfo: null,
+    onConfirm: () => {}
+  });
+
   const phanLoaiSuggestions = useMemo(() => {
     const list = data.map(p => String(p.phan_loai || '').trim()).filter(Boolean);
     return Array.from(new Set(list)).sort();
@@ -989,9 +999,96 @@ export default function PersonnelPage() {
     setError(null);
   };
 
+  const executeSave = async (finalDataToSave: any) => {
+    setSubmitting(true); setError(null);
+    try {
+      const response = await apiService.save(finalDataToSave, modal.mode, "ns_dich_vu");
+      const currentId = response.id || response.newId || finalDataToSave.id || `NS-${Date.now()}`;
+      finalDataToSave.id = currentId;
+
+      if (modal.mode === 'update' && finalDataToSave.ma_so_nhan_vien) {
+        const kiemNhiemList = data.filter(item => item.ma_so_nhan_vien === finalDataToSave.ma_so_nhan_vien && item.id !== currentId);
+        if (kiemNhiemList.length > 0) {
+          const fieldsToExclude = ['id', 'id_don_vi', 'phong_ban', 'chuc_vu', 'phan_loai', 'ngach_luong', 'thu_nhap', 'trang_thai', 'ngay_nghi_viec', 'ngay_vao_lam_lai'];
+          const syncData: any = {};
+          Object.keys(finalDataToSave).forEach(key => { if (!fieldsToExclude.includes(key)) syncData[key] = finalDataToSave[key]; });
+          for (const kn of kiemNhiemList) {
+            const updatedKN = { ...kn, ...syncData };
+            await apiService.save(updatedKN, 'update', "ns_dich_vu");
+            setData(prev => prev.map(item => item.id === updatedKN.id ? updatedKN : item));
+          }
+          toast.success(`Đã tự động đồng bộ thông tin cho ${kiemNhiemList.length} vị trí kiêm nhiệm!`);
+        }
+      }
+
+      if (modal.mode === 'create') { setData(prev => [...prev, finalDataToSave]); }
+      else { setData(prev => prev.map(item => item.id === finalDataToSave.id ? finalDataToSave : item)); }
+
+      setModal(prev => ({ ...prev, isOpen: false }));
+      toast.success(modal.mode === 'create' ? "Thêm mới thành công!" : "Cập nhật thành công!");
+    } catch (err: any) { setError(err.message || 'Lỗi lưu dữ liệu.'); toast.error(err.message || "Đã xảy ra lỗi!"); }
+    finally { setSubmitting(false); }
+  };
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.id_don_vi) return toast.warning("Vui lòng chọn Đơn vị công tác!");
+
+    // Kiểm tra trùng MSNV khi THÊM MỚI nhân sự
+    if (modal.mode === 'create' && formData.ma_so_nhan_vien) {
+      const dup = data.find(item => 
+        item.ma_so_nhan_vien && 
+        String(item.ma_so_nhan_vien).trim().toLowerCase() === String(formData.ma_so_nhan_vien).trim().toLowerCase()
+      );
+      if (dup) {
+        const finalDataToSave = {
+          ...formData,
+          tuoi: '',
+          tham_nien: calculateSeniority(formData.ngay_nhan_vien || '', formData.trang_thai || 'Đang làm việc', formData.ngay_nghi_viec || ''),
+          trang_thai: formData.trang_thai || 'Đang làm việc'
+        };
+        if (formData.nam_sinh) {
+          const birthDate = new Date(formData.nam_sinh); const today = new Date();
+          let age = today.getFullYear() - birthDate.getFullYear();
+          const m = today.getMonth() - birthDate.getMonth();
+          if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) { age--; }
+          finalDataToSave.tuoi = age.toString();
+        }
+
+        const fieldsToExclude = ['ngay_sinh', 'email_ca_nhan', 'id_phap_nhan', 'ten_phap_nhan', 'ten_don_vi', 'ngay_nhan_viec'];
+        fieldsToExclude.forEach(f => { delete (finalDataToSave as any)[f]; });
+
+        if (!finalDataToSave.ngay_nhan_vien && finalDataToSave.ma_so_nhan_vien) { finalDataToSave.ngay_nhan_vien = extractStartDateFromMaNV(finalDataToSave.ma_so_nhan_vien); }
+        if (!finalDataToSave.nam_sinh) finalDataToSave.nam_sinh = null;
+        if (!finalDataToSave.ngay_nhan_vien) finalDataToSave.ngay_nhan_vien = null;
+        if (!finalDataToSave.ngay_nghi_viec) finalDataToSave.ngay_nghi_viec = null;
+        if (!finalDataToSave.ngay_vao_lam_lai) finalDataToSave.ngay_vao_lam_lai = null;
+
+        if (finalDataToSave.nhom_doi_tuong) {
+          const nhom = String(finalDataToSave.nhom_doi_tuong).replace(/\D/g, '');
+          if (nhom === '1' || nhom === '2' || nhom === '6') finalDataToSave.chung_nhan = 'Giấy chứng nhận huấn luyện ATVSLĐ';
+          else if (nhom === '3') finalDataToSave.chung_nhan = 'Thẻ An toàn lao động';
+          else if (nhom === '4') finalDataToSave.chung_nhan = 'Quyết định Công nhận Kết quả Huấn luyện ATVSLĐ';
+          finalDataToSave.cc_atvsld = true;
+        } else {
+          finalDataToSave.chung_nhan = null;
+        }
+
+        setDupConfirmModal({
+          isOpen: true,
+          dupInfo: {
+            ho_ten: dup.ho_ten,
+            ten_don_vi: donViMap[dup.id_don_vi] || dup.id_don_vi,
+            ma_so_nhan_vien: formData.ma_so_nhan_vien
+          },
+          onConfirm: () => {
+            executeSave(finalDataToSave);
+            setDupConfirmModal({ isOpen: false, dupInfo: null, onConfirm: () => {} });
+          }
+        });
+        return;
+      }
+    }
 
     let calculatedTuoi = '';
     if (formData.nam_sinh) {
@@ -1031,34 +1128,7 @@ export default function PersonnelPage() {
       finalDataToSave.chung_nhan = null;
     }
 
-    setSubmitting(true); setError(null);
-    try {
-      const response = await apiService.save(finalDataToSave, modal.mode, "ns_dich_vu");
-      const currentId = response.id || response.newId || finalDataToSave.id || `NS-${Date.now()}`;
-      finalDataToSave.id = currentId;
-
-      if (modal.mode === 'update' && finalDataToSave.ma_so_nhan_vien) {
-        const kiemNhiemList = data.filter(item => item.ma_so_nhan_vien === finalDataToSave.ma_so_nhan_vien && item.id !== currentId);
-        if (kiemNhiemList.length > 0) {
-          const fieldsToExclude = ['id', 'id_don_vi', 'phong_ban', 'chuc_vu', 'phan_loai', 'ngach_luong', 'thu_nhap', 'trang_thai', 'ngay_nghi_viec', 'ngay_vao_lam_lai'];
-          const syncData: any = {};
-          Object.keys(finalDataToSave).forEach(key => { if (!fieldsToExclude.includes(key)) syncData[key] = finalDataToSave[key]; });
-          for (const kn of kiemNhiemList) {
-            const updatedKN = { ...kn, ...syncData };
-            await apiService.save(updatedKN, 'update', "ns_dich_vu");
-            setData(prev => prev.map(item => item.id === updatedKN.id ? updatedKN : item));
-          }
-          toast.success(`Đã tự động đồng bộ thông tin cho ${kiemNhiemList.length} vị trí kiêm nhiệm!`);
-        }
-      }
-
-      if (modal.mode === 'create') { setData(prev => [...prev, finalDataToSave]); }
-      else { setData(prev => prev.map(item => item.id === finalDataToSave.id ? finalDataToSave : item)); }
-
-      setModal(prev => ({ ...prev, isOpen: false }));
-      toast.success(modal.mode === 'create' ? "Thêm mới thành công!" : "Cập nhật thành công!");
-    } catch (err: any) { setError(err.message || 'Lỗi lưu dữ liệu.'); toast.error(err.message || "Đã xảy ra lỗi!"); }
-    finally { setSubmitting(false); }
+    await executeSave(finalDataToSave);
   };
 
   const confirmDelete = async () => {
@@ -2748,6 +2818,47 @@ export default function PersonnelPage() {
             <div className="flex gap-3">
               <button onClick={() => setIsConfirmOpen(false)} className="flex-1 py-3 bg-gray-100 text-gray-700 hover:bg-gray-200 rounded-xl font-bold transition-colors">Hủy</button>
               <button onClick={confirmDelete} disabled={submitting} className="flex-1 py-3 text-white bg-red-600 hover:bg-red-700 rounded-xl font-bold flex items-center justify-center gap-2 shadow-md transition-colors">{submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Trash2 className="w-5 h-5" />} Xóa</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 🔴 MODAL CẢNH BÁO TRÙNG MSNV TÙY BIẾN */}
+      {dupConfirmModal.isOpen && dupConfirmModal.dupInfo && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white p-6 rounded-2xl border border-amber-200 shadow-2xl w-full max-w-md animate-in zoom-in duration-200">
+            <div className="flex items-center gap-3 mb-4 pb-3 border-b border-amber-100">
+              <div className="p-2 bg-amber-50 rounded-xl text-amber-600 border border-amber-100">
+                <AlertTriangle size={24} />
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-amber-800">Cảnh Báo Trùng MSNV</h3>
+                <p className="text-[11px] font-bold text-amber-600 uppercase tracking-wider">Phát hiện mã số nhân viên đã tồn tại</p>
+              </div>
+            </div>
+            
+            <div className="bg-amber-50/50 p-4 rounded-xl border border-amber-100/50 text-sm text-gray-700 space-y-2 mb-6">
+              <p>Mã số nhân viên <span className="font-bold text-gray-900">"{dupConfirmModal.dupInfo.ma_so_nhan_vien}"</span> hiện đã được gán cho một nhân sự khác trong hệ thống:</p>
+              <div className="pl-3 border-l-2 border-amber-400 space-y-1 text-xs">
+                <p><span className="font-bold text-gray-400 mr-1.5">Họ và tên:</span> <span className="font-bold text-gray-900">{dupConfirmModal.dupInfo.ho_ten}</span></p>
+                <p><span className="font-bold text-gray-400 mr-1.5">Đơn vị công tác:</span> <span className="font-bold text-gray-800">{dupConfirmModal.dupInfo.ten_don_vi}</span></p>
+              </div>
+              <p className="text-xs italic text-gray-500 pt-1">Nếu đây là vị trí kiêm nhiệm (làm song song 2 chức danh/đơn vị), anh/chị có thể tiếp tục tạo mới bản ghi này.</p>
+            </div>
+
+            <div className="flex gap-3">
+              <button 
+                onClick={() => setDupConfirmModal({ isOpen: false, dupInfo: null, onConfirm: () => {} })}
+                className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl transition-all"
+              >
+                Hủy lưu
+              </button>
+              <button 
+                onClick={dupConfirmModal.onConfirm}
+                className="flex-1 py-3 bg-amber-600 hover:bg-amber-700 transition-all text-white font-bold rounded-xl flex items-center justify-center gap-1.5 shadow-md shadow-amber-500/20"
+              >
+                <CheckCheck size={18} /> Đồng ý lưu
+              </button>
             </div>
           </div>
         </div>

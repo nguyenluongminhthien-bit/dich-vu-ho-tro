@@ -19,7 +19,7 @@ export default function LogPage() {
           apiService.getUsers()
         ]);
         setUsers(rawUsers);
-        
+
         // Hàm parse Date an toàn (Hỗ trợ nhiều định dạng từ DB)
         const parseSafeDate = (dateStr: string) => {
           if (!dateStr) return 0;
@@ -54,7 +54,7 @@ export default function LogPage() {
     return logs.filter(log => {
       const userFullName = log.ho_ten || userMap[log.id_user] || '';
       return (
-        stripAccents(log.id_user || '').includes(cleanSearch) || 
+        stripAccents(log.id_user || '').includes(cleanSearch) ||
         stripAccents(userFullName).includes(cleanSearch) ||
         stripAccents(log.hanh_dong || '').includes(cleanSearch) ||
         stripAccents(log.chi_tiet || '').includes(cleanSearch)
@@ -100,44 +100,44 @@ export default function LogPage() {
         </div>
       </div>
 
-      {error && <div className="mb-4 p-4 bg-red-50 text-red-700 rounded-lg flex items-center gap-2 border border-red-100"><AlertCircle size={20}/> {error}</div>}
+      {error && <div className="mb-4 p-4 bg-red-50 text-red-700 rounded-lg flex items-center gap-2 border border-red-100"><AlertCircle size={16} /> {error}</div>}
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 flex-1 overflow-hidden flex flex-col">
         <div className="overflow-x-auto flex-1">
           <table className="w-full text-left">
             <thead className="bg-[#f8fafc] border-b border-gray-200 sticky top-0 z-10">
               <tr className="text-xs font-bold text-gray-500 uppercase tracking-wider">
-                <th className="p-4 w-48"><div className="flex items-center gap-1.5"><Clock size={14}/> Thời gian</div></th>
-                <th className="p-4 w-48"><div className="flex items-center gap-1.5"><User size={14}/> Tài khoản</div></th>
-                <th className="p-4 w-48"><div className="flex items-center gap-1.5"><User size={14}/> Họ tên</div></th>
-                <th className="p-4 w-36"><div className="flex items-center gap-1.5"><Activity size={14}/> Hành động</div></th>
-                <th className="p-4"><div className="flex items-center gap-1.5"><ClipboardList size={14}/> Chi tiết cập nhật</div></th>
+                <th className="p-4 w-35"><div className="flex items-center gap-1.5"><Clock size={12} /> Thời gian</div></th>
+                <th className="p-4 w-35"><div className="flex items-center gap-1.5"><User size={12} /> Tài khoản</div></th>
+                <th className="p-4 w-60"><div className="flex items-center gap-1.5"><User size={12} /> Họ tên</div></th>
+                <th className="p-4 w-35"><div className="flex items-center gap-1.5"><Activity size={14} /> Hành động</div></th>
+                <th className="p-4"><div className="flex items-center gap-1.5"><ClipboardList size={14} /> Chi tiết cập nhật</div></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {loading ? (<tr><td colSpan={5} className="p-12 text-center"><Loader2 className="w-8 h-8 animate-spin mx-auto text-[#05469B] mb-2"/> Đang tải log...</td></tr>) 
-              : filteredLogs.length === 0 ? (<tr><td colSpan={5} className="p-12 text-center text-gray-400"><ClipboardList size={40} className="mx-auto mb-3 opacity-50"/> Không có nhật ký nào.</td></tr>) 
-              : filteredLogs.map((log, idx) => {
-                
-                const { dateStr, timeStr } = formatLogTime(log.thoi_gian);
+              {loading ? (<tr><td colSpan={5} className="p-12 text-center"><Loader2 className="w-8 h-8 animate-spin mx-auto text-[#05469B] mb-2" /> Đang tải log...</td></tr>)
+                : filteredLogs.length === 0 ? (<tr><td colSpan={5} className="p-12 text-center text-gray-400"><ClipboardList size={40} className="mx-auto mb-3 opacity-50" /> Không có nhật ký nào.</td></tr>)
+                  : filteredLogs.map((log, idx) => {
 
-                return (
-                  <tr key={log.id || idx} className="hover:bg-blue-50/30 transition-colors">
-                    <td className="p-4">
-                      <span className="font-bold text-gray-700 text-sm block">{timeStr || '---'}</span>
-                      {dateStr && <span className="text-xs text-gray-400 font-medium flex items-center gap-1 mt-0.5"><Calendar size={10}/> {dateStr}</span>}
-                    </td>
-                    <td className="p-4 font-bold text-[#05469B] text-sm">{log.id_user}</td>
-                    <td className="p-4 font-bold text-gray-800 text-sm">{log.ho_ten || userMap[log.id_user] || '---'}</td>
-                    <td className="p-4">
-                      <span className={`px-2 py-1 border rounded text-[10px] font-black tracking-wider uppercase ${getActionColor(log.hanh_dong)}`}>
-                        {log.hanh_dong}
-                      </span>
-                    </td>
-                    <td className="p-4 text-sm font-medium text-gray-700 whitespace-pre-wrap leading-relaxed">{log.chi_tiet || '---'}</td>
-                  </tr>
-                );
-              })}
+                    const { dateStr, timeStr } = formatLogTime(log.thoi_gian);
+
+                    return (
+                      <tr key={log.id || idx} className="hover:bg-blue-50/30 transition-colors">
+                        <td className="p-4">
+                          <span className="font-bold text-gray-700 text-sm block">{timeStr || '---'}</span>
+                          {dateStr && <span className="text-xs text-gray-400 font-medium flex items-center gap-1 mt-0.5"><Calendar size={10} /> {dateStr}</span>}
+                        </td>
+                        <td className="p-4 font-bold text-[#05469B] text-sm">{log.id_user}</td>
+                        <td className="p-4 font-bold text-gray-800 text-sm">{log.ho_ten || userMap[log.id_user] || '---'}</td>
+                        <td className="p-4">
+                          <span className={`px-2 py-1 border rounded text-[10px] font-black tracking-wider uppercase ${getActionColor(log.hanh_dong)}`}>
+                            {log.hanh_dong}
+                          </span>
+                        </td>
+                        <td className="p-4 text-sm font-medium text-gray-700 whitespace-pre-wrap leading-relaxed">{log.chi_tiet || '---'}</td>
+                      </tr>
+                    );
+                  })}
             </tbody>
           </table>
         </div>
