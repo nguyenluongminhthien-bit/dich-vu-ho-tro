@@ -1,4 +1,4 @@
-# 📑 ARCHITECTURE.md — BẢN ĐỒ HỆ THỐNG QTVP-ASDS (dành cho AI)
+# 📑 ARCHITECTURE.md — BẢN ĐỒ HỆ THỐNG QUẢN TRỊ VĂN PHÒNG (dành cho AI)
 
 > File này được dựng lại bằng cách quét trực tiếp 81 file `.ts/.tsx` thật trong repo (không suy đoán từ tên file). Nguồn xác thực: export chính của từng file + tên bảng Supabase thực sự được gọi (`services/api/modules.ts`, `apiService.save(...)`).
 > **Quy tắc bắt buộc:** Mỗi khi thêm/sửa 1 tính năng, PHẢI cập nhật bảng mục 3 trong cùng lần commit.
