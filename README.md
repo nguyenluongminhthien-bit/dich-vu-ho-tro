@@ -1,6 +1,6 @@
-# 🏢 HỆ THỐNG QUẢN TRỊ VĂN PHÒNG & AN SINH ĐỜI SỐNG (QTVP-ASDS)
+# 🏢 HỆ THỐNG QUẢN TRỊ VĂN PHÒNG (QTVP)
 
-Tài liệu này cung cấp bức tranh toàn cảnh 100% về kiến trúc, tất cả 12 phân hệ nghiệp vụ, cơ chế phân quyền, nguyên tắc tối ưu hiệu năng và giải thích cấu trúc file dự án **QTVP-ASDS**.
+Tài liệu này cung cấp bức tranh toàn cảnh 100% về kiến trúc, tất cả 12 phân hệ nghiệp vụ, cơ chế phân quyền, nguyên tắc tối ưu hiệu năng và giải thích cấu trúc file dự án **QTVP**.
 
 ---
 
