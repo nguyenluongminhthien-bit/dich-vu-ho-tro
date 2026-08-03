@@ -6,7 +6,7 @@ import { buildHierarchicalOptions, getUnitEmoji } from '../../utils/hierarchy';
 import { CERTIFICATES } from '../../constants/certificates';
 
 const NHOM_ATVSLD_INFO: Record<string, { title: string; vp: string[]; showroom?: string[]; both?: string[] }> = {
-  'Nhóm 1': {
+  '1': {
     title: 'Nhóm 1 — Ban Lãnh Đạo & Quản Lý',
     vp: [
       'TGĐ/ P.TGĐ/ Giám đốc/ Phó Giám đốc;',
@@ -19,14 +19,14 @@ const NHOM_ATVSLD_INFO: Record<string, { title: string; vp: string[]; showroom?:
       'QĐ/PQĐ'
     ]
   },
-  'Nhóm 2': {
+  '2': {
     title: 'Nhóm 2 — Cán Bộ Chuyên Trách ATVSLĐ',
     both: [
       'PT/Chuyên viên phụ trách công tác ATVSLĐ (VP Công ty, Showroom)'
     ],
     vp: []
   },
-  'Nhóm 3': {
+  '3': {
     title: 'Nhóm 3 — Lao Động Có Yêu Cầu Nghiêm Ngặt',
     vp: [
       'CV Kỹ thuật & CN sửa chữa'
@@ -36,7 +36,7 @@ const NHOM_ATVSLD_INFO: Record<string, { title: string; vp: string[]; showroom?:
       'Nhân viên Kho xe & Lái xe; Nhân viên PVHC (vệ sinh)'
     ]
   },
-  'Nhóm 4': {
+  '4': {
     title: 'Nhóm 4 — Văn Phòng, Kinh Doanh & Dịch Vụ',
     vp: [
       'Trợ lý/ Trưởng nhóm/ Chuyên viên/Nhân viên'
@@ -46,7 +46,7 @@ const NHOM_ATVSLD_INFO: Record<string, { title: string; vp: string[]; showroom?:
       'Hỗ trợ kinh doanh (HT KD xe, HT KD DVPT, PVHC (phục vụ khách chờ, Bảo vệ).'
     ]
   },
-  'Nhóm 6': {
+  '6': {
     title: 'Nhóm 6 — Mạng Lưới Vệ Sinh Viên',
     both: [
       'NS được phân công trách nhiệm An toàn, vệ sinh viên (VP Công ty, Showroom)'
@@ -352,7 +352,7 @@ export default function PersonnelModal({
                     <select
                       required
                       name="nhom_doi_tuong"
-                      value={formData.nhom_doi_tuong || 'Nhóm 4'}
+                      value={formData.nhom_doi_tuong || '4'}
                       onChange={(e) => {
                         handleInputChange(e);
                         setShowNhomTooltip(true);

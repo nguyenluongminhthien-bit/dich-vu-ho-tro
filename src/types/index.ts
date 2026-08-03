@@ -256,6 +256,9 @@ export interface ThietBi {
   quy_cach_chat_lieu: string;
   thoi_gian_khau_hao: string;
   tai_san_thuoc: string;
+  so_luong?: number;
+  vi_tri_bo_tri?: string;
+  thong_so_ky_thuat?: string;
   [key: string]: any;
 }
 

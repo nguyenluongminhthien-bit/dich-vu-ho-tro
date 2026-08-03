@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { 
-  GraduationCap, Plus, Search, Edit2, Trash2, Calendar, MapPin, 
-  Users, CheckCircle2, ChevronLeft, ClipboardPaste, RefreshCw, AlertTriangle, 
+import {
+  GraduationCap, Plus, Search, Edit2, Trash2, Calendar, MapPin,
+  Users, CheckCircle2, ChevronLeft, ClipboardPaste, RefreshCw, AlertTriangle,
   ExternalLink, CheckCircle, Info, BookOpen, UserCheck, Eye
 } from 'lucide-react';
 import { apiService } from '../../services/api';
@@ -26,7 +26,7 @@ const getShortHoSo = (hoSoText: string): string => {
 
 export default function KhoaHocTab({ onReloadData, selectedUnitFilter, allowedDonViIds }: KhoaHocTabProps) {
   const { user } = useAuth();
-  
+
   // States tải dữ liệu
   const [khoaHocList, setKhoaHocList] = useState<KhoaHuanLuyen[]>([]);
   const [hocVienList, setHocVienList] = useState<HocVienKhoaHuanLuyen[]>([]);
@@ -39,7 +39,7 @@ export default function KhoaHocTab({ onReloadData, selectedUnitFilter, allowedDo
   const [selectedKhoaHoc, setSelectedKhoaHoc] = useState<KhoaHuanLuyen | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [hvSearchTerm, setHvSearchTerm] = useState('');
-  
+
   // Modals
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [currentKhoaHoc, setCurrentKhoaHoc] = useState<Partial<KhoaHuanLuyen> | null>(null);
@@ -100,8 +100,8 @@ export default function KhoaHocTab({ onReloadData, selectedUnitFilter, allowedDo
       );
 
       // Bộ lọc theo đơn vị đã chọn (hỗ trợ hiển thị dữ liệu cũ chưa có id_don_vi)
-      const matchesUnit = !selectedUnitFilter || 
-        !kh.id_don_vi || 
+      const matchesUnit = !selectedUnitFilter ||
+        !kh.id_don_vi ||
         activeUnitSubordinates.includes(kh.id_don_vi);
 
       return matchesSearch && matchesUnit;
@@ -129,12 +129,23 @@ export default function KhoaHocTab({ onReloadData, selectedUnitFilter, allowedDo
 
   // Thống kê đầu Tab
   const stats = useMemo(() => {
-    const totalKh = khoaHocList.length;
-    const totalHv = hocVienList.length;
+    const targetKhoaHocs = khoaHocList.filter(kh =>
+      !selectedUnitFilter ||
+      !kh.id_don_vi ||
+      activeUnitSubordinates.includes(kh.id_don_vi)
+    );
+
+    const targetHocViens = hocVienList.filter(hv =>
+      !selectedUnitFilter ||
+      activeUnitSubordinates.includes(hv.id_don_vi)
+    );
+
+    const totalKh = targetKhoaHocs.length;
+    const totalHv = targetHocViens.length;
     let datCount = 0;
     let failCount = 0;
-    
-    hocVienList.forEach(hv => {
+
+    targetHocViens.forEach(hv => {
       // SỬA LỖI: So khớp CHÍNH XÁC và chuẩn hóa NFC để tránh dùng includes() gây nhận nhầm trạng thái "chưa đạt"
       const kq = String(hv.ket_qua || '').trim().toLowerCase().normalize('NFC');
       if (kq === 'đạt' || kq === 'dat') {
@@ -146,7 +157,7 @@ export default function KhoaHocTab({ onReloadData, selectedUnitFilter, allowedDo
 
     const percentDat = totalHv > 0 ? Math.round((datCount / totalHv) * 100) : 0;
     return { totalKh, totalHv, datCount, failCount, percentDat };
-  }, [khoaHocList, hocVienList]);
+  }, [khoaHocList, hocVienList, selectedUnitFilter, activeUnitSubordinates]);
 
   // Tạo/Sửa khóa học
   const handleOpenEditModal = (kh: Partial<KhoaHuanLuyen> | null = null) => {
@@ -173,9 +184,9 @@ export default function KhoaHocTab({ onReloadData, selectedUnitFilter, allowedDo
     try {
       const isCreate = !currentKhoaHoc.id;
       const dataToSave = { ...currentKhoaHoc };
-      
+
       const saved = await apiService.save(dataToSave, isCreate ? 'create' : 'update', 'hs_khoa_huan_luyen');
-      
+
       if (isCreate) {
         setKhoaHocList(prev => [saved, ...prev]);
         toast.success('Đã tạo khóa học mới!');
@@ -219,7 +230,7 @@ export default function KhoaHocTab({ onReloadData, selectedUnitFilter, allowedDo
         const hvToDelete = hocVienList.find(item => item.id === deleteTargetId);
         await apiService.delete(deleteTargetId, 'hs_hoc_vien_khoa_huan_luyen');
         setHocVienList(prev => prev.filter(item => item.id !== deleteTargetId));
-        
+
         // Giảm sĩ số thực tế
         if (selectedKhoaHoc) {
           const updatedKhoa = {
@@ -333,7 +344,7 @@ export default function KhoaHocTab({ onReloadData, selectedUnitFilter, allowedDo
       const updatedHocVienList = pastedRows.map((row, idx) => {
         const msnv = String(row.msnv || '').trim();
         const systemPerson = personnelMap.get(msnv);
-        
+
         return {
           id: `HV${Date.now()}-${idx}-${Math.random().toString(36).substr(2, 9)}`,
           id_khoa_hoc: selectedKhoaHoc.id,
@@ -346,7 +357,7 @@ export default function KhoaHocTab({ onReloadData, selectedUnitFilter, allowedDo
           quoc_tich: row.quoc_tich || '',
           chuc_vu: row.chuc_vu || systemPerson?.chuc_vu || '',
           don_vi_text: row.don_vi_text || '',
-          id_don_vi: systemPerson?.id_don_vi || null,
+          id_don_vi: systemPerson?.id_don_vi || selectedKhoaHoc?.id_don_vi || null,
           nhom: row.nhom || '',
           noi_dung_huan_luyen: row.noi_dung_huan_luyen || '',
           thoi_gian_text: row.thoi_gian_text || '',
@@ -360,7 +371,7 @@ export default function KhoaHocTab({ onReloadData, selectedUnitFilter, allowedDo
 
       // Lưu đợt học viên mới vào Supabase
       toast.info(`Đang lưu ${updatedHocVienList.length} học viên...`);
-      
+
       // Xóa học viên cũ của khóa này (nếu dán đè/dán mới) trước khi import mới hoặc update đè.
       // Dựa theo đặc tả D.1: nếu msnv đã có thì UPDATE đè lên, chưa thì tạo mới.
       // Để đơn giản và chính xác, ta so khớp msnv hiện tại trong khóa:
@@ -382,11 +393,11 @@ export default function KhoaHocTab({ onReloadData, selectedUnitFilter, allowedDo
 
       // Lưu mảng
       await apiService.save(toSaveArray, 'create', 'hs_hoc_vien_khoa_huan_luyen');
-      
+
       // Tải lại dữ liệu học viên
       const newHvList = await apiService.getHocVienKhoaHuanLuyen();
       setHocVienList(newHvList || []);
-      
+
       toast.success(`Đã nhập thành công ${toSaveArray.length} học viên! Bắt đầu đồng bộ thông tin nhân sự...`);
 
       // Cập nhật sĩ số thực tế cho khóa học
@@ -454,8 +465,8 @@ export default function KhoaHocTab({ onReloadData, selectedUnitFilter, allowedDo
 
       for (const item of uniqueAffected) {
         // Tìm toàn bộ hồ sơ nhân sự khớp (chính + kiêm nhiệm)
-        const matchedPersons = personnelList.filter(p => 
-          p.ma_so_nhan_vien === item.msnv && 
+        const matchedPersons = personnelList.filter(p =>
+          p.ma_so_nhan_vien === item.msnv &&
           (!item.id_don_vi || p.id_don_vi === item.id_don_vi)
         );
 
@@ -524,7 +535,7 @@ export default function KhoaHocTab({ onReloadData, selectedUnitFilter, allowedDo
   // Trích xuất ngày kết thúc từ chuỗi thoi_gian_text hoặc dùng fallback
   const extractHuanLuyenDen = (timeText: string, fallbackDate: string): string => {
     if (!timeText) return fallbackDate;
-    
+
     // Tìm cụm ngày cuối cùng định dạng dd/mm/yyyy
     const matches = timeText.match(/(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})/g);
     if (matches && matches.length > 0) {
@@ -552,8 +563,17 @@ export default function KhoaHocTab({ onReloadData, selectedUnitFilter, allowedDo
       const isDat = kqNormalized === 'đạt' || kqNormalized === 'dat';
       // Tìm theo key kết hợp hoặc fallback theo mã nhân viên nếu chưa được điền id_don_vi
       const key = hv.id_don_vi ? `${hv.msnv}_${hv.id_don_vi}` : '';
-      const hasSystemPerson = key ? personnelMap.has(key) : personnelList.some(p => p.ma_so_nhan_vien === hv.msnv);
-      return isDat && hasSystemPerson && !hv.da_dong_bo_nhan_su;
+      const person = key ? personnelMap.get(key) : personnelList.find(p => p.ma_so_nhan_vien === hv.msnv);
+      
+      if (!isDat || !person) return false;
+
+      const currentCccd = person.cccd ? String(person.cccd).trim() : '';
+      const isCccdEmpty = !currentCccd || currentCccd.toLowerCase() === 'null';
+      const studentCccd = hv.so_cccd ? String(hv.so_cccd).trim() : '';
+      const hasStudentCccd = studentCccd && studentCccd.toLowerCase() !== 'null';
+      const needsCccdSync = isCccdEmpty && hasStudentCccd;
+
+      return !hv.da_dong_bo_nhan_su || needsCccdSync;
     });
 
     if (pendingSync.length === 0) {
@@ -562,7 +582,7 @@ export default function KhoaHocTab({ onReloadData, selectedUnitFilter, allowedDo
     }
 
     setSyncProgress({ current: 0, total: pendingSync.length });
-    
+
     // Cắt mảng thành các batch (cỡ lô 15 dòng)
     const BATCH_SIZE = 15;
     const batches: any[][] = [];
@@ -577,9 +597,9 @@ export default function KhoaHocTab({ onReloadData, selectedUnitFilter, allowedDo
           // Lấy person theo key kết hợp, fallback tìm kiếm theo msnv nếu hv.id_don_vi trống
           const key = hv.id_don_vi ? `${hv.msnv}_${hv.id_don_vi}` : '';
           const person = key ? personnelMap.get(key) : personnelList.find(p => p.ma_so_nhan_vien === hv.msnv);
-          
+
           if (!person) return;
-          
+
           // Regex trích xuất số nhóm '1'..'6' từ chuỗi nhom
           const nhomDigits = String(hv.nhom || '').replace(/\D/g, '');
           const nhom = nhomDigits || '3'; // mặc định nhóm 3 nếu thiếu
@@ -590,6 +610,12 @@ export default function KhoaHocTab({ onReloadData, selectedUnitFilter, allowedDo
           const chungNhan = getChungNhanByNhom(nhom);
 
           // Cập nhật thông tin Personnel
+          const currentCccd = person.cccd ? String(person.cccd).trim() : '';
+          const isCccdEmpty = !currentCccd || currentCccd.toLowerCase() === 'null';
+          
+          const studentCccd = hv.so_cccd ? String(hv.so_cccd).trim() : '';
+          const hasStudentCccd = studentCccd && studentCccd.toLowerCase() !== 'null';
+
           const updatedPerson = {
             ...person,
             cc_atvsld: true,
@@ -597,7 +623,8 @@ export default function KhoaHocTab({ onReloadData, selectedUnitFilter, allowedDo
             huan_luyen_tu: selectedKhoaHoc?.ngay_bat_dau || null,
             huan_luyen_den: huanLuyenDen,
             gia_tri_den: giaTriDen,
-            chung_nhan: chungNhan
+            chung_nhan: chungNhan,
+            cccd: (isCccdEmpty && hasStudentCccd) ? studentCccd : person.cccd
           };
 
           // Lưu Personnel
@@ -621,7 +648,7 @@ export default function KhoaHocTab({ onReloadData, selectedUnitFilter, allowedDo
         // Tải lại danh sách nhân sự mới sau khi hoàn thành
         const newPers = await apiService.getPersonnel();
         setPersonnelList(newPers || []);
-        
+
         // Tải lại danh sách học viên
         const newHvList = await apiService.getHocVienKhoaHuanLuyen();
         setHocVienList(newHvList || []);
@@ -756,12 +783,12 @@ export default function KhoaHocTab({ onReloadData, selectedUnitFilter, allowedDo
             <table className="w-full text-left border-collapse text-xs min-w-[900px]">
               <thead className="bg-gray-50 border-b border-lime-100 font-bold text-gray-600 uppercase">
                 <tr>
-                  <th className="p-3 w-12 text-center">STT</th>
-                  <th className="p-3">Tên khóa huấn luyện</th>
+                  <th className="p-3 w-10 text-center">STT</th>
+                  <th className="p-3 w-75">Tên khóa huấn luyện</th>
                   <th className="p-3">Đơn vị đào tạo</th>
                   <th className="p-3 text-center">Thời gian</th>
                   <th className="p-3">Địa điểm</th>
-                  <th className="p-3 text-center">Sĩ số (Dự kiến/Thực tế)</th>
+                  <th className="p-3 w-35 text-center">Sĩ số<br />(Dự kiến/Thực tế)</th>
                   <th className="p-3 text-center">Trạng thái</th>
                   <th className="p-3 font-semibold">Hồ sơ</th>
                   <th className="p-3 text-center w-36">Hành động</th>
@@ -797,13 +824,12 @@ export default function KhoaHocTab({ onReloadData, selectedUnitFilter, allowedDo
                       </td>
                       <td className="p-3 text-center">
                         <span
-                          className={`px-2 py-0.5 rounded-full border text-[10px] font-bold inline-block min-w-[70px] ${
-                            kh.trang_thai === 'Hoàn thành'
-                              ? 'bg-lime-100 text-lime-800 border-lime-200'
-                              : kh.trang_thai === 'Đang diễn ra'
+                          className={`px-2 py-0.5 rounded-full border text-[10px] font-bold inline-block min-w-[70px] ${kh.trang_thai === 'Hoàn thành'
+                            ? 'bg-lime-100 text-lime-800 border-lime-200'
+                            : kh.trang_thai === 'Đang diễn ra'
                               ? 'bg-blue-100 text-blue-800 border-blue-200'
                               : 'bg-yellow-100 text-yellow-800 border-yellow-200'
-                          }`}
+                            }`}
                         >
                           {kh.trang_thai}
                         </span>
@@ -930,12 +956,12 @@ export default function KhoaHocTab({ onReloadData, selectedUnitFilter, allowedDo
                 <thead className="bg-gray-50 border-b border-lime-100 font-bold text-gray-600 uppercase">
                   <tr>
                     <th className="p-3 w-12 text-center">STT</th>
-                    <th className="p-3 w-24">Mã NV</th>
-                    <th className="p-3">Họ và tên</th>
-                    <th className="p-3">Nhân sự Đơn vị (Excel / Thực tế)</th>
+                    <th className="p-3 w-20">Mã NV</th>
+                    <th className="p-3 w-35">Họ và tên</th>
+                    <th className="p-3 w-60">Nhân sự Đơn vị</th>
                     <th className="p-3">Chức vụ</th>
                     <th className="p-3 text-center">Nhóm</th>
-                    <th className="p-3">Nội dung / Thời gian</th>
+                    <th className="p-3 ">Nội dung / Thời gian</th>
                     <th className="p-3 text-center">Điểm (LT / TH)</th>
                     <th className="p-3 text-center">Kết quả</th>
                     <th className="p-3 text-center w-24">Đồng bộ</th>
@@ -986,11 +1012,10 @@ export default function KhoaHocTab({ onReloadData, selectedUnitFilter, allowedDo
                           </td>
                           <td className="p-3 text-center">
                             <span
-                              className={`px-2.5 py-0.5 rounded-full border text-[10px] font-black inline-block ${
-                                isDat
-                                  ? 'bg-lime-100 text-lime-800 border-lime-200'
-                                  : 'bg-red-50 text-red-700 border-red-200'
-                              }`}
+                              className={`px-2.5 py-0.5 rounded-full border text-[10px] font-black inline-block ${isDat
+                                ? 'bg-lime-100 text-lime-800 border-lime-200'
+                                : 'bg-red-50 text-red-700 border-red-200'
+                                }`}
                             >
                               {hv.ket_qua || 'Chưa đạt'}
                             </span>
@@ -1215,19 +1240,19 @@ export default function KhoaHocTab({ onReloadData, selectedUnitFilter, allowedDo
               {confirmType === 'KHOA_HOC' ? 'Xóa khóa học?' : 'Xóa học viên?'}
             </h3>
             <p className="text-gray-500 text-sm mb-6">
-              {confirmType === 'KHOA_HOC' 
-                ? 'Bạn có chắc chắn muốn xóa khóa huấn luyện này? Tất cả học viên và kết quả thuộc khóa sẽ bị xóa vĩnh viễn.' 
+              {confirmType === 'KHOA_HOC'
+                ? 'Bạn có chắc chắn muốn xóa khóa huấn luyện này? Tất cả học viên và kết quả thuộc khóa sẽ bị xóa vĩnh viễn.'
                 : 'Bạn có chắc chắn muốn xóa học viên này khỏi danh sách khóa huấn luyện?'}
             </p>
             <div className="flex gap-3">
-              <button 
-                onClick={() => { setConfirmType(null); setDeleteTargetId(null); }} 
+              <button
+                onClick={() => { setConfirmType(null); setDeleteTargetId(null); }}
                 className="flex-1 py-3 bg-gray-100 text-gray-700 hover:bg-gray-200 rounded-xl font-bold transition-colors"
               >
                 Hủy
               </button>
-              <button 
-                onClick={executeDelete} 
+              <button
+                onClick={executeDelete}
                 className="flex-1 py-3 text-white bg-red-600 hover:bg-red-700 rounded-xl font-bold flex items-center justify-center gap-2 shadow-md transition-colors"
               >
                 Xóa

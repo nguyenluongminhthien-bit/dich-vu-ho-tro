@@ -4,7 +4,7 @@ import {
   Search, Plus, Edit, Trash2, X, AlertCircle, Loader2, Save,
   MonitorSmartphone, Building2, MapPin, ChevronDown, ChevronRight, PanelLeftClose, PanelLeftOpen,
   History, Calendar, Info, Eye, Cpu, Image as ImageIcon, FileText, Link as LinkIcon,
-  Sofa, Video, Package, Layers, Camera, QrCode, Printer
+  Sofa, Video, Package, Layers, Camera, QrCode, Printer, ClipboardPaste, ShieldCheck
 } from 'lucide-react';
 import { apiService } from '../services/api';
 import { DonVi, ThietBi, NhatKyThietBi, Personnel } from '../types';
@@ -21,19 +21,55 @@ import { useAllowedUnits } from '../hooks/useAllowedUnits';
 import CustomAutocomplete from '../components/ui/CustomAutocomplete';
 // @ts-ignore
 import { QRCodeSVG } from 'qrcode.react';
+import PasteImportModal, { ColumnMapItem } from '../components/ui/PasteImportModal';
 
 
 // --- DANH SÁCH NHÓM TÀI SẢN CHUẨN ---
 const ASSET_GROUPS = [
-  "Thiết bị CNTT (PC, Laptop,...)",
-  "Máy móc VP (In, Scan, Photo, Chấm công...)",
-  "Nội thất & Tủ kệ",
-  "Điện máy & Điện lạnh (Tivi, AC, Tủ lạnh...)",
-  "Hệ thống kỹ thuật (Camera, Mạng, PCCC, Điện...)",
+  "Thiết bị CNTT",
+  "Trang thiết bị VP",
+  "Nội thất VP",
+  "Điện máy",
+  "Hệ thống kỹ thuật",
   "Phần mềm & Bản quyền",
-  "CCDC An ninh & Vệ sinh (Xe đẩy, máy tuần tra...)",
-  "Vật dụng Trang trí & Khác"
+  "Công cụ dụng cụ",
+  "Vật dụng khác"
 ];
+
+const NHOM_THIETBI_INFO: Record<string, { title: string; items: string[] }> = {
+  "Thiết bị CNTT": {
+    title: "Thiết bị CNTT",
+    items: ["PC", "Laptop", "Màn hình máy tính", "Máy chủ (Server)", "Switch/Router mạng", "Ổ cứng di động", "Webcam"]
+  },
+  "Trang thiết bị VP": {
+    title: "Trang thiết bị Văn phòng",
+    items: ["Máy in", "Máy photocopy", "Máy scan", "Máy chấm công", "Máy hủy tài liệu", "Máy fax", "Máy đếm tiền"]
+  },
+  "Nội thất VP": {
+    title: "Nội thất Văn phòng",
+    items: ["Bàn làm việc", "Ghế văn phòng", "Tủ hồ sơ", "Kệ tài liệu", "Vách ngăn", "Bàn họp", "Ghế sofa tiếp khách"]
+  },
+  "Điện máy": {
+    title: "Điện máy & Điện lạnh",
+    items: ["Tivi", "Máy lạnh (điều hòa)", "Tủ lạnh", "Máy nước nóng lạnh", "Quạt", "Lò vi sóng", "Bình đun nước"]
+  },
+  "Hệ thống kỹ thuật": {
+    title: "Hệ thống kỹ thuật hạ tầng",
+    items: ["Camera an ninh", "Hệ thống mạng nội bộ", "Hệ thống PCCC", "Hệ thống điện", "Thang máy", "Máy phát điện", "Hệ thống âm thanh"]
+  },
+  "Phần mềm & Bản quyền": {
+    title: "Phần mềm & Bản quyền",
+    items: ["Bản quyền Windows/Office", "Phần mềm kế toán", "Phần mềm diệt virus", "License phần mềm thiết kế/quản lý"]
+  },
+  "Công cụ dụng cụ": {
+    title: "Công cụ dụng cụ",
+    items: ["Xe đẩy hàng", "Máy tuần tra", "Dụng cụ sửa chữa", "Bộ đồ nghề điện", "Thang", "Máy hút bụi"]
+  },
+  "Vật dụng khác": {
+    title: "Vật dụng khác",
+    items: ["Vật dụng trang trí", "Bình chữa cháy mini", "Thảm", "Rèm cửa", "Vật dụng chưa phân loại"]
+  }
+};
 
 // --- HỆ THỐNG PHÂN LOẠI TÀI SẢN THÔNG MINH ĐỂ BUNG FORM ĐỘNG ---
 const isITEquipment = (nhom: string) => {
@@ -86,6 +122,10 @@ export default function EquipmentPage() {
   const [isTbModalOpen, setIsTbModalOpen] = useState(false);
   const [tbModalMode, setTbModalMode] = useState<'create' | 'update'>('create');
   const [tbFormData, setTbFormData] = useState<any>({});
+  const [isPasteModalOpen, setIsPasteModalOpen] = useState(false);
+  const [showNhomTBTooltip, setShowNhomTBTooltip] = useState(false);
+  const [isAddDropdownOpen, setIsAddDropdownOpen] = useState(false);
+  const addDropdownRef = useRef<HTMLDivElement>(null);
 
   // Modals Nhật ký
   const [isNkModalOpen, setIsNkModalOpen] = useState(false);
@@ -258,6 +298,19 @@ export default function EquipmentPage() {
 
   useEffect(() => { loadData(); }, []);
 
+  // Lắng nghe click ra ngoài để tự động đóng Dropdown
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (addDropdownRef.current && !addDropdownRef.current.contains(event.target as Node)) {
+        setIsAddDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
   const donViMap = useMemo(() => {
     const map: Record<string, string> = {};
     donViList.forEach(dv => { map[dv.id] = dv.ten_don_vi; });
@@ -405,6 +458,259 @@ export default function EquipmentPage() {
       });
     }
     setIsTbModalOpen(true); setError(null);
+  };
+
+  // Cấu hình 27 cột cho Dán Excel danh mục thiết bị
+  const pasteColumns: ColumnMapItem[] = [
+    { key: 'ma_tai_san', label: 'Mã tài sản', type: 'text', required: true },
+    { key: 'ten_thiet_bi', label: 'Tên thiết bị', type: 'text', required: true },
+    { key: 'ten_don_vi', label: 'Đơn vị', type: 'text', required: false },
+    { key: 'nhom_thiet_bi', label: 'Nhóm thiết bị', type: 'text', required: false },
+    { key: 'so_luong', label: 'Số lượng', type: 'text', required: false },
+    { key: 'don_vi_tinh', label: 'Đơn vị tính', type: 'text', required: false },
+    { key: 'vi_tri_bo_tri', label: 'Vị trí bố trí', type: 'text', required: false },
+    { key: 'nha_cung_cap', label: 'Nhà cung cấp', type: 'text', required: false },
+    { key: 'ngay_mua', label: 'Ngày mua', type: 'text', required: false },
+    { key: 'gia_mua', label: 'Giá mua', type: 'text', required: false },
+    { key: 'han_bao_hanh', label: 'Hạn bảo hành', type: 'text', required: false },
+    { key: 'thoi_gian_khau_hao', label: 'Thời gian khấu hao', type: 'text', required: false },
+    { key: 'tai_san_thuoc', label: 'Tài sản thuộc', type: 'text', required: false },
+    { key: 'cpu', label: 'CPU', type: 'text', required: false },
+    { key: 'ram', label: 'RAM', type: 'text', required: false },
+    { key: 'ssd', label: 'SSD', type: 'text', required: false },
+    { key: 'hdd', label: 'HDD', type: 'text', required: false },
+    { key: 'vga', label: 'VGA', type: 'text', required: false },
+    { key: 'man_hinh', label: 'Màn hình', type: 'text', required: false },
+    { key: 'thong_so_ky_thuat', label: 'Thông số kỹ thuật chung', type: 'text', required: false },
+    { key: 'tinh_trang', label: 'Tình trạng', type: 'text', required: false },
+    { key: 'quy_cach_chat_lieu', label: 'Quy cách/chất liệu', type: 'text', required: false },
+    { key: 'so_seri', label: 'Số seri', type: 'text', required: false },
+    { key: 'phu_kien', label: 'Phụ kiện/Ghi chú thêm', type: 'text', required: false },
+    { key: 'mo_ta_dac_diem', label: 'Mô tả đặc điểm', type: 'text', required: false },
+    { key: 'link_ho_so', label: 'Link hồ sơ', type: 'text', required: false },
+    { key: 'link_hinh_anh', label: 'Link hình ảnh', type: 'text', required: false }
+  ];
+
+  const handleValidatePasteRow = (row: any, allRows?: any[]) => {
+    const errors: Record<string, string> = {};
+    const warnings: Record<string, string> = {};
+
+    // 1. Validate Mã tài sản
+    const maTS = String(row.ma_tai_san || '').trim();
+    if (maTS) {
+      // 1a. Trùng với mã hiện có trong CSDL
+      const isDuplicateInDb = tbData.some(existing =>
+        existing.ma_tai_san &&
+        String(existing.ma_tai_san).trim().toLowerCase() === maTS.toLowerCase()
+      );
+      if (isDuplicateInDb) {
+        errors['ma_tai_san'] = 'Mã tài sản đã tồn tại trong cơ sở dữ liệu (Không cho phép ghi đè).';
+      }
+
+      // 1b. Trùng ngay trong cùng phiên dán Excel
+      if (allRows) {
+        const matches = allRows.filter(r =>
+          r.ma_tai_san &&
+          String(r.ma_tai_san).trim().toLowerCase() === maTS.toLowerCase()
+        );
+        if (matches.length > 1) {
+          errors['ma_tai_san'] = 'Mã tài sản bị trùng lặp trong danh sách dán.';
+        }
+      }
+    }
+
+    // 2. Validate Đơn vị
+    let dvName = String(row.ten_don_vi || '').trim().toLowerCase();
+
+    // Nếu rỗng, tự động điền đơn vị từ bộ lọc ngoài (nếu có chọn)
+    if (!dvName && selectedUnitFilter && selectedUnitFilter !== 'ALL') {
+      const activeUnit = donViList.find(dv => String(dv.id) === String(selectedUnitFilter));
+      if (activeUnit) {
+        row.ten_don_vi = activeUnit.ten_don_vi;
+        dvName = activeUnit.ten_don_vi.toLowerCase();
+      }
+    }
+
+    if (dvName) {
+      const matchedDv = donViList.find(dv => String(dv.ten_don_vi).trim().toLowerCase() === dvName);
+      if (!matchedDv) {
+        errors['ten_don_vi'] = 'Đơn vị không khớp với bất kỳ đơn vị nào trong hệ thống.';
+      }
+    } else {
+      errors['ten_don_vi'] = 'Cột "Đơn vị" là bắt buộc.';
+    }
+
+    // 3. Validate Số lượng và Giá mua (cảnh báo nếu chứa ký tự không phải số)
+    if (row.so_luong !== undefined && row.so_luong !== null && String(row.so_luong).trim() !== '') {
+      const val = String(row.so_luong).trim();
+      if (isNaN(Number(val)) || Number(val) <= 0) {
+        warnings['so_luong'] = 'Số lượng không hợp lệ, hệ thống sẽ bỏ qua và mặc định là 1.';
+      }
+    }
+    if (row.gia_mua !== undefined && row.gia_mua !== null && String(row.gia_mua).trim() !== '') {
+      const val = String(row.gia_mua).trim();
+      const cleanVal = val.replace(/[^0-9.-]/g, '');
+      if (cleanVal === '' || isNaN(Number(cleanVal))) {
+        warnings['gia_mua'] = 'Giá mua không phải số hợp lệ, hệ thống sẽ bỏ trống trường này.';
+      }
+    }
+
+    // 4. Validate định dạng ngày mua và hạn bảo hành dd/mm/yyyy
+    const dateRegex = /^\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{4}$/;
+    if (row.ngay_mua && String(row.ngay_mua).trim() !== '') {
+      const val = String(row.ngay_mua).trim();
+      if (!dateRegex.test(val)) {
+        warnings['ngay_mua'] = 'Ngày mua không đúng định dạng dd/mm/yyyy, hệ thống sẽ bỏ trống.';
+      }
+    }
+    if (row.han_bao_hanh && String(row.han_bao_hanh).trim() !== '') {
+      const val = String(row.han_bao_hanh).trim();
+      if (!dateRegex.test(val)) {
+        warnings['han_bao_hanh'] = 'Hạn bảo hành không đúng định dạng dd/mm/yyyy, hệ thống sẽ bỏ trống.';
+      }
+    }
+
+    // 5. Validate Tình trạng
+    const validStatuses = [
+      'Đang sử dụng',
+      'Lưu kho - Chờ sử dụng',
+      'Lưu kho - Chờ thanh lý',
+      'Đang sửa chữa',
+      'Đã thanh lý / Hỏng hóc'
+    ];
+    if (row.tinh_trang && String(row.tinh_trang).trim() !== '') {
+      const statusVal = String(row.tinh_trang).trim();
+      const matchedStatus = validStatuses.find(s => s.toLowerCase() === statusVal.toLowerCase());
+      if (matchedStatus) {
+        row.tinh_trang = matchedStatus;
+      } else {
+        errors['tinh_trang'] = `Trạng thái không hợp lệ. Chỉ chấp nhận: ${validStatuses.join(', ')}`;
+      }
+    } else {
+      row.tinh_trang = 'Đang sử dụng';
+    }
+
+    return { errors, warnings };
+  };
+
+  const handlePasteSave = async (parsedData: any[]) => {
+    setSubmitting(true);
+    try {
+      const itemsToSave = parsedData.map(item => {
+        // Ánh xạ tên đơn vị để lấy id_don_vi
+        let matchedDv = donViList.find(dv =>
+          String(dv.ten_don_vi).trim().toLowerCase() === String(item.ten_don_vi).trim().toLowerCase()
+        );
+
+        // Nếu không khớp tên đơn vị mà bộ lọc ngoài đang chọn đơn vị cụ thể, dùng bộ lọc ngoài
+        if (!matchedDv && selectedUnitFilter && selectedUnitFilter !== 'ALL') {
+          matchedDv = donViList.find(dv => String(dv.id) === String(selectedUnitFilter));
+        }
+
+        const id_don_vi = matchedDv ? matchedDv.id : '';
+
+        // Xử lý Số lượng
+        let so_luong = 1;
+        if (item.so_luong !== undefined && item.so_luong !== null && String(item.so_luong).trim() !== '') {
+          const val = Number(String(item.so_luong).replace(/\D/g, ''));
+          if (!isNaN(val) && val > 0) {
+            so_luong = val;
+          }
+        }
+
+        // Xử lý Giá mua
+        let gia_mua = '';
+        if (item.gia_mua !== undefined && item.gia_mua !== null && String(item.gia_mua).trim() !== '') {
+          const val = Number(String(item.gia_mua).replace(/[^0-9.-]/g, ''));
+          if (!isNaN(val)) {
+            gia_mua = String(val);
+          }
+        }
+
+        // Chuyển đổi định dạng ngày dd/mm/yyyy sang yyyy-mm-dd
+        const convertToIsoDate = (dateStr: string): string => {
+          if (!dateStr) return '';
+          const parts = dateStr.split(/[\/\-.]/);
+          if (parts.length === 3) {
+            let d = parts[0].padStart(2, '0');
+            let m = parts[1].padStart(2, '0');
+            let y = parts[2];
+            if (y.length === 2) y = '20' + y;
+            return `${y}-${m}-${d}`;
+          }
+          return '';
+        };
+
+        const ngay_mua = convertToIsoDate(item.ngay_mua);
+        const han_bao_hanh = convertToIsoDate(item.han_bao_hanh);
+
+        // Xử lý Tình trạng (nếu rỗng hoặc sai thì mặc định Đang sử dụng)
+        const validStatuses = [
+          'Đang sử dụng',
+          'Lưu kho - Chờ sử dụng',
+          'Lưu kho - Chờ thanh lý',
+          'Đang sửa chữa',
+          'Đã thanh lý / Hỏng hóc'
+        ];
+        let tinh_trang = 'Đang sử dụng';
+        if (item.tinh_trang && String(item.tinh_trang).trim() !== '') {
+          const matchedStatus = validStatuses.find(s => s.toLowerCase() === String(item.tinh_trang).trim().toLowerCase());
+          if (matchedStatus) {
+            tinh_trang = matchedStatus;
+          }
+        }
+
+        // Chuẩn hóa dữ liệu thiết bị sạch sẽ
+        const cleanItem: any = {
+          id_don_vi,
+          ma_tai_san: String(item.ma_tai_san || '').trim(),
+          ten_thiet_bi: String(item.ten_thiet_bi || '').trim(),
+          nhom_thiet_bi: item.nhom_thiet_bi ? String(item.nhom_thiet_bi).trim() : 'Thiết bị văn phòng',
+          so_luong,
+          don_vi_tinh: item.don_vi_tinh ? String(item.don_vi_tinh).trim() : 'Cái',
+          vi_tri_bo_tri: item.vi_tri_bo_tri ? String(item.vi_tri_bo_tri).trim() : '',
+          nha_cung_cap: item.nha_cung_cap ? String(item.nha_cung_cap).trim() : '',
+          ngay_mua: ngay_mua || null,
+          gia_mua: gia_mua || null,
+          han_bao_hanh: han_bao_hanh || null,
+          thoi_gian_khau_hao: item.thoi_gian_khau_hao ? String(item.thoi_gian_khau_hao).trim() : '',
+          tai_san_thuoc: item.tai_san_thuoc ? String(item.tai_san_thuoc).trim() : '',
+          cpu: item.cpu ? String(item.cpu).trim() : '',
+          ram: item.ram ? String(item.ram).trim() : '',
+          ssd: item.ssd ? String(item.ssd).trim() : '',
+          hdd: item.hdd ? String(item.hdd).trim() : '',
+          vga: item.vga ? String(item.vga).trim() : '',
+          man_hinh: item.man_hinh ? String(item.man_hinh).trim() : '',
+          thong_so_ky_thuat: item.thong_so_ky_thuat ? String(item.thong_so_ky_thuat).trim() : '',
+          quy_cach_chat_lieu: item.quy_cach_chat_lieu ? String(item.quy_cach_chat_lieu).trim() : '',
+          so_seri: item.so_seri ? String(item.so_seri).trim() : '',
+          phu_kien: item.phu_kien ? String(item.phu_kien).trim() : '',
+          mo_ta_dac_diem: item.mo_ta_dac_diem ? String(item.mo_ta_dac_diem).trim() : '',
+          link_ho_so: item.link_ho_so ? String(item.link_ho_so).trim() : '',
+          link_hinh_anh: item.link_hinh_anh ? String(item.link_hinh_anh).trim() : '',
+          tinh_trang
+        };
+
+        return cleanItem;
+      });
+
+      const savedItems: any[] = [];
+      for (const item of itemsToSave) {
+        // Tự sinh ID ngẫu nhiên cho bản ghi mới
+        item.id = `TB-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+        const response = await apiService.save(item, 'create', 'ts_thiet_bi');
+        const savedId = response?.id || response?.newId || item.id;
+        savedItems.push({ ...item, id: savedId });
+      }
+
+      setTbData(prev => [...savedItems, ...prev]);
+      toast.success(`Đã lưu thành công ${savedItems.length} thiết bị mới!`);
+    } catch (err: any) {
+      console.error(err);
+      toast.error('Lỗi khi nhập dữ liệu hàng loạt: ' + err.message);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   // 1. CẬP NHẬT HÀM LƯU TÀI SẢN (THIẾT BỊ)
@@ -638,7 +944,7 @@ export default function EquipmentPage() {
       <div className="flex-1 min-w-0 max-w-full overflow-hidden p-4 sm:p-6 relative transition-all duration-300 w-full flex flex-col">
 
         {/* FIXED HEADER & WARNINGS */}
-        <div className="shrink-0 flex flex-col z-10">
+        <div className="shrink-0 flex flex-col z-30">
           <div className={`flex flex-col sm:flex-row justify-between items-center mb-6 gap-4 ${isListCollapsed ? 'md:pl-10' : ''}`}>
             <div className="flex items-center gap-2.5 w-full sm:w-auto">
               {isListCollapsed && (
@@ -679,7 +985,42 @@ export default function EquipmentPage() {
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
                 <input type="text" placeholder="Tìm Mã, Tên, Pháp nhân, Vị trí..." className="w-full pl-9 pr-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#05469B] outline-none shadow-sm text-sm" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
               </div>
-              <button onClick={() => openTbModal('create')} className="w-full sm:w-auto flex items-center justify-center gap-2 bg-[#05469B] hover:bg-[#04367a] text-white px-5 py-2.5 rounded-lg font-bold shadow-sm transition-all whitespace-nowrap"><Plus className="w-5 h-5" /> Thêm Tài sản</button>
+              {/* Dropdown nút Thêm Tài sản mới */}
+              <div className="relative w-full sm:w-auto" ref={addDropdownRef}>
+                <button
+                  onClick={() => setIsAddDropdownOpen(!isAddDropdownOpen)}
+                  className="w-full sm:w-auto flex items-center justify-center gap-2 bg-[#05469B] hover:bg-[#04367a] text-white px-5 py-2.5 rounded-lg font-bold shadow-sm transition-all whitespace-nowrap cursor-pointer"
+                >
+                  <Plus className="w-5 h-5" />
+                  <span>Thêm Tài sản</span>
+                  <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${isAddDropdownOpen ? 'rotate-180' : ''}`} />
+                </button>
+
+                {isAddDropdownOpen && (
+                  <div className="absolute right-0 mt-2 w-56 bg-white border border-gray-150 rounded-xl shadow-xl py-2 z-[60] animate-in fade-in slide-in-from-top-2 duration-150">
+                    <button
+                      onClick={() => {
+                        setIsAddDropdownOpen(false);
+                        openTbModal('create');
+                      }}
+                      className="w-full text-left px-4 py-2.5 hover:bg-gray-50 text-gray-700 font-semibold text-sm flex items-center gap-2.5 transition-colors cursor-pointer"
+                    >
+                      <Plus size={16} className="text-[#05469B]" />
+                      <span>Thêm từng thiết bị</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setIsAddDropdownOpen(false);
+                        setIsPasteModalOpen(true);
+                      }}
+                      className="w-full text-left px-4 py-2.5 hover:bg-gray-50 text-indigo-700 font-semibold text-sm flex items-center gap-2.5 transition-colors cursor-pointer border-t border-gray-100"
+                    >
+                      <ClipboardPaste size={16} className="text-indigo-600" />
+                      <span>Thêm hàng loạt (Form)</span>
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
@@ -744,12 +1085,12 @@ export default function EquipmentPage() {
                                 </span>
                               </td>
                               <td className="p-3 font-semibold text-gray-800">
-                                <span className="text-[#05469B] font-bold">{tb.name}</span>
+                                <span className="text-[#05469B] font-bold">{tb.ten_thiet_bi}</span>
                                 <span className="text-gray-400 mx-1.5">—</span>
-                                <span className="text-xs text-gray-500 font-mono">[{tb.code}]</span>
+                                <span className="text-xs text-gray-500 font-mono">[{tb.ma_tai_san}]</span>
                               </td>
                               <td className="p-3 text-gray-600 text-xs w-48">
-                                {tb.unitName}
+                                {donViMap[tb.id_don_vi] || tb.id_don_vi}
                               </td>
                               <td className="p-3 text-right font-bold text-gray-700 text-xs w-32">
                                 {tb.dateStr}
@@ -1203,8 +1544,19 @@ export default function EquipmentPage() {
 
                     {/* Dòng 2: Nhóm TS SMART DROPDOWN - Tên - SL - ĐVT - Tình trạng */}
                     <div className="flex flex-col md:flex-row gap-4">
-                      <div className="w-full md:w-[20%] relative">
-                        <label className="block text-xs font-bold text-gray-700 mb-1">Nhóm Thiết bị *</label>
+                      <div className="w-full md:w-[20%] relative" onMouseLeave={() => setShowNhomTBTooltip(false)}>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="block text-xs font-bold text-gray-700">Nhóm Thiết bị *</label>
+                          <button
+                            type="button"
+                            onClick={() => setShowNhomTBTooltip(!showNhomTBTooltip)}
+                            onMouseEnter={() => setShowNhomTBTooltip(true)}
+                            className="text-emerald-600 hover:text-emerald-700 flex items-center justify-center w-5 h-5 bg-emerald-50 hover:bg-emerald-100 rounded-full border border-emerald-200 transition-colors cursor-pointer shadow-2xs"
+                            title="Xem thành phần nhóm thiết bị"
+                          >
+                            <Info size={13} className="shrink-0" />
+                          </button>
+                        </div>
                         {isCustomGroup ? (
                           <div className="relative">
                             <input
@@ -1223,13 +1575,41 @@ export default function EquipmentPage() {
                             required
                             name="nhom_thiet_bi"
                             value={tbFormData.nhom_thiet_bi || ''}
-                            onChange={(e) => setTbFormData({ ...tbFormData, nhom_thiet_bi: e.target.value })}
-                            className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-bold text-indigo-700"
+                            onChange={(e) => {
+                              setTbFormData({ ...tbFormData, nhom_thiet_bi: e.target.value });
+                              setShowNhomTBTooltip(true);
+                            }}
+                            onFocus={() => setShowNhomTBTooltip(true)}
+                            className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-bold text-indigo-700 cursor-pointer"
                           >
                             <option value="" disabled>-- Chọn Nhóm --</option>
                             {ASSET_GROUPS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                             <option value="Khác">➕ Khác (Tự nhập...)</option>
                           </select>
+                        )}
+
+                        {/* TOOLTIP HIỆN ĐẠI CAO CẤP */}
+                        {showNhomTBTooltip && NHOM_THIETBI_INFO[tbFormData.nhom_thiet_bi] && (
+                          <div className="absolute left-0 top-full mt-2 w-72 sm:w-80 bg-white rounded-2xl shadow-2xl border border-gray-100 p-4 z-50 animate-in fade-in zoom-in-95 duration-200">
+                            <div className="flex items-start justify-between border-b border-gray-100 pb-2 mb-2.5">
+                              <div className="flex items-center gap-1.5 font-black text-emerald-800 text-xs">
+                                <ShieldCheck size={16} className="text-emerald-600 shrink-0" />
+                                <span>{NHOM_THIETBI_INFO[tbFormData.nhom_thiet_bi].title}</span>
+                              </div>
+                              <button type="button" onClick={() => setShowNhomTBTooltip(false)} className="text-gray-400 hover:text-red-500 bg-gray-50 hover:bg-red-50 rounded-full p-1 transition-colors"><X size={12} /></button>
+                            </div>
+
+                            <div className="space-y-2 overflow-y-auto max-h-48 custom-scrollbar">
+                              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Danh mục thiết bị tiêu biểu:</p>
+                              <ul className="space-y-1.5 text-xs text-gray-700 font-medium">
+                                {NHOM_THIETBI_INFO[tbFormData.nhom_thiet_bi].items.map((item, index) => (
+                                  <li key={index} className="flex items-start gap-2 pl-2 relative before:absolute before:left-0 before:top-2 before:w-1.5 before:h-1.5 before:bg-emerald-500 before:rounded-full">
+                                    {item}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          </div>
                         )}
                       </div>
                       <div className="w-full md:w-[35%]">
@@ -1635,6 +2015,18 @@ export default function EquipmentPage() {
           </div>
         </div>,
         document.body
+      )}
+
+      {/* 🟢 MODAL DÁN EXCEL NHẬP HÀNG LOẠT THIẾT BỊ */}
+      {isPasteModalOpen && (
+        <PasteImportModal
+          isOpen={isPasteModalOpen}
+          onClose={() => setIsPasteModalOpen(false)}
+          onSave={handlePasteSave}
+          title="Dán Excel Danh Mục Thiết Bị"
+          columnMapping={pasteColumns}
+          onValidateRow={handleValidatePasteRow}
+        />
       )}
     </div>
   );

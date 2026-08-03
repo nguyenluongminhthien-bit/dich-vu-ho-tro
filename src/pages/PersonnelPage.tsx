@@ -275,7 +275,7 @@ export default function PersonnelPage() {
   }>({
     isOpen: false,
     dupInfo: null,
-    onConfirm: () => {}
+    onConfirm: () => { }
   });
 
   const phanLoaiSuggestions = useMemo(() => {
@@ -1036,8 +1036,8 @@ export default function PersonnelPage() {
 
     // Kiểm tra trùng MSNV khi THÊM MỚI nhân sự
     if (modal.mode === 'create' && formData.ma_so_nhan_vien) {
-      const dup = data.find(item => 
-        item.ma_so_nhan_vien && 
+      const dup = data.find(item =>
+        item.ma_so_nhan_vien &&
         String(item.ma_so_nhan_vien).trim().toLowerCase() === String(formData.ma_so_nhan_vien).trim().toLowerCase()
       );
       if (dup) {
@@ -1083,7 +1083,7 @@ export default function PersonnelPage() {
           },
           onConfirm: () => {
             executeSave(finalDataToSave);
-            setDupConfirmModal({ isOpen: false, dupInfo: null, onConfirm: () => {} });
+            setDupConfirmModal({ isOpen: false, dupInfo: null, onConfirm: () => { } });
           }
         });
         return;
@@ -1151,10 +1151,10 @@ export default function PersonnelPage() {
         cleanGhiChu = cleanGhiChu.replace(/^\[Đã điều chuyển ra ngoài:[^\]]*\]\s*/, '');
       }
 
-      const rehireData = { 
-        ...personnelToRehire, 
-        trang_thai: 'Đang làm việc', 
-        ngay_vao_lam_lai: rehireDate, 
+      const rehireData = {
+        ...personnelToRehire,
+        trang_thai: 'Đang làm việc',
+        ngay_vao_lam_lai: rehireDate,
         ngay_nghi_viec: null,
         ghi_chu: cleanGhiChu
       };
@@ -1255,7 +1255,10 @@ export default function PersonnelPage() {
       const phia = getRegion(dv.id); const tenDV = dv.ten_don_vi;
       const validIds = [dv.id, ...getAllSubordinateIds(dv.id, donViList)];
       const unitStaff = data.filter(p => validIds.includes(p.id_don_vi) && p.trang_thai !== 'Đã nghỉ việc' && p.trang_thai !== 'Đã điều chuyển');
-      const dvht = unitStaff.find(p => p.phan_loai === 'PT QTVP & ASĐS' || p.phan_loai === 'PT QTVT & ASĐS' || p.phan_loai === 'PT DVHT KD' || String(p.chuc_vu).toLowerCase().includes('dvht') || String(p.chuc_vu).toLowerCase().includes('qtvp')) || {};
+      const ptqtvp = unitStaff.find(p => {
+        const cv = String(p.chuc_vu || '').trim().toLowerCase().normalize('NFC');
+        return cv === 'pt qtvp' || cv === 'trưởng phòng qtvp';
+      }) || {};
       let tgd;
       const cleanTenDV = tenDV.trim().toUpperCase();
       if (cleanTenDV === 'THACO AUTO') {
@@ -1268,12 +1271,12 @@ export default function PersonnelPage() {
           return cv.includes('chủ tịch') || cv === 'tổng giám đốc' || cv.includes('thường trực');
         }) || {};
       }
-      if (!dvht.ho_ten && !tgd.ho_ten && unitStaff.length === 0) return;
-      rowsHTML += `<tr><td class="center">${stt++}</td><td>${phia}</td><td class="bold">${tenDV}</td><td>${dvht.ho_ten || ''}</td><td>${dvht.email || ''}</td><td class="center">${dvht.sdt_cong_ty || dvht.sdt_ca_nhan ? formatPhoneNumber(dvht.sdt_cong_ty || dvht.sdt_ca_nhan) : ''}</td><td>${tgd.ho_ten || ''}</td><td>${tgd.email || ''}</td><td class="center">${tgd.sdt_cong_ty || tgd.sdt_ca_nhan ? formatPhoneNumber(tgd.sdt_cong_ty || tgd.sdt_ca_nhan) : ''}</td></tr>`;
+      if (!ptqtvp.ho_ten && !tgd.ho_ten && unitStaff.length === 0) return;
+      rowsHTML += `<tr><td class="center">${stt++}</td><td>${phia}</td><td class="bold">${tenDV}</td><td>${ptqtvp.ho_ten || ''}</td><td>${ptqtvp.email || ''}</td><td class="center">${ptqtvp.sdt_cong_ty || ptqtvp.sdt_ca_nhan ? formatPhoneNumber(ptqtvp.sdt_cong_ty || ptqtvp.sdt_ca_nhan) : ''}</td><td>${tgd.ho_ten || ''}</td><td>${tgd.email || ''}</td><td class="center">${tgd.sdt_cong_ty || tgd.sdt_ca_nhan ? formatPhoneNumber(tgd.sdt_cong_ty || tgd.sdt_ca_nhan) : ''}</td></tr>`;
     });
-    const tableHTML = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="UTF-8"><style>table { border-collapse: collapse; font-family: 'Times New Roman', serif; } th, td { border: 1px solid #000000; padding: 6px; vertical-align: middle; } .header { background-color: #fff2cc; color: #002060; font-weight: bold; text-align: center; } .center { text-align: center; } .bold { font-weight: bold; color: #002060; }</style></head><body><table><thead><tr class="header"><th rowspan="2">STT</th><th rowspan="2">Phía</th><th rowspan="2" style="width: 250px;">ĐƠN VỊ</th><th colspan="3">PT DVHT KD</th><th colspan="3">LÃNH ĐẠO ĐƠN VỊ</th></tr><tr class="header"><th>Họ và tên</th><th>Email</th><th>SĐT</th><th>Họ và tên</th><th>Email</th><th>SĐT</th></tr></thead><tbody>${rowsHTML}</tbody></table></body></html>`;
+    const tableHTML = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="UTF-8"><style>table { border-collapse: collapse; font-family: 'Times New Roman', serif; } th, td { border: 1px solid #000000; padding: 6px; vertical-align: middle; } .header { background-color: #fff2cc; color: #002060; font-weight: bold; text-align: center; } .center { text-align: center; } .bold { font-weight: bold; color: #002060; }</style></head><body><table><thead><tr class="header"><th rowspan="2">STT</th><th rowspan="2">Phía</th><th rowspan="2" style="width: 250px;">ĐƠN VỊ</th><th colspan="3">PT QTVP</th><th colspan="3">LÃNH ĐẠO ĐƠN VỊ</th></tr><tr class="header"><th>Họ và tên</th><th>Email</th><th>SĐT</th><th>Họ và tên</th><th>Email</th><th>SĐT</th></tr></thead><tbody>${rowsHTML}</tbody></table></body></html>`;
     const blob = new Blob([tableHTML], { type: 'application/vnd.ms-excel' }); const url = URL.createObjectURL(blob);
-    const link = document.createElement('a'); link.href = url; link.download = `Danh_Ba_Lanh_Dao_DVHT_${new Date().toISOString().slice(0, 10)}.xls`;
+    const link = document.createElement('a'); link.href = url; link.download = `Danh_Ba_Lanh_Dao_QTVP_${new Date().toISOString().slice(0, 10)}.xls`;
     document.body.appendChild(link); link.click(); document.body.removeChild(link); URL.revokeObjectURL(url);
     setIsExportModalOpen(false); toast.success("Đã xuất file Danh bạ (Excel) thành công!");
   };
@@ -1672,7 +1675,7 @@ export default function PersonnelPage() {
                                   }}
                                   className="w-full text-left px-3 py-2 rounded-lg font-semibold text-xs hover:bg-indigo-50 text-indigo-700 flex items-center gap-2 transition-all cursor-pointer"
                                 >
-                                  <ClipboardPaste size={13} /> Thêm hàng loạt (Excel)
+                                  <ClipboardPaste size={13} /> Thêm hàng loạt (Form)
                                 </button>
                               </div>
                             )}
@@ -1933,10 +1936,10 @@ export default function PersonnelPage() {
                       </th>
                     )}
                     <th className={`py-2.5 px-3 ${showSelectCheckboxes ? 'w-[8%]' : 'w-[9%]'} whitespace-nowrap bg-[#f8fafc]`}>Mã NV</th>
-                    <th className="py-2.5 px-3 w-[18%] whitespace-nowrap bg-[#f8fafc]">Họ Tên / Trạng thái</th>
+                    <th className="py-2.5 px-3 w-[20%] whitespace-nowrap bg-[#f8fafc]">Họ Tên / Trạng thái</th>
                     <th className={`py-2.5 px-3 ${showSelectCheckboxes ? 'w-[22%]' : 'w-[24%]'} bg-[#f8fafc]`}>Chức vụ &amp; Bộ phận</th>
                     <th className={`py-2.5 px-3 ${showSelectCheckboxes ? 'w-[12%]' : 'w-[13%]'} bg-[#f8fafc]`}>Đơn Vị</th>
-                    <th className="py-2.5 px-3 w-[14%] whitespace-nowrap bg-[#f8fafc]">Điện thoại</th>
+                    <th className="py-2.5 px-3 w-[10%] whitespace-nowrap bg-[#f8fafc]">Điện thoại</th>
                     <th className="py-2.5 px-3 w-[10%] whitespace-nowrap bg-[#f8fafc]">Thâm niên</th>
                     <th className="py-2.5 px-3 text-center w-[12%] whitespace-nowrap bg-[#f8fafc]">Thao tác</th>
                   </tr>
@@ -2457,7 +2460,7 @@ export default function PersonnelPage() {
               <h3 className="text-xl font-black text-emerald-700 flex items-center gap-2"><FileSpreadsheet size={24} /> Xuất Excel Danh bạ</h3>
               <button onClick={() => setIsExportModalOpen(false)} className="text-gray-400 hover:text-red-500 transition-colors"><X size={20} /></button>
             </div>
-            <p className="text-sm text-gray-600 mb-6">Bạn muốn tải xuống danh bạ (Gồm Lãnh đạo & PT Dịch vụ Hỗ trợ) của khu vực nào?</p>
+            <p className="text-sm text-gray-600 mb-6">Bạn muốn tải xuống danh bạ (Gồm Lãnh đạo & PT QTVP) của khu vực nào?</p>
             <div className="flex flex-col gap-3 mb-6">
               <label className={`flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-colors ${exportRegion === 'ALL' ? 'border-emerald-500 bg-emerald-50' : 'border-gray-100 hover:bg-gray-50'}`}><input type="radio" name="exportRegion" checked={exportRegion === 'ALL'} onChange={() => setExportRegion('ALL')} className="w-4 h-4 text-emerald-600 focus:ring-emerald-500" /><span className="font-bold text-gray-800">Toàn quốc (Toàn bộ Hệ thống)</span></label>
               <label className={`flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-colors ${exportRegion === 'NAM' ? 'border-emerald-500 bg-emerald-50' : 'border-gray-100 hover:bg-gray-50'}`}><input type="radio" name="exportRegion" checked={exportRegion === 'NAM'} onChange={() => setExportRegion('NAM')} className="w-4 h-4 text-emerald-600 focus:ring-emerald-500" /><span className="font-bold text-gray-800">CTTT Phía Nam (Các tỉnh Miền Nam)</span></label>
@@ -2836,7 +2839,7 @@ export default function PersonnelPage() {
                 <p className="text-[11px] font-bold text-amber-600 uppercase tracking-wider">Phát hiện mã số nhân viên đã tồn tại</p>
               </div>
             </div>
-            
+
             <div className="bg-amber-50/50 p-4 rounded-xl border border-amber-100/50 text-sm text-gray-700 space-y-2 mb-6">
               <p>Mã số nhân viên <span className="font-bold text-gray-900">"{dupConfirmModal.dupInfo.ma_so_nhan_vien}"</span> hiện đã được gán cho một nhân sự khác trong hệ thống:</p>
               <div className="pl-3 border-l-2 border-amber-400 space-y-1 text-xs">
@@ -2847,13 +2850,13 @@ export default function PersonnelPage() {
             </div>
 
             <div className="flex gap-3">
-              <button 
-                onClick={() => setDupConfirmModal({ isOpen: false, dupInfo: null, onConfirm: () => {} })}
+              <button
+                onClick={() => setDupConfirmModal({ isOpen: false, dupInfo: null, onConfirm: () => { } })}
                 className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl transition-all"
               >
                 Hủy lưu
               </button>
-              <button 
+              <button
                 onClick={dupConfirmModal.onConfirm}
                 className="flex-1 py-3 bg-amber-600 hover:bg-amber-700 transition-all text-white font-bold rounded-xl flex items-center justify-center gap-1.5 shadow-md shadow-amber-500/20"
               >
