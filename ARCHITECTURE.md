@@ -41,6 +41,7 @@ src/
 │   ├── expiryStatus.ts            # Tính trạng thái hạn (CẢNH BÁO/QUÁ HẠN...)
 │   ├── atvsld.ts                  # getChungNhanByNhom(), calcGiaTriDen() — công thức hạn ATVSLĐ
 │   ├── exportExcel.ts / exportReports.ts
+│   ├── excelTemplates.ts          # Định nghĩa cấu trúc cột và dữ liệu mẫu Excel dán hàng loạt (Nhân sự, OSH, TBNN, TTB VP) + hàm download
 │   ├── mathEvaluator.ts           # safeEvalMath() — tính công thức nhập tay
 │   ├── logger.ts / logger.tsx     # ⚠️ TRÙNG LẶP — 2 file cùng export generateDiffLog(), cần dọn
 │   └── toast.ts
@@ -68,7 +69,7 @@ src/
 | Tài sản-Thiết bị (`equipments`) | `EquipmentPage.tsx` (1623 dòng) | — | `ts_thiet_bi`, `nk_thiet_bi` (nhật ký thiết bị) | ✅ |
 | Tài liệu (`documents`) | `DocumentPage.tsx` (1674 dòng) | Các component con hiển thị bảng theo tab nằm trong `src/components/document/` (`AllDocTable.tsx`, `ThongBaoTable.tsx`, `QuyetDinhTable.tsx`, `CongVanDenTable.tsx`, `CongVanDiTable.tsx`, `ToTrinhTable.tsx`), file helper `documentHelpers.ts`, component `LineTabs.tsx`. | `vb_tb` | ✅ |
 | Quy định (`policies`) | `PolicyPage.tsx` (557 dòng) | — | `qd_qt` | ✅ |
-| Báo cáo (`reports`) | `ReportPage.tsx` (699 dòng) | `CustomReportBuilder`, `ReportConfigPanel`, `ReportFilterBar`, `ReportList`, `ReportPreviewTable` | đọc tổng hợp nhiều bảng (`hs_an_ninh`, `dm_don_vi`, `ns_dich_vu`, `dm_phap_nhan`, `vb_tb`), không ghi | ✅ |
+| Báo cáo (`reports`) | `ReportPage.tsx` (699 dòng) | `CustomReportBuilder`, `ReportConfigPanel`, `ReportFilterBar`, `ReportList` (có tích hợp khối Tải Form Nhập Hàng Loạt qua `excelTemplates.ts`), `ReportPreviewTable` | đọc tổng hợp nhiều bảng (`hs_an_ninh`, `dm_don_vi`, `ns_dich_vu`, `dm_phap_nhan`, `vb_tb`), không ghi | ✅ |
 | Tài khoản (`accounts`) | `AccountPage.tsx` (516 dòng) | — | `config_users` | ✅ |
 | Nhật ký (`logs`) | `LogPage.tsx` (146 dòng) | — | `sys_logs` (ghi qua `writeLog()` ở mọi `save()`/`deleteRecord()`) | ✅ |
 | Đăng nhập | `LoginPage.tsx` (131 dòng) | `AuthContext.tsx` | Supabase Auth | ✅ |

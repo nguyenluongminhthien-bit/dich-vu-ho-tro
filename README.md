@@ -1,6 +1,6 @@
-# 🏢 HỆ THỐNG QUẢN TRỊ VĂN PHÒNG (QTVP)
+# 🏢 HỆ THỐNG QUẢN TRỊ VĂN PHÒNG & AN SINH ĐỜI SỐNG (QTVP-ASDS)
 
-Tài liệu này cung cấp bức tranh toàn cảnh 100% về kiến trúc, tất cả 12 phân hệ nghiệp vụ, cơ chế phân quyền, nguyên tắc tối ưu hiệu năng và giải thích cấu trúc file dự án **QTVP**.
+Tài liệu này cung cấp bức tranh toàn cảnh 100% về kiến trúc, tất cả 12 phân hệ nghiệp vụ, cơ chế phân quyền, nguyên tắc tối ưu hiệu năng và giải thích cấu trúc file dự án **QTVP-ASDS**.
 
 ---
 
@@ -63,6 +63,7 @@ QTVP-ASDS App
   - Theo dõi lịch sử người sử dụng thuê bao (`lich_su_nsd`).
   - Quản lý chi tiết chi phí cước tháng phát sinh (`cp_cuoc_thang`), so sánh với snapshot định mức, hiển thị biểu đồ biến động cước (`PersonnelDetailCuocChart.tsx`, `ThueBaoDetailCuocChart.tsx`).
 - **Thao tác Nghiệp vụ Nâng cao**: Tạo hồ sơ kiêm nhiệm (`handleDuplicate`), Điều chuyển / Nghỉ việc (`handleOffboardClick` - tự động kiểm tra tài sản chưa trả), Vào làm lại (`handleConfirmRehire`).
+- **Xuất danh bạ (Excel)**: Chuyển đổi vai trò hiển thị và lọc từ "PT DVHT KD" thành "PT QTVP", chỉ trích xuất các nhân sự có chức vụ chính xác là "PT QTVP" hoặc "Trưởng phòng QTVP" (hỗ trợ so khớp NFC không phân biệt chữ hoa/thường). Tên file tải về định dạng: `Danh_Ba_Lanh_Dao_QTVP_YYYY-MM-DD.xls`.
 - **Nhập Dán Excel Hàng Loạt (Paste Import)**: Cho phép copy-paste toàn bộ bảng Excel vào phần mềm.
   - *Quy tắc bảo toàn dữ liệu*: Bắt buộc MSNV và Họ tên. Đối với nhân sự đã tồn tại, các cột để trống trong file Excel sẽ **GIỮ NGUYÊN 100% dữ liệu cũ trong CSDL**, không bị ghi đè hay nhảy chức danh.
 
@@ -105,6 +106,7 @@ QTVP-ASDS App
 - **Mẫu báo cáo Pháp nhân Hóa đơn**: Tổng hợp mã số thuế và tên công ty xuất hóa đơn.
 - **Mẫu báo cáo Khảo sát An ninh Bảo vệ 13 mục**: Cho phép xuất file Excel đa Worksheet (mỗi đơn vị/showroom 1 Sheet) theo đúng chuẩn khảo sát AN-BV.
 - **Trình dựng Báo cáo Tùy chỉnh (`CustomReportBuilder.tsx`)**: Cho phép chọn bảng dữ liệu, chọn cột hiển thị, thiết lập bộ lọc và xuất file Excel theo ý muốn.
+- **Tải Form Nhập Hàng Loạt**: Tích hợp khu vực tải tập trung 4 biểu mẫu dán Excel chuẩn hóa (Nhân sự, Học viên ATVSLĐ, Thiết bị nghiêm ngặt, Trang thiết bị văn phòng) ngay bên dưới mục "VĂN BẢN". Mỗi file tải về bao gồm cấu trúc cột hoàn chỉnh và kèm theo đúng 1 dòng dữ liệu ví dụ thực tế hợp lệ (đáp ứng đầy đủ các kiểm duyệt định dạng ngày tháng `dd/mm/yyyy`, CCCD, nhóm,...), giúp người dùng dễ tham khảo và chạy thử nghiệm dán mẫu thành công không phát sinh lỗi.
 
 #### 👤 11. Phân hệ Quản lý Tài khoản (AccountPage.tsx)
 - **Quản lý Người dùng**: Tạo mới, cập nhật thông tin tài khoản, cấp lại mật khẩu.
