@@ -1,13 +1,13 @@
-# 🏢 HỆ THỐNG QUẢN TRỊ VĂN PHÒNG & AN SINH ĐỜI SỐNG (QTVP-ASDS)
+# 🏢 HỆ THỐNG QUẢN TRỊ VĂN PHÒNG (QTVP)
 
-Tài liệu này cung cấp bức tranh toàn cảnh 100% về kiến trúc, tất cả 12 phân hệ nghiệp vụ, cơ chế phân quyền, nguyên tắc tối ưu hiệu năng và giải thích cấu trúc file dự án **QTVP-ASDS**.
+Tài liệu này cung cấp bức tranh toàn cảnh 100% về kiến trúc, tất cả 12 phân hệ nghiệp vụ, cơ chế phân quyền, nguyên tắc tối ưu hiệu năng và giải thích cấu trúc file dự án **QTVP**.
 
 ---
 
 ## 1. TỔNG QUAN HỆ THỐNG & CÔNG NGHỆ (SYSTEM OVERVIEW & TECH STACK)
 
 ### 1.1. Mục tiêu Hệ thống
-* **Mục tiêu:** Số hóa, chuẩn hóa và quản trị tập trung toàn bộ các mảng nghiệp vụ: **QTVP&ASĐS - Nhân sự - Tài sản - Xe - Thiết bị - PCCC - ATVSLĐ - An ninh Bảo vệ - VTLT - Báo cáo** cho hệ thống Đơn vị Công ty Tỉnh thành/Showroom/Điểm bán hàng trực thuộc trên toàn quốc.
+* **Mục tiêu:** Số hóa, chuẩn hóa và quản trị tập trung toàn bộ các mảng nghiệp vụ: **QTVP - Nhân sự - Tài sản - Xe - Thiết bị - PCCC - ATVSLĐ - An ninh Bảo vệ - VTLT - Báo cáo** cho hệ thống Đơn vị Công ty Tỉnh thành/Showroom/Điểm bán hàng trực thuộc trên toàn quốc.
 * **Mô hình kiến trúc:** Single Page Application (SPA) React + TypeScript kết hợp Supabase REST API & Smart Two-Layer Cache.
 * **Cơ chế phân quyền:** Quản trị phân quyền dựa trên cây dữ liệu đệ quy (Hierarchy-based Access Control) kết hợp vai trò người dùng (Role-based Access Control).
 
