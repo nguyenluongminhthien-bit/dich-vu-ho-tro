@@ -1,13 +1,13 @@
-# 🏢 HỆ THỐNG QUẢN TRỊ VĂN PHÒNG (QTVP)
+# 🏢 HỆ THỐNG QUẢN TRỊ VĂN PHÒNG & AN SINH ĐỜI SỐNG (QTVP-ASDS)
 
-Tài liệu này cung cấp bức tranh toàn cảnh 100% về kiến trúc, tất cả 12 phân hệ nghiệp vụ, cơ chế phân quyền, nguyên tắc tối ưu hiệu năng và giải thích cấu trúc file dự án **QTVP**.
+Tài liệu này cung cấp bức tranh toàn cảnh 100% về kiến trúc, tất cả 12 phân hệ nghiệp vụ, cơ chế phân quyền, nguyên tắc tối ưu hiệu năng và giải thích cấu trúc file dự án **QTVP-ASDS**.
 
 ---
 
 ## 1. TỔNG QUAN HỆ THỐNG & CÔNG NGHỆ (SYSTEM OVERVIEW & TECH STACK)
 
 ### 1.1. Mục tiêu Hệ thống
-* **Mục tiêu:** Số hóa, chuẩn hóa và quản trị tập trung toàn bộ các mảng nghiệp vụ: **QTVP - Nhân sự - Tài sản - Xe - Thiết bị - PCCC - ATVSLĐ - An ninh Bảo vệ - VTLT - Báo cáo** cho hệ thống Đơn vị Công ty Tỉnh thành/Showroom/Điểm bán hàng trực thuộc trên toàn quốc.
+* **Mục tiêu:** Số hóa, chuẩn hóa và quản trị tập trung toàn bộ các mảng nghiệp vụ: **QTVP&ASĐS - Nhân sự - Tài sản - Xe - Thiết bị - PCCC - ATVSLĐ - An ninh Bảo vệ - VTLT - Báo cáo** cho hệ thống Đơn vị Công ty Tỉnh thành/Showroom/Điểm bán hàng trực thuộc trên toàn quốc.
 * **Mô hình kiến trúc:** Single Page Application (SPA) React + TypeScript kết hợp Supabase REST API & Smart Two-Layer Cache.
 * **Cơ chế phân quyền:** Quản trị phân quyền dựa trên cây dữ liệu đệ quy (Hierarchy-based Access Control) kết hợp vai trò người dùng (Role-based Access Control).
 
@@ -20,9 +20,9 @@ Tài liệu này cung cấp bức tranh toàn cảnh 100% về kiến trúc, t�
 
 ---
 
-## 2. BẢN ĐỒ TẤT CẢ 12 PHÂN HỆ NGHIỆP VỤ (MODULE SITEMAP)
+## 2. BẢN ĐỒ TẤT CẢ 13 PHÂN HỆ NGHIỆP VỤ (MODULE SITEMAP)
 
-Hệ thống bao gồm 12 phân hệ chính được tích hợp liền mạch trên thanh Sidebar bên trái:
+Hệ thống bao gồm 13 phân hệ chính được tích hợp liền mạch trên thanh Sidebar bên trái:
 
 ```text
 QTVP-ASDS App
@@ -33,11 +33,12 @@ QTVP-ASDS App
 ├── 🛡️ 05. Quản lý ATVSLĐ & Thiết bị Nghiêm ngặt (ATVSLĐ)
 ├── 🚗 06. Quản lý Xe & Chi phí Vận hành (Vehicles)
 ├── 💻 07. Quản lý Trang thiết bị & QR Code (Equipments)
-├── 📄 08. Quản lý Văn bản & Thông báo (Documents)
-├── 📜 09. Quản lý Quy định & Quy trình (Policies)
-├── 📊 10. Báo cáo Tổng hợp & Custom Builder (Reports)
-├── 👤 11. Quản lý Tài khoản (Accounts)
-└── 📜 12. Nhật ký Hệ thống (System Logs)
+├── 🤝 08. Quản lý Nhà cung cấp (Suppliers)
+├── 📄 09. Quản lý Văn bản & Thông báo (Documents)
+├── 📜 10. Quản lý Quy định & Quy trình (Policies)
+├── 📊 11. Báo cáo Tổng hợp & Custom Builder (Reports)
+├── 👤 12. Quản lý Tài khoản (Accounts)
+└── 📜 13. Nhật ký Hệ thống (System Logs)
 ```
 
 ---
@@ -91,28 +92,34 @@ QTVP-ASDS App
 - **Nhật ký Thiết bị (NhatKyThietBi)**: Ghi nhận lịch sử bàn giao người sử dụng, phòng ban quản lý, lịch sử sửa chữa, nâng cấp, báo hỏng, chi phí.
 - **Deep Link & Quét mã QR**: Tạo mã QR tài sản (`qrcode.react`), hỗ trợ quét mã QR qua camera (`html5-qrcode`) hoặc truy cập thẳng qua URL `/?tab=equipment&qr=MÃ_TÀI_SẢN` để mở ngay chi tiết thiết bị.
 
-#### 📄 08. Phân hệ Quản lý Văn bản & Thông báo (DocumentPage.tsx)
+#### 🤝 08. Phân hệ Quản lý Nhà cung cấp (SupplierPage.tsx)
+- **Quản lý Đối tác & Nhà cung cấp**: Quản lý đầy đủ danh sách nhà cung cấp dịch vụ hành chính/tiện ích/kỹ thuật cho các đơn vị trên toàn quốc (16 nhóm dịch vụ cố định).
+- **Bộ lọc đa chiều**: Lọc đệ quy theo Cây đơn vị (Unit Tree), phân nhóm dịch vụ, trạng thái hợp tác (Đang hợp tác/Ngừng hợp tác) và tìm kiếm thông tin nhanh.
+- **Quản lý Hợp đồng & Thời hạn**: Tự động tính toán và hiển thị huy hiệu cảnh báo thời hạn hết hạn hợp đồng nếu còn dưới 30 ngày (sử dụng hàm kiểm tra `getExpiryStatus`).
+- **Modal Thao tác Nghiệp vụ**: Xem chi tiết toàn diện thông tin doanh nghiệp, thông tin liên hệ đầu mối trực tiếp, đánh giá dịch vụ, và dán đường dẫn file hồ sơ năng lực trực tuyến.
+
+#### 📄 09. Phân hệ Quản lý Văn bản & Thông báo (DocumentPage.tsx)
 - **Phân loại Văn bản**: Quản lý văn bản đến/đi, thông báo, quyết định, quy định.
 - **Phân quyền thao tác**:
   - Chỉ đơn vị ban hành hoặc HO Admin mới có quyền Sửa/Xóa văn bản đó.
   - Các đơn vị khác chỉ có quyền Xem (Read-only).
 - **Auto-fill Người lấy số**: Nhập mã nhân viên tự động điền Họ tên và Bộ phận lấy số.
 
-#### 📜 09. Phân hệ Quản lý Quy định & Quy trình (PolicyPage.tsx)
+#### 📜 10. Phân hệ Quản lý Quy định & Quy trình (PolicyPage.tsx)
 - Lưu trữ, phân loại và tra cứu các quy định hành chính, quy trình làm việc chuẩn áp dụng trong toàn hệ thống.
 
-#### 📊 10. Phân hệ Báo cáo Tổng hợp & Custom Builder (ReportPage.tsx)
+#### 📊 11. Phân hệ Báo cáo Tổng hợp & Custom Builder (ReportPage.tsx)
 - **Mẫu báo cáo Cấu trúc Đơn vị (`ReportList.tsx`)**: Tổng hợp sơ đồ và thông tin liên hệ đơn vị.
 - **Mẫu báo cáo Pháp nhân Hóa đơn**: Tổng hợp mã số thuế và tên công ty xuất hóa đơn.
 - **Mẫu báo cáo Khảo sát An ninh Bảo vệ 13 mục**: Cho phép xuất file Excel đa Worksheet (mỗi đơn vị/showroom 1 Sheet) theo đúng chuẩn khảo sát AN-BV.
 - **Trình dựng Báo cáo Tùy chỉnh (`CustomReportBuilder.tsx`)**: Cho phép chọn bảng dữ liệu, chọn cột hiển thị, thiết lập bộ lọc và xuất file Excel theo ý muốn.
 - **Tải Form Nhập Hàng Loạt**: Tích hợp khu vực tải tập trung 4 biểu mẫu dán Excel chuẩn hóa (Nhân sự, Học viên ATVSLĐ, Thiết bị nghiêm ngặt, Trang thiết bị văn phòng) ngay bên dưới mục "VĂN BẢN". Mỗi file tải về bao gồm cấu trúc cột hoàn chỉnh và kèm theo đúng 1 dòng dữ liệu ví dụ thực tế hợp lệ (đáp ứng đầy đủ các kiểm duyệt định dạng ngày tháng `dd/mm/yyyy`, CCCD, nhóm,...), giúp người dùng dễ tham khảo và chạy thử nghiệm dán mẫu thành công không phát sinh lỗi.
 
-#### 👤 11. Phân hệ Quản lý Tài khoản (AccountPage.tsx)
+#### 👤 12. Phân hệ Quản lý Tài khoản (AccountPage.tsx)
 - **Quản lý Người dùng**: Tạo mới, cập nhật thông tin tài khoản, cấp lại mật khẩu.
 - **Phân quyền chi tiết (Granular Permissions)**: Phân quyền theo Cây đơn vị (`id_don_vi`) và Phân quyền Module thanh menu (`quyen_truy_cap`).
 
-#### 📜 12. Phân hệ Nhật ký Hệ thống (LogPage.tsx)
+#### 📜 13. Phân hệ Nhật ký Hệ thống (LogPage.tsx)
 - **Ghi vết Tự động (SysLog)**: Tự động lưu vết lịch sử Đăng nhập, Đăng xuất, Thêm mới, Cập nhật, Xóa bản ghi của tất cả người dùng kèm thời gian và IP/thông tin thao tác.
 
 ---
