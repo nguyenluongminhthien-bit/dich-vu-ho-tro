@@ -419,5 +419,34 @@ export const INITIAL_MOCK_DATA: Record<string, any[]> = {
       trang_thai_xu_ly: 'Đang xử lý',
       muc_do_khan: 'Khẩn'
     }
+  ],
+
+  dm_ncc: [
+    {
+      id: 'NCC1',
+      ten_cong_ty: 'Công ty Cổ phần Nước khoáng Lavie',
+      ten_goi_tat: 'Lavie',
+      mst: '0100112233',
+      dai_dien_phap_luat: 'Giulio Alberoni',
+      chuc_vu_ddpl: 'Giám đốc',
+      sdt_ddpl: '02839401234',
+      dau_moi: 'Nguyễn Văn Nam',
+      chuc_vu_dau_moi: 'Trưởng phòng Hành chính',
+      sdt_dau_moi: '0909123456',
+      email_dau_moi: 'nam.nguyen@laviewater.com',
+      dia_chi: 'Khánh Hậu, Tân An, Long An',
+      nhom_dich_vu: 'Nước uống',
+      dich_vu: 'Cung cấp nước khoáng bình 19L và chai nhỏ',
+      id_don_vi: 'HO',
+      ngay_bat_dau_hd: '2025-01-01',
+      ngay_het_han_hd: '2026-12-31',
+      danh_gia: 'Dịch vụ giao hàng nhanh, nước chất lượng tốt',
+      trang_thai: 'Đang hợp tác',
+      hinh_thuc_tt: 'Chuyển khoản chậm 30 ngày',
+      link_ho_so: 'https://laviewater.com',
+      ghi_chu: 'Cấp vỏ bình đặt cọc 50.000đ/vỏ',
+      dau_moi_json: [],
+      gia_han_tu_dong: 12
+    }
   ]
 };

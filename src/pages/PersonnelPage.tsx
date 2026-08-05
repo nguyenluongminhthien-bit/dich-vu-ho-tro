@@ -2724,7 +2724,7 @@ export default function PersonnelPage() {
               {/* 🟢 HÀNG GHI CHÚ (Chuyển xuống ngay bên dưới) */}
               <div>
                 <h4 className="font-bold text-gray-800 mb-3 uppercase tracking-wider text-sm flex items-center gap-2"><Info size={18} className="text-blue-500" /> Ghi chú khác</h4>
-                <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100"><p className="text-sm font-semibold text-gray-800 whitespace-pre-wrap">{viewData.ghi_chu || 'Không có ghi chú.'}</p></div>
+                <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100"><p className="text-sm font-semibold text-green-800 whitespace-pre-wrap">{viewData.ghi_chu || 'Không có ghi chú.'}</p></div>
               </div>
 
               <div>

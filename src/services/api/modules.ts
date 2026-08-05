@@ -1,4 +1,4 @@
-import { Personnel, DonVi, User, SysLog, ThueBao, CuocThang } from '../../types';
+import { Personnel, DonVi, User, SysLog, ThueBao, CuocThang, NhaCungCap } from '../../types';
 import { fetchWithCache, resolveTable, invalidateCache } from './cache';
 import { SUPABASE_URL, HEADERS, API_MODE } from './client';
 import { writeLog } from './logs';
@@ -21,6 +21,7 @@ async function getWithFallback<T>(tableName: string, forceRefresh = false): Prom
 
 export const getPersonnel = (forceRefresh = false) => getWithFallback<Personnel>('ns_dich_vu', forceRefresh);
 export const getDonVi = (forceRefresh = false) => getWithFallback<DonVi>('dm_don_vi', forceRefresh);
+export const getNhaCungCap = (forceRefresh = false) => getWithFallback<NhaCungCap>('dm_ncc', forceRefresh);
 export const getAnNinh = () => getWithFallback<any>('hs_an_ninh');
 export const getXe = () => getWithFallback<any>('ts_xe');
 export const getChiPhiXe = () => getWithFallback<any>('cp_hoat_dong_xe');

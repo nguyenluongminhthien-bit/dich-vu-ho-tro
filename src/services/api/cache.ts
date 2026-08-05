@@ -9,7 +9,8 @@ export const TABLE_MAP: Record<string, string> = {
   'HS_PCCC': 'hs_pccc',
   'TS_PCCC': 'ts_pccc',
   'HS_ATVSLD': 'hs_an_toan_lao_dong',
-  'HS_PCTT': 'hs_pctt'
+  'HS_PCTT': 'hs_pctt',
+  'NhaCungCap': 'dm_ncc'
 };
 
 export const resolveTable = (name: string) => TABLE_MAP[name] || name.toLowerCase();

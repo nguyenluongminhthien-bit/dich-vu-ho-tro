@@ -11,6 +11,7 @@ const VehiclePage = React.lazy(() => import('./pages/VehiclePage'));
 const DocumentPage = React.lazy(() => import('./pages/DocumentPage')); 
 const PolicyPage = React.lazy(() => import('./pages/PolicyPage')); 
 const EquipmentPage = React.lazy(() => import('./pages/EquipmentPage')); 
+const SupplierPage = React.lazy(() => import('./pages/SupplierPage'));
 const FireSafetyPage = React.lazy(() => import('./pages/FireSafetyPage'));
 const AtvsldPage = React.lazy(() => import('./pages/AtvsldPage'));
 const AccountPage = React.lazy(() => import('./pages/AccountPage'));
@@ -68,6 +69,7 @@ function AppContent() {
       if (tab === 'atvsld') return checkPermission('ATVSLD');
       if (tab === 'vehicles') return checkPermission('Xe');
       if (tab === 'equipments') return checkPermission('ThietBi');
+      if (tab === 'suppliers') return checkPermission('NhaCungCap');
       if (tab === 'documents') return checkPermission('VanBan');
       if (tab === 'policies') return checkPermission('QuyDinh');
       if (tab === 'departments') return checkPermission('CongTy');
@@ -86,6 +88,7 @@ function AppContent() {
         { tab: 'atvsld', key: 'ATVSLD' },
         { tab: 'vehicles', key: 'Xe' },
         { tab: 'equipments', key: 'ThietBi' },
+        { tab: 'suppliers', key: 'NhaCungCap' },
         { tab: 'documents', key: 'VanBan' },
         { tab: 'policies', key: 'QuyDinh' },
         { tab: 'reports', key: 'BaoCao' }
@@ -116,7 +119,7 @@ function AppContent() {
 
     // 2. Kiểm tra pathname trực tiếp (Ví dụ: /T24ATTS32120025)
     const path = window.location.pathname.replace(/^\//, ''); // Bỏ dấu / ở đầu
-    if (path && path.length >= 5 && !['dashboard', 'personnel', 'firesafety', 'atvsld', 'vehicles', 'equipments', 'documents', 'policies', 'departments', 'accounts', 'logs', 'reports'].includes(path.toLowerCase())) {
+    if (path && path.length >= 5 && !['dashboard', 'personnel', 'firesafety', 'atvsld', 'vehicles', 'equipments', 'suppliers', 'documents', 'policies', 'departments', 'accounts', 'logs', 'reports'].includes(path.toLowerCase())) {
       // Coi đây là Mã tài sản quét trực tiếp từ QR!
       // Thiết lập lại URL thành dạng query để EquipmentPage xử lý đồng bộ
       const newUrl = `${window.location.origin}/?tab=equipment&qr=${path}`;
@@ -175,6 +178,12 @@ function AppContent() {
         {checkPermission('ThietBi') && (
           <TabContainer active={activeTab === 'equipments'}>
             <EquipmentPage />
+          </TabContainer>
+        )}
+        
+        {checkPermission('NhaCungCap') && (
+          <TabContainer active={activeTab === 'suppliers'}>
+            <SupplierPage />
           </TabContainer>
         )}
         

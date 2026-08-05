@@ -67,7 +67,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (rawRole.toUpperCase() === 'ADMIN') {
         finalIdDonVi = 'ALL';
       } else {
-        finalIdDonVi = String(userData.id_don_vi || userData.ID_DonVi || userData.idDonVi || 'UNKNOWN').trim();
+        const rawId = userData.id_don_vi || userData.ID_DonVi || userData.idDonVi;
+        finalIdDonVi = rawId ? String(rawId).trim() : 'HO';
       }
 
       // 🟢 3. CHUẨN HÓA THÔNG TIN NGƯỜI DÙNG (Bao gồm cả Cột Truy Cập)

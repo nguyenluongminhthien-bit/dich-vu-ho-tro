@@ -44,6 +44,40 @@ export interface DonVi {
   [key: string]: any;
 }
 
+export interface NhaCungCapDauMoi {
+  ho_ten: string;
+  sdt: string;
+  email?: string;
+  vai_tro?: string;
+}
+
+export interface NhaCungCap {
+  id: string;
+  ten_cong_ty: string;
+  ten_goi_tat?: string;
+  mst?: string;
+  dai_dien_phap_luat?: string;
+  chuc_vu_ddpl?: string;
+  sdt_ddpl?: string;
+  dau_moi: string;
+  chuc_vu_dau_moi?: string;
+  sdt_dau_moi: string;
+  email_dau_moi?: string;
+  dia_chi?: string;
+  nhom_dich_vu: string;
+  dich_vu?: string;
+  id_don_vi?: string;
+  ngay_bat_dau_hd?: string;
+  ngay_het_han_hd?: string;
+  danh_gia?: string;
+  trang_thai?: string;
+  hinh_thuc_tt?: string;
+  link_ho_so?: string;
+  ghi_chu?: string;
+  dau_moi_json?: NhaCungCapDauMoi[];
+  gia_han_tu_dong?: number;
+}
+
 export interface Personnel {
   id: string; // Khóa chính (thay cho ID_NhanSu)
   ma_so_nhan_vien: string;

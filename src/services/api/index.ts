@@ -3,6 +3,7 @@ import { writeLog } from './logs';
 import {
   getPersonnel,
   getDonVi,
+  getNhaCungCap,
   getAnNinh,
   getXe,
   getChiPhiXe,
@@ -36,6 +37,7 @@ export const apiService = {
   login,
   getPersonnel,
   getDonVi,
+  getNhaCungCap,
   getAnNinh,
   getXe,
   getChiPhiXe,

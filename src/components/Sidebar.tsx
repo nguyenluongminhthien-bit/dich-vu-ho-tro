@@ -16,7 +16,8 @@ import {
   ClipboardList,
   Moon,
   Sun,
-  BarChart3
+  BarChart3,
+  Handshake
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -207,6 +208,18 @@ export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
                   >
                     <MonitorSmartphone size={18} />
                     {!isCollapsed && <span className="text-sm">Quản lý TTB VP</span>}
+                  </button>
+                )}
+
+                {checkPermission('NhaCungCap') && (
+                  <button
+                    onClick={() => setActiveTab('suppliers')}
+                    title="Quản lý Nhà cung cấp"
+                    className={`w-full flex items-center ${isCollapsed ? 'justify-center py-3' : 'gap-3 px-3 py-2.5'} rounded-lg font-semibold transition-all duration-200 ${activeTab === 'suppliers' ? 'bg-white/10 text-white shadow-sm' : 'text-blue-100 hover:bg-white/5 hover:text-white'
+                      }`}
+                  >
+                    <Handshake size={18} />
+                    {!isCollapsed && <span className="text-sm">Quản lý NCC</span>}
                   </button>
                 )}
 
