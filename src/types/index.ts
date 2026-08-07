@@ -293,6 +293,7 @@ export interface ThietBi {
   so_luong?: number;
   vi_tri_bo_tri?: string;
   thong_so_ky_thuat?: string;
+  id_ncc?: string | null;
   [key: string]: any;
 }
 

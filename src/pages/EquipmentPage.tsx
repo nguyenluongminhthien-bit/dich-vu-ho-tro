@@ -7,7 +7,7 @@ import {
   Sofa, Video, Package, Layers, Camera, QrCode, Printer, ClipboardPaste, ShieldCheck
 } from 'lucide-react';
 import { apiService } from '../services/api';
-import { DonVi, ThietBi, NhatKyThietBi, Personnel } from '../types';
+import { DonVi, ThietBi, NhatKyThietBi, Personnel, NhaCungCap } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { buildHierarchicalOptions, getUnitEmoji, sortDonViByThuTu, groupParentUnits, getAllSubordinateIds, getDefaultUnitId } from '../utils/hierarchy';
 import { formatCurrency, toUnaccented, stripAccents } from '../utils/formatters';
@@ -84,7 +84,46 @@ const isFurniture = (nhom: string) => {
   return ['bàn', 'ghế', 'tủ', 'kệ', 'nội thất', 'sofa', 'giường', 'quầy', 'bảng', 'màn chiếu'].some(kw => lower.includes(kw));
 };
 
+const mapNhomThietBiToNhomDichVu = (nhomThietBi: string): string[] => {
+  if (!nhomThietBi) return [];
+  switch (nhomThietBi) {
+    case "Thiết bị CNTT":
+      return ["Thiết bị CNTT & Văn phòng", "Viễn thông", "Khác"];
+    case "Trang thiết bị VP":
+      return ["Thiết bị CNTT & Văn phòng", "Văn phòng phẩm & Ấn vật phẩm", "Tạp phẩm", "Khác"];
+    case "Nội thất VP":
+      return ["Trang trí VP, quầy lễ tân", "Công cụ dụng cụ", "Sửa chữa, bảo trì", "Khác"];
+    case "Điện máy":
+      return ["Thiết bị CNTT & Văn phòng", "Công cụ dụng cụ", "Sửa chữa, bảo trì", "Khác"];
+    case "Hệ thống kỹ thuật":
+      return ["An ninh - Bảo vệ", "Viễn thông", "Thiết bị CNTT & Văn phòng", "Sửa chữa, bảo trì", "Đào tạo, Chứng nhận & Kiểm định", "Khác"];
+    case "Phần mềm & Bản quyền":
+      return ["Thiết bị CNTT & Văn phòng", "Viễn thông", "Khác"];
+    case "Công cụ dụng cụ":
+      return ["Công cụ dụng cụ", "Tạp phẩm", "Sửa chữa, bảo trì", "Khác"];
+    case "Vật dụng khác":
+      return ["Khác", "Văn phòng phẩm & Ấn vật phẩm", "Tạp phẩm", "Trang trí VP, quầy lễ tân", "Tiếp khách (Phòng chờ KH)", "Công cụ dụng cụ", "Sửa chữa, bảo trì"];
+    default:
+      return ["Khác", "Thiết bị CNTT & Văn phòng", "Công cụ dụng cụ", "Sửa chữa, bảo trì"];
+  }
+};
 
+const calculateWarrantyExpiry = (ngayMua: string, soThang: number): string => {
+  if (!ngayMua) return '';
+  const date = new Date(ngayMua);
+  if (isNaN(date.getTime())) return '';
+  date.setMonth(date.getMonth() + soThang);
+  return date.toISOString().split('T')[0];
+};
+
+const calculateWarrantyMonths = (ngayMua: string, hanBh: string): number => {
+  if (!ngayMua || !hanBh) return 0;
+  const start = new Date(ngayMua);
+  const end = new Date(hanBh);
+  if (isNaN(start.getTime()) || isNaN(end.getTime())) return 0;
+  const diffMonths = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth());
+  return diffMonths > 0 ? diffMonths : 0;
+};
 
 export default function EquipmentPage() {
   const { user } = useAuth();
@@ -97,6 +136,7 @@ export default function EquipmentPage() {
   const [tbData, setTbData] = useState<any[]>([]);
   const [nkData, setNkData] = useState<any[]>([]);
   const [nhansuData, setNhansuData] = useState<Personnel[]>([]);
+  const [nccList, setNccList] = useState<NhaCungCap[]>([]);
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -122,6 +162,7 @@ export default function EquipmentPage() {
   const [isTbModalOpen, setIsTbModalOpen] = useState(false);
   const [tbModalMode, setTbModalMode] = useState<'create' | 'update'>('create');
   const [tbFormData, setTbFormData] = useState<any>({});
+  const [showAllNccGroups, setShowAllNccGroups] = useState(false);
   const [isPasteModalOpen, setIsPasteModalOpen] = useState(false);
   const [showNhomTBTooltip, setShowNhomTBTooltip] = useState(false);
   const [isAddDropdownOpen, setIsAddDropdownOpen] = useState(false);
@@ -288,10 +329,18 @@ export default function EquipmentPage() {
   const loadData = async () => {
     setLoading(true); setError(null);
     try {
-      const [dvResult, tbResult, nkResult, nsResult] = await Promise.all([
-        apiService.getDonVi(), apiService.getThietBi(), apiService.getNhatKyThietBi(), apiService.getPersonnel().catch(() => [])
+      const [dvResult, tbResult, nkResult, nsResult, nccResult] = await Promise.all([
+        apiService.getDonVi(),
+        apiService.getThietBi(),
+        apiService.getNhatKyThietBi(),
+        apiService.getPersonnel().catch(() => []),
+        apiService.getNhaCungCap().catch(() => [])
       ]);
-      setDonViList(dvResult || []); setTbData(tbResult || []); setNkData(nkResult || []); setNhansuData(nsResult || []);
+      setDonViList(dvResult || []);
+      setTbData(tbResult || []);
+      setNkData(nkResult || []);
+      setNhansuData(nsResult || []);
+      setNccList(nccResult || []);
     } catch (err: any) { setError(err.message || 'Lỗi tải dữ liệu Trang thiết bị.'); }
     finally { setLoading(false); }
   };
@@ -318,6 +367,15 @@ export default function EquipmentPage() {
   }, [donViList]);
 
   const allowedDonViIds = useAllowedUnits(donViList);
+
+  const displayedNccList = useMemo(() => {
+    if (showAllNccGroups || !tbFormData.nhom_thiet_bi) return nccList;
+    const allowedDichVuGroups = mapNhomThietBiToNhomDichVu(tbFormData.nhom_thiet_bi);
+    return nccList.filter(ncc =>
+      allowedDichVuGroups.includes(ncc.nhom_dich_vu) ||
+      ncc.id === tbFormData.id_ncc
+    );
+  }, [nccList, showAllNccGroups, tbFormData.nhom_thiet_bi, tbFormData.id_ncc]);
 
   const hasInitializedRef = useRef(false);
 
@@ -447,13 +505,19 @@ export default function EquipmentPage() {
   const openTbModal = (mode: 'create' | 'update', item?: any) => {
     setTbModalMode(mode);
     const defaultDonViId = user?.id_don_vi || (user as any)?.idDonVi;
+    setShowAllNccGroups(false); // Reset to show filtered list by default
 
-    if (item) { setTbFormData({ ...item }); }
-    else {
+    if (item) {
+      const initialMonths = calculateWarrantyMonths(item.ngay_mua, item.han_bao_hanh);
+      setTbFormData({
+        ...item,
+        so_thang_bh: initialMonths > 0 ? initialMonths : ''
+      });
+    } else {
       setTbFormData({
         id: '', id_don_vi: selectedUnitFilter || (defaultDonViId !== 'ALL' ? defaultDonViId : ''), tai_san_thuoc: '', ma_tai_san: '', ten_thiet_bi: '', nhom_thiet_bi: '',
         so_luong: '1', don_vi_tinh: 'Cái', vi_tri_bo_tri: '', mo_ta_dac_diem: '', quy_cach_chat_lieu: '', thong_so_ky_thuat: '',
-        nha_cung_cap: '', ngay_mua: '', gia_mua: '', han_bao_hanh: '', thoi_gian_khau_hao: '', tinh_trang: 'Đang sử dụng', link_hinh_anh: '', link_ho_so: '',
+        nha_cung_cap: '', id_ncc: null, ngay_mua: '', gia_mua: '', han_bao_hanh: '', so_thang_bh: '', thoi_gian_khau_hao: '', tinh_trang: 'Đang sử dụng', link_hinh_anh: '', link_ho_so: '',
         so_seri: '', cpu: '', ram: '', ssd: '', hdd: '', vga: '', man_hinh: '', phu_kien: ''
       });
     }
@@ -642,7 +706,19 @@ export default function EquipmentPage() {
         };
 
         const ngay_mua = convertToIsoDate(item.ngay_mua);
-        const han_bao_hanh = convertToIsoDate(item.han_bao_hanh);
+        
+        let han_bao_hanh = '';
+        const rawBh = String(item.han_bao_hanh || '').trim();
+        if (rawBh) {
+          const monthsVal = Number(rawBh);
+          if (!isNaN(monthsVal) && monthsVal > 0 && monthsVal < 120) {
+            if (ngay_mua) {
+              han_bao_hanh = calculateWarrantyExpiry(ngay_mua, monthsVal);
+            }
+          } else {
+            han_bao_hanh = convertToIsoDate(rawBh);
+          }
+        }
 
         // Xử lý Tình trạng (nếu rỗng hoặc sai thì mặc định Đang sử dụng)
         const validStatuses = [
@@ -660,6 +736,12 @@ export default function EquipmentPage() {
           }
         }
 
+        const nccName = item.nha_cung_cap ? String(item.nha_cung_cap).trim() : '';
+        const matchedNcc = nccList.find(n =>
+          n.ten_cong_ty.trim().toLowerCase() === nccName.toLowerCase() ||
+          (n.ten_goi_tat && n.ten_goi_tat.trim().toLowerCase() === nccName.toLowerCase())
+        );
+
         // Chuẩn hóa dữ liệu thiết bị sạch sẽ
         const cleanItem: any = {
           id_don_vi,
@@ -669,7 +751,8 @@ export default function EquipmentPage() {
           so_luong,
           don_vi_tinh: item.don_vi_tinh ? String(item.don_vi_tinh).trim() : 'Cái',
           vi_tri_bo_tri: item.vi_tri_bo_tri ? String(item.vi_tri_bo_tri).trim() : '',
-          nha_cung_cap: item.nha_cung_cap ? String(item.nha_cung_cap).trim() : '',
+          nha_cung_cap: nccName,
+          id_ncc: matchedNcc ? matchedNcc.id : null,
           ngay_mua: ngay_mua || null,
           gia_mua: gia_mua || null,
           han_bao_hanh: han_bao_hanh || null,
@@ -722,6 +805,10 @@ export default function EquipmentPage() {
     if (!tbFormData.nhom_thiet_bi) return toast.warning("Vui lòng chọn hoặc nhập Nhóm Thiết bị!");
 
     let finalData = { ...tbFormData };
+    if (finalData.id_ncc === 'custom') {
+      finalData.id_ncc = null;
+    }
+    delete finalData.so_thang_bh;
     if (!isITEquipment(finalData.nhom_thiet_bi)) {
       ['cpu', 'ram', 'ssd', 'hdd', 'vga', 'man_hinh'].forEach(k => finalData[k] = '');
     }
@@ -762,7 +849,29 @@ export default function EquipmentPage() {
 
   const handleTbChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    setTbFormData(prev => ({ ...prev, [name]: name === 'gia_mua' ? value.replace(/\D/g, '') : value }));
+    setTbFormData((prev: any) => {
+      const updated = { ...prev, [name]: name === 'gia_mua' ? value.replace(/\D/g, '') : value };
+      
+      if (name === 'so_thang_bh') {
+        const months = parseInt(value, 10);
+        if (!isNaN(months) && months > 0) {
+          updated.han_bao_hanh = calculateWarrantyExpiry(updated.ngay_mua, months);
+        } else {
+          updated.han_bao_hanh = '';
+        }
+      } else if (name === 'han_bao_hanh') {
+        updated.so_thang_bh = value ? calculateWarrantyMonths(updated.ngay_mua, value) || '' : '';
+      } else if (name === 'ngay_mua') {
+        const months = parseInt(updated.so_thang_bh, 10);
+        if (!isNaN(months) && months > 0) {
+          updated.han_bao_hanh = calculateWarrantyExpiry(value, months);
+        } else if (updated.han_bao_hanh) {
+          updated.so_thang_bh = calculateWarrantyMonths(value, updated.han_bao_hanh) || '';
+        }
+      }
+      
+      return updated;
+    });
   };
 
   const isCustomGroup = tbFormData.nhom_thiet_bi === 'Khác' || (tbFormData.nhom_thiet_bi && !ASSET_GROUPS.includes(tbFormData.nhom_thiet_bi));
@@ -1138,9 +1247,9 @@ export default function EquipmentPage() {
                   <th className="p-4 w-32">Mã / Nhóm</th>
                   <th className="p-4 w-56">Tên Tài sản / Thiết bị</th>
                   <th className="p-4 w-32">Vị trí &amp; SL</th>
-                  <th className="p-4 w-40">Đơn Vị / Pháp Nhân</th>
+                  <th className="p-4 w-50">Đơn Vị / Pháp Nhân</th>
                   <th className="p-4">Thông số / Mô tả</th>
-                  <th className="p-4 w-32">Tình trạng</th>
+                  <th className="p-4 w-30">Tình trạng</th>
                   <th className="p-4 text-center w-36">Thao tác</th>
                 </tr>
               </thead>
@@ -1694,30 +1803,103 @@ export default function EquipmentPage() {
                   </div>
                 )}
 
-                {/* KHỐI 3: KẾ TOÁN & HỒ SƠ (FLEX ROW LAYOUT) */}
+                {/* KHỐI 3: KẾ TOÁN & HỒ SƠ */}
                 <div className="bg-gray-50 p-5 rounded-xl border border-gray-200">
                   <h4 className="font-bold text-gray-800 mb-4 flex items-center gap-2"><div className="w-2 h-6 bg-gray-400 rounded-full"></div> 3. Hồ sơ Mua sắm & Kế toán</h4>
                   <div className="flex flex-col gap-4">
 
-                    {/* Dòng 1: NCC (50%) - Ngày mua (25%) - Hạn BH (25%) */}
+                    {/* Dòng 1: Nhà Cung cấp */}
                     <div className="flex flex-col md:flex-row gap-4">
-                      <div className="w-full md:w-2/4">
-                        <label className="block text-xs font-bold text-gray-700 mb-1">Nhà cung cấp</label>
-                        <input type="text" name="nha_cung_cap" value={tbFormData.nha_cung_cap || ''} onChange={handleTbChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" />
-                      </div>
-                      <div className="w-full md:w-1/4">
-                        <label className="block text-xs font-bold text-gray-700 mb-1">Ngày mua</label>
-                        <input type="date" name="ngay_mua" value={tbFormData.ngay_mua || ''} onChange={handleTbChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" />
-                      </div>
-                      <div className="w-full md:w-1/4">
-                        <label className="block text-xs font-bold text-gray-700 mb-1">Hạn bảo hành</label>
-                        <input type="date" name="han_bao_hanh" value={tbFormData.han_bao_hanh || ''} onChange={handleTbChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" />
+                      <div className="w-full">
+                        <div className="flex justify-between items-center mb-1">
+                          <label className="block text-xs font-bold text-gray-700">Nhà cung cấp</label>
+                          <label className="flex items-center gap-1.5 text-[11px] text-indigo-600 font-bold cursor-pointer hover:text-indigo-850 select-none">
+                            <input
+                              type="checkbox"
+                              checked={showAllNccGroups}
+                              onChange={(e) => setShowAllNccGroups(e.target.checked)}
+                              className="w-3.5 h-3.5 rounded text-indigo-600 border-gray-300 focus:ring-indigo-500 cursor-pointer"
+                            />
+                            <span>Tất cả NCC</span>
+                          </label>
+                        </div>
+                        {tbFormData.id_ncc === 'custom' ? (
+                          <div className="relative">
+                            <input
+                              type="text"
+                              name="nha_cung_cap"
+                              value={tbFormData.nha_cung_cap || ''}
+                              onChange={handleTbChange}
+                              placeholder="Nhập tên nhà cung cấp tự do..."
+                              className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] pr-10 font-semibold"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setTbFormData(prev => ({ ...prev, id_ncc: null, nha_cung_cap: '' }));
+                              }}
+                              className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#05469B] p-1 rounded-full hover:bg-gray-100 transition-colors"
+                              title="Quay lại danh sách chọn"
+                            >
+                              <History size={16} />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex gap-2">
+                            <select
+                              name="id_ncc"
+                              value={tbFormData.id_ncc || ''}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                if (val === 'custom') {
+                                  setTbFormData(prev => ({ ...prev, id_ncc: 'custom', nha_cung_cap: '' }));
+                                } else {
+                                  const selectedNcc = nccList.find(ncc => ncc.id === val);
+                                  setTbFormData(prev => ({
+                                    ...prev,
+                                    id_ncc: val || null,
+                                    nha_cung_cap: selectedNcc ? selectedNcc.ten_cong_ty : ''
+                                  }));
+                                }
+                              }}
+                              className="flex-1 p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-semibold text-gray-700"
+                            >
+                              <option value="">-- Chọn Nhà cung cấp --</option>
+                              {displayedNccList.map(ncc => (
+                                <option key={ncc.id} value={ncc.id}>
+                                  {ncc.ten_cong_ty}
+                                </option>
+                              ))}
+                              <option value="custom" className="text-[#05469B] font-bold">+ Khác (Tự nhập)</option>
+                            </select>
+                          </div>
+                        )}
                       </div>
                     </div>
 
-                    {/* Dòng 2: Đơn giá (30%) - Khấu hao (20%) - Link hồ sơ (50%) */}
-                    <div className="flex flex-col md:flex-row gap-4">
-                      <div className="w-full md:w-[30%]">
+                    {/* Dòng 2: Ngày mua - Thời hạn BH (Tháng) - Hạn bảo hành - Đơn giá - Khấu hao (Tháng) */}
+                    <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1">Ngày mua</label>
+                        <input type="date" name="ngay_mua" value={tbFormData.ngay_mua || ''} onChange={handleTbChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1">Thời hạn BH (tháng)</label>
+                        <input
+                          type="number"
+                          name="so_thang_bh"
+                          value={tbFormData.so_thang_bh || ''}
+                          onChange={handleTbChange}
+                          min={0}
+                          placeholder="VD: 12"
+                          className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-semibold text-gray-800"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1">Hạn bảo hành</label>
+                        <input type="date" name="han_bao_hanh" value={tbFormData.han_bao_hanh || ''} onChange={handleTbChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" />
+                      </div>
+                      <div>
                         <label className="block text-xs font-bold text-red-600 mb-1">Đơn giá (VNĐ)</label>
                         <input
                           type="text"
@@ -1731,11 +1913,15 @@ export default function EquipmentPage() {
                           className={`w-full p-2.5 border border-red-200 rounded-lg bg-red-50 text-red-700 outline-none focus:ring-2 focus:ring-red-500 font-bold ${hasRule('TB_HIDE_PRICE') ? 'opacity-60 cursor-not-allowed bg-gray-50 text-gray-500 border-gray-200' : ''}`}
                         />
                       </div>
-                      <div className="w-full md:w-[20%]">
+                      <div>
                         <label className="block text-xs font-bold text-gray-700 mb-1">Khấu hao (Tháng)</label>
                         <input type="number" name="thoi_gian_khau_hao" value={tbFormData.thoi_gian_khau_hao || ''} onChange={handleTbChange} placeholder="VD: 36" className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" />
                       </div>
-                      <div className="w-full md:w-[50%]">
+                    </div>
+
+                    {/* Dòng 3: Link Hồ sơ */}
+                    <div className="flex flex-col md:flex-row gap-4">
+                      <div className="w-full">
                         <label className="block text-xs font-bold text-gray-700 mb-1">Link Hồ sơ (BB Bàn giao, Phiếu xuất kho, Hợp đồng...)</label>
                         <div className="relative">
                           <FileText className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
@@ -1866,7 +2052,7 @@ export default function EquipmentPage() {
                           {nk.hinh_anh_minh_chung && <a href={nk.hinh_anh_minh_chung} target="_blank" rel="noreferrer" className="text-[10px] font-bold text-blue-500 flex items-center gap-1 mb-2 hover:underline"><ImageIcon size={12} /> Xem ảnh minh chứng</a>}
 
                           {nk.chi_phi && Number(nk.chi_phi) > 0 && (
-                            <p className="text-xs text-red-600 bg-red-50 p-1.5 rounded mb-1 font-bold border border-red-100">Chi phí: {formatCurrency(nk.chi_phi)} VNĐ</p>
+                            <p className="text-xs text-red-600 bg-red-50 p-1.5 rounded mb-1 font-bold border border-red-100">Chi phí: {formatCurrency(nk.chi_phi)}</p>
                           )}
                           {nk.ghi_chu_sua_chua_nang_cap && <p className="text-xs text-orange-700 bg-orange-50 p-1.5 rounded mb-1 border border-orange-100">Ghi chú: {nk.ghi_chu_sua_chua_nang_cap}</p>}
                           {nk.tinh_trang_ghi_nhan_thiet_bi && <p className="text-xs text-gray-600 bg-gray-50 p-1.5 rounded border border-gray-100">Khác: {nk.tinh_trang_ghi_nhan_thiet_bi}</p>}
@@ -1959,10 +2145,29 @@ export default function EquipmentPage() {
                 <div>
                   <p className="text-xs text-gray-500 font-bold mb-1">Nguyên giá</p>
                   <p className="font-bold text-red-600">
-                    {hasRule('TB_HIDE_PRICE') ? '***' : `${formatCurrency(viewData.gia_mua)} đ`}
+                    {hasRule('TB_HIDE_PRICE') ? '***' : formatCurrency(viewData.gia_mua)}
                   </p>
                 </div>
-                <div><p className="text-xs text-gray-500 font-bold mb-1">Nhà cung cấp</p><p className="font-semibold text-gray-800">{viewData.nha_cung_cap || '-'}</p></div>
+                <div>
+                  <p className="text-xs text-gray-500 font-bold mb-1">Nhà cung cấp</p>
+                  {(() => {
+                    const matchedNcc = nccList.find(n => n.id === viewData.id_ncc);
+                    if (matchedNcc) {
+                      const displayPhone = matchedNcc.sdt_lh || matchedNcc.sdt_ddpl;
+                      return (
+                        <div className="space-y-0.5">
+                          <p className="font-bold text-gray-800 uppercase leading-snug">{matchedNcc.ten_cong_ty}</p>
+                          {displayPhone && (
+                            <p className="text-xs">
+                              📞 <a href={`tel:${String(displayPhone).replace(/\D/g, '')}`} className="text-[#05469B] font-bold hover:underline">{displayPhone}</a>
+                            </p>
+                          )}
+                        </div>
+                      );
+                    }
+                    return <p className="font-semibold text-gray-850">{viewData.nha_cung_cap || '-'}</p>;
+                  })()}
+                </div>
                 <div className="md:col-span-4"><p className="text-xs text-gray-500 font-bold mb-1">Mô tả ngoại hình / Ghi chú</p><p className="font-medium text-gray-700 bg-white p-2 rounded border border-gray-100">{viewData.mo_ta_dac_diem || '-'}</p></div>
               </div>
 
@@ -1987,7 +2192,7 @@ export default function EquipmentPage() {
                             {nk.tinh_trang_ghi_nhan_thiet_bi && <p className="text-[11px] font-bold text-orange-700 mb-1 border-l-2 border-orange-400 pl-2">Tình trạng: {nk.tinh_trang_ghi_nhan_thiet_bi}</p>}
                             {nk.hinh_anh_minh_chung && <a href={nk.hinh_anh_minh_chung} target="_blank" rel="noreferrer" className="text-[10px] font-bold text-blue-500 flex items-center gap-1 mb-2 hover:underline"><ImageIcon size={12} /> Xem ảnh minh chứng</a>}
 
-                            {nk.chi_phi && Number(nk.chi_phi) > 0 && (<p className="text-xs text-red-600 bg-red-50 p-1.5 rounded mb-1 font-bold border border-red-100">Chi phí: {formatCurrency(nk.chi_phi)} VNĐ</p>)}
+                            {nk.chi_phi && Number(nk.chi_phi) > 0 && (<p className="text-xs text-red-600 bg-red-50 p-1.5 rounded mb-1 font-bold border border-red-100">Chi phí: {formatCurrency(nk.chi_phi)}</p>)}
                             {nk.ghi_chu_sua_chua_nang_cap && <p className="text-xs text-orange-700 bg-orange-50 p-1.5 rounded mb-1 border border-orange-100">Ghi chú: {nk.ghi_chu_sua_chua_nang_cap}</p>}
                             {nk.tinh_trang_ghi_nhan_thiet_bi && <p className="text-xs text-gray-600 bg-gray-50 p-1.5 rounded border border-gray-100">Khác: {nk.tinh_trang_ghi_nhan_thiet_bi}</p>}
                           </div>

@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { X, Loader2, Save, Utensils, Briefcase, Pocket } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { X, Loader2, Save, Utensils, Briefcase, Pocket, History, Filter } from 'lucide-react';
 import { apiService } from '../../services/api';
 import { toast } from "../../utils/toast";
+import { NhaCungCap } from '../../types';
 
 const formatCurrency = (val: string | number | undefined | null) => {
   if (!val) return '';
@@ -10,7 +11,7 @@ const formatCurrency = (val: string | number | undefined | null) => {
 
 const EMPTY_FORM = {
   id: '', id_don_vi: '', dinh_bien: '', pvhc_khach_cho: '', pvhc_ve_sinh: '',
-  hien_huu: '', pvhc_dich_vu: '', vi_tri: '', ncc_dich_vu: '', chi_phi_thue: ''
+  hien_huu: '', pvhc_dich_vu: '', vi_tri: '', ncc_dich_vu: '', chi_phi_thue: '', id_ncc: null
 };
 
 interface Props {
@@ -26,15 +27,54 @@ export default function PvhcModal({ isOpen, currentData, selectedUnitId, onSaved
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [nccList, setNccList] = useState<NhaCungCap[]>([]);
+  const [loadingNcc, setLoadingNcc] = useState(false);
+  const [selectedNccGroup, setSelectedNccGroup] = useState<string>('ALL');
+
   useEffect(() => {
     if (isOpen) {
       setError(null);
-      setFormData(currentData
-        ? { ...currentData, id: currentData.id || '' }
-        : { ...EMPTY_FORM, id: `HC${Date.now()}`, id_don_vi: selectedUnitId || '' }
-      );
+      setSelectedNccGroup('ALL');
+      const initialForm = currentData
+        ? { ...currentData, id: currentData.id || '', id_ncc: currentData.id_ncc || null }
+        : { ...EMPTY_FORM, id: `HC${Date.now()}`, id_don_vi: selectedUnitId || '' };
+      
+      setFormData(initialForm);
+
+      setLoadingNcc(true);
+      apiService.getNhaCungCap()
+        .then(res => {
+          setNccList(res || []);
+          // Tự động khớp nhà cung cấp cũ qua tên nếu chưa có id_ncc
+          if (currentData && !currentData.id_ncc && currentData.ncc_dich_vu) {
+            const name = String(currentData.ncc_dich_vu).trim().toLowerCase();
+            const matched = (res || []).find(n => 
+              n.ten_cong_ty.trim().toLowerCase() === name || 
+              (n.ten_goi_tat && n.ten_goi_tat.trim().toLowerCase() === name)
+            );
+            if (matched) {
+              setFormData((prev: any) => ({ ...prev, id_ncc: matched.id }));
+            }
+          }
+        })
+        .catch(err => console.error('Lỗi lấy danh sách NCC:', err))
+        .finally(() => setLoadingNcc(false));
     }
   }, [isOpen, currentData, selectedUnitId]);
+
+  const displayedNccList = useMemo(() => {
+    const logisticsGroups = ['Nước uống', 'Xử lý chất thải & Vệ sinh', 'Tạp phẩm', 'Môi trường, cảnh quan', 'Đồng phục', 'Khác'];
+    if (selectedNccGroup === 'ALL') {
+      return nccList.filter(ncc => 
+        logisticsGroups.includes(ncc.nhom_dich_vu) || 
+        ncc.id === formData.id_ncc
+      );
+    }
+    return nccList.filter(ncc => 
+      ncc.nhom_dich_vu === selectedNccGroup || 
+      ncc.id === formData.id_ncc
+    );
+  }, [nccList, selectedNccGroup, formData.id_ncc]);
 
   if (!isOpen) return null;
 
@@ -59,6 +99,11 @@ export default function PvhcModal({ isOpen, currentData, selectedUnitId, onSaved
       finalData.vi_tri = null; 
       finalData.ncc_dich_vu = null; 
       finalData.chi_phi_thue = null; 
+      finalData.id_ncc = null;
+    }
+
+    if (finalData.id_ncc === 'custom') {
+      finalData.id_ncc = null;
     }
 
     // 🟢 Dọn dẹp dữ liệu: Tự động chuyển các chuỗi rỗng còn lại thành null
@@ -121,7 +166,92 @@ export default function PvhcModal({ isOpen, currentData, selectedUnitId, onSaved
             </div>
             {Number(formData.pvhc_dich_vu) > 0 && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 pt-4 border-t border-orange-100 animate-in fade-in">
-                <div><label className="block text-xs font-bold text-gray-700 mb-1">Nhà cung cấp *</label><input type="text" required name="ncc_dich_vu" value={formData.ncc_dich_vu || ''} onChange={handleChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-orange-500" /></div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1 flex items-center justify-between">
+                    <span>Nhà cung cấp dịch vụ *</span>
+                    {loadingNcc && <Loader2 className="w-3.5 h-3.5 animate-spin text-gray-400" />}
+                  </label>
+                  
+                  {/* Quick filters for Supplier categories */}
+                  {formData.id_ncc !== 'custom' && (
+                    <div className="mb-2 flex flex-wrap gap-1.5 items-center">
+                      <span className="text-[10px] font-bold text-gray-400 uppercase mr-0.5">Lọc:</span>
+                      {[
+                        { value: 'ALL', label: 'Hậu cần' },
+                        { value: 'Nước uống', label: 'Nước' },
+                        { value: 'Xử lý chất thải & Vệ sinh', label: 'Vệ sinh' },
+                        { value: 'Tạp phẩm', label: 'Tạp phẩm' },
+                        { value: 'Khác', label: 'Khác' }
+                      ].map(grp => (
+                        <button
+                          key={grp.value}
+                          type="button"
+                          onClick={() => setSelectedNccGroup(grp.value)}
+                          className={`px-2 py-0.5 text-[9px] font-bold rounded-md border transition-all ${
+                            selectedNccGroup === grp.value
+                              ? 'bg-orange-500 text-white border-orange-500 shadow-sm'
+                              : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
+                          }`}
+                        >
+                          {grp.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {formData.id_ncc === 'custom' ? (
+                    <div className="relative">
+                      <input
+                        type="text"
+                        required
+                        name="ncc_dich_vu"
+                        value={formData.ncc_dich_vu || ''}
+                        onChange={handleChange}
+                        placeholder="Nhập tên nhà cung cấp tự do..."
+                        className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-orange-500 pr-10 font-semibold"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFormData(prev => ({ ...prev, id_ncc: null, ncc_dich_vu: '' }));
+                        }}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-orange-500 p-1 rounded-full hover:bg-gray-100 transition-colors"
+                        title="Quay lại danh sách chọn"
+                      >
+                        <History size={16} />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      <select
+                        name="id_ncc"
+                        value={formData.id_ncc || ''}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val === 'custom') {
+                            setFormData(prev => ({ ...prev, id_ncc: 'custom', ncc_dich_vu: '' }));
+                          } else {
+                            const selectedNcc = nccList.find(ncc => ncc.id === val);
+                            setFormData(prev => ({
+                              ...prev,
+                              id_ncc: val || null,
+                              ncc_dich_vu: selectedNcc ? selectedNcc.ten_cong_ty : ''
+                            }));
+                          }
+                        }}
+                        className="flex-1 p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-orange-500 font-semibold text-gray-700 text-sm"
+                      >
+                        <option value="">-- Chọn Nhà cung cấp --</option>
+                        {displayedNccList.map(ncc => (
+                          <option key={ncc.id} value={ncc.id}>
+                            [{ncc.nhom_dich_vu}] {ncc.ten_cong_ty}
+                          </option>
+                        ))}
+                        <option value="custom" className="text-orange-600 font-bold">+ Khác (Tự nhập)</option>
+                      </select>
+                    </div>
+                  )}
+                </div>
                 <div><label className="block text-xs font-bold text-red-600 mb-1">Chi phí thuê / tháng (VNĐ) *</label><input type="text" required name="chi_phi_thue" value={formatCurrency(formData.chi_phi_thue)} onChange={handleChange} className="w-full p-2.5 border border-red-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-red-500 font-bold text-red-600" /></div>
               </div>
             )}

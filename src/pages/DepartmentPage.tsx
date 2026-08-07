@@ -13,7 +13,7 @@ import {
   PhoneCall, PlusCircle, ShieldCheck, CheckCircle2, Siren, AlertTriangle, Eye
 } from 'lucide-react';
 import { apiService } from '../services/api';
-import { DonVi, Personnel, AnNinh, PhapNhan, PhongHop, TS_Xe, ThietBi } from '../types';
+import { DonVi, Personnel, AnNinh, PhapNhan, PhongHop, TS_Xe, ThietBi, NhaCungCap } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { formatCurrency, formatPhoneNumber, toUnaccented, stripAccents, normalizeDateToISO, safeGet } from '../utils/formatters';
 import PnModal from '../components/department/PnModal';
@@ -158,6 +158,7 @@ export default function DepartmentPage() {
   const [xeData, setXeData] = useState<TS_Xe[]>([]);
   const [thietBiData, setThietBiData] = useState<ThietBi[]>([]);
   const [pvhcData, setPvhcData] = useState<any[]>([]);
+  const [nccList, setNccList] = useState<NhaCungCap[]>([]);
 
   const [pcccData, setPcccData] = useState<any[]>([]);
   const [tsPcccData, setTsPcccData] = useState<any[]>([]);
@@ -210,7 +211,7 @@ export default function DepartmentPage() {
   const loadData = async () => {
     setLoading(true); setError(null);
     try {
-      const [dvResult, nsResult, anResult, pnResult, phResult, xeResult, tbResult, pvhcResult, pcResult, atvsldResult, pcttResult, tsPcccResult] = await Promise.all([
+      const [dvResult, nsResult, anResult, pnResult, phResult, xeResult, tbResult, pvhcResult, pcResult, atvsldResult, pcttResult, tsPcccResult, nccResult] = await Promise.all([
         apiService.getDonVi(), apiService.getPersonnel(), apiService.getAnNinh(), apiService.getPhapNhan(),
         apiService.getPhongHop ? apiService.getPhongHop() : Promise.resolve([]),
         apiService.getXe ? apiService.getXe().catch(() => []) : Promise.resolve([]),
@@ -219,10 +220,11 @@ export default function DepartmentPage() {
         apiService.getPCCC ? apiService.getPCCC().catch(() => []) : Promise.resolve([]),
         apiService.getATVSLD ? apiService.getATVSLD().catch(() => []) : Promise.resolve([]),
         apiService.getPCTT ? apiService.getPCTT().catch(() => []) : Promise.resolve([]),
-        apiService.getTsPCCC ? apiService.getTsPCCC().catch(() => []) : Promise.resolve([])
+        apiService.getTsPCCC ? apiService.getTsPCCC().catch(() => []) : Promise.resolve([]),
+        apiService.getNhaCungCap ? apiService.getNhaCungCap().catch(() => []) : Promise.resolve([])
       ]);
       setData(dvResult || []); setPersonnelData(nsResult || []); setAnNinhData(anResult || []); setPhapNhanData(pnResult || []); setPhongHopData(phResult || []);
-      setXeData(xeResult || []); setThietBiData(tbResult || []); setPvhcData(pvhcResult || []);
+      setXeData(xeResult || []); setThietBiData(tbResult || []); setPvhcData(pvhcResult || []); setNccList(nccResult || []);
 
       const cleanPccc = (pcResult || []).map((item: any) => ({
         ...item,
@@ -1202,7 +1204,7 @@ export default function DepartmentPage() {
                             <div className="bg-blue-50 p-2 rounded-lg border border-blue-100 text-center"><p className="text-[10px] font-bold text-blue-600 uppercase">Tổng ANBV</p><p className="text-lg font-black text-[#05469B]">{aggregatedSecurity.tongANBV}</p></div>
                             <div className="bg-emerald-50 p-2 rounded-lg border border-emerald-100 text-center"><p className="text-[10px] font-bold text-emerald-600 uppercase">Nội bộ</p><p className="text-lg font-black text-emerald-700">{aggregatedSecurity.noiBo}</p></div>
                             <div className="bg-orange-50 p-2 rounded-lg border border-orange-100 text-center"><p className="text-[10px] font-bold text-orange-600 uppercase">Dịch vụ ngoài</p><p className="text-lg font-black text-orange-700">{aggregatedSecurity.dichVu}</p></div>
-                            <div className="bg-red-50 p-2 rounded-lg border border-red-100 text-center"><p className="text-[10px] font-bold text-red-600 uppercase">Phí thuê/tháng</p><p className="text-sm font-black text-red-700 mt-1">{formatCurrency(aggregatedSecurity.chiPhi)} đ</p></div>
+                            <div className="bg-red-50 p-2 rounded-lg border border-red-100 text-center"><p className="text-[10px] font-bold text-red-600 uppercase">Phí thuê/tháng</p><p className="text-sm font-black text-red-700 mt-1">{formatCurrency(aggregatedSecurity.chiPhi)}</p></div>
                           </div>
                         </div>
                         <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
@@ -1280,7 +1282,7 @@ export default function DepartmentPage() {
                       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
 
                         {/* CỘT 1: LỰC LƯỢNG BV */}
-                        <div className="lg:col-span-5 bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex flex-col">
+                        <div className="lg:col-span-6 bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex flex-col">
                           <h4 className="font-bold text-[#05469B] mb-4 flex items-center gap-2 border-b border-gray-100 pb-2"><Users size={18} /> Lực lượng BV, ĐTKH</h4>
                           <div className="space-y-3 text-sm flex-1">
                             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-0"><span className="text-gray-500 font-medium whitespace-nowrap shrink-0">Tổng ANBV / Định biên:</span><span className="font-black text-[#05469B] sm:text-right">{currentAnNinh.tong_bv || 0} / {currentAnNinh.dinh_bien_bv || 0}</span></div>
@@ -1294,11 +1296,37 @@ export default function DepartmentPage() {
                                 </div>
                                 <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-1 sm:gap-0">
                                   <span className="text-gray-500 font-medium whitespace-nowrap shrink-0">Nhà cung cấp:</span>
-                                  <span className="font-bold text-gray-800 sm:text-right uppercase break-words">{currentAnNinh.ncc_dich_vu || '---'}</span>
+                                  {(() => {
+                                    const matchedNcc = nccList.find(n => n.id === currentAnNinh.id_ncc);
+                                    if (matchedNcc) {
+                                      const displayPhone = matchedNcc.sdt_lh || matchedNcc.sdt_ddpl || matchedNcc.sdt_dau_moi;
+                                      const contactPerson = matchedNcc.dau_moi || matchedNcc.dai_dien_phap_luat;
+                                      return (
+                                        <div className="flex flex-col items-start sm:items-end">
+                                          <span className="font-bold text-gray-800 sm:text-right uppercase sm:whitespace-nowrap">{matchedNcc.ten_cong_ty}</span>
+                                          {(contactPerson || displayPhone) && (
+                                            <span className="text-xs text-gray-500 mt-0.5 sm:text-right">
+                                              Đầu mối:
+                                              {contactPerson && <span className="font-bold text-gray-700"> {contactPerson}</span>}
+                                              {displayPhone && (
+                                                <>
+                                                  {" - "}
+                                                  <a href={`tel:${String(displayPhone).replace(/\D/g, '')}`} className="text-[#05469B] font-bold hover:underline">
+                                                    {displayPhone}
+                                                  </a>
+                                                </>
+                                              )}
+                                            </span>
+                                          )}
+                                        </div>
+                                      );
+                                    }
+                                    return <span className="font-bold text-gray-800 sm:text-right uppercase break-words">{currentAnNinh.ncc_dich_vu || '---'}</span>;
+                                  })()}
                                 </div>
                                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-0">
                                   <span className="text-gray-500 font-medium whitespace-nowrap shrink-0">Chi phí thuê:</span>
-                                  <span className="font-black text-red-600 sm:text-right">{formatCurrency(currentAnNinh.chi_phi_thue) || '0'} VNĐ/tháng</span>
+                                  <span className="font-black text-red-600 sm:text-right">{currentAnNinh.chi_phi_thue && currentAnNinh.chi_phi_thue !== '0' && currentAnNinh.chi_phi_thue !== 0 ? `${Number(currentAnNinh.chi_phi_thue).toLocaleString('vi-VN')} VNĐ/tháng` : 'Chưa cập nhật'}</span>
                                 </div>
                                 <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-1 sm:gap-0">
                                   <span className="text-gray-500 font-medium whitespace-nowrap shrink-0 mt-0.5">Thời hạn HĐ:</span>
@@ -1337,7 +1365,7 @@ export default function DepartmentPage() {
                         </div>
 
                         {/* CỘT 2: ĐẶC ĐIỂM ĐỊA BÀN (Có thông tin Hàng rào) */}
-                        <div className="lg:col-span-7 bg-emerald-50/50 p-5 rounded-xl border border-emerald-100 shadow-sm flex flex-col h-full">
+                        <div className="lg:col-span-6 bg-emerald-50/50 p-5 rounded-xl border border-emerald-100 shadow-sm flex flex-col h-full">
                           <h4 className="font-bold text-emerald-700 mb-4 flex items-center gap-2 border-b border-emerald-200 pb-2"><Compass size={18} /> Đặc điểm Địa bàn & Phương án</h4>
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-5 flex-1">
                             {[
@@ -1871,7 +1899,7 @@ export default function DepartmentPage() {
                         <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-between"><p className="text-[11px] font-bold text-blue-600 uppercase mb-2">Hiện hữu / Định biên</p><p className="text-2xl font-black text-[#05469B]">{aggregatedPvhc.hienHuu} / {aggregatedPvhc.dinhBien}</p></div>
                         <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-between"><p className="text-[11px] font-bold text-emerald-600 uppercase mb-2">Hậu cần Nội bộ</p><p className="text-xs text-gray-500 font-medium">Chờ: {aggregatedPvhc.khachCho} | VS: {aggregatedPvhc.veSinh}</p><p className="text-2xl font-black text-emerald-700">{aggregatedPvhc.khachCho + aggregatedPvhc.veSinh}</p></div>
                         <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-between"><p className="text-[10px] font-bold text-orange-600 uppercase mb-2">Dịch vụ Thuê ngoài</p><p className="text-2xl font-black text-orange-700">{aggregatedPvhc.dichVu}</p></div>
-                        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-between"><p className="text-[10px] font-bold text-red-600 uppercase mb-2">Tổng Phí thuê/tháng</p><p className="text-lg font-black text-red-700">{formatCurrency(aggregatedPvhc.chiPhi)} đ</p></div>
+                        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-between"><p className="text-[10px] font-bold text-red-600 uppercase mb-2">Tổng Phí thuê/tháng</p><p className="text-lg font-black text-red-700">{formatCurrency(aggregatedPvhc.chiPhi)}</p></div>
                       </div>
                     </div>
                   )}
@@ -1892,8 +1920,38 @@ export default function DepartmentPage() {
                           <div className="space-y-4 flex-1">
                             <div className="flex justify-between items-center p-3 bg-orange-50 rounded-lg border border-orange-100"><span className="text-orange-800 font-semibold text-sm">Nhân sự dịch vụ</span><span className="text-orange-700 font-black">{currentPvhc.pvhc_dich_vu || 0} Người</span></div>
                             <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg border border-gray-100"><span className="text-gray-600 font-semibold text-sm">Vị trí đảm nhận</span><span className="text-gray-800 font-bold text-right break-words">{currentPvhc.vi_tri || '---'}</span></div>
-                            <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg border border-gray-100"><span className="text-gray-600 font-semibold text-sm">Nhà cung cấp</span><span className="text-gray-800 font-black uppercase text-right break-words">{currentPvhc.ncc_dich_vu || '---'}</span></div>
-                            <div className="flex justify-between items-center p-3 bg-red-50 rounded-lg border border-red-100"><span className="text-red-800 font-semibold text-sm">Chi phí thuê / tháng</span><span className="text-red-600 font-black">{formatCurrency(currentPvhc.chi_phi_thue) || 0} VNĐ</span></div>
+                            {(() => {
+                              const matchedNcc = nccList.find(n => n.id === currentPvhc.id_ncc);
+                              if (matchedNcc) {
+                                const displayPhone = matchedNcc.sdt_lh || matchedNcc.sdt_ddpl || matchedNcc.sdt_dau_moi;
+                                const contactPerson = matchedNcc.dau_moi || matchedNcc.dai_dien_phap_luat;
+                                return (
+                                  <div className="flex justify-between items-start p-3 bg-gray-50 rounded-lg border border-gray-100 w-full text-sm">
+                                    <span className="text-gray-600 font-semibold shrink-0">Nhà cung cấp</span>
+                                    <div className="text-right space-y-1 ml-2 max-w-[70%]">
+                                      <span className="font-black text-gray-800 uppercase block break-words leading-tight">{matchedNcc.ten_cong_ty}</span>
+                                      {contactPerson && (
+                                        <p className="text-xs text-gray-500 leading-none">
+                                          Đầu mối: <span className="font-bold text-gray-700">{contactPerson}</span>
+                                        </p>
+                                      )}
+                                      {displayPhone && (
+                                        <p className="text-xs leading-none">
+                                          📞 <a href={`tel:${String(displayPhone).replace(/\D/g, '')}`} className="text-[#05469B] font-bold hover:underline">{displayPhone}</a>
+                                        </p>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              }
+                              return (
+                                <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg border border-gray-100 w-full">
+                                  <span className="text-gray-600 font-semibold text-sm">Nhà cung cấp</span>
+                                  <span className="text-gray-800 font-black uppercase text-right break-words">{currentPvhc.ncc_dich_vu || '---'}</span>
+                                </div>
+                              );
+                            })()}
+                            <div className="flex justify-between items-center p-3 bg-red-50 rounded-lg border border-red-100"><span className="text-red-800 font-semibold text-sm">Chi phí thuê / tháng</span><span className="text-red-600 font-black">{currentPvhc.chi_phi_thue && currentPvhc.chi_phi_thue !== '0' && currentPvhc.chi_phi_thue !== 0 ? `${Number(currentPvhc.chi_phi_thue).toLocaleString('vi-VN')} VNĐ/tháng` : 'Chưa cập nhật'}</span></div>
                           </div>
                         </div>
                       ) : (<div className="bg-gray-50 p-5 rounded-2xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center text-gray-400"><Shield size={32} className="mb-2 opacity-30" /><p className="text-sm font-medium">Không có thuê ngoài dịch vụ</p></div>)}

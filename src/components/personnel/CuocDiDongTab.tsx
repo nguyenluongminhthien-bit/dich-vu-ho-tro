@@ -6,7 +6,7 @@ import {
   Pencil, ArrowLeftRight, UserPlus, PauseCircle, PlayCircle, XCircle, Zap, ChevronDown, Sparkles
 } from 'lucide-react';
 import { apiService } from '../../services/api';
-import { Personnel, DonVi, ThueBao, CuocThang, LichSuNSD } from '../../types';
+import { Personnel, DonVi, ThueBao, CuocThang, LichSuNSD, NhaCungCap } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
 import { toast } from '../../utils/toast';
 import { formatCurrencySpace, formatPhoneNumber } from '../../utils/formatters';
@@ -254,16 +254,20 @@ export default function CuocDiDongTab({
     visible: boolean;
   }>({ x: 0, y: 0, thang: '', tongCuoc: 0, dinhMuc: null, visible: false });
 
+  const [nccList, setNccList] = useState<NhaCungCap[]>([]);
+
   // Load Data
   const loadData = async () => {
     setLoading(true);
     try {
-      const [tbResult, cResult] = await Promise.all([
+      const [tbResult, cResult, nccResult] = await Promise.all([
         apiService.getThueBao(),
-        apiService.getCuocThang()
+        apiService.getCuocThang(),
+        apiService.getNhaCungCap().catch(() => [])
       ]);
       setThueBaoList(tbResult || []);
       setCuocList(cResult || []);
+      setNccList(nccResult || []);
     } catch (e: any) {
       toast.error('Lỗi khi tải dữ liệu cước ĐTDĐ: ' + e.message);
     } finally {
@@ -288,6 +292,11 @@ export default function CuocDiDongTab({
     document.addEventListener('mousedown', handleOutsideClick);
     return () => document.removeEventListener('mousedown', handleOutsideClick);
   }, []);
+
+  // Lọc danh sách Nhà cung cấp thuộc nhóm Viễn thông
+  const telecomNccList = useMemo(() => {
+    return nccList.filter(n => n.nhom_dich_vu === 'Viễn thông' || n.id === thueBaoModal.data.id_ncc);
+  }, [nccList, thueBaoModal.data.id_ncc]);
 
   // Lọc pháp nhân cho thanh bộ lọc và căn cứ chuẩn theo Đơn vị đang được lựa chọn bên Bộ lọc Đơn vị
   const filteredPhapNhansForFilter = useMemo(() => {
@@ -533,6 +542,7 @@ export default function CuocDiDongTab({
         loai_thue_bao: 'Cá nhân',
         trang_thai: 'Đang hoạt động',
         nha_mang: 'Viettel',
+        id_ncc: null,
         dinh_muc_cuoc: null,
         id_don_vi: selectedUnitFilter || ''
       },
@@ -545,10 +555,25 @@ export default function CuocDiDongTab({
 
   // Open Update Modal
   const openUpdateModal = (tb: ThueBao) => {
+    let initialData = { ...tb, id_ncc: tb.id_ncc || null };
+    // Khớp mã NCC tự động nếu là bản ghi cũ
+    if (!initialData.id_ncc && initialData.nha_mang) {
+      const name = String(initialData.nha_mang).trim().toLowerCase();
+      const matched = nccList.find(n =>
+        n.ten_cong_ty.trim().toLowerCase() === name ||
+        (n.ten_goi_tat && n.ten_goi_tat.trim().toLowerCase() === name) ||
+        name.includes(n.ten_goi_tat?.toLowerCase() || '') ||
+        (n.ten_goi_tat?.toLowerCase() || '').includes(name)
+      );
+      if (matched) {
+        initialData.id_ncc = matched.id;
+      }
+    }
+
     setThueBaoModal({
       open: true,
       mode: 'update',
-      data: { ...tb },
+      data: initialData,
       changeNVReason: '',
       showReasonInput: false,
       originalNhanSuId: tb.id_nhan_su || null
@@ -594,6 +619,9 @@ export default function CuocDiDongTab({
     try {
       let isCreate = mode === 'create';
       let payload = { ...formData };
+      if (payload.id_ncc === 'custom') {
+        payload.id_ncc = null;
+      }
 
       // Parse current JSON history list
       let historyList: LichSuNSD[] = [];
@@ -2093,22 +2121,71 @@ export default function CuocDiDongTab({
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">Nhà mạng *</label>
-                    <select
-                      required
-                      value={thueBaoModal.data.nha_mang || 'Viettel'}
-                      onChange={(e) => setThueBaoModal(prev => ({
-                        ...prev,
-                        data: { ...prev.data, nha_mang: e.target.value }
-                      }))}
-                      className="w-full p-2.5 border border-gray-200 dark:border-gray-700 rounded-lg bg-[#FFFFF0] dark:bg-gray-900 outline-none focus:ring-2 focus:ring-[#05469B] font-bold"
-                    >
-                      <option value="Viettel">Viettel</option>
-                      <option value="Vinaphone">Vinaphone</option>
-                      <option value="Mobifone">Mobifone</option>
-                      <option value="Vietnamobile">Vietnamobile</option>
-                      <option value="Reddi">Reddi</option>
-                    </select>
+                    <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1 flex items-center justify-between">
+                      <span>Nhà mạng *</span>
+                    </label>
+
+                    {thueBaoModal.data.id_ncc === 'custom' ? (
+                      <div className="relative">
+                        <input
+                          type="text"
+                          required
+                          value={thueBaoModal.data.nha_mang || ''}
+                          onChange={(e) => setThueBaoModal(prev => ({
+                            ...prev,
+                            data: { ...prev.data, nha_mang: e.target.value }
+                          }))}
+                          placeholder="Nhập tên nhà mạng..."
+                          className="w-full p-2.5 border border-gray-200 dark:border-gray-700 rounded-lg bg-[#FFFFF0] dark:bg-gray-900 outline-none focus:ring-2 focus:ring-[#05469B] pr-10 font-bold dark:text-gray-200"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setThueBaoModal(prev => ({
+                              ...prev,
+                              data: { ...prev.data, id_ncc: null, nha_mang: '' }
+                            }));
+                          }}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#05469B] p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-850 transition-colors"
+                          title="Quay lại danh sách chọn"
+                        >
+                          <History size={16} />
+                        </button>
+                      </div>
+                    ) : (
+                      <select
+                        required
+                        value={thueBaoModal.data.id_ncc || ''}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val === 'custom') {
+                            setThueBaoModal(prev => ({
+                              ...prev,
+                              data: { ...prev.data, id_ncc: 'custom', nha_mang: '' }
+                            }));
+                          } else {
+                            const selectedNcc = telecomNccList.find(ncc => ncc.id === val);
+                            setThueBaoModal(prev => ({
+                              ...prev,
+                              data: {
+                                ...prev.data,
+                                id_ncc: val || null,
+                                nha_mang: selectedNcc ? (selectedNcc.ten_goi_tat || selectedNcc.ten_cong_ty) : ''
+                              }
+                            }));
+                          }
+                        }}
+                        className="w-full p-2.5 border border-gray-200 dark:border-gray-700 rounded-lg bg-[#FFFFF0] dark:bg-gray-900 outline-none focus:ring-2 focus:ring-[#05469B] font-bold text-gray-750 dark:text-gray-300 text-sm"
+                      >
+                        <option value="">-- Chọn Nhà mạng / Đối tác --</option>
+                        {telecomNccList.map(ncc => (
+                          <option key={ncc.id} value={ncc.id}>
+                            {ncc.ten_cong_ty} {ncc.ten_goi_tat ? `(${ncc.ten_goi_tat})` : ''}
+                          </option>
+                        ))}
+                        <option value="custom" className="text-[#05469B] font-bold dark:text-blue-400">+ Khác (Tự nhập)</option>
+                      </select>
+                    )}
                   </div>
                 </div>
 
