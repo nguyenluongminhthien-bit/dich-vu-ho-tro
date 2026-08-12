@@ -66,11 +66,11 @@ src/
 | An toàn PCCC (`firesafety`) | `FireSafetyPage.tsx` (1117 dòng) | dùng chung `PcccModal` (ở `components/department/`) | `hs_pccc`, `ts_pccc` | ✅ |
 | ATVSLĐ (`atvsld`) | `AtvsldPage.tsx` (676 dòng) — có 4 tab cấp 1: `hoso`, `daotao` (2 tab con `kehoach`/`khoahoc`), `thietbi`, `khamsuckhoe` | `HoSoTab.tsx`, `KeHoachTab.tsx`, `KhoaHocTab.tsx` (975 dòng), `StrictEquipmentTab.tsx` (996 dòng), modal `AtvsldModal`, component `LineTabs.tsx` | `hs_an_toan_lao_dong` (hồ sơ), `hs_khoa_huan_luyen`+`hs_hoc_vien_khoa_huan_luyen` (khóa học), `ts_thiet_bi_nghiem_ngat`+`nk_kiem_dinh_tbnn` (thiết bị nghiêm ngặt), `dm_chu_ky_atvsld` (định nghĩa, chưa thấy nơi ghi/đọc trực tiếp — kiểm tra lại) | 🔧 Tab `khamsuckhoe` **CHƯA XÂY** — hiện chỉ là khung placeholder "sắp cập nhật" (xem mục 7) |
 | Phương tiện (`vehicles`) | `VehiclePage.tsx` (1380 dòng) | — | `ts_xe`, `cp_hoat_dong_xe` | ✅ |
-| Tài sản-Thiết bị (`equipments`) | `EquipmentPage.tsx` (1623 dòng) | — | `ts_thiet_bi`, `nk_thiet_bi` (nhật ký thiết bị) | ✅ |
+| Tài sản-Thiết bị (`equipments`) | `EquipmentPage.tsx` (3205 dòng) | `PasteImportModal`, `CustomAutocomplete` | `ts_thiet_bi`, `nk_thiet_bi`, `dm_phap_nhan` (lọc theo `id_don_vi`) | ✅ |
 | Nhà cung cấp (`suppliers`) | `SupplierPage.tsx` (khoảng 600 dòng) | modal xem chi tiết, modal thêm/sửa | `dm_ncc` | ✅ |
 | Tài liệu (`documents`) | `DocumentPage.tsx` (1674 dòng) | Các component con hiển thị bảng theo tab nằm trong `src/components/document/` (`AllDocTable.tsx`, `ThongBaoTable.tsx`, `QuyetDinhTable.tsx`, `CongVanDenTable.tsx`, `CongVanDiTable.tsx`, `ToTrinhTable.tsx`), file helper `documentHelpers.ts`, component `LineTabs.tsx`. | `vb_tb` | ✅ |
 | Quy định (`policies`) | `PolicyPage.tsx` (557 dòng) | — | `qd_qt` | ✅ |
-| Báo cáo (`reports`) | `ReportPage.tsx` (699 dòng) | `CustomReportBuilder`, `ReportConfigPanel`, `ReportFilterBar`, `ReportList` (có tích hợp khối Tải Form Nhập Hàng Loạt qua `excelTemplates.ts`), `ReportPreviewTable` | đọc tổng hợp nhiều bảng (`hs_an_ninh`, `dm_don_vi`, `ns_dich_vu`, `dm_phap_nhan`, `vb_tb`), không ghi | ✅ |
+| Báo cáo (`reports`) | `ReportPage.tsx` (699 dòng) | `CustomReportBuilder`, `ReportConfigPanel`, `ReportFilterBar`, `ReportList` (tích hợp khối Tải Form Nhập Hàng Loạt qua `excelTemplates.ts` đọc DB mẫu theo 3 tiêu chí), `ReportPreviewTable` | đọc tổng hợp nhiều bảng (`hs_an_ninh`, `dm_don_vi`, `ns_dich_vu`, `dm_phap_nhan`, `vb_tb`), không ghi | ✅ |
 | Tài khoản (`accounts`) | `AccountPage.tsx` (516 dòng) | — | `config_users` | ✅ |
 | Nhật ký (`logs`) | `LogPage.tsx` (146 dòng) | — | `sys_logs` (ghi qua `writeLog()` ở mọi `save()`/`deleteRecord()`) | ✅ |
 | Đăng nhập | `LoginPage.tsx` (131 dòng) | `AuthContext.tsx` | Supabase Auth | ✅ |
@@ -96,8 +96,19 @@ src/
 - ADMIN hoặc `id_don_vi` thuộc `HO`/`ALL`/chứa "TOÀN QUỐC" → xem toàn hệ thống.
 - `utils/hierarchy.ts` → `getDefaultUnitId()`: tính đơn vị mặc định khi tải trang (THACO AUTO đối với Admin/Toàn quyền, Đơn vị mẹ quản lý cấp tỉnh/thành đối với tài khoản showroom/con).
 
-## 7. NỢ KỸ THUẬT / VẤN ĐỀ ĐÃ XÁC MINH TRONG CODE
+## 7. NỢ KỸ THUẬT & CÁC CẢI TIẾN ĐÃ HOÀN THÀNH
 
+- [x] **Ràng buộc Đơn vị Quản lý ↔ Pháp nhân (Công ty sở hữu)**: Trong Modal Thêm/Sửa thiết bị (`EquipmentPage.tsx`), chọn Đơn vị quản lý tự động lọc danh sách pháp nhân thuộc Đơn vị đó (`dm_phap_nhan` theo `id_don_vi`), hỗ trợ sổ xuống chọn chính xác đối với đơn vị có nhiều pháp nhân trực thuộc.
+- [x] **Chuẩn hóa Giao diện Nhập liệu**: Màu nền `#FFFFF0` nhẹ dịu, chữ màu đen rõ ràng và cỡ chữ đồng nhất giữa tất cả các trường dữ liệu trên Modal Thêm mới/Chỉnh sửa thiết bị.
+- [x] **Làm sạch Chuỗi Kỹ thuật & Tự thêm đơn vị GB (`utils/formatters.ts`)**: 
+  - `cleanTechnicalString`: Xóa khoảng trắng thừa quanh dấu gạch ngang (VD: `i7 - 1185G7` thành `i7-1185G7`).
+  - `formatMemorySize`: Nhập số thuần (`512`, `16`) hay chữ dính (`512gb`, `16GB`) $\rightarrow$ tự động gắn đơn vị chuẩn **`512 GB`**, **`16 GB`**. Áp dụng cả khi Dán Excel hàng loạt lẫn Nhập/Sửa từng thiết bị.
+- [x] **Form Mẫu Excel Tải Xuất Từ DB theo 3 Tiêu chí (`utils/excelTemplates.ts`)**:
+  - Tải Form Mẫu Nhập Hàng Loạt cho **Trang thiết bị văn phòng** và **Nhân sự** tự động trích xuất 01 bản ghi mẫu từ DB thực tế theo ĐÚNG 3 tiêu chí: *1. Điền đầy đủ nhất*, *2. Mới nhất gần thời điểm hiện tại nhất*, *3. Mô tả chi tiết nhất*.
+- [x] **Hỗ trợ Đa nghiệp vụ (ngăn cách bằng dấu ";") cho Tài liệu & Quy định**:
+  - Tự động tách chuỗi nghiệp vụ ghép (VD: `"Kinh doanh; Nhân sự"`) thành các tag/badge độc lập trên mọi bảng danh sách tài liệu và modal chi tiết.
+  - Cập nhật danh sách nhóm nghiệp vụ bên trái ở `PolicyPage.tsx` để hiển thị các nghiệp vụ đơn lẻ, sửa đổi bộ lọc và logic đếm số lượng tài liệu chính xác.
+  - Nâng cấp `CustomAutocomplete` ở `DocumentPage.tsx` hỗ trợ tự nhận diện từ khóa và điền gợi ý thông minh sau dấu `;`.
 - [ ] **`utils/logger.ts` và `utils/logger.tsx` trùng nhau** — cả 2 cùng export `generateDiffLog()`. Cần xác định file nào đang thực sự được import và xóa file còn lại.
 - [ ] Tab **"Khám sức khỏe & Bệnh nghề nghiệp"** trong `AtvsldPage.tsx` mới chỉ là khung placeholder (dòng ~624), CHƯA có bảng Supabase, CHƯA có component riêng — cần tạo `SucKhoeTab.tsx` + bảng mới nếu muốn triển khai.
 - [ ] Bảng `dm_chu_ky_atvsld` có hàm `getChuKyATVSLD()` trong `modules.ts` nhưng KHÔNG tìm thấy nơi nào trong `components/`/`pages/` gọi hàm này hoặc dùng chuỗi `'dm_chu_ky_atvsld'` trực tiếp — khả năng là bảng chưa được nối vào UI, hoặc đã lệch tên biến. Cần kiểm tra lại thủ công trước khi phát triển thêm module ATVSLĐ.

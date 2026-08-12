@@ -89,6 +89,10 @@ QTVP-ASDS App
 
 #### 💻 07. Phân hệ Quản lý Trang thiết bị & QR Code (EquipmentPage.tsx)
 - **Master Thiết bị CNTT & Văn phòng**: Quản lý mã tài sản, tên thiết bị, nhóm, thông số kỹ thuật (CPU, RAM, SSD, VGA, màn hình...), hạn bảo hành, nhà cung cấp.
+- **Ràng buộc Đơn vị Quản lý ↔ Pháp nhân (Công ty sở hữu)**: Khi chọn Đơn vị quản lý trong Modal Thêm/Sửa thiết bị, trường **Tài sản thuộc Pháp nhân** tự động lọc danh sách các pháp nhân thuộc Đơn vị quản lý đó (`dm_phap_nhan` theo `id_don_vi`), hỗ trợ sổ xuống chọn chuẩn xác ngay cả với các đơn vị có nhiều pháp nhân trực thuộc.
+- **Chuẩn hóa Màu sắc & Giao diện Nhập liệu**: Đồng nhất màu nền `#FFFFF0` nhẹ dịu, chữ màu đen rõ ràng và font size đồng nhất giữa tất cả các trường dữ liệu trên bảng Thêm mới / Cập nhật tài sản.
+- **Tự động Làm sạch Chuỗi Kỹ thuật (`cleanTechnicalString`)**: Tự động loại bỏ khoảng trắng thừa quanh dấu gạch ngang (VD: `i7 - 1185G7` thành `i7-1185G7`, `Core i5 - 1135G7` thành `Core i5-1135G7`). Áp dụng tự động cho CPU, VGA, Mã tài sản, Số seri.
+- **Tự động Định dạng Đơn vị GB (`formatMemorySize`)**: Nhập số thuần (VD: `512`, `16`, `256`) hay chữ dính liền (`512gb`, `16GB`) $\rightarrow$ tự động gắn đơn vị chuẩn **`512 GB`**, **`16 GB`**, **`256 GB`**. Áp dụng đồng bộ cả khi Dán Excel hàng loạt lẫn Nhập/Sửa từng thiết bị đơn lẻ.
 - **Nhật ký Thiết bị (NhatKyThietBi)**: Ghi nhận lịch sử bàn giao người sử dụng, phòng ban quản lý, lịch sử sửa chữa, nâng cấp, báo hỏng, chi phí.
 - **Deep Link & Quét mã QR**: Tạo mã QR tài sản (`qrcode.react`), hỗ trợ quét mã QR qua camera (`html5-qrcode`) hoặc truy cập thẳng qua URL `/?tab=equipment&qr=MÃ_TÀI_SẢN` để mở ngay chi tiết thiết bị.
 
@@ -104,16 +108,19 @@ QTVP-ASDS App
   - Chỉ đơn vị ban hành hoặc HO Admin mới có quyền Sửa/Xóa văn bản đó.
   - Các đơn vị khác chỉ có quyền Xem (Read-only).
 - **Auto-fill Người lấy số**: Nhập mã nhân viên tự động điền Họ tên và Bộ phận lấy số.
+- **Hỗ trợ Đa nghiệp vụ**: Cho phép nhập nhiều phân loại nghiệp vụ ngăn cách bởi dấu `;`. Giao diện bảng danh sách tài liệu (`AllDocTable.tsx`, `ThongBaoTable.tsx`, `QuyetDinhTable.tsx`, `CongVanDiTable.tsx`, `ToTrinhTable.tsx`) tự động tách chuỗi theo dấu `;` để hiển thị thành các tag nghiệp vụ độc lập, gọn gàng.
+- **Autocomplete Nhiều giá trị**: Ô nhập liệu Nghiệp vụ tự động gợi ý thông minh dựa trên phần văn bản sau dấu `;` cuối cùng và điền tiếp nối một cách chuẩn xác mà không đè lên giá trị đã nhập trước đó.
 
 #### 📜 10. Phân hệ Quản lý Quy định & Quy trình (PolicyPage.tsx)
 - Lưu trữ, phân loại và tra cứu các quy định hành chính, quy trình làm việc chuẩn áp dụng trong toàn hệ thống.
+- **Xử lý Đa nghiệp vụ Đồng bộ**: Tự động đồng bộ và tách các chuỗi nghiệp vụ ghép từ phân hệ Văn bản. Danh sách nhóm nghiệp vụ bên trái chỉ chứa các nghiệp vụ đơn lẻ, sạch sẽ. Bộ lọc và số lượng đếm tài liệu cho mỗi nghiệp vụ được xử lý chính xác tuyệt đối.
 
 #### 📊 11. Phân hệ Báo cáo Tổng hợp & Custom Builder (ReportPage.tsx)
 - **Mẫu báo cáo Cấu trúc Đơn vị (`ReportList.tsx`)**: Tổng hợp sơ đồ và thông tin liên hệ đơn vị.
 - **Mẫu báo cáo Pháp nhân Hóa đơn**: Tổng hợp mã số thuế và tên công ty xuất hóa đơn.
 - **Mẫu báo cáo Khảo sát An ninh Bảo vệ 13 mục**: Cho phép xuất file Excel đa Worksheet (mỗi đơn vị/showroom 1 Sheet) theo đúng chuẩn khảo sát AN-BV.
 - **Trình dựng Báo cáo Tùy chỉnh (`CustomReportBuilder.tsx`)**: Cho phép chọn bảng dữ liệu, chọn cột hiển thị, thiết lập bộ lọc và xuất file Excel theo ý muốn.
-- **Tải Form Nhập Hàng Loạt**: Tích hợp khu vực tải tập trung 4 biểu mẫu dán Excel chuẩn hóa (Nhân sự, Học viên ATVSLĐ, Thiết bị nghiêm ngặt, Trang thiết bị văn phòng) ngay bên dưới mục "VĂN BẢN". Mỗi file tải về bao gồm cấu trúc cột hoàn chỉnh và kèm theo đúng 1 dòng dữ liệu ví dụ thực tế hợp lệ (đáp ứng đầy đủ các kiểm duyệt định dạng ngày tháng `dd/mm/yyyy`, CCCD, nhóm,...), giúp người dùng dễ tham khảo và chạy thử nghiệm dán mẫu thành công không phát sinh lỗi.
+- **Tải Form Nhập Hàng Loạt Chuẩn DB theo 3 Tiêu chí**: Tích hợp khu vực tải tập trung 4 biểu mẫu dán Excel chuẩn hóa. Đặc biệt đối với **Trang thiết bị văn phòng** và **Nhân sự**, file Excel mẫu `.xls` được tạo tự động bằng cách quét 100% dữ liệu thực tế đang có trong DB và áp dụng thuật toán trích xuất 01 bản ghi mẫu theo đúng 3 tiêu chí: *1. Điền đầy đủ thông tin nhất*, *2. Thời gian thêm mới gần nhất với hiện tại*, *3. Mô tả chi tiết nhất*. Dữ liệu dòng mẫu 100% là dữ liệu thật thực tế từ hệ thống của người dùng.
 
 #### 👤 12. Phân hệ Quản lý Tài khoản (AccountPage.tsx)
 - **Quản lý Người dùng**: Tạo mới, cập nhật thông tin tài khoản, cấp lại mật khẩu.
