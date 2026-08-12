@@ -1299,8 +1299,8 @@ export default function DepartmentPage() {
                                   {(() => {
                                     const matchedNcc = nccList.find(n => n.id === currentAnNinh.id_ncc);
                                     if (matchedNcc) {
-                                      const displayPhone = matchedNcc.sdt_lh || matchedNcc.sdt_ddpl || matchedNcc.sdt_dau_moi;
                                       const contactPerson = matchedNcc.dau_moi || matchedNcc.dai_dien_phap_luat;
+                                      const displayPhone = matchedNcc.dau_moi ? (matchedNcc.sdt_dau_moi || matchedNcc.sdt_ddpl) : (matchedNcc.sdt_ddpl || matchedNcc.sdt_dau_moi);
                                       return (
                                         <div className="flex flex-col items-start sm:items-end">
                                           <span className="font-bold text-gray-800 sm:text-right uppercase sm:whitespace-nowrap">{matchedNcc.ten_cong_ty}</span>
@@ -1923,8 +1923,8 @@ export default function DepartmentPage() {
                             {(() => {
                               const matchedNcc = nccList.find(n => n.id === currentPvhc.id_ncc);
                               if (matchedNcc) {
-                                const displayPhone = matchedNcc.sdt_lh || matchedNcc.sdt_ddpl || matchedNcc.sdt_dau_moi;
                                 const contactPerson = matchedNcc.dau_moi || matchedNcc.dai_dien_phap_luat;
+                                const displayPhone = matchedNcc.dau_moi ? (matchedNcc.sdt_dau_moi || matchedNcc.sdt_ddpl) : (matchedNcc.sdt_ddpl || matchedNcc.sdt_dau_moi);
                                 return (
                                   <div className="flex justify-between items-start p-3 bg-gray-50 rounded-lg border border-gray-100 w-full text-sm">
                                     <span className="text-gray-600 font-semibold shrink-0">Nhà cung cấp</span>

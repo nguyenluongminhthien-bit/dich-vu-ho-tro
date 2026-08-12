@@ -69,8 +69,10 @@ export const AllDocTable: React.FC<DocumentTableProps> = ({
                       )}
                     </div>
                     {item.nghiep_vu && item.nghiep_vu.trim() !== '' && !/Chưa phân loại|Chưa PL|Trống/i.test(item.nghiep_vu.trim()) && (
-                      <div className="mt-1 flex items-center gap-1.5">
-                        <span className="text-[9px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded uppercase tracking-wide shrink-0">{item.nghiep_vu}</span>
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {item.nghiep_vu.split(';').map(p => p.trim()).filter(Boolean).map((nv, idx) => (
+                          <span key={idx} className="text-[9px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded uppercase tracking-wide shrink-0">{nv}</span>
+                        ))}
                       </div>
                     )}
                   </td>
@@ -204,7 +206,11 @@ export const AllDocTable: React.FC<DocumentTableProps> = ({
                   <span className="text-[9px] font-bold text-gray-600 bg-gray-100 px-1.5 py-0.5 rounded uppercase">{item.phan_loai}</span>
                   {isMatDocument(item.mat) && <span className="text-[9px] font-black text-red-600 bg-red-100 px-1.5 py-0.5 rounded flex items-center gap-0.5 border border-red-200"><Lock size={10}/> MẬT</span>}
                   {item.nghiep_vu && item.nghiep_vu.trim() !== '' && !/Chưa phân loại|Chưa PL|Trống/i.test(item.nghiep_vu.trim()) && (
-                    <span className="text-[9px] font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded uppercase border border-indigo-100">{item.nghiep_vu}</span>
+                    <div className="flex flex-wrap gap-1">
+                      {item.nghiep_vu.split(';').map(p => p.trim()).filter(Boolean).map((nv, idx) => (
+                        <span key={idx} className="text-[9px] font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded uppercase border border-indigo-100">{nv}</span>
+                      ))}
+                    </div>
                   )}
                 </div>
               </div>

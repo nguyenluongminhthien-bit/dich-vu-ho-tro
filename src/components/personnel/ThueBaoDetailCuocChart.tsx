@@ -85,12 +85,17 @@ export default function ThueBaoDetailCuocChart({ thueBao, cuocList, dinhMuc }: P
 
   // Giá trị lớn nhất của trục Oy để vẽ biểu đồ
   const maxOy = useMemo(() => {
-    let max = (nguongDinhMuc || 100000) * 1.35;
+    // Đặt giá trị khởi điểm dựa trên định mức hoặc 100.
+    let max = (nguongDinhMuc || 100) * 1.35;
     chartData.forEach(d => {
       if (d.currVal !== null && d.currVal > max) max = d.currVal * 1.15;
       if (d.prevVal !== null && d.prevVal > max) max = d.prevVal * 1.15;
     });
-    return Math.max(max, 300000);
+
+    // Tự động nhận diện đơn vị: nếu max > 5000 thì dùng mốc tối thiểu là 300,000 VNĐ,
+    // ngược lại (đơn vị nghìn đồng) thì dùng mốc tối thiểu là 300.
+    const minLimit = max > 5000 ? 300000 : 300;
+    return Math.max(max, minLimit);
   }, [chartData, nguongDinhMuc]);
 
   // Thông số vẽ SVG (Hệ tọa độ)
@@ -156,7 +161,7 @@ export default function ThueBaoDetailCuocChart({ thueBao, cuocList, dinhMuc }: P
           {nguongDinhMuc !== null ? (
             <div className="flex items-center gap-1.5">
               <span className="w-4 h-0.5 bg-[#EF4444] inline-block"></span>
-              <span className="text-red-600 dark:text-red-400 font-bold">Định mức: {formatCurrency(nguongDinhMuc)}đ</span>
+              <span className="text-red-600 dark:text-red-400 font-bold">Định mức: {formatCurrency(maxOy > 5000 ? nguongDinhMuc : nguongDinhMuc * 1000)}đ</span>
             </div>
           ) : (
             <div className="flex items-center gap-1.5 bg-blue-50 dark:bg-blue-950/40 px-2.5 py-0.5 rounded border border-blue-200 dark:border-blue-800">
@@ -192,9 +197,9 @@ export default function ThueBaoDetailCuocChart({ thueBao, cuocList, dinhMuc }: P
                   textAnchor="end"
                   className="fill-gray-400 dark:fill-gray-500 font-bold text-[10px]"
                 >
-                  {val >= 1000000
-                    ? `${(val / 1000000).toFixed(1)}M`
-                    : `${Math.round(val / 1000)}k`}
+                  {maxOy > 5000
+                    ? (val >= 1000000 ? `${(val / 1000000).toFixed(1)}M` : `${Math.round(val / 1000)}k`)
+                    : `${Math.round(val)}k`}
                 </text>
               </g>
             );
@@ -291,7 +296,7 @@ export default function ThueBaoDetailCuocChart({ thueBao, cuocList, dinhMuc }: P
                 textAnchor="end"
                 className="fill-red-500 font-extrabold text-[9px]"
               >
-                ĐM {formatCurrency(nguongDinhMuc)}
+                ĐM {formatCurrency(maxOy > 5000 ? nguongDinhMuc : nguongDinhMuc * 1000)}
               </text>
             </g>
           )}
@@ -324,7 +329,7 @@ export default function ThueBaoDetailCuocChart({ thueBao, cuocList, dinhMuc }: P
               <div className="flex justify-between items-center">
                 <span className="text-gray-600 dark:text-gray-400">Năm hiện tại ({currYear}):</span>
                 <span className="font-black text-[#00529C] dark:text-blue-400">
-                  {tooltip.currVal !== null ? `${formatCurrency(tooltip.currVal)} VNĐ` : 'Chưa có'}
+                  {tooltip.currVal !== null ? `${formatCurrency(maxOy > 5000 ? tooltip.currVal : tooltip.currVal * 1000)} VNĐ` : 'Chưa có'}
                 </span>
               </div>
 
@@ -332,7 +337,7 @@ export default function ThueBaoDetailCuocChart({ thueBao, cuocList, dinhMuc }: P
               <div className="flex justify-between items-center">
                 <span className="text-gray-600 dark:text-gray-400">Năm trước ({prevYear}):</span>
                 <span className="font-bold text-[#808080] dark:text-gray-400">
-                  {tooltip.prevVal !== null ? `${formatCurrency(tooltip.prevVal)} VNĐ` : 'Chưa có'}
+                  {tooltip.prevVal !== null ? `${formatCurrency(maxOy > 5000 ? tooltip.prevVal : tooltip.prevVal * 1000)} VNĐ` : 'Chưa có'}
                 </span>
               </div>
 
@@ -351,7 +356,7 @@ export default function ThueBaoDetailCuocChart({ thueBao, cuocList, dinhMuc }: P
                   >
                     {tooltip.diff > 0 && <TrendingUp size={13} className="shrink-0" />}
                     {tooltip.diff < 0 && <TrendingDown size={13} className="shrink-0" />}
-                    {tooltip.diff > 0 ? '+' : ''}{formatCurrency(tooltip.diff)} VNĐ
+                    {tooltip.diff > 0 ? '+' : ''}{formatCurrency(maxOy > 5000 ? tooltip.diff : tooltip.diff * 1000)} VNĐ
                   </span>
                 </div>
               )}

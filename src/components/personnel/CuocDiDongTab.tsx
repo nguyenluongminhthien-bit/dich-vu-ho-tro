@@ -92,7 +92,55 @@ const parseNum = (s?: string | null): number =>
 
 const parseExcelNum = (s?: string | null): number => {
   if (!s || s === '-' || s.trim() === '-' || s.trim() === '---') return 0;
-  return parseFloat(String(s).replace(/[^0-9.-]/g, '')) || 0;
+  let str = String(s).trim();
+  
+  // Kiểm tra nếu có cả dấu chấm và dấu phẩy (VD: 215.000,50 hoặc 215,000.50)
+  if (str.includes('.') && str.includes(',')) {
+    const dotIdx = str.indexOf('.');
+    const commaIdx = str.indexOf(',');
+    if (dotIdx < commaIdx) {
+      // Định dạng VN: 215.000,50
+      const integerPart = str.split(',')[0].replace(/\./g, '');
+      const decimalPart = str.split(',')[1];
+      return parseFloat(`${integerPart}.${decimalPart}`) || 0;
+    } else {
+      // Định dạng US: 215,000.50
+      const integerPart = str.split('.')[0].replace(/,/g, '');
+      const decimalPart = str.split('.')[1];
+      return parseFloat(`${integerPart}.${decimalPart}`) || 0;
+    }
+  }
+  
+  // Chỉ có dấu chấm (VD: 215.000 hoặc 215.5)
+  if (str.includes('.')) {
+    const parts = str.split('.');
+    const lastPart = parts[parts.length - 1];
+    if (lastPart.length === 3) {
+      // Dấu chấm là phân cách hàng nghìn (VD: 215.000)
+      return parseInt(str.replace(/\./g, ''), 10) || 0;
+    } else {
+      // Dấu chấm là phân cách thập phân (VD: 215.5)
+      const integerPart = parts.slice(0, -1).join('');
+      return parseFloat(`${integerPart}.${lastPart}`) || 0;
+    }
+  }
+  
+  // Chỉ có dấu phẩy (VD: 215,000 hoặc 215,5)
+  if (str.includes(',')) {
+    const parts = str.split(',');
+    const lastPart = parts[parts.length - 1];
+    if (lastPart.length === 3) {
+      // Dấu phẩy là phân cách hàng nghìn (VD: 215,000)
+      return parseInt(str.replace(/,/g, ''), 10) || 0;
+    } else {
+      // Dấu phẩy là phân cách thập phân (VD: 215,5)
+      const integerPart = parts.slice(0, -1).join('');
+      return parseFloat(`${integerPart}.${lastPart}`) || 0;
+    }
+  }
+  
+  // Số thông thường không phân cách
+  return parseFloat(str.replace(/[^0-9.-]/g, '')) || 0;
 };
 
 export default function CuocDiDongTab({

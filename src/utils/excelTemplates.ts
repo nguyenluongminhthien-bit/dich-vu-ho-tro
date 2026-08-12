@@ -1,3 +1,6 @@
+import { INITIAL_MOCK_DATA } from '../services/api/mockData';
+import { getLocalRecords } from '../services/api/localStore';
+import { apiCache } from '../services/api/cache';
 import { toast } from './toast';
 
 export interface ExcelTemplateConfig {
@@ -63,25 +66,239 @@ export const EXCEL_TEMPLATES: Record<string, ExcelTemplateConfig> = {
       "Link hồ sơ", "Link hình ảnh"
     ],
     dummyRow: [
-      "TS0001", "Máy tính xách tay Dell Latitude 5420", "Văn phòng Sala", "Máy tính xách tay", "1",
-      "Cái", "Phòng họp lớn", "FPT Shop", "2024-01-01", "18500000",
-      "2026-01-01", "36 tháng", "Công ty", "Core i5-1135G7", "16GB",
-      "512GB", "", "Intel Iris Xe", "14 inch FHD", "Vỏ nhôm xám", "Đang sử dụng",
-      "Nhựa/Nhôm", "DELL5420-999", "Cáp sạc, túi chống sốc", "Mới 98%",
-      "http://link-ho-so.com", "http://link-hinh-anh.com"
+      "TS-IT-001", "PC Gaming Văn Phòng HP ProTower", "Showroom Bình Dương", "Máy móc CNTT (PC, Laptop, Server...)", "1",
+      "Bộ", "Phòng Kế Toán - Tầng 2", "Phong Vũ IT", "2023-05-10", "18500000",
+      "2025-05-10", "36 tháng", "Công ty sở hữu", "Core i7 12700", "16 GB",
+      "512 GB", "1 TB", "GTX 1650", "Dell 24 inch", "Core i7 12700, RAM 16 GB, SSD 512 GB", "Tốt",
+      "Kim loại/Nhựa", "PCDELL12345", "Chuột, phím, tai nghe", "Core i7, RAM 16GB, SSD 512GB",
+      "", ""
     ]
   }
 };
 
-export const downloadExcelTemplate = (moduleKey: keyof typeof EXCEL_TEMPLATES) => {
+export const getMostCompleteEquipmentDummyRow = (items: any[], donViMap?: Record<string, string>): string[] | undefined => {
+  if (!items || items.length === 0) return undefined;
+
+  const itemsWithScores = items.map((item, originalIndex) => {
+    let filledCount = 0;
+    let textLength = 0;
+
+    Object.keys(item).forEach(k => {
+      const val = item[k];
+      if (val !== undefined && val !== null && String(val).trim() !== '') {
+        filledCount += 1;
+        textLength += String(val).trim().length;
+      }
+    });
+
+    let recencyTimestamp = originalIndex;
+    const strId = String(item.id || item.ID || '');
+    const tsMatch = strId.match(/\d{10,}/);
+    if (tsMatch) {
+      recencyTimestamp = Number(tsMatch[0]);
+    } else if (item.created_at) {
+      const t = new Date(item.created_at).getTime();
+      if (!isNaN(t)) recencyTimestamp = t;
+    } else if (item.ngay_mua) {
+      const t = new Date(item.ngay_mua).getTime();
+      if (!isNaN(t)) recencyTimestamp = t;
+    }
+
+    return {
+      item,
+      filledCount,
+      textLength,
+      recencyTimestamp,
+      originalIndex
+    };
+  });
+
+  // Ưu tiên: filledCount cao nhất -> recencyTimestamp mới nhất -> textLength lớn nhất
+  itemsWithScores.sort((a, b) => {
+    if (b.filledCount !== a.filledCount) {
+      return b.filledCount - a.filledCount;
+    }
+    if (b.recencyTimestamp !== a.recencyTimestamp) {
+      return b.recencyTimestamp - a.recencyTimestamp;
+    }
+    if (b.textLength !== a.textLength) {
+      return b.textLength - a.textLength;
+    }
+    return b.originalIndex - a.originalIndex;
+  });
+
+  const bestItem = itemsWithScores[0]?.item;
+  if (!bestItem) return undefined;
+
+  const dvName = (donViMap && donViMap[bestItem.id_don_vi]) || bestItem.ten_don_vi || '';
+
+  return [
+    bestItem.ma_tai_san || '',
+    bestItem.ten_thiet_bi || '',
+    dvName || '',
+    bestItem.nhom_thiet_bi || '',
+    String(bestItem.so_luong !== undefined && bestItem.so_luong !== null ? bestItem.so_luong : '1'),
+    bestItem.don_vi_tinh || 'Cái',
+    bestItem.vi_tri_bo_tri || '',
+    bestItem.nha_cung_cap || '',
+    bestItem.ngay_mua || '',
+    bestItem.gia_mua !== undefined && bestItem.gia_mua !== null ? String(bestItem.gia_mua) : '',
+    bestItem.han_bao_hanh || '',
+    bestItem.thoi_gian_khau_hao || '',
+    bestItem.tai_san_thuoc || '',
+    bestItem.cpu || '',
+    bestItem.ram || '',
+    bestItem.ssd || '',
+    bestItem.hdd || '',
+    bestItem.vga || '',
+    bestItem.man_hinh || '',
+    bestItem.thong_so_ky_thuat || '',
+    bestItem.tinh_trang || 'Đang sử dụng',
+    bestItem.quy_cach_chat_lieu || '',
+    bestItem.so_seri || '',
+    bestItem.phu_kien || '',
+    bestItem.mo_ta_dac_diem || '',
+    bestItem.link_ho_so || '',
+    bestItem.link_hinh_anh || ''
+  ];
+};
+
+export const getMostCompletePersonnelDummyRow = (items: any[], donViMap?: Record<string, string>): string[] | undefined => {
+  if (!items || items.length === 0) return undefined;
+
+  const itemsWithScores = items.map((item, originalIndex) => {
+    let filledCount = 0;
+    let textLength = 0;
+
+    Object.keys(item).forEach(k => {
+      const val = item[k];
+      if (val !== undefined && val !== null && String(val).trim() !== '') {
+        filledCount += 1;
+        textLength += String(val).trim().length;
+      }
+    });
+
+    let recencyTimestamp = originalIndex;
+    const strId = String(item.id || item.ID || '');
+    const tsMatch = strId.match(/\d{10,}/);
+    if (tsMatch) {
+      recencyTimestamp = Number(tsMatch[0]);
+    } else if (item.created_at) {
+      const t = new Date(item.created_at).getTime();
+      if (!isNaN(t)) recencyTimestamp = t;
+    } else if (item.ngay_nhan_viec) {
+      const t = new Date(item.ngay_nhan_viec).getTime();
+      if (!isNaN(t)) recencyTimestamp = t;
+    }
+
+    return {
+      item,
+      filledCount,
+      textLength,
+      recencyTimestamp,
+      originalIndex
+    };
+  });
+
+  // Ưu tiên: filledCount cao nhất -> recencyTimestamp mới nhất -> textLength lớn nhất
+  itemsWithScores.sort((a, b) => {
+    if (b.filledCount !== a.filledCount) {
+      return b.filledCount - a.filledCount;
+    }
+    if (b.recencyTimestamp !== a.recencyTimestamp) {
+      return b.recencyTimestamp - a.recencyTimestamp;
+    }
+    if (b.textLength !== a.textLength) {
+      return b.textLength - a.textLength;
+    }
+    return b.originalIndex - a.originalIndex;
+  });
+
+  const bestItem = itemsWithScores[0]?.item;
+  if (!bestItem) return undefined;
+
+  const dvName = (donViMap && donViMap[bestItem.id_don_vi]) || bestItem.ten_don_vi || '';
+
+  return [
+    "1",
+    bestItem.ma_so_nhan_vien || bestItem.msnv || '',
+    bestItem.ho_ten || '',
+    bestItem.chuc_vu || bestItem.chuc_danh || '',
+    bestItem.bo_phan || bestItem.phong_ban || '',
+    dvName || '',
+    bestItem.showroom || '',
+    bestItem.phia || '',
+    bestItem.phan_loai || '',
+    bestItem.sdt_cong_ty || '',
+    bestItem.gioi_tinh || '',
+    bestItem.nam_sinh ? String(bestItem.nam_sinh) : '',
+    bestItem.ngay_nhan_viec || bestItem.ngay_lam || '',
+    bestItem.sdt_ca_nhan || '',
+    bestItem.email || '',
+    bestItem.ngach || '',
+    bestItem.nhom_atvsld ? String(bestItem.nhom_atvsld) : '',
+    bestItem.hl_tu || '',
+    bestItem.hl_den || '',
+    bestItem.gia_tri_den || '',
+    bestItem.khoi || '',
+    bestItem.dia_diem_lv || '',
+    bestItem.so_cccd || bestItem.cccd || '',
+    bestItem.the_thang !== undefined && bestItem.the_thang !== null ? String(bestItem.the_thang) : '',
+    bestItem.the_xe || '',
+    bestItem.hang_loai_xe || '',
+    bestItem.bien_kiem_soat || ''
+  ];
+};
+
+export const downloadExcelTemplate = (moduleKey: keyof typeof EXCEL_TEMPLATES, customDummyRow?: string[]) => {
   const config = EXCEL_TEMPLATES[moduleKey];
   if (!config) {
     console.error(`Không tìm thấy cấu hình form mẫu cho module: ${moduleKey}`);
     return;
   }
 
+  let rowToUse = customDummyRow && customDummyRow.length === config.headers.length ? customDummyRow : config.dummyRow;
+
+  if (moduleKey === 'office_equipment' && !customDummyRow) {
+    // Đọc dữ liệu từ live cache -> localStore -> initial mock
+    let itemsToScan: any[] = [];
+    if (apiCache['ts_thiet_bi']?.data && Array.isArray(apiCache['ts_thiet_bi'].data) && apiCache['ts_thiet_bi'].data.length > 0) {
+      itemsToScan = apiCache['ts_thiet_bi'].data;
+    } else {
+      const local = getLocalRecords('ts_thiet_bi');
+      itemsToScan = (local && local.length > 0) ? local : INITIAL_MOCK_DATA.ts_thiet_bi;
+    }
+
+    const donViList = getLocalRecords('dm_don_vi');
+    const donViMap: Record<string, string> = {};
+    if (donViList && Array.isArray(donViList)) {
+      donViList.forEach((u: any) => { donViMap[u.id] = u.ten_don_vi; });
+    }
+
+    const dbSample = getMostCompleteEquipmentDummyRow(itemsToScan, donViMap);
+    if (dbSample) rowToUse = dbSample;
+  } else if (moduleKey === 'personnel' && !customDummyRow) {
+    // Đọc dữ liệu từ live cache -> localStore -> initial mock cho nhân sự
+    let itemsToScan: any[] = [];
+    if (apiCache['ns_dich_vu']?.data && Array.isArray(apiCache['ns_dich_vu'].data) && apiCache['ns_dich_vu'].data.length > 0) {
+      itemsToScan = apiCache['ns_dich_vu'].data;
+    } else {
+      const local = getLocalRecords('ns_dich_vu');
+      itemsToScan = (local && local.length > 0) ? local : INITIAL_MOCK_DATA.ns_dich_vu;
+    }
+
+    const donViList = getLocalRecords('dm_don_vi');
+    const donViMap: Record<string, string> = {};
+    if (donViList && Array.isArray(donViList)) {
+      donViList.forEach((u: any) => { donViMap[u.id] = u.ten_don_vi; });
+    }
+
+    const dbSample = getMostCompletePersonnelDummyRow(itemsToScan, donViMap);
+    if (dbSample) rowToUse = dbSample;
+  }
+
   const headerHTML = config.headers.map(h => `<th>${h}</th>`).join('');
-  const dummyHTML = config.dummyRow.map(d => `<td>${d}</td>`).join('');
+  const dummyHTML = rowToUse.map(d => `<td>${d || ''}</td>`).join('');
 
   const tableHTML = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="UTF-8"><style>table { border-collapse: collapse; font-family: 'Arial', sans-serif; } th, td { border: 1px solid #000000; padding: 6px; vertical-align: middle; } .header { background-color: #d9e1f2; color: #000000; font-weight: bold; text-align: center; }</style></head><body><table><thead><tr class="header">${headerHTML}</tr></thead><tbody><tr>${dummyHTML}</tr></tbody></table></body></html>`;
 

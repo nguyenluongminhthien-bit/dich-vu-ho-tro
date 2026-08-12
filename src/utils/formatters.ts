@@ -87,3 +87,35 @@ export const safeGet = (obj: any, key: string): any => {
   }
   return '';
 };
+
+// 🟢 1. Hàm làm sạch ký tự kỹ thuật: Xóa khoảng trắng thừa xung quanh dấu gạch ngang (i7 - 1185G7 -> i7-1185G7)
+export const cleanTechnicalString = (str: any): string => {
+  if (!str) return '';
+  let result = String(str).trim();
+  // Xóa khoảng trắng quanh dấu gạch ngang giữa các từ/số
+  result = result.replace(/(\w+)\s*-\s*(\w+)/g, '$1-$2');
+  // Thu gọn nhiều khoảng trắng liên tiếp
+  result = result.replace(/\s+/g, ' ');
+  return result.trim();
+};
+
+// 🟢 2. Hàm tự động chuẩn hóa RAM, SSD, HDD: Thêm đơn vị GB nếu chỉ nhập số (512 -> 512 GB, 16gb -> 16 GB)
+export const formatMemorySize = (val: any): string => {
+  if (!val) return '';
+  let str = String(val).trim();
+  if (!str) return '';
+
+  // Nếu là số nguyên (VD: 512, 16, 256, 8, 32, 1000)
+  if (/^\d+$/.test(str)) {
+    return `${str} GB`;
+  }
+
+  // Nếu dính liền chữ gb hoặc GB (VD: 512gb, 16GB, 256Gb)
+  if (/^\d+\s*gb$/i.test(str)) {
+    const num = str.replace(/\D/g, '');
+    return `${num} GB`;
+  }
+
+  // Thu gọn khoảng trắng thừa
+  return str.replace(/\s+/g, ' ').trim();
+};

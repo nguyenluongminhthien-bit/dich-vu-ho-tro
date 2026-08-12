@@ -65,8 +65,10 @@ export const CongVanDiTable: React.FC<DocumentTableProps> = ({
                       <span className="text-[8px] font-black text-white bg-red-500 px-1.5 py-0.5 rounded animate-pulse uppercase tracking-wider">Mới</span>
                     )}
                     {item.nghiep_vu && item.nghiep_vu.trim() !== '' && !/Chưa phân loại|Chưa PL|Trống/i.test(item.nghiep_vu.trim()) && (
-                      <div className="mt-1 flex items-center gap-1.5">
-                        <span className="text-[9px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded uppercase tracking-wide shrink-0">{item.nghiep_vu}</span>
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {item.nghiep_vu.split(';').map(p => p.trim()).filter(Boolean).map((nv, idx) => (
+                          <span key={idx} className="text-[9px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded uppercase tracking-wide shrink-0">{nv}</span>
+                        ))}
                       </div>
                     )}
                   </td>
@@ -153,7 +155,11 @@ export const CongVanDiTable: React.FC<DocumentTableProps> = ({
                   <span className="font-black text-[#05469B] bg-blue-50 px-2 py-0.5 rounded text-[10px] border border-blue-100">{item.so_hieu}</span>
                   {isMatDocument(item.mat) && <span className="text-[9px] font-black text-red-600 bg-red-100 px-1.5 py-0.5 rounded flex items-center gap-0.5 border border-red-200"><Lock size={10}/> MẬT</span>}
                   {item.nghiep_vu && item.nghiep_vu.trim() !== '' && !/Chưa phân loại|Chưa PL|Trống/i.test(item.nghiep_vu.trim()) && (
-                    <span className="text-[9px] font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded uppercase border border-indigo-100">{item.nghiep_vu}</span>
+                    <div className="flex flex-wrap gap-1">
+                      {item.nghiep_vu.split(';').map(p => p.trim()).filter(Boolean).map((nv, idx) => (
+                        <span key={idx} className="text-[9px] font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded uppercase border border-indigo-100">{nv}</span>
+                      ))}
+                    </div>
                   )}
                 </div>
               </div>

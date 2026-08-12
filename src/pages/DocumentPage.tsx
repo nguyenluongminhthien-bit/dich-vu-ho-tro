@@ -43,7 +43,13 @@ const CustomAutocomplete = ({ name, value, onChange, placeholder, suggestions, o
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const filtered = suggestions.filter((s: string) => s.toLowerCase().includes((value || '').toLowerCase()));
+  const lastQuery = useMemo(() => {
+    if (!value) return '';
+    const parts = value.split(';');
+    return parts[parts.length - 1].trim();
+  }, [value]);
+
+  const filtered = suggestions.filter((s: string) => s.toLowerCase().includes(lastQuery.toLowerCase()));
 
   return (
     <div className="relative w-full" ref={wrapperRef}>
@@ -64,7 +70,13 @@ const CustomAutocomplete = ({ name, value, onChange, placeholder, suggestions, o
               key={item}
               className="px-3 py-2.5 hover:bg-blue-50 cursor-pointer flex justify-between items-center group text-sm text-gray-700 border-b border-gray-50 last:border-0"
               onClick={() => {
-                onChange({ target: { name, value: item } });
+                let newValue = item;
+                if (value && value.includes(';')) {
+                  const parts = value.split(';');
+                  parts[parts.length - 1] = ' ' + item;
+                  newValue = parts.join(';');
+                }
+                onChange({ target: { name, value: newValue } });
                 setIsOpen(false);
               }}
             >
@@ -82,6 +94,68 @@ const CustomAutocomplete = ({ name, value, onChange, placeholder, suggestions, o
               </button>
             </li>
           ))}
+        </ul>
+      )}
+    </div>
+  );
+};
+
+// COMPONENT CHỌN VĂN BẢN THAY THẾ TÙY CHỈNH
+const DocumentSelectAutocomplete = ({ value, onChange, documents, placeholder, currentDocId }: any) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const filteredDocs = (documents || []).filter((doc: any) => {
+    if (currentDocId && String(doc.id) === String(currentDocId)) return false;
+    const docText = `${doc.so_hieu || ''} ${doc.tieu_de || ''}`.toLowerCase();
+    return docText.includes(search.toLowerCase());
+  });
+
+  const selectedDoc = (documents || []).find((doc: any) => String(doc.id) === String(value));
+  const displayText = selectedDoc ? `${selectedDoc.so_hieu} - ${selectedDoc.tieu_de}` : '';
+
+  return (
+    <div className="relative w-full" ref={wrapperRef}>
+      <input
+        type="text"
+        placeholder={placeholder}
+        value={isOpen ? search : displayText}
+        onChange={(e) => setSearch(e.target.value)}
+        onFocus={() => { setIsOpen(true); setSearch(''); }}
+        className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] text-gray-800 text-sm font-semibold"
+        autoComplete="off"
+      />
+      {isOpen && (
+        <ul className="absolute z-50 w-full bg-white border border-gray-200 rounded-lg shadow-xl mt-1 max-h-60 overflow-y-auto custom-scrollbar">
+          {filteredDocs.length === 0 ? (
+            <li className="px-3 py-2.5 text-xs text-gray-400 italic">Không tìm thấy văn bản nào</li>
+          ) : (
+            filteredDocs.map((doc: any) => (
+              <li
+                key={doc.id}
+                className="px-3 py-2.5 hover:bg-blue-50 cursor-pointer text-xs text-gray-700 border-b border-gray-50 last:border-0"
+                onClick={() => {
+                  onChange(doc.id);
+                  setIsOpen(false);
+                  setSearch('');
+                }}
+              >
+                <div className="font-bold text-[#05469B]">{doc.so_hieu}</div>
+                <div className="text-gray-500 truncate text-[11px]">{doc.tieu_de}</div>
+              </li>
+            ))
+          )}
         </ul>
       )}
     </div>
@@ -365,6 +439,21 @@ export default function DocumentPage() {
 
   const { suggestNguoiky, suggestChucvu, suggestNguoilayso, suggestBPlayso, suggestNghiepvu, suggestDonViXuLy } = useMemo(() => {
     const getUnique = (field: string) => {
+      if (field === 'nghiep_vu') {
+        const list: string[] = [];
+        vbData.forEach(item => {
+          const val = item[field];
+          if (val) {
+            val.split(';').forEach((p: string) => {
+              const trimmed = p.trim();
+              if (trimmed && !blacklist.includes(trimmed)) {
+                list.push(trimmed);
+              }
+            });
+          }
+        });
+        return Array.from(new Set(list));
+      }
       const allValues = vbData.map(item => item[field]).filter(Boolean);
       const uniqueValues = Array.from(new Set(allValues)) as string[];
       return uniqueValues.filter(val => !blacklist.includes(val.trim()));
@@ -382,6 +471,10 @@ export default function DocumentPage() {
 
   const suggestMsnv = useMemo(() => {
     return Array.from(new Set(personnelList.map(p => p.ma_so_nhan_vien).filter(Boolean)));
+  }, [personnelList]);
+
+  const suggestHoTen = useMemo(() => {
+    return Array.from(new Set(personnelList.map(p => p.ho_ten).filter(Boolean)));
   }, [personnelList]);
 
   const allowedDonViIds = useAllowedUnits(donViList);
@@ -648,13 +741,27 @@ export default function DocumentPage() {
     const defaultDonViId = user?.id_don_vi || (user as any)?.idDonVi;
 
     if (item) {
+      let foundReplacedId = '';
+      if (item.van_ban_thay_the || item.vb_thay_the) {
+        const refStr = String(item.van_ban_thay_the || item.vb_thay_the).trim();
+        const matched = vbData.find(doc =>
+          String(doc.id) === refStr ||
+          String(doc.so_hieu).trim() === refStr ||
+          (doc.link_vb && String(doc.link_vb).trim() === refStr)
+        );
+        if (matched) foundReplacedId = matched.id;
+      }
+
       setFormData({
         ...item,
         ngay_ban_hanh: item.ngay_ban_hanh ? item.ngay_ban_hanh.split('T')[0] : '',
         ngay_nhan: item.ngay_nhan ? item.ngay_nhan.split('T')[0] : '',
         han_xu_ly: item.han_xu_ly ? item.han_xu_ly.split('T')[0] : '',
         mat: isMatDocument(item.mat),
-        msnv_nguoi_lay_so: item.msnv_nguoi_lay_so || item.msnv_lay_so || ''
+        msnv_nguoi_lay_so: item.msnv_nguoi_lay_so || item.msnv_lay_so || '',
+        replaced_doc_id: foundReplacedId,
+        initial_replaced_doc_id: foundReplacedId,
+        is_replacing: !!foundReplacedId
       });
       setIsAutoNumber(false);
     } else {
@@ -665,7 +772,7 @@ export default function DocumentPage() {
         bo_phan_xu_ly: '', han_xu_ly: '', trang_thai_xu_ly: 'Chờ xử lý',
         nguoi_ky: '', chuc_vu: '', nguoi_lay_so: '', bo_phan_lay_so: '', pham_vi_ap_dung: selectedUnitFilter || 'Toàn hệ thống',
         hieu_luc: 'Còn hiệu lực', nghiep_vu: '', van_ban_thay_the: '', mat: false,
-        msnv_nguoi_lay_so: ''
+        msnv_nguoi_lay_so: '', replaced_doc_id: '', initial_replaced_doc_id: '', is_replacing: false
       });
       setIsAutoNumber(false);
     }
@@ -724,6 +831,23 @@ Anh/chị vui lòng gửi file scan đầy đủ chữ ký và mộc để phụ
       finalData.trang_thai_xu_ly = null;
     }
 
+    // Trích xuất replaced_doc_id, initial_replaced_doc_id và xóa khỏi payload gửi lên database
+    const isReplacing = finalData.is_replacing;
+    const replacedDocId = isReplacing ? finalData.replaced_doc_id : '';
+    const initialReplacedDocId = finalData.initial_replaced_doc_id || '';
+    delete finalData.replaced_doc_id;
+    delete finalData.initial_replaced_doc_id;
+    delete finalData.is_replacing;
+
+    if (replacedDocId) {
+      const replacedDoc = vbData.find(d => String(d.id) === String(replacedDocId));
+      if (replacedDoc) {
+        finalData.van_ban_thay_the = replacedDoc.so_hieu;
+      }
+    } else {
+      finalData.van_ban_thay_the = null;
+    }
+
     Object.keys(finalData).forEach(key => {
       if (finalData[key] === '' || finalData[key] === ' ') {
         finalData[key] = null;
@@ -746,6 +870,36 @@ Anh/chị vui lòng gửi file scan đầy đủ chữ ký và mộc để phụ
       } else {
         setVbData(prev => prev.map(item => String(item.id) === String(finalData.id) ? finalData : item));
       }
+
+      // 1. Khôi phục văn bản cũ nếu người dùng thay đổi hoặc hủy liên kết thay thế
+      if (initialReplacedDocId && initialReplacedDocId !== replacedDocId) {
+        const oldLinkedDoc = vbData.find(d => String(d.id) === String(initialReplacedDocId));
+        if (oldLinkedDoc) {
+          const restoredDoc = {
+            ...oldLinkedDoc,
+            hieu_luc: 'Còn hiệu lực', // Khôi phục trạng thái hiệu lực
+            van_ban_thay_the: null     // Xóa liên kết
+          };
+          await apiService.save(restoredDoc, 'update', "vb_tb");
+          setVbData(prev => prev.map(item => String(item.id) === String(oldLinkedDoc.id) ? restoredDoc : item));
+        }
+      }
+
+      // 2. Tự động cập nhật trạng thái văn bản cũ mới bị thay thế sang Hết hiệu lực
+      if (replacedDocId && replacedDocId !== initialReplacedDocId) {
+        const replacedDoc = vbData.find(d => String(d.id) === String(replacedDocId));
+        if (replacedDoc) {
+          const newDocRef = finalData.link_vb || finalData.so_hieu;
+          const updatedReplaced = {
+            ...replacedDoc,
+            hieu_luc: 'Hết hiệu lực', // Theo yêu cầu của user
+            van_ban_thay_the: newDocRef
+          };
+          await apiService.save(updatedReplaced, 'update', "vb_tb");
+          setVbData(prev => prev.map(item => String(item.id) === String(replacedDoc.id) ? updatedReplaced : item));
+        }
+      }
+
       setIsModalOpen(false);
 
       if (modalMode === 'create') {
@@ -780,6 +934,21 @@ Anh/chị vui lòng gửi file scan đầy đủ chữ ký và mộc để phụ
         }));
       } else {
         setFormData((prev: any) => ({ ...prev, msnv_nguoi_lay_so: value }));
+      }
+    } else if (name === 'nguoi_lay_so') {
+      const cleanVal = String(value || '').trim().toLowerCase();
+      const matchedPerson = personnelList.find(
+        (p) => String(p.ho_ten || '').trim().toLowerCase() === cleanVal
+      );
+      if (matchedPerson) {
+        setFormData((prev: any) => ({
+          ...prev,
+          nguoi_lay_so: value,
+          msnv_nguoi_lay_so: matchedPerson.ma_so_nhan_vien || '',
+          bo_phan_lay_so: matchedPerson.phong_ban || '',
+        }));
+      } else {
+        setFormData((prev: any) => ({ ...prev, nguoi_lay_so: value }));
       }
     } else {
       setFormData((prev: any) => ({ ...prev, [name]: value }));
@@ -864,6 +1033,16 @@ Anh/chị vui lòng gửi file scan đầy đủ chữ ký và mộc để phụ
       </div>
     );
   };
+
+  const getLinkedDocument = useCallback((refStr: string) => {
+    if (!refStr) return null;
+    const cleanRef = refStr.trim();
+    return vbData.find(d =>
+      String(d.id) === cleanRef ||
+      String(d.so_hieu).trim() === cleanRef ||
+      (d.link_vb && String(d.link_vb).trim() === cleanRef)
+    );
+  }, [vbData]);
 
   if (loading) return <PageWithFilterSkeleton rows={8} />;
   return (
@@ -1445,7 +1624,7 @@ Anh/chị vui lòng gửi file scan đầy đủ chữ ký và mộc để phụ
                       </div>
                       <div className="md:col-span-4 min-w-0">
                         <label className="block text-[11px] font-bold text-gray-700 mb-1">Người lấy số</label>
-                        <CustomAutocomplete name="nguoi_lay_so" value={formData.nguoi_lay_so} onChange={handleInputChange} placeholder="Nhân viên..." suggestions={suggestNguoilayso} onRemove={handleRemoveSuggestion} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" />
+                        <CustomAutocomplete name="nguoi_lay_so" value={formData.nguoi_lay_so} onChange={handleInputChange} placeholder="Nhân viên..." suggestions={suggestHoTen} onRemove={handleRemoveSuggestion} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" />
                       </div>
                       <div className="md:col-span-4 min-w-0">
                         <label className="block text-[11px] font-bold text-gray-700 mb-1">Bộ phận lấy số</label>
@@ -1473,6 +1652,46 @@ Anh/chị vui lòng gửi file scan đầy đủ chữ ký và mộc để phụ
                             <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-orange-500" size={16} />
                             <input type="text" required name="van_ban_thay_the" value={formData.van_ban_thay_the || ''} onChange={handleInputChange} className="w-full pl-9 pr-4 py-2.5 border border-orange-300 rounded-lg bg-white outline-none focus:ring-2 focus:ring-orange-500 text-blue-600 text-sm font-medium break-all" placeholder="Dán link Google Drive hoặc mã số của văn bản mới thay thế..." />
                           </div>
+                        </div>
+                      )}
+
+                      {/* Checkbox kích hoạt Thay thế văn bản */}
+                      <div className="md:col-span-10 min-w-0 mt-1">
+                        <label className="inline-flex items-center p-2.5 md:p-3 border border-blue-200 rounded-lg bg-blue-50/30 cursor-pointer hover:bg-blue-50 transition-colors shadow-sm w-full md:w-max">
+                          <input
+                            type="checkbox"
+                            name="is_replacing"
+                            checked={!!formData.is_replacing}
+                            onChange={(e) => {
+                              const checked = e.target.checked;
+                              setFormData((prev: any) => ({
+                                ...prev,
+                                is_replacing: checked,
+                                replaced_doc_id: checked ? prev.replaced_doc_id : '' // Xóa lựa chọn nếu bỏ chọn
+                              }));
+                            }}
+                            className="w-4 h-4 text-[#05469B] border-gray-300 rounded focus:ring-[#05469B] shrink-0"
+                          />
+                          <FileText size={14} className="text-[#05469B] mx-2 shrink-0" />
+                          <span className="text-[11px] md:text-xs font-bold text-[#05469B]">Văn bản này thay thế cho văn bản khác</span>
+                        </label>
+                      </div>
+
+                      {/* Chọn văn bản bị thay thế bởi văn bản hiện tại (chỉ hiển thị khi check) */}
+                      {formData.is_replacing && (
+                        <div className="md:col-span-10 bg-blue-50/40 p-4 rounded-xl border border-blue-100 mt-2 min-w-0 animate-in fade-in zoom-in duration-200">
+                          <label className="block text-[11px] font-bold text-[#05469B] mb-1.5 uppercase flex items-center gap-1.5">
+                            <FileText size={14} /> Chọn văn bản bị thay thế bởi văn bản hiện tại *
+                          </label>
+                          <DocumentSelectAutocomplete
+                            value={formData.replaced_doc_id || ''}
+                            onChange={(docId: string) => {
+                              setFormData((prev: any) => ({ ...prev, replaced_doc_id: docId }));
+                            }}
+                            documents={vbData}
+                            placeholder="Tìm số hiệu hoặc tiêu đề văn bản bị thay thế..."
+                            currentDocId={formData.id}
+                          />
                         </div>
                       )}
                     </div>
@@ -1604,7 +1823,15 @@ Anh/chị vui lòng gửi file scan đầy đủ chữ ký và mộc để phụ
                   </div>
                   <div className="bg-orange-50/50 p-3 md:p-4 rounded-xl border border-orange-100/50 flex flex-col justify-center items-start min-w-0">
                     <span className="text-[10px] text-gray-500 font-bold flex items-center gap-1.5 uppercase mb-2"><Layers size={14} className="text-orange-500 shrink-0" /> Phân loại Nghiệp vụ</span>
-                    <span className="font-black text-[#05469B] text-xs md:text-sm px-2 md:px-3 py-1 md:py-1.5 bg-white rounded border border-[#05469B]/20 shadow-sm truncate max-w-full">{viewData.nghiep_vu || '---'}</span>
+                    <div className="flex flex-wrap gap-1.5 max-w-full">
+                      {viewData.nghiep_vu ? (
+                        viewData.nghiep_vu.split(';').map(p => p.trim()).filter(Boolean).map((nv, idx) => (
+                          <span key={idx} className="font-black text-[#05469B] text-xs md:text-sm px-2 md:px-3 py-1 md:py-1.5 bg-white rounded border border-[#05469B]/20 shadow-sm truncate">{nv}</span>
+                        ))
+                      ) : (
+                        <span className="font-black text-[#05469B] text-xs md:text-sm px-2 md:px-3 py-1 md:py-1.5 bg-white rounded border border-[#05469B]/20 shadow-sm truncate">---</span>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1631,11 +1858,65 @@ Anh/chị vui lòng gửi file scan đầy đủ chữ ký và mộc để phụ
                     <ExternalLink size={18} className="md:w-5 md:h-5" /> Mở File Văn Bản
                   </a>
                 )}
-                {isReplacedStatus(viewData.hieu_luc) && viewData.van_ban_thay_the && (
-                  <a href={viewData.van_ban_thay_the} target="_blank" rel="noreferrer" className="flex-1 flex items-center justify-center gap-2 py-3.5 md:py-4 bg-orange-50 border border-orange-200 text-orange-700 hover:bg-orange-100 rounded-xl font-bold transition-colors shadow-sm text-sm md:text-base">
-                    <ExternalLink size={18} className="md:w-5 md:h-5" /> Xem Văn bản mới thay thế
-                  </a>
-                )}
+                {/* Hiển thị liên kết thay thế văn bản hai chiều */}
+                {viewData.van_ban_thay_the && (() => {
+                  const linkedDoc = getLinkedDocument(viewData.van_ban_thay_the);
+
+                  // Trường hợp 1: Văn bản hiện tại đã "Hết hiệu lực" (là văn bản cũ) -> Dẫn tới văn bản mới thay thế
+                  if (viewData.hieu_luc === 'Hết hiệu lực' || isReplacedStatus(viewData.hieu_luc)) {
+                    if (linkedDoc) {
+                      return (
+                        <button
+                          type="button"
+                          onClick={() => setViewData(linkedDoc)}
+                          className="flex-1 flex items-center justify-center gap-2 py-3.5 md:py-4 bg-orange-50 border border-orange-200 text-orange-700 hover:bg-orange-100 rounded-xl font-bold transition-colors shadow-sm text-sm md:text-base cursor-pointer"
+                        >
+                          <ExternalLink size={18} className="md:w-5 md:h-5" /> Xem Văn bản mới thay thế: {linkedDoc.so_hieu}
+                        </button>
+                      );
+                    } else if (String(viewData.van_ban_thay_the).startsWith('http')) {
+                      return (
+                        <a
+                          href={viewData.van_ban_thay_the}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="flex-1 flex items-center justify-center gap-2 py-3.5 md:py-4 bg-orange-50 border border-orange-200 text-orange-700 hover:bg-orange-100 rounded-xl font-bold transition-colors shadow-sm text-sm md:text-base"
+                        >
+                          <ExternalLink size={18} className="md:w-5 md:h-5" /> Xem Văn bản mới thay thế (Link ngoài)
+                        </a>
+                      );
+                    } else {
+                      return (
+                        <div className="flex-1 py-3 px-4 bg-orange-50 border border-orange-200 text-orange-700 rounded-xl text-xs md:text-sm font-semibold text-center flex items-center justify-center">
+                          Được thay thế bởi văn bản: <span className="font-bold ml-1">{viewData.van_ban_thay_the}</span>
+                        </div>
+                      );
+                    }
+                  }
+
+                  // Trường hợp 2: Văn bản hiện tại đang "Còn hiệu lực" (là văn bản mới) -> Dẫn ngược về văn bản cũ bị thay thế
+                  if (viewData.hieu_luc === 'Còn hiệu lực') {
+                    if (linkedDoc) {
+                      return (
+                        <button
+                          type="button"
+                          onClick={() => setViewData(linkedDoc)}
+                          className="flex-1 flex items-center justify-center gap-2 py-3.5 md:py-4 bg-blue-50 border border-blue-200 text-[#05469B] hover:bg-blue-100 rounded-xl font-bold transition-colors shadow-sm text-sm md:text-base cursor-pointer"
+                        >
+                          <ExternalLink size={18} className="md:w-5 md:h-5" /> Thay thế cho văn bản cũ: {linkedDoc.so_hieu}
+                        </button>
+                      );
+                    } else {
+                      return (
+                        <div className="flex-1 py-3 px-4 bg-blue-50 border border-blue-200 text-[#05469B] rounded-xl text-xs md:text-sm font-semibold text-center flex items-center justify-center">
+                          Thay thế cho văn bản trước đó: <span className="font-bold ml-1">{viewData.van_ban_thay_the}</span>
+                        </div>
+                      );
+                    }
+                  }
+
+                  return null;
+                })()}
               </div>
 
             </div>

@@ -314,6 +314,22 @@ export default function PersonnelPage() {
   const [bulkImportText, setBulkImportText] = useState('');
   const [bulkImportData, setBulkImportData] = useState<any[]>([]);
   const [isAnalyzingBulk, setIsAnalyzingBulk] = useState(false);
+  const [ignoredUpdates, setIgnoredUpdates] = useState<Set<string>>(new Set());
+  const [pendingOffboards, setPendingOffboards] = useState<Map<string, any>>(new Map());
+  const [activeReconcileTab, setActiveReconcileTab] = useState<'new' | 'update' | 'unchanged' | 'missing'>('new');
+
+  const toggleMissingItemKeep = (item: any) => {
+    const key = item.ma_so_nhan_vien;
+    if (pendingOffboards.has(key)) {
+      setPendingOffboards(prev => {
+        const next = new Map(prev);
+        next.delete(key);
+        return next;
+      });
+    } else {
+      handleOffboardClick(item);
+    }
+  };
 
 
 
@@ -446,6 +462,120 @@ export default function PersonnelPage() {
     const subIds = getAllSubordinateIds(selectedUnitFilter, donViList);
     return [selectedUnitFilter, ...subIds];
   }, [selectedUnitFilter, donViList]);
+
+  const currentActivePersonnelOfUnit = useMemo(() => {
+    if (!selectedUnitFilter || selectedUnitFilter === 'ALL') {
+      return data.filter(ns => ns.trang_thai !== 'Đã nghỉ việc');
+    }
+    const unitIds = [selectedUnitFilter, ...getAllSubordinateIds(selectedUnitFilter, donViList)];
+    return data.filter(ns => unitIds.includes(ns.id_don_vi) && ns.trang_thai !== 'Đã nghỉ việc');
+  }, [data, selectedUnitFilter, donViList]);
+
+  const reconciliationResult = useMemo(() => {
+    if (bulkImportData.length === 0) return null;
+
+    const activeDbList = currentActivePersonnelOfUnit;
+    const newItems: any[] = [];
+    const updateItems: any[] = [];
+    const unchangedItems: any[] = [];
+
+    const dbMap = new Map<string, any>();
+    activeDbList.forEach(ns => {
+      if (ns.ma_so_nhan_vien) {
+        dbMap.set(String(ns.ma_so_nhan_vien).trim().toLowerCase(), ns);
+      }
+    });
+
+    bulkImportData.forEach((item: any) => {
+      const key = String(item.ma_so_nhan_vien).trim().toLowerCase();
+      const existing = dbMap.get(key);
+
+      if (!existing) {
+        newItems.push(item);
+      } else {
+        const changes: any[] = [];
+        
+        const fieldLabels: Record<string, string> = {
+          ho_ten: 'Họ tên',
+          chuc_vu: 'Chức vụ',
+          phong_ban: 'Phòng ban/Bộ phận',
+          phan_loai: 'Phân loại',
+          sdt_cong_ty: 'SĐT Công ty',
+          sdt_ca_nhan: 'SĐT Cá nhân',
+          email: 'Email',
+          gioi_tinh: 'Giới tính',
+          nam_sinh: 'Năm sinh',
+          ngay_nhan_vien: 'Ngày vào làm',
+          ngach_luong: 'Ngạch lương',
+          nhom_doi_tuong: 'Nhóm đối tượng ATVSLĐ',
+          huan_luyen_tu: 'Huấn luyện từ',
+          huan_luyen_den: 'Huấn luyện đến',
+          gia_tri_den: 'Giá trị chứng nhận đến',
+          chung_nhan: 'Chứng nhận',
+          khoi: 'Khối',
+          dia_diem_lam_viec: 'Địa điểm làm việc',
+          cccd: 'Số CCCD',
+          the_thang: 'Thẻ tháng',
+          the_xe: 'Thẻ xe',
+          hang_loai_xe: 'Hạng/Loại xe',
+          bks: 'Biển kiểm soát'
+        };
+
+        Object.keys(item).forEach(col => {
+          if (col === 'id_don_vi') return;
+          
+          const valIncoming = item[col];
+          if (valIncoming !== undefined && valIncoming !== null && String(valIncoming).trim() !== '') {
+            const valExisting = existing[col];
+            
+            const strIncoming = String(valIncoming).trim().toLowerCase();
+            const strExisting = String(valExisting || '').trim().toLowerCase();
+
+            let isDifferent = false;
+            if (col.startsWith('sdt_')) {
+              const phoneIncoming = strIncoming.replace(/\D/g, '');
+              const phoneExisting = strExisting.replace(/\D/g, '');
+              isDifferent = phoneIncoming !== phoneExisting;
+            } else if (col === 'bks') {
+              const bksIncoming = strIncoming.replace(/[^a-z0-9]/g, '');
+              const bksExisting = strExisting.replace(/[^a-z0-9]/g, '');
+              isDifferent = bksIncoming !== bksExisting;
+            } else {
+              isDifferent = strIncoming !== strExisting;
+            }
+
+            if (isDifferent) {
+              changes.push({
+                field: col,
+                label: fieldLabels[col] || col,
+                oldValue: valExisting || '---',
+                newValue: valIncoming
+              });
+            }
+          }
+        });
+
+        if (changes.length > 0) {
+          updateItems.push({ item, existing, changes });
+        } else {
+          unchangedItems.push(item);
+        }
+      }
+    });
+
+    const incomingMsnvs = new Set(bulkImportData.map(item => String(item.ma_so_nhan_vien).trim().toLowerCase()));
+    const missingItems = activeDbList.filter(ns => {
+      const msnv = String(ns.ma_so_nhan_vien || '').trim().toLowerCase();
+      return msnv && !incomingMsnvs.has(msnv);
+    });
+
+    return {
+      newItems,
+      updateItems,
+      unchangedItems,
+      missingItems
+    };
+  }, [bulkImportData, currentActivePersonnelOfUnit]);
 
   // 🟢 TÍNH TOÁN DANH SÁCH TÙY CHỌN BỘ LỌC NÂNG CAO
   const availableFilterOptions = useMemo(() => {
@@ -1131,6 +1261,69 @@ export default function PersonnelPage() {
     await executeSave(finalDataToSave);
   };
 
+  const confirmBulkSave = async () => {
+    if (!reconciliationResult) return;
+    setSubmitting(true);
+    try {
+      let createCount = 0;
+      let updateCount = 0;
+      let offboardCount = 0;
+
+      // 1. Thêm mới
+      for (const item of reconciliationResult.newItems) {
+        const newData = {
+          phan_loai: 'Nhân viên',
+          gioi_tinh: 'Nam',
+          trang_thai: 'Đang làm việc',
+          ...item,
+          id: `NS-${Date.now()}-${Math.floor(Math.random() * 1000)}`
+        };
+        if (!newData.id_don_vi && selectedUnitFilter) {
+          newData.id_don_vi = selectedUnitFilter;
+        }
+        await apiService.save(newData, 'create', 'ns_dich_vu');
+        createCount++;
+      }
+
+      // 2. Cập nhật
+      for (const group of reconciliationResult.updateItems) {
+        if (ignoredUpdates.has(group.existing.ma_so_nhan_vien)) {
+          continue;
+        }
+        const mergedData = { ...group.existing };
+        Object.keys(group.item).forEach(key => {
+          if (group.item[key] !== undefined && group.item[key] !== null && group.item[key] !== '') {
+            mergedData[key] = group.item[key];
+          }
+        });
+        mergedData.trang_thai = mergedData.trang_thai || 'Đang làm việc';
+        await apiService.save(mergedData, 'update', 'ns_dich_vu');
+        updateCount++;
+      }
+
+      // 3. Điều chuyển / Nghỉ việc dôi dư
+      for (const [msnv, offboardInfo] of pendingOffboards.entries()) {
+        await apiService.save(offboardInfo.updatedData, 'update', 'ns_dich_vu');
+        offboardCount++;
+      }
+
+      let successMsg = `Thao tác thành công! Đã thêm mới ${createCount} người và cập nhật ${updateCount} người.`;
+      if (offboardCount > 0) {
+        successMsg = `Thao tác thành công! Đã thêm mới ${createCount} người, cập nhật ${updateCount} người và điều chuyển/nghỉ việc ${offboardCount} người.`;
+      }
+      toast.success(successMsg);
+      
+      await loadData(true);
+
+      setIsBulkImportOpen(false);
+      setBulkImportData([]);
+      setBulkImportText('');
+      setIgnoredUpdates(new Set());
+      setPendingOffboards(new Map());
+    } catch (err: any) { setError(err.message || 'Lỗi lưu dữ liệu.'); toast.error(err.message || "Đã xảy ra lỗi!"); }
+    finally { setSubmitting(false); }
+  };
+
   const confirmDelete = async () => {
     if (!itemToDelete) return;
     setSubmitting(true); setError(null);
@@ -1216,9 +1409,25 @@ export default function PersonnelPage() {
         updatedData.id_don_vi = transferInternalUnitId;
       }
 
-      await apiService.save(updatedData, "update", "ns_dich_vu");
-      setData(prev => prev.map(item => item.id === personnelToOffboard.id ? updatedData : item));
-      setIsOffboardOpen(false); setPersonnelToOffboard(null);
+      if (isBulkImportOpen) {
+        setPendingOffboards(prev => {
+          const next = new Map(prev);
+          next.set(personnelToOffboard.ma_so_nhan_vien, {
+            updatedData,
+            transferType,
+            transferInternalUnitId,
+            transferExternalUnitName
+          });
+          return next;
+        });
+        setIsOffboardOpen(false);
+        setPersonnelToOffboard(null);
+      } else {
+        await apiService.save(updatedData, "update", "ns_dich_vu");
+        setData(prev => prev.map(item => item.id === personnelToOffboard.id ? updatedData : item));
+        setIsOffboardOpen(false);
+        setPersonnelToOffboard(null);
+      }
     } catch (err: any) { alert("Lỗi: " + err.message); } finally { setSubmitting(false); }
   };
 
@@ -1374,50 +1583,69 @@ export default function PersonnelPage() {
 
           parsedData.push(item);
         }
-        setBulkImportData(parsedData.filter(d => d.ma_so_nhan_vien && d.ho_ten));
-        toast.success(`Đã nhận diện ${parsedData.length} nhân sự!`);
+        const incoming = parsedData.filter(d => d.ma_so_nhan_vien && d.ho_ten);
+
+        const activeDbList = currentActivePersonnelOfUnit;
+        let newCount = 0;
+        let updateCount = 0;
+        let missingCount = 0;
+        
+        const dbMap = new Map<string, any>();
+        activeDbList.forEach(ns => {
+          if (ns.ma_so_nhan_vien) {
+            dbMap.set(String(ns.ma_so_nhan_vien).trim().toLowerCase(), ns);
+          }
+        });
+        
+        incoming.forEach((item: any) => {
+          const key = String(item.ma_so_nhan_vien).trim().toLowerCase();
+          const existing = dbMap.get(key);
+          if (!existing) {
+            newCount++;
+          } else {
+            let hasChanged = false;
+            Object.keys(item).forEach(col => {
+              if (col === 'id_don_vi') return;
+              const valIncoming = item[col];
+              if (valIncoming !== undefined && valIncoming !== null && String(valIncoming).trim() !== '') {
+                const valExisting = existing[col];
+                const strIncoming = String(valIncoming).trim().toLowerCase();
+                const strExisting = String(valExisting || '').trim().toLowerCase();
+                let isDifferent = false;
+                if (col.startsWith('sdt_')) {
+                  isDifferent = strIncoming.replace(/\D/g, '') !== strExisting.replace(/\D/g, '');
+                } else if (col === 'bks') {
+                  isDifferent = strIncoming.replace(/[^a-z0-9]/g, '') !== strExisting.replace(/[^a-z0-9]/g, '');
+                } else {
+                  isDifferent = strIncoming !== strExisting;
+                }
+                if (isDifferent) hasChanged = true;
+              }
+            });
+            if (hasChanged) updateCount++;
+          }
+        });
+        
+        const incomingMsnvs = new Set(incoming.map(item => String(item.ma_so_nhan_vien).trim().toLowerCase()));
+        activeDbList.forEach(ns => {
+          const msnv = String(ns.ma_so_nhan_vien || '').trim().toLowerCase();
+          if (msnv && !incomingMsnvs.has(msnv)) {
+            missingCount++;
+          }
+        });
+        
+        if (newCount > 0) setActiveReconcileTab('new');
+        else if (updateCount > 0) setActiveReconcileTab('update');
+        else if (missingCount > 0) setActiveReconcileTab('missing');
+        else setActiveReconcileTab('unchanged');
+
+        setBulkImportData(incoming);
+        toast.success(`Đã phân tích xong: Phát hiện ${newCount} người mới, ${updateCount} cập nhật, ${missingCount} dôi dư!`);
       } catch (err) { toast.error('Lỗi phân tích dữ liệu!'); } finally { setIsAnalyzingBulk(false); }
     }, 100);
   };
 
-  const confirmBulkSave = async () => {
-    if (bulkImportData.length === 0) return;
-    setSubmitting(true);
-    try {
-      let updatedState = [...data]; let createCount = 0; let updateCount = 0;
-      for (const item of bulkImportData) {
-        const existingIndex = updatedState.findIndex(d => String(d.ma_so_nhan_vien).toLowerCase() === String(item.ma_so_nhan_vien).toLowerCase());
-        if (existingIndex >= 0) {
-          // NGUYÊN TẮC: CẬP NHẬT NHÂN SỰ ĐÃ TỒN TẠI
-          // Chỉ cập nhật các trường ĐƯỢC CUNG CẤP TRONG EXCEL (khác undefined và khác '')
-          // Các trường trống trong Excel SẼ GIỮ NGUYÊN 100% GIÁ TRỊ CŨ TRONG CSDL
-          const mergedData: any = { ...updatedState[existingIndex] };
-          Object.keys(item).forEach(key => {
-            if (item[key] !== undefined && item[key] !== null && item[key] !== '') {
-              mergedData[key] = item[key];
-            }
-          });
-          mergedData.trang_thai = mergedData.trang_thai || 'Đang làm việc';
-          await apiService.save(mergedData, 'update', 'ns_dich_vu');
-          updatedState[existingIndex] = mergedData; updateCount++;
-        } else {
-          // NGUYÊN TẮC: TẠO MỚI NHÂN SỰ CHƯA TỒN TẠI
-          const newData = {
-            phan_loai: 'Nhân viên',
-            gioi_tinh: 'Nam',
-            trang_thai: 'Đang làm việc',
-            ...item,
-            id: `NS-${Date.now()}-${Math.floor(Math.random() * 1000)}`
-          };
-          if (!newData.id_don_vi && selectedUnitFilter) newData.id_don_vi = selectedUnitFilter;
-          await apiService.save(newData, 'create', 'ns_dich_vu');
-          updatedState.push(newData); createCount++;
-        }
-      }
-      setData(updatedState); toast.success(`Thành công! Tạo mới ${createCount}, Cập nhật ${updateCount}.`);
-      setIsBulkImportOpen(false); setBulkImportData([]); setBulkImportText('');
-    } catch (err) { toast.error("Lỗi lưu dữ liệu hàng loạt!"); } finally { setSubmitting(false); }
-  };
+
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, type } = e.target;
@@ -2476,7 +2704,7 @@ export default function PersonnelPage() {
       )}
 
       {isOffboardOpen && personnelToOffboard && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[90vh] animate-in zoom-in duration-200 overflow-hidden">
             <div className="bg-orange-500 text-white p-5 flex items-start justify-between">
               <div className="flex gap-4 items-center">
@@ -2872,92 +3100,420 @@ export default function PersonnelPage() {
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl flex flex-col max-h-[90vh] animate-in zoom-in duration-200">
             <div className="flex justify-between items-center p-5 border-b border-indigo-100 bg-indigo-50 rounded-t-2xl">
               <h3 className="text-xl font-black text-indigo-800 flex items-center gap-2"><ClipboardPaste size={24} /> Dán Dữ Liệu Hàng Loạt</h3>
-              <button onClick={() => setIsBulkImportOpen(false)} className="text-indigo-400 hover:text-red-500 rounded-full p-1.5 bg-white shadow-sm"><X size={24} /></button>
+              <button onClick={() => { setIsBulkImportOpen(false); setBulkImportData([]); setBulkImportText(''); setIgnoredUpdates(new Set()); }} className="text-indigo-400 hover:text-red-500 rounded-full p-1.5 bg-white shadow-sm transition-colors"><X size={24} /></button>
             </div>
-            <div className="p-6 overflow-y-auto space-y-4 custom-scrollbar">
-              <div className="bg-indigo-50/50 p-5 rounded-2xl border border-indigo-100 space-y-3">
-                <div className="flex items-center gap-1.5 text-xs text-indigo-800 font-bold">
-                  <Info size={15} className="shrink-0 text-indigo-600" />
-                  <span>Cấu trúc dán (Quét từ Cột 1 đến 27, có hay không có Tiêu đề đều được):</span>
-                </div>
-                <div className="flex flex-wrap gap-2 text-[11px]">
-                  <span className="px-2.5 py-1 rounded-lg bg-white border border-indigo-200 text-gray-500 font-medium">1. Số TT</span>
-                  <span className="px-2.5 py-1 rounded-lg bg-white border border-indigo-300 text-indigo-800 font-bold">2. Mã NV *</span>
-                  <span className="px-2.5 py-1 rounded-lg bg-white border border-indigo-300 text-indigo-800 font-bold">3. Họ tên *</span>
-                  <span className="px-2.5 py-1 rounded-lg bg-white border border-indigo-300 text-indigo-800 font-bold">4. Chức danh *</span>
-                  <span className="px-2.5 py-1 rounded-lg bg-white border border-indigo-200 text-gray-700 font-medium">5. Bộ phận</span>
-                  <span className="px-2.5 py-1 rounded-lg bg-white border border-indigo-200 text-gray-500 font-medium">6. Đơn vị</span>
-                  <span className="px-2.5 py-1 rounded-lg bg-white border border-indigo-200 text-gray-500 font-medium">7. Showroom</span>
-                  <span className="px-2.5 py-1 rounded-lg bg-white border border-indigo-200 text-gray-500 font-medium">8. Phía</span>
-                  <span className="px-2.5 py-1 rounded-lg bg-white border border-indigo-200 text-gray-700 font-medium">9. Phân loại</span>
-                  <span className="px-2.5 py-1 rounded-lg bg-white border border-indigo-200 text-gray-700 font-medium">10. SĐT Cty</span>
-                  <span className="px-2.5 py-1 rounded-lg bg-white border border-indigo-200 text-gray-700 font-medium">11. Giới tính</span>
-                  <span className="px-2.5 py-1 rounded-lg bg-white border border-indigo-200 text-gray-700 font-medium">12. Năm sinh</span>
-                  <span className="px-2.5 py-1 rounded-lg bg-white border border-indigo-200 text-gray-700 font-medium">13. Ngày làm</span>
-                  <span className="px-2.5 py-1 rounded-lg bg-white border border-indigo-200 text-gray-700 font-medium">14. SĐT CNhân</span>
-                  <span className="px-2.5 py-1 rounded-lg bg-white border border-indigo-200 text-gray-700 font-medium">15. Email</span>
-                  <span className="px-2.5 py-1 rounded-lg bg-white border border-indigo-200 text-gray-700 font-medium">16. Ngạch</span>
-                  <span className="px-2.5 py-1 rounded-lg bg-indigo-50 border border-indigo-300 text-indigo-900 font-bold shadow-xs">17. Nhóm ATVSLĐ</span>
-                  <span className="px-2.5 py-1 rounded-lg bg-white border border-indigo-200 text-gray-700 font-medium">18. HL Từ</span>
-                  <span className="px-2.5 py-1 rounded-lg bg-white border border-indigo-200 text-gray-700 font-medium">19. HL Đến</span>
-                  <span className="px-2.5 py-1 rounded-lg bg-white border border-indigo-200 text-gray-700 font-medium">20. Giá trị đến</span>
-                  <span className="px-2.5 py-1 rounded-lg bg-white border border-indigo-300 text-indigo-800 font-bold">21. Khối</span>
-                  <span className="px-2.5 py-1 rounded-lg bg-white border border-indigo-300 text-indigo-800 font-bold">22. Địa điểm LV</span>
-                  <span className="px-2.5 py-1 rounded-lg bg-white border border-indigo-300 text-indigo-800 font-bold">23. CCCD</span>
-                  <span className="px-2.5 py-1 rounded-lg bg-white border border-indigo-300 text-indigo-800 font-bold">24. Thẻ thang</span>
-                  <span className="px-2.5 py-1 rounded-lg bg-white border border-indigo-300 text-indigo-800 font-bold">25. Thẻ xe</span>
-                  <span className="px-2.5 py-1 rounded-lg bg-white border border-indigo-300 text-indigo-800 font-bold">26. Hãng Loại xe</span>
-                  <span className="px-2.5 py-1 rounded-lg bg-white border border-indigo-300 text-indigo-800 font-bold">27. Biển kiểm soát</span>
-                </div>
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between text-xs pt-1 gap-2">
-                  <span className="text-emerald-600 font-black flex items-center gap-1">✓ Hệ thống tự động gán vào đơn vị: {selectedUnitName}</span>
-                  <span className="text-gray-400 italic">Chú ý: Các cột 6, 7, 8 trong bảng Excel cần được giữ nguyên (để trống) để đảm bảo đúng thứ tự dán.</span>
-                </div>
-              </div>
-              <textarea value={bulkImportText} onChange={handlePasteBulkData} disabled={isAnalyzingBulk} placeholder="Ctrl+V bảng Excel vào đây..." className="w-full h-32 p-3 text-sm border-2 border-dashed border-indigo-300 rounded-xl outline-none focus:border-indigo-500 bg-white resize-none"></textarea>
-              {isAnalyzingBulk && <div className="text-center py-4"><Loader2 className="animate-spin inline mr-2" /> Đang xử lý...</div>}
-              {bulkImportData.length > 0 && (
-                <div className="mt-4">
-                  <h4 className="font-bold mb-2">Xem trước ({bulkImportData.length} người)</h4>
-                  <div className="border border-gray-200 rounded-xl max-h-64 overflow-y-auto custom-scrollbar">
-                    <table className="w-full text-left text-xs">
-                      <thead className="bg-gray-100 sticky top-0 font-bold">
-                        <tr>
-                          <th className="p-3">Mã NV</th>
-                          <th className="p-3">Họ Tên</th>
-                          <th className="p-3">Bộ phận</th>
-                          <th className="p-3">Chức vụ</th>
-                          <th className="p-3">Khối</th>
-                          <th className="p-3">Địa điểm LV</th>
-                          <th className="p-3">Nhóm (AT)</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-100">
-                        {bulkImportData.slice(0, 20).map((item, idx) => (
-                          <tr key={idx} className="hover:bg-blue-50/50">
-                            <td className="p-3 font-bold text-[#05469B]">{item.ma_so_nhan_vien}</td>
-                            <td className="p-3">{item.ho_ten}</td>
-                            <td className="p-3">{item.phong_ban}</td>
-                            <td className="p-3">{item.phan_loai}</td>
-                            <td className="p-3 font-semibold text-indigo-700">{item.khoi}</td>
-                            <td className="p-3 font-semibold text-indigo-700">{item.dia_diem_lam_viec}</td>
-                            <td className="p-3 font-semibold text-emerald-600">{item.nhom_doi_tuong}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+            
+            <div className="p-6 overflow-y-auto space-y-5 custom-scrollbar bg-gray-55/30">
+              
+              {!reconciliationResult && (
+                <div className="bg-indigo-50/50 p-5 rounded-2xl border border-indigo-100 space-y-3">
+                  <div className="flex items-center gap-1.5 text-xs text-indigo-800 font-bold">
+                    <Info size={15} className="shrink-0 text-indigo-600" />
+                    <span>Cấu trúc dán (Quét từ Cột 1 đến 27, có hay không có Tiêu đề đều được):</span>
                   </div>
-                  {bulkImportData.length > 20 && (
-                    <div className="text-center text-sm text-gray-500 mt-2 font-medium italic">
-                      ... và {bulkImportData.length - 20} nhân sự khác (chỉ hiển thị xem trước 20 dòng để tối ưu tốc độ)
+                  <div className="flex flex-wrap gap-2 text-[11px]">
+                    <span className="px-2.5 py-1 rounded-lg bg-white border border-indigo-200 text-gray-500 font-medium">1. Số TT</span>
+                    <span className="px-2.5 py-1 rounded-lg bg-white border border-indigo-300 text-indigo-800 font-bold">2. Mã NV *</span>
+                    <span className="px-2.5 py-1 rounded-lg bg-white border border-indigo-300 text-indigo-800 font-bold">3. Họ tên *</span>
+                    <span className="px-2.5 py-1 rounded-lg bg-white border border-indigo-300 text-indigo-800 font-bold">4. Chức danh *</span>
+                    <span className="px-2.5 py-1 rounded-lg bg-white border border-indigo-200 text-gray-700 font-medium">5. Bộ phận</span>
+                    <span className="px-2.5 py-1 rounded-lg bg-white border border-indigo-200 text-gray-500 font-medium">6. Đơn vị</span>
+                    <span className="px-2.5 py-1 rounded-lg bg-white border border-indigo-200 text-gray-500 font-medium">7. Showroom</span>
+                    <span className="px-2.5 py-1 rounded-lg bg-white border border-indigo-200 text-gray-500 font-medium">8. Phía</span>
+                    <span className="px-2.5 py-1 rounded-lg bg-white border border-indigo-200 text-gray-700 font-medium">9. Phân loại</span>
+                    <span className="px-2.5 py-1 rounded-lg bg-white border border-indigo-200 text-gray-700 font-medium">10. SĐT Cty</span>
+                    <span className="px-2.5 py-1 rounded-lg bg-white border border-indigo-200 text-gray-700 font-medium">11. Giới tính</span>
+                    <span className="px-2.5 py-1 rounded-lg bg-white border border-indigo-200 text-gray-700 font-medium">12. Năm sinh</span>
+                    <span className="px-2.5 py-1 rounded-lg bg-white border border-indigo-200 text-gray-700 font-medium">13. Ngày làm</span>
+                    <span className="px-2.5 py-1 rounded-lg bg-white border border-indigo-200 text-gray-700 font-medium">14. SĐT CNhân</span>
+                    <span className="px-2.5 py-1 rounded-lg bg-white border border-indigo-200 text-gray-700 font-medium">15. Email</span>
+                    <span className="px-2.5 py-1 rounded-lg bg-white border border-indigo-200 text-gray-700 font-medium">16. Ngạch</span>
+                    <span className="px-2.5 py-1 rounded-lg bg-indigo-50 border border-indigo-300 text-indigo-900 font-bold shadow-xs">17. Nhóm ATVSLĐ</span>
+                    <span className="px-2.5 py-1 rounded-lg bg-white border border-indigo-200 text-gray-700 font-medium">18. HL Từ</span>
+                    <span className="px-2.5 py-1 rounded-lg bg-white border border-indigo-200 text-gray-700 font-medium">19. HL Đến</span>
+                    <span className="px-2.5 py-1 rounded-lg bg-white border border-indigo-200 text-gray-700 font-medium">20. Giá trị đến</span>
+                    <span className="px-2.5 py-1 rounded-lg bg-white border border-indigo-300 text-indigo-800 font-bold">21. Khối</span>
+                    <span className="px-2.5 py-1 rounded-lg bg-white border border-indigo-300 text-indigo-800 font-bold">22. Địa điểm LV</span>
+                    <span className="px-2.5 py-1 rounded-lg bg-white border border-indigo-300 text-indigo-800 font-bold">23. CCCD</span>
+                    <span className="px-2.5 py-1 rounded-lg bg-white border border-indigo-300 text-indigo-800 font-bold">24. Thẻ thang</span>
+                    <span className="px-2.5 py-1 rounded-lg bg-white border border-indigo-300 text-indigo-800 font-bold">25. Thẻ xe</span>
+                    <span className="px-2.5 py-1 rounded-lg bg-white border border-indigo-300 text-indigo-800 font-bold">26. Hãng Loại xe</span>
+                    <span className="px-2.5 py-1 rounded-lg bg-white border border-indigo-300 text-indigo-800 font-bold">27. Biển kiểm soát</span>
+                  </div>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between text-xs pt-1 gap-2">
+                    <span className="text-emerald-600 font-black flex items-center gap-1">✓ Hệ thống tự động gán vào đơn vị: {selectedUnitName}</span>
+                    <span className="text-gray-400 italic">Chú ý: Các cột 6, 7, 8 trong bảng Excel cần được giữ nguyên (để trống) để đảm bảo đúng thứ tự dán.</span>
+                  </div>
+                </div>
+              )}
+
+              {!reconciliationResult ? (
+                <div className="space-y-4">
+                  <textarea 
+                    value={bulkImportText} 
+                    onChange={handlePasteBulkData} 
+                    disabled={isAnalyzingBulk} 
+                    placeholder="Ctrl+V bảng Excel vào đây..." 
+                    className="w-full h-44 p-4 text-sm border-2 border-dashed border-indigo-300 rounded-2xl outline-none focus:border-indigo-500 bg-white resize-none shadow-inner"
+                  ></textarea>
+                  {isAnalyzingBulk && (
+                    <div className="text-center py-6 text-indigo-700 font-bold flex items-center justify-center gap-2 animate-pulse">
+                      <Loader2 className="animate-spin" /> Đang tiến hành đối chiếu và kiểm tra dữ liệu biến động...
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-5 animate-in fade-in duration-200">
+                  {/* Summary Metric Cards */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div 
+                      onClick={() => { if (reconciliationResult.newItems.length > 0) setActiveReconcileTab('new'); }}
+                      className={`p-4 rounded-2xl border transition-all shadow-sm ${
+                        reconciliationResult.newItems.length > 0 ? 'cursor-pointer hover:scale-[1.02]' : 'opacity-50 cursor-not-allowed'
+                      } ${
+                        activeReconcileTab === 'new' 
+                          ? 'bg-emerald-50 border-emerald-300 text-emerald-900 ring-2 ring-emerald-400/20' 
+                          : 'bg-white border-gray-150 text-gray-500'
+                      }`}
+                    >
+                      <div className="text-[10px] font-black uppercase tracking-wider text-emerald-600 flex items-center gap-1.5">🟢 Thêm mới</div>
+                      <div className="text-3xl font-black mt-2 text-emerald-800">{reconciliationResult.newItems.length}</div>
+                      <div className="text-[10px] opacity-75 mt-1">MSNV chưa có trên hệ thống</div>
+                    </div>
+
+                    <div 
+                      onClick={() => { if (reconciliationResult.updateItems.length > 0) setActiveReconcileTab('update'); }}
+                      className={`p-4 rounded-2xl border transition-all shadow-sm ${
+                        reconciliationResult.updateItems.length > 0 ? 'cursor-pointer hover:scale-[1.02]' : 'opacity-50 cursor-not-allowed'
+                      } ${
+                        activeReconcileTab === 'update' 
+                          ? 'bg-amber-50 border-amber-300 text-amber-900 ring-2 ring-amber-400/20' 
+                          : 'bg-white border-gray-150 text-gray-500'
+                      }`}
+                    >
+                      <div className="text-[10px] font-black uppercase tracking-wider text-amber-600 flex items-center gap-1.5">🟡 Thay đổi</div>
+                      <div className="text-3xl font-black mt-2 text-amber-800">
+                        {reconciliationResult.updateItems.length - ignoredUpdates.size}/{reconciliationResult.updateItems.length}
+                      </div>
+                      <div className="text-[10px] opacity-75 mt-1">Cập nhật thông tin mới / Tổng số</div>
+                    </div>
+
+                    <div 
+                      onClick={() => { if (reconciliationResult.unchangedItems.length > 0) setActiveReconcileTab('unchanged'); }}
+                      className={`p-4 rounded-2xl border transition-all shadow-sm ${
+                        reconciliationResult.unchangedItems.length > 0 ? 'cursor-pointer hover:scale-[1.02]' : 'opacity-50 cursor-not-allowed'
+                      } ${
+                        activeReconcileTab === 'unchanged' 
+                          ? 'bg-slate-100 border-slate-300 text-slate-900 ring-2 ring-slate-400/20' 
+                          : 'bg-white border-gray-150 text-gray-500'
+                      }`}
+                    >
+                      <div className="text-[10px] font-black uppercase tracking-wider text-slate-500 flex items-center gap-1.5">⚪ Giữ nguyên</div>
+                      <div className="text-3xl font-black mt-2 text-slate-800">{reconciliationResult.unchangedItems.length}</div>
+                      <div className="text-[10px] opacity-75 mt-1">Dữ liệu khớp 100% (Sẽ bỏ qua)</div>
+                    </div>
+
+                    <div 
+                      onClick={() => { if (reconciliationResult.missingItems.length > 0) setActiveReconcileTab('missing'); }}
+                      className={`p-4 rounded-2xl border transition-all shadow-sm ${
+                        reconciliationResult.missingItems.length > 0 ? 'cursor-pointer hover:scale-[1.02]' : 'opacity-50 cursor-not-allowed'
+                      } ${
+                        activeReconcileTab === 'missing' 
+                          ? 'bg-red-50 border-red-300 text-red-900 ring-2 ring-red-400/20' 
+                          : 'bg-white border-gray-150 text-gray-500'
+                      }`}
+                    >
+                      <div className="text-[10px] font-black uppercase tracking-wider text-red-600 flex items-center gap-1.5">🔴 Nhân sự dôi dư</div>
+                      <div className="text-3xl font-black mt-2 text-red-800">
+                        {pendingOffboards.size}/{reconciliationResult.missingItems.length}
+                      </div>
+                      <div className="text-[10px] opacity-75 mt-1">Điều chuyển / Nghỉ việc / Tổng số</div>
+                    </div>
+                  </div>
+
+                  {/* Active Tab Reconciliation Details Table */}
+                  {activeReconcileTab === 'new' && (
+                    <div className="border border-emerald-100 rounded-2xl overflow-hidden bg-white shadow-xs">
+                      <div className="p-4 bg-emerald-50/50 border-b border-emerald-100 text-xs font-bold text-emerald-800 flex justify-between items-center">
+                        <span>Nhân sự mới sẽ được tự động thêm vào đơn vị ({reconciliationResult.newItems.length} người)</span>
+                      </div>
+                      <div className="max-h-80 overflow-y-auto custom-scrollbar">
+                        <table className="w-full text-left text-xs">
+                          <thead className="bg-gray-50 sticky top-0 font-bold border-b border-gray-100">
+                            <tr>
+                              <th className="p-3">Mã số nhân viên</th>
+                              <th className="p-3">Họ và Tên</th>
+                              <th className="p-3">Chức vụ</th>
+                              <th className="p-3">Bộ phận</th>
+                              <th className="p-3">Khối</th>
+                              <th className="p-3">Địa điểm làm việc</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100">
+                            {reconciliationResult.newItems.map((item, idx) => (
+                              <tr key={idx} className="hover:bg-emerald-50/10">
+                                <td className="p-3 font-bold text-emerald-700">{item.ma_so_nhan_vien}</td>
+                                <td className="p-3 font-semibold text-gray-800">{item.ho_ten}</td>
+                                <td className="p-3 text-gray-600">{item.chuc_vu || '---'}</td>
+                                <td className="p-3 text-gray-600">{item.phong_ban || '---'}</td>
+                                <td className="p-3 text-gray-600">{item.khoi || '---'}</td>
+                                <td className="p-3 text-gray-500">{item.dia_diem_lam_viec || '---'}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {activeReconcileTab === 'update' && (
+                    <div className="border border-amber-100 rounded-2xl overflow-hidden bg-white shadow-xs">
+                      <div className="p-4 bg-amber-50/50 border-b border-amber-100 text-xs font-bold text-amber-800 flex justify-between items-center">
+                        <span>Thông tin khác biệt phát hiện so với cơ sở dữ liệu ({reconciliationResult.updateItems.length} người)</span>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIgnoredUpdates(new Set());
+                            }}
+                            className="px-2.5 py-1 bg-white hover:bg-amber-100 text-amber-800 rounded-lg border border-amber-200 transition-colors font-bold cursor-pointer text-[10px]"
+                          >
+                            Chọn tất cả cập nhật 🔄
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const allMsnvs = new Set(reconciliationResult.updateItems.map(g => g.existing.ma_so_nhan_vien));
+                              setIgnoredUpdates(allMsnvs);
+                            }}
+                            className="px-2.5 py-1 bg-white hover:bg-gray-100 text-gray-700 rounded-lg border border-gray-200 transition-colors font-bold cursor-pointer text-[10px]"
+                          >
+                            Giữ nguyên toàn bộ cũ 🔒
+                          </button>
+                        </div>
+                      </div>
+                      <div className="max-h-80 overflow-y-auto custom-scrollbar">
+                        <table className="w-full text-left text-xs">
+                          <thead className="bg-gray-50 sticky top-0 font-bold border-b border-gray-100">
+                            <tr>
+                              <th className="p-3 w-[25%]">Nhân sự</th>
+                              <th className="p-3 w-[65%]">Chi tiết các trường thay đổi (Cũ → Mới)</th>
+                              <th className="p-3 w-[10%] text-center">Cập nhật</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-150">
+                            {reconciliationResult.updateItems.map((group, idx) => {
+                              const isIgnored = ignoredUpdates.has(group.existing.ma_so_nhan_vien);
+                              return (
+                                <tr key={idx} className={`transition-all duration-150 ${isIgnored ? 'bg-gray-50 opacity-60' : 'hover:bg-amber-50/5'}`}>
+                                  <td className="p-3 align-top border-r border-gray-50">
+                                    <div>
+                                      <div className={`font-bold text-gray-800 ${isIgnored ? 'line-through text-gray-400' : ''}`}>{group.existing.ho_ten}</div>
+                                      <div className="text-[10px] font-mono font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded inline-block mt-1">
+                                        {group.existing.ma_so_nhan_vien}
+                                      </div>
+                                      <div className="text-[10px] mt-1 font-semibold">
+                                        {isIgnored ? (
+                                          <span className="text-gray-500 flex items-center gap-1">🔒 Giữ nguyên cũ</span>
+                                        ) : (
+                                          <span className="text-amber-700 flex items-center gap-1">🔄 Sẽ cập nhật</span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </td>
+                                  <td className="p-3">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2">
+                                      {group.changes.map((ch: any, cidx: number) => (
+                                        <div key={cidx} className={`flex flex-wrap items-center gap-1 text-[11px] leading-relaxed ${isIgnored ? 'line-through text-gray-400 opacity-60' : ''}`}>
+                                          <span className="font-bold text-gray-500">{ch.label}:</span>
+                                          <span className="text-red-600 line-through bg-red-50 px-1.5 py-0.5 rounded font-medium">{String(ch.oldValue)}</span>
+                                          <span className="text-gray-400">→</span>
+                                          <span className="text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.5 rounded">{String(ch.newValue)}</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </td>
+                                  <td className="p-3 text-center align-middle">
+                                    <input 
+                                      type="checkbox"
+                                      checked={!isIgnored}
+                                      onChange={() => {
+                                        setIgnoredUpdates(prev => {
+                                          const next = new Set(prev);
+                                          const key = group.existing.ma_so_nhan_vien;
+                                          if (next.has(key)) {
+                                            next.delete(key);
+                                          } else {
+                                            next.add(key);
+                                          }
+                                          return next;
+                                        });
+                                      }}
+                                      className="w-4 h-4 rounded text-amber-500 focus:ring-amber-500 border-gray-300 cursor-pointer"
+                                      title={isIgnored ? "Cập nhật thông tin mới" : "Bỏ cập nhật (Giữ nguyên cũ)"}
+                                    />
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {activeReconcileTab === 'unchanged' && (
+                    <div className="border border-gray-100 rounded-2xl overflow-hidden bg-white shadow-xs">
+                      <div className="p-4 bg-slate-50 border-b border-gray-200 text-xs font-bold text-slate-600">
+                        Thông tin trùng khớp hoàn toàn, hệ thống sẽ bỏ qua không ghi đè ({reconciliationResult.unchangedItems.length} người)
+                      </div>
+                      <div className="max-h-80 overflow-y-auto custom-scrollbar">
+                        <table className="w-full text-left text-xs">
+                          <thead className="bg-gray-50 sticky top-0 font-bold border-b border-gray-100">
+                            <tr>
+                              <th className="p-3">Mã số nhân viên</th>
+                              <th className="p-3">Họ và Tên</th>
+                              <th className="p-3">Chức danh</th>
+                              <th className="p-3">Bộ phận</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100 text-gray-400">
+                            {reconciliationResult.unchangedItems.map((item, idx) => (
+                              <tr key={idx}>
+                                <td className="p-3 font-semibold">{item.ma_so_nhan_vien}</td>
+                                <td className="p-3">{item.ho_ten}</td>
+                                <td className="p-3">{item.chuc_vu || '---'}</td>
+                                <td className="p-3">{item.phong_ban || '---'}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {activeReconcileTab === 'missing' && (
+                    <div className="border border-red-100 rounded-2xl overflow-hidden bg-white shadow-xs">
+                      <div className="p-4 bg-red-50/50 border-b border-red-100 flex flex-col md:flex-row md:items-center justify-between gap-3">
+                        <span className="text-xs font-bold text-red-800">
+                          Phát hiện {reconciliationResult.missingItems.length} nhân viên có trên hệ thống của đơn vị nhưng KHÔNG có tên trong Excel mới dán
+                        </span>
+                        <span className="text-[11px] text-red-600 font-bold bg-white border border-red-200 px-3 py-1.5 rounded-xl shadow-xs">
+                          Mặc định: Giữ nguyên hoạt động. Bỏ chọn "Giữ nguyên" để tiến hành Điều chuyển / Nghỉ việc.
+                        </span>
+                      </div>
+                      <div className="max-h-80 overflow-y-auto custom-scrollbar">
+                        <table className="w-full text-left text-xs">
+                          <thead className="bg-gray-50 sticky top-0 font-bold border-b border-gray-100">
+                            <tr>
+                              <th className="p-3 w-[15%]">Mã số nhân viên</th>
+                              <th className="p-3 w-[30%]">Họ và Tên</th>
+                              <th className="p-3 w-[20%]">Chức danh</th>
+                              <th className="p-3 w-[25%]">Bộ phận hiện tại</th>
+                              <th className="p-3 w-[10%] text-center">Giữ nguyên</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100">
+                            {reconciliationResult.missingItems.map((item, idx) => {
+                              const isOffboarded = pendingOffboards.has(item.ma_so_nhan_vien);
+                              const offboardInfo = pendingOffboards.get(item.ma_so_nhan_vien);
+                              
+                              let statusBadge = null;
+                              if (isOffboarded && offboardInfo) {
+                                if (offboardInfo.transferType === 'OFFBOARD') {
+                                  statusBadge = (
+                                    <span className="text-[10px] font-bold text-red-600 bg-red-50 border border-red-200 px-2 py-0.5 rounded-lg flex items-center gap-1">
+                                      ⛔ Nghỉ việc
+                                    </span>
+                                  );
+                                } else if (offboardInfo.transferType === 'EXTERNAL') {
+                                  statusBadge = (
+                                    <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-lg flex items-center gap-1" title={offboardInfo.transferExternalUnitName}>
+                                      🏢 Chuyển ngoài
+                                    </span>
+                                  );
+                                } else if (offboardInfo.transferType === 'INTERNAL') {
+                                  const targetUnitName = donViMap[offboardInfo.transferInternalUnitId] || offboardInfo.transferInternalUnitId;
+                                  statusBadge = (
+                                    <span className="text-[10px] font-bold text-blue-600 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-lg flex items-center gap-1" title={targetUnitName}>
+                                      🔄 Chuyển nội bộ
+                                    </span>
+                                  );
+                                }
+                              }
+
+                              return (
+                                <tr key={idx} className={`transition-all duration-150 ${isOffboarded ? 'bg-red-50/20 opacity-60' : 'hover:bg-red-50/10'}`}>
+                                  <td className={`p-3 font-bold ${isOffboarded ? 'line-through text-gray-400' : 'text-red-700'}`}>{item.ma_so_nhan_vien}</td>
+                                  <td className="p-3">
+                                    <div className={`font-semibold text-gray-800 ${isOffboarded ? 'line-through text-gray-400' : ''}`}>{item.ho_ten}</div>
+                                    {statusBadge && (
+                                      <div 
+                                        onClick={() => handleOffboardClick(item)}
+                                        className="mt-1 flex items-center cursor-pointer hover:opacity-80 w-fit"
+                                        title="Click để điều chỉnh thông tin Điều chuyển / Nghỉ việc"
+                                      >
+                                        {statusBadge}
+                                      </div>
+                                    )}
+                                  </td>
+                                  <td className={`p-3 text-gray-600 ${isOffboarded ? 'line-through text-gray-400' : ''}`}>{item.chuc_vu || '---'}</td>
+                                  <td className={`p-3 text-gray-600 ${isOffboarded ? 'line-through text-gray-400' : ''}`}>{item.phong_ban || '---'}</td>
+                                  <td className="p-3 text-center">
+                                    <input 
+                                      type="checkbox"
+                                      checked={!isOffboarded}
+                                      onChange={() => toggleMissingItemKeep(item)}
+                                      className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-gray-300 cursor-pointer"
+                                      title={isOffboarded ? "Khôi phục trạng thái hoạt động" : "Bỏ giữ nguyên để thực hiện Điều chuyển / Nghỉ việc"}
+                                    />
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
                   )}
                 </div>
               )}
             </div>
-            <div className="p-5 border-t bg-gray-50 flex justify-end gap-3">
-              <button onClick={() => { setIsBulkImportOpen(false); setBulkImportData([]); setBulkImportText(''); }} className="px-6 py-2.5 bg-gray-200 rounded-xl font-bold">Hủy</button>
-              <button onClick={confirmBulkSave} disabled={submitting || bulkImportData.length === 0} className="px-6 py-2.5 bg-indigo-600 text-white rounded-xl font-bold flex items-center gap-2">{submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <CheckCheck size={20} />} Xác nhận Lưu</button>
+            
+            <div className="p-5 border-t bg-gray-50 flex justify-between items-center">
+              {reconciliationResult ? (
+                <button 
+                  onClick={() => {
+                    setBulkImportData([]);
+                    setBulkImportText('');
+                    setIgnoredUpdates(new Set());
+                    setPendingOffboards(new Map());
+                  }} 
+                  className="px-6 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold rounded-xl transition-colors"
+                >
+                  Quay lại dán Excel
+                </button>
+              ) : (
+                <button 
+                  onClick={() => { setIsBulkImportOpen(false); setBulkImportData([]); setBulkImportText(''); setIgnoredUpdates(new Set()); setPendingOffboards(new Map()); }} 
+                  className="px-6 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold rounded-xl transition-colors"
+                >
+                  Hủy
+                </button>
+              )}
+              
+              <button 
+                onClick={confirmBulkSave} 
+                disabled={submitting || (reconciliationResult ? (
+                  reconciliationResult.newItems.length === 0 && 
+                  reconciliationResult.updateItems.length === 0 &&
+                  pendingOffboards.size === 0
+                ) : bulkImportData.length === 0)} 
+                className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 transition-colors text-white rounded-xl font-bold flex items-center gap-2 shadow-md shadow-indigo-500/20"
+              >
+                {submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <CheckCheck size={20} />} 
+                {reconciliationResult ? 'Xác nhận Lưu thay đổi' : 'Xác nhận Lưu'}
+              </button>
             </div>
           </div>
         </div>

@@ -38,13 +38,27 @@ export default function PersonnelDetailCuocChart({ personnel }: Props) {
   const currYear = useMemo(() => new Date().getFullYear(), []);
   const prevYear = useMemo(() => currYear - 1, [currYear]);
 
-  // Ngưỡng định mức: Trả về số nếu có, hoặc null nếu để trống (không giới hạn / Lãnh đạo)
+  // Ngưỡng định mức: Trả về số nếu có, hoặc lấy từ các thuê bao liên kết
   const nguongDinhMuc = useMemo(() => {
+    // 1. Ưu tiên lấy trực tiếp từ hồ sơ nhân sự
     if (personnel.dinh_muc_cuoc !== null && personnel.dinh_muc_cuoc !== undefined && Number(personnel.dinh_muc_cuoc) > 0) {
       return Number(personnel.dinh_muc_cuoc);
     }
+    
+    // 2. Nếu hồ sơ nhân sự không có, tìm từ danh sách thuê bao của nhân sự này
+    const maNV = String(personnel.ma_so_nhan_vien || '').trim().toLowerCase();
+    const idNS = personnel.id;
+    const userTbs = thueBaoList.filter(tb =>
+      tb.id_nhan_su === idNS || (maNV && String(tb.ma_so_nv || '').trim().toLowerCase() === maNV)
+    );
+    
+    const tbWithDm = userTbs.find(tb => tb.dinh_muc_cuoc !== null && tb.dinh_muc_cuoc !== undefined && Number(tb.dinh_muc_cuoc) > 0);
+    if (tbWithDm) {
+      return Number(tbWithDm.dinh_muc_cuoc);
+    }
+    
     return null; // Không có định mức
-  }, [personnel.dinh_muc_cuoc]);
+  }, [personnel.dinh_muc_cuoc, personnel.id, personnel.ma_so_nhan_vien, thueBaoList]);
 
   useEffect(() => {
     let isMounted = true;
@@ -115,13 +129,17 @@ export default function PersonnelDetailCuocChart({ personnel }: Props) {
 
   // Giá trị lớn nhất của trục Oy để vẽ biểu đồ
   const maxOy = useMemo(() => {
-    // Nếu có định mức thì dựa vào định mức, nếu không có thì mặc định mức tối thiểu 300k hoặc dựa vào giá trị cước max thực tế
-    let max = nguongDinhMuc !== null ? nguongDinhMuc * 1.35 : 300000;
+    // Đặt giá trị khởi điểm là định mức hoặc 300.
+    let max = nguongDinhMuc !== null ? nguongDinhMuc * 1.35 : 300;
     chartData.forEach(d => {
       if (d.currVal !== null && d.currVal > max) max = d.currVal * 1.15;
       if (d.prevVal !== null && d.prevVal > max) max = d.prevVal * 1.15;
     });
-    return Math.max(max, 300000);
+    
+    // Tự động nhận diện đơn vị: nếu max > 5000 thì dùng mốc tối thiểu là 300,000 VNĐ,
+    // ngược lại (đơn vị nghìn đồng) thì dùng mốc tối thiểu là 300.
+    const minLimit = max > 5000 ? 300000 : 300;
+    return Math.max(max, minLimit);
   }, [chartData, nguongDinhMuc]);
 
   // Thông số vẽ SVG (Hệ tọa độ)
@@ -200,7 +218,7 @@ export default function PersonnelDetailCuocChart({ personnel }: Props) {
           {nguongDinhMuc !== null && (
             <div className="flex items-center gap-1.5">
               <span className="w-4 h-0.5 bg-[#EF4444] inline-block"></span>
-              <span className="text-red-600">Định mức: {formatCurrency(nguongDinhMuc)}đ</span>
+              <span className="text-red-600">Định mức: {formatCurrency(maxOy > 5000 ? nguongDinhMuc : nguongDinhMuc * 1000)}đ</span>
             </div>
           )}
         </div>
@@ -231,9 +249,9 @@ export default function PersonnelDetailCuocChart({ personnel }: Props) {
                   textAnchor="end"
                   className="fill-gray-400 font-bold text-[10px]"
                 >
-                  {val >= 1000000
-                    ? `${(val / 1000000).toFixed(1)}M`
-                    : `${Math.round(val / 1000)}k`}
+                  {maxOy > 5000
+                    ? (val >= 1000000 ? `${(val / 1000000).toFixed(1)}M` : `${Math.round(val / 1000)}k`)
+                    : `${Math.round(val)}k`}
                 </text>
               </g>
             );
@@ -324,7 +342,7 @@ export default function PersonnelDetailCuocChart({ personnel }: Props) {
                 textAnchor="end"
                 className="fill-red-500 font-extrabold text-[9px]"
               >
-                ĐM {formatCurrency(nguongDinhMuc)}
+                ĐM {formatCurrency(maxOy > 5000 ? nguongDinhMuc : nguongDinhMuc * 1000)}
               </text>
             </g>
           )}
@@ -352,14 +370,14 @@ export default function PersonnelDetailCuocChart({ personnel }: Props) {
               <div className="flex justify-between items-center">
                 <span className="text-gray-600">Năm hiện tại ({currYear}):</span>
                 <span className="font-black text-[#00529C]">
-                  {tooltip.currVal !== null ? `${formatCurrency(tooltip.currVal)} VNĐ` : 'Chưa có'}
+                  {tooltip.currVal !== null ? `${formatCurrency(maxOy > 5000 ? tooltip.currVal : tooltip.currVal * 1000)} VNĐ` : 'Chưa có'}
                 </span>
               </div>
 
               <div className="flex justify-between items-center">
                 <span className="text-gray-600">Năm trước ({prevYear}):</span>
                 <span className="font-bold text-[#808080]">
-                  {tooltip.prevVal !== null ? `${formatCurrency(tooltip.prevVal)} VNĐ` : 'Chưa có'}
+                  {tooltip.prevVal !== null ? `${formatCurrency(maxOy > 5000 ? tooltip.prevVal : tooltip.prevVal * 1000)} VNĐ` : 'Chưa có'}
                 </span>
               </div>
 
@@ -376,7 +394,7 @@ export default function PersonnelDetailCuocChart({ personnel }: Props) {
                   >
                     {tooltip.diff > 0 && <TrendingUp size={13} className="shrink-0" />}
                     {tooltip.diff < 0 && <TrendingDown size={13} className="shrink-0" />}
-                    {tooltip.diff > 0 ? '+' : ''}{formatCurrency(tooltip.diff)} VNĐ
+                    {tooltip.diff > 0 ? '+' : ''}{formatCurrency(maxOy > 5000 ? tooltip.diff : tooltip.diff * 1000)} VNĐ
                   </span>
                 </div>
               )}

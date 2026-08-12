@@ -6,8 +6,8 @@ interface ExpiryAlertPanelProps {
   setIsNotifHubOpen: (val: boolean) => void;
   expiredCount: number;
   warningCount: number;
-  activeNotifTab: 'all' | 'vehicle' | 'equipment' | 'personnel_cert' | 'personnel_event';
-  setActiveNotifTab: (val: 'all' | 'vehicle' | 'equipment' | 'personnel_cert' | 'personnel_event') => void;
+  activeNotifTab: 'all' | 'personnel_cert' | 'vehicle' | 'equipment' | 'supplier' | 'personnel_event';
+  setActiveNotifTab: (val: 'all' | 'personnel_cert' | 'vehicle' | 'equipment' | 'supplier' | 'personnel_event') => void;
   notifications: any[];
   filteredNotifications: any[];
 }
@@ -86,9 +86,10 @@ export default function ExpiryAlertPanel({
           <div className="flex flex-wrap gap-2 mb-4 border-b border-gray-100 pb-3">
             {[
               { id: 'all', label: 'Tất cả', count: notifications.length },
-              { id: 'vehicle', label: '🚗 Đội xe', count: notifications.filter(n => n.category === 'vehicle').length },
+              { id: 'personnel_cert', label: '🛡️ Chứng chỉ', count: notifications.filter(n => n.category === 'personnel_cert').length },
+              { id: 'vehicle', label: '🚗 Xe', count: notifications.filter(n => n.category === 'vehicle').length },
               { id: 'equipment', label: '💻 Thiết bị', count: notifications.filter(n => n.category === 'equipment').length },
-              { id: 'personnel_cert', label: '🛡️ Chứng chỉ & HĐ', count: notifications.filter(n => n.category === 'personnel_cert').length },
+              { id: 'supplier', label: '🤝 Nhà cung cấp', count: notifications.filter(n => n.category === 'supplier').length },
               { id: 'personnel_event', label: '🎂 Sinh nhật', count: notifications.filter(n => n.category === 'personnel_event').length },
             ].map(tab => (
               <button
@@ -107,6 +108,8 @@ export default function ExpiryAlertPanel({
                       ? 'bg-white/20 text-white'
                       : tab.id === 'personnel_event'
                       ? 'bg-pink-100 text-pink-700 border border-pink-200'
+                      : tab.id === 'supplier'
+                      ? 'bg-blue-100 text-blue-700 border border-blue-200'
                       : 'bg-red-50 text-red-600 border border-red-100'
                   }`}>
                     {tab.count}
@@ -208,7 +211,7 @@ export default function ExpiryAlertPanel({
                       </div>
                     </div>
                     <div className="mt-2 border-t border-gray-100/50 pt-1.5 flex justify-between items-center text-[10px] font-semibold text-gray-400">
-                      <span>{notif.category === 'vehicle' ? '🚗 Xe cộ' : notif.category === 'equipment' ? '💻 Thiết bị' : '🛡️ Chứng chỉ & HĐ'}</span>
+                      <span>{notif.category === 'vehicle' ? '🚗 Xe cộ' : notif.category === 'equipment' ? '💻 Thiết bị' : notif.category === 'supplier' ? '🤝 Nhà cung cấp' : '🛡️ Chứng chỉ & HĐ'}</span>
                       <span className="truncate max-w-[150px]">{notif.unitName}</span>
                     </div>
                   </div>

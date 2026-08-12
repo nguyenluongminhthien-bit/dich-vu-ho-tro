@@ -4,13 +4,13 @@ import {
   Search, Plus, Edit, Trash2, X, AlertCircle, Loader2, Save,
   MonitorSmartphone, Building2, MapPin, ChevronDown, ChevronRight, PanelLeftClose, PanelLeftOpen,
   History, Calendar, Info, Eye, Cpu, Image as ImageIcon, FileText, Link as LinkIcon,
-  Sofa, Video, Package, Layers, Camera, QrCode, Printer, ClipboardPaste, ShieldCheck
+  Sofa, Video, Package, Layers, Camera, QrCode, Printer, ClipboardPaste, ShieldCheck, BarChart3
 } from 'lucide-react';
 import { apiService } from '../services/api';
 import { DonVi, ThietBi, NhatKyThietBi, Personnel, NhaCungCap } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { buildHierarchicalOptions, getUnitEmoji, sortDonViByThuTu, groupParentUnits, getAllSubordinateIds, getDefaultUnitId } from '../utils/hierarchy';
-import { formatCurrency, toUnaccented, stripAccents } from '../utils/formatters';
+import { formatCurrency, toUnaccented, stripAccents, cleanTechnicalString, formatMemorySize } from '../utils/formatters';
 import { toast } from '../utils/toast';
 import { PageWithFilterSkeleton } from '../components/SkeletonLoader';
 import ExpiryBadge from '../components/ExpiryBadge';
@@ -137,6 +137,7 @@ export default function EquipmentPage() {
   const [nkData, setNkData] = useState<any[]>([]);
   const [nhansuData, setNhansuData] = useState<Personnel[]>([]);
   const [nccList, setNccList] = useState<NhaCungCap[]>([]);
+  const [phapNhanList, setPhapNhanList] = useState<any[]>([]);
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -145,6 +146,7 @@ export default function EquipmentPage() {
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
   const [unitSearchTerm, setUnitSearchTerm] = useState('');
+  const [detailTypeFilter, setDetailTypeFilter] = useState('');
   const [isListCollapsed, setIsListCollapsed] = useState(false);
   const [selectedUnitFilter, setSelectedUnitFilter] = useState<string | null>(null);
   const [expandedParents, setExpandedParents] = useState<string[]>([]);
@@ -156,7 +158,7 @@ export default function EquipmentPage() {
   // 🟢 Reset về trang 1 mỗi khi đổi bộ lọc hoặc tìm kiếm
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, selectedUnitFilter]);
+  }, [searchTerm, selectedUnitFilter, detailTypeFilter]);
 
   // Modals Thiết bị
   const [isTbModalOpen, setIsTbModalOpen] = useState(false);
@@ -202,11 +204,26 @@ export default function EquipmentPage() {
   // 🟢 THÊM DÒNG NÀY: Trạng thái ẩn hoàn toàn thông báo
   const [isDismissed, setIsDismissed] = useState(false);
 
+  // 🟢 STATE CHO DASHBOARD THỐNG KÊ CHI TIẾT
+  const [isStatsDashboardOpen, setIsStatsDashboardOpen] = useState(false);
+  const [statsActiveTab, setStatsActiveTab] = useState<'type' | 'status' | 'location' | 'supplier' | 'value'>('type');
+
+  // State chuyển đổi Tab chính & Phân tích báo cáo động
+  const [activeMainTab, setActiveMainTab] = useState<'list' | 'report'>('list');
+  const [reportDimension, setReportDimension] = useState<'location' | 'department' | 'type' | 'supplier'>('location');
+  const [drillDownValue, setDrillDownValue] = useState<string | null>(null);
+
+
+
   // 🟢 STATE PHỤC VỤ TÍNH NĂNG QR CODE & IN TEM NHÃN
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [selectedItemsForPrint, setSelectedItemsForPrint] = useState<string[]>([]);
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
   const [printItemsList, setPrintItemsList] = useState<any[]>([]);
+  const [qrMultipleMatches, setQrMultipleMatches] = useState<any[]>([]);
+  const [isQrMatchesModalOpen, setIsQrMatchesModalOpen] = useState(false);
+  const [nkReceivingUnit, setNkReceivingUnit] = useState<string>('');
+  const [isCrossUnitSearch, setIsCrossUnitSearch] = useState<boolean>(false);
 
   // Hàm xử lý khi quét được mã QR thành công
   const handleScannedCode = (code: string) => {
@@ -232,13 +249,29 @@ export default function EquipmentPage() {
       }
     }
 
-    const matchedAsset = tbData.find(tb => String(tb.ma_tai_san).trim().toUpperCase() === assetCode.trim().toUpperCase());
-    if (matchedAsset) {
-      setViewData(matchedAsset);
+    const cleanCode = assetCode.trim().toUpperCase();
+
+    // 1. Tìm theo số seri trước
+    const matchedBySeri = tbData.find(tb => tb.so_seri && String(tb.so_seri).trim().toUpperCase() === cleanCode);
+    if (matchedBySeri) {
+      setViewData(matchedBySeri);
       setIsViewModalOpen(true);
-      toast.success(`Đã tìm thấy tài sản: ${matchedAsset.ten_thiet_bi}`);
+      toast.success(`Đã tìm thấy tài sản theo Số seri: ${matchedBySeri.ten_thiet_bi}`);
     } else {
-      toast.error(`Không tìm thấy tài sản nào có mã "${assetCode}"!`);
+      // 2. Nếu không khớp Số seri, tìm theo Mã tài sản
+      const matchedAssets = tbData.filter(tb => String(tb.ma_tai_san).trim().toUpperCase() === cleanCode);
+      if (matchedAssets.length === 1) {
+        setViewData(matchedAssets[0]);
+        setIsViewModalOpen(true);
+        toast.success(`Đã tìm thấy tài sản: ${matchedAssets[0].ten_thiet_bi}`);
+      } else if (matchedAssets.length > 1) {
+        setQrMultipleMatches(matchedAssets);
+        setIsScannerOpen(false); // Đóng camera quét
+        setIsQrMatchesModalOpen(true); // Mở modal chọn
+        toast.info(`Tìm thấy ${matchedAssets.length} thiết bị dùng chung mã tài sản.`);
+      } else {
+        toast.error(`Không tìm thấy tài sản nào khớp với mã hoặc số seri "${cleanCode}"!`);
+      }
     }
   };
 
@@ -259,6 +292,97 @@ export default function EquipmentPage() {
       };
     }
     return { name: 'Chưa bàn giao', msnv: '---' };
+  };
+
+  // 🟢 Hàm phụ trợ đầy đủ thông tin bàn giao sử dụng cho gom nhóm phòng ban
+  const getLatestUserFull = (itemId: string) => {
+    const logs = nkData.filter(log => log.id_ts_thiet_bi === itemId);
+    if (logs.length === 0) return { name: 'Chưa bàn giao', msnv: '---', department: 'Chưa bàn giao' };
+
+    const sorted = [...logs].sort((a, b) => String(b.ngay_ghi_nhan || '').localeCompare(String(a.ngay_ghi_nhan || '')));
+    const latestUserLog = sorted.find(log => log.ho_ten_nguoi_dung);
+    if (latestUserLog) {
+      return {
+        name: latestUserLog.ho_ten_nguoi_dung,
+        msnv: latestUserLog.msnv_nguoi_dung || '---',
+        department: latestUserLog.bp_quan_ly_su_dung || 'Chưa rõ'
+      };
+    }
+    return { name: 'Chưa bàn giao', msnv: '---', department: 'Chưa bàn giao' };
+  };
+
+  // 🟢 Hàm phân tích chi tiết cấu hình phần cứng IT
+  const getITConfigStats = (items: any[]) => {
+    const cpuStats: Record<string, number> = {};
+    const ramStats: Record<string, number> = {};
+    const storageStats: Record<string, number> = {};
+    const vgaStats: Record<string, number> = {};
+
+    items.forEach(item => {
+      if (!item.cpu && !item.ram && !item.man_hinh && !item.ssd && !item.hdd) return;
+
+      // CPU
+      const cpuVal = String(item.cpu || '').trim();
+      if (cpuVal) {
+        let simplifiedCpu = 'Khác';
+        const lowerCpu = cpuVal.toLowerCase();
+        if (lowerCpu.includes('i7')) simplifiedCpu = 'Intel Core i7';
+        else if (lowerCpu.includes('i5')) simplifiedCpu = 'Intel Core i5';
+        else if (lowerCpu.includes('i3')) simplifiedCpu = 'Intel Core i3';
+        else if (lowerCpu.includes('i9')) simplifiedCpu = 'Intel Core i9';
+        else if (lowerCpu.includes('ryzen 7')) simplifiedCpu = 'AMD Ryzen 7';
+        else if (lowerCpu.includes('ryzen 5')) simplifiedCpu = 'AMD Ryzen 5';
+        else if (lowerCpu.includes('ryzen 3')) simplifiedCpu = 'AMD Ryzen 3';
+        else if (lowerCpu.includes('apple m')) {
+          const match = cpuVal.match(/apple m[1234]\s*(pro|max)?/i);
+          simplifiedCpu = match ? match[0].toUpperCase() : 'Apple Silicon';
+        } else {
+          simplifiedCpu = cpuVal;
+        }
+        cpuStats[simplifiedCpu] = (cpuStats[simplifiedCpu] || 0) + 1;
+      }
+
+      // RAM
+      const ramVal = String(item.ram || '').trim();
+      if (ramVal) {
+        const cleanRam = ramVal.toUpperCase().replace(/\s+/g, '');
+        ramStats[cleanRam] = (ramStats[cleanRam] || 0) + 1;
+      }
+
+      // Storage
+      const ssdVal = String(item.ssd || '').trim();
+      const hddVal = String(item.hdd || '').trim();
+      if (ssdVal) {
+        const cleanSsd = 'SSD ' + ssdVal.toUpperCase().replace(/\s+/g, '');
+        storageStats[cleanSsd] = (storageStats[cleanSsd] || 0) + 1;
+      }
+      if (hddVal) {
+        const cleanHdd = 'HDD ' + hddVal.toUpperCase().replace(/\s+/g, '');
+        storageStats[cleanHdd] = (storageStats[cleanHdd] || 0) + 1;
+      }
+
+      // VGA
+      const vgaVal = String(item.vga || '').trim();
+      if (vgaVal) {
+        let simplifiedVga = 'Card rời';
+        const lowerVga = vgaVal.toLowerCase();
+        if (lowerVga.includes('onboard') || lowerVga.includes('intel hd') || lowerVga.includes('iris') || lowerVga.includes('share') || lowerVga.includes('tích hợp')) {
+          simplifiedVga = 'Card tích hợp (Onboard)';
+        } else if (lowerVga.includes('nvidia') || lowerVga.includes('rtx') || lowerVga.includes('gtx') || lowerVga.includes('geforce') || lowerVga.includes('amd radeon') || lowerVga.includes('rx ')) {
+          simplifiedVga = 'Card rời (NVIDIA/AMD)';
+        } else {
+          simplifiedVga = vgaVal;
+        }
+        vgaStats[simplifiedVga] = (vgaStats[simplifiedVga] || 0) + 1;
+      }
+    });
+
+    return {
+      cpu: Object.entries(cpuStats).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count),
+      ram: Object.entries(ramStats).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count),
+      storage: Object.entries(storageStats).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count),
+      vga: Object.entries(vgaStats).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count)
+    };
   };
 
   // Vòng đời camera quét QR trong ứng dụng (sử dụng Dynamic Import để giảm tải bundle)
@@ -314,33 +438,54 @@ export default function EquipmentPage() {
     const params = new URLSearchParams(window.location.search);
     const qrParam = params.get('qr');
     if (qrParam) {
-      const matchedAsset = tbData.find(tb => String(tb.ma_tai_san).trim().toUpperCase() === qrParam.trim().toUpperCase());
-      if (matchedAsset) {
-        setViewData(matchedAsset);
+      const code = qrParam.trim().toUpperCase();
+
+      // 1. Tìm theo số seri trước
+      const matchedBySeri = tbData.find(tb => tb.so_seri && String(tb.so_seri).trim().toUpperCase() === code);
+      if (matchedBySeri) {
+        setViewData(matchedBySeri);
         setIsViewModalOpen(true);
-        // Xóa tham số qr khỏi URL để tránh tự mở lại khi refresh trang
-        const cleanSearch = window.location.search.replace(/[?&]qr=[^&]+/, '').replace(/^&/, '?');
-        const newUrl = window.location.origin + window.location.pathname + (cleanSearch === '?' ? '' : cleanSearch);
-        window.history.replaceState({}, document.title, newUrl);
+        toast.success(`Đã tìm thấy tài sản theo Số seri: ${matchedBySeri.ten_thiet_bi}`);
+      } else {
+        // 2. Nếu không khớp Số seri, tìm theo Mã tài sản
+        const matchedAssets = tbData.filter(tb => String(tb.ma_tai_san).trim().toUpperCase() === code);
+        if (matchedAssets.length === 1) {
+          setViewData(matchedAssets[0]);
+          setIsViewModalOpen(true);
+          toast.success(`Đã tìm thấy tài sản: ${matchedAssets[0].ten_thiet_bi}`);
+        } else if (matchedAssets.length > 1) {
+          setQrMultipleMatches(matchedAssets);
+          setIsQrMatchesModalOpen(true);
+          toast.info(`Tìm thấy ${matchedAssets.length} thiết bị dùng chung mã tài sản.`);
+        } else {
+          toast.error(`Không tìm thấy tài sản nào khớp với mã hoặc số seri "${qrParam}"!`);
+        }
       }
+
+      // Xóa tham số qr khỏi URL để tránh tự mở lại khi refresh trang
+      const cleanSearch = window.location.search.replace(/[?&]qr=[^&]+/, '').replace(/^&/, '?');
+      const newUrl = window.location.origin + window.location.pathname + (cleanSearch === '?' ? '' : cleanSearch);
+      window.history.replaceState({}, document.title, newUrl);
     }
   }, [tbData]);
 
   const loadData = async () => {
     setLoading(true); setError(null);
     try {
-      const [dvResult, tbResult, nkResult, nsResult, nccResult] = await Promise.all([
+      const [dvResult, tbResult, nkResult, nsResult, nccResult, pnResult] = await Promise.all([
         apiService.getDonVi(),
         apiService.getThietBi(),
         apiService.getNhatKyThietBi(),
         apiService.getPersonnel().catch(() => []),
-        apiService.getNhaCungCap().catch(() => [])
+        apiService.getNhaCungCap().catch(() => []),
+        apiService.getPhapNhan().catch(() => [])
       ]);
       setDonViList(dvResult || []);
       setTbData(tbResult || []);
       setNkData(nkResult || []);
       setNhansuData(nsResult || []);
       setNccList(nccResult || []);
+      setPhapNhanList(pnResult || []);
     } catch (err: any) { setError(err.message || 'Lỗi tải dữ liệu Trang thiết bị.'); }
     finally { setLoading(false); }
   };
@@ -377,6 +522,70 @@ export default function EquipmentPage() {
     );
   }, [nccList, showAllNccGroups, tbFormData.nhom_thiet_bi, tbFormData.id_ncc]);
 
+  // 🟢 LỌC DANH SÁCH PHÁP NHÂN GỢI Ý THEO ĐƠN VỊ QUẢN LÝ ĐANG CHỌN (HỖ TRỢ CẢ ĐƠN VỊ CON & ĐƠN VỊ MẸ, HỖ TRỢ PHẨY ID_DON_VI)
+  const suggestPhapNhanOptions = useMemo(() => {
+    if (!tbFormData.id_don_vi) {
+      const allNames = phapNhanList.map(pn => (pn.ten_cong_ty || pn.ten_phap_nhan || '').trim()).filter(Boolean);
+      return Array.from(new Set(allNames)) as string[];
+    }
+
+    const targetId = String(tbFormData.id_don_vi).trim();
+    const subIds = getAllSubordinateIds(targetId, donViList);
+
+    // Lấy thêm các ID đơn vị cấp cha/mẹ để đảm bảo lấy được Pháp nhân được gán ở cấp tổng
+    const ancestorIds: string[] = [];
+    let currUnit = donViList.find(u => String(u.id).trim() === targetId);
+    const visited = new Set<string>();
+    while (currUnit && currUnit.cap_quan_ly && !visited.has(currUnit.id)) {
+      visited.add(currUnit.id);
+      const parentId = String(currUnit.cap_quan_ly).trim();
+      if (parentId && parentId !== 'HO') {
+        ancestorIds.push(parentId);
+        currUnit = donViList.find(u => String(u.id).trim() === parentId);
+      } else {
+        break;
+      }
+    }
+
+    const validUnitIds = new Set([targetId, ...subIds, ...ancestorIds]);
+
+    // 1. Lọc dm_phap_nhan thỏa mãn nếu bất kỳ ID nào trong chuỗi phẩy id_don_vi khớp với validUnitIds
+    const matchedPns = phapNhanList.filter(pn => {
+      const pnUnitIds = String(pn.id_don_vi || '').split(',').map(s => s.trim()).filter(Boolean);
+      return pnUnitIds.some(id => validUnitIds.has(id));
+    });
+    let matchedNames = matchedPns.map(pn => (pn.ten_cong_ty || pn.ten_phap_nhan || '').trim()).filter(Boolean);
+
+    // 2. Dự phòng: Nếu dm_phap_nhan chưa được gán cho đơn vị này, lấy tên Pháp nhân từng dùng trong tbData
+    if (matchedNames.length === 0) {
+      const existingNames = tbData
+        .filter(tb => validUnitIds.has(String(tb.id_don_vi).trim()) && tb.tai_san_thuoc)
+        .map(tb => String(tb.tai_san_thuoc).trim());
+      matchedNames = Array.from(new Set(existingNames)).filter(Boolean);
+    }
+
+    // 3. Dự phòng cấp 2: Nếu vẫn không tìm thấy, trả về toàn bộ Pháp nhân để không bị bỏ trống danh sách chọn
+    if (matchedNames.length === 0) {
+      matchedNames = phapNhanList.map(pn => (pn.ten_cong_ty || pn.ten_phap_nhan || '').trim()).filter(Boolean);
+    }
+
+    return Array.from(new Set(matchedNames)) as string[];
+  }, [tbFormData.id_don_vi, phapNhanList, donViList, tbData]);
+
+  // 🟢 TỰ ĐỘNG ĐIỀN HOẶC CẬP NHẬT PHÁP NHÂN KHI ĐỔI ĐƠN VỊ QUẢN LÝ
+  useEffect(() => {
+    if (!isTbModalOpen || !tbFormData.id_don_vi) return;
+    if (suggestPhapNhanOptions.length === 1) {
+      if (tbFormData.tai_san_thuoc !== suggestPhapNhanOptions[0]) {
+        setTbFormData((prev: any) => ({ ...prev, tai_san_thuoc: suggestPhapNhanOptions[0] }));
+      }
+    } else if (suggestPhapNhanOptions.length > 1 && tbFormData.tai_san_thuoc) {
+      if (!suggestPhapNhanOptions.includes(tbFormData.tai_san_thuoc) && !tbFormData.is_custom_phap_nhan) {
+        setTbFormData((prev: any) => ({ ...prev, tai_san_thuoc: suggestPhapNhanOptions[0] || '' }));
+      }
+    }
+  }, [tbFormData.id_don_vi, suggestPhapNhanOptions, isTbModalOpen]);
+
   const hasInitializedRef = useRef(false);
 
   useEffect(() => {
@@ -390,6 +599,27 @@ export default function EquipmentPage() {
       hasInitializedRef.current = true;
     }
   }, [donViList, user, allowedDonViIds]);
+
+  // Lấy danh sách các Phân loại chi tiết duy nhất trong tập dữ liệu hiện tại để hiển thị ở dropdown lọc
+  const uniqueDetailTypes = useMemo(() => {
+    let temp = tbData.filter(item => allowedDonViIds.includes(item.id_don_vi));
+    if (selectedUnitFilter) {
+      const validIds = [selectedUnitFilter, ...getAllSubordinateIds(selectedUnitFilter, donViList)];
+      temp = temp.filter(item => validIds.includes(item.id_don_vi));
+    }
+    if (searchTerm) {
+      const cleanSearch = stripAccents(searchTerm);
+      temp = temp.filter(item =>
+        stripAccents(item.ma_tai_san || '').includes(cleanSearch) ||
+        stripAccents(item.ten_thiet_bi || '').includes(cleanSearch) ||
+        stripAccents(item.nhom_thiet_bi || '').includes(cleanSearch) ||
+        stripAccents(item.vi_tri_bo_tri || '').includes(cleanSearch) ||
+        stripAccents(item.tai_san_thuoc || '').includes(cleanSearch)
+      );
+    }
+    const types = temp.map(item => item.quy_cach_chat_lieu || 'Chưa phân loại').filter(Boolean);
+    return Array.from(new Set(types)).sort() as string[];
+  }, [tbData, searchTerm, selectedUnitFilter, allowedDonViIds, donViList]);
 
   const filteredTBs = useMemo(() => {
     let result = tbData.filter(item => allowedDonViIds.includes(item.id_don_vi));
@@ -407,8 +637,110 @@ export default function EquipmentPage() {
         stripAccents(item.tai_san_thuoc || '').includes(cleanSearch)
       );
     }
+    if (detailTypeFilter) {
+      result = result.filter(item => (item.quy_cach_chat_lieu || 'Chưa phân loại') === detailTypeFilter);
+    }
     return result;
-  }, [tbData, searchTerm, selectedUnitFilter, allowedDonViIds, donViList]);
+  }, [tbData, searchTerm, selectedUnitFilter, detailTypeFilter, allowedDonViIds, donViList]);
+
+  // 🟢 TÍNH TOÁN THỐNG KÊ CHI TIẾT ĐỘNG THEO DỮ LIỆU ĐÃ LỌC
+  const statsSummary = useMemo(() => {
+    let totalQty = 0;
+    let totalVal = 0;
+    let minPrice = Infinity;
+    let maxPrice = -Infinity;
+    let minPriceName = '';
+    let maxPriceName = '';
+
+    const detailCounts: Record<string, { count: number; value: number }> = {};
+    const statusCounts: Record<string, number> = {};
+    const locationCounts: Record<string, number> = {};
+    const supplierCounts: Record<string, number> = {};
+
+    filteredTBs.forEach(tb => {
+      const qty = Number(tb.so_luong) || 1;
+      const price = Number(tb.gia_mua) || 0;
+      const subtotal = price * qty;
+
+      totalQty += qty;
+      totalVal += subtotal;
+
+      if (price > 0) {
+        if (price < minPrice) {
+          minPrice = price;
+          minPriceName = tb.ten_thiet_bi;
+        }
+        if (price > maxPrice) {
+          maxPrice = price;
+          maxPriceName = tb.ten_thiet_bi;
+        }
+      }
+
+      // 1. Theo phân loại chi tiết (được lưu ở quy_cach_chat_lieu)
+      const detailType = tb.quy_cach_chat_lieu || 'Chưa phân loại';
+      if (!detailCounts[detailType]) {
+        detailCounts[detailType] = { count: 0, value: 0 };
+      }
+      detailCounts[detailType].count += qty;
+      detailCounts[detailType].value += subtotal;
+
+      // 2. Theo tình trạng sử dụng
+      const status = tb.tinh_trang || 'Chưa rõ';
+      statusCounts[status] = (statusCounts[status] || 0) + qty;
+
+      // 3. Theo vị trí
+      const loc = tb.vi_tri_bo_tri || 'Chưa rõ';
+      locationCounts[loc] = (locationCounts[loc] || 0) + qty;
+
+      // 4. Theo nhà cung cấp
+      const ncc = tb.nha_cung_cap || 'Chưa rõ';
+      supplierCounts[ncc] = (supplierCounts[ncc] || 0) + qty;
+    });
+
+    return {
+      totalQty,
+      totalVal,
+      minPrice: minPrice === Infinity ? 0 : minPrice,
+      minPriceName,
+      maxPrice: maxPrice === -Infinity ? 0 : maxPrice,
+      maxPriceName,
+      detailCounts: Object.entries(detailCounts).map(([type, d]) => ({ type, ...d })).sort((a, b) => b.count - a.count),
+      statusCounts: Object.entries(statusCounts).map(([status, count]) => ({ status, count })),
+      locationCounts: Object.entries(locationCounts).map(([loc, count]) => ({ loc, count })).sort((a, b) => b.count - a.count),
+      supplierCounts: Object.entries(supplierCounts).map(([ncc, count]) => ({ ncc, count })).sort((a, b) => b.count - a.count)
+    };
+  }, [filteredTBs]);
+
+  // 🟢 TÍNH TOÁN BÁO CÁO PHÂN TÍCH ĐỘNG (Tab 2 Báo cáo Thống kê)
+  const reportSummary = useMemo(() => {
+    const groups: Record<string, { name: string; count: number; value: number; items: any[] }> = {};
+
+    filteredTBs.forEach(tb => {
+      const qty = Number(tb.so_luong) || 1;
+      const price = Number(tb.gia_mua) || 0;
+      const subtotal = price * qty;
+
+      let key = 'Chưa rõ';
+      if (reportDimension === 'location') {
+        key = tb.vi_tri_bo_tri || 'Chưa rõ';
+      } else if (reportDimension === 'department') {
+        key = getLatestUserFull(tb.id).department;
+      } else if (reportDimension === 'type') {
+        key = tb.quy_cach_chat_lieu || 'Chưa phân loại';
+      } else if (reportDimension === 'supplier') {
+        key = tb.nha_cung_cap || 'Chưa rõ';
+      }
+
+      if (!groups[key]) {
+        groups[key] = { name: key, count: 0, value: 0, items: [] };
+      }
+      groups[key].count += qty;
+      groups[key].value += subtotal;
+      groups[key].items.push(tb);
+    });
+
+    return Object.values(groups).sort((a, b) => b.count - a.count);
+  }, [filteredTBs, reportDimension, nkData]);
 
   const selectedUnitName = useMemo(() => {
     if (!selectedUnitFilter) return 'Tất cả Đơn vị';
@@ -455,26 +787,58 @@ export default function EquipmentPage() {
     };
   }, [tbData]);
 
-  // 🟢 LỌC DANH SÁCH NHÂN SỰ THEO ĐƠN VỊ CỦA THIẾT BỊ ĐANG CHỌN
+  // 🟢 LỌC DANH SÁCH NHÂN SỰ THEO ĐƠN VỊ CỦA THIẾT BỊ ĐANG CHỌN (HỖ TRỢ ĐIỀU CHUYỂN & MƯỢN LIÊN ĐƠN VỊ)
   const suggestHoTen = useMemo(() => {
     if (!selectedTbForNk) return [];
+
+    // 1. Nếu là Điều chuyển đơn vị
+    if (nkFormData.loai_nhat_ky === 'Điều chuyển đơn vị') {
+      if (!nkReceivingUnit) return [];
+      const validIds = [nkReceivingUnit, ...getAllSubordinateIds(nkReceivingUnit, donViList)];
+      const filteredNs = nhansuData.filter(ns => validIds.includes(ns.id_don_vi));
+      return Array.from(new Set(filteredNs.map(item => item.ho_ten).filter(Boolean))) as string[];
+    }
+
+    // 2. Nếu là Cấp phát liên đơn vị (Mượn tạm)
+    const isAssignEvent = nkFormData.loai_nhat_ky === 'Cấp mới' || nkFormData.loai_nhat_ky === 'Cấp máy đã qua sử dụng';
+    if (isAssignEvent && isCrossUnitSearch) {
+      // Trả về toàn bộ nhân sự hệ thống
+      return Array.from(new Set(nhansuData.map(item => item.ho_ten).filter(Boolean))) as string[];
+    }
+
+    // 3. Mặc định: Lọc theo đơn vị hiện tại của thiết bị
     const unitId = selectedTbForNk.id_don_vi;
     const validIds = [unitId, ...getAllSubordinateIds(unitId, donViList)];
-
     const filteredNs = nhansuData.filter(ns => validIds.includes(ns.id_don_vi));
     return Array.from(new Set(filteredNs.map(item => item.ho_ten).filter(Boolean))) as string[];
-  }, [nhansuData, selectedTbForNk, donViList]);
+  }, [nhansuData, selectedTbForNk, donViList, nkFormData.loai_nhat_ky, nkReceivingUnit, isCrossUnitSearch]);
 
   // Lọc danh sách mã số nhân viên của các nhân sự thuộc đơn vị
   const suggestMsnv = useMemo(() => {
     if (!selectedTbForNk) return [];
+
+    // 1. Nếu là Điều chuyển đơn vị
+    if (nkFormData.loai_nhat_ky === 'Điều chuyển đơn vị') {
+      if (!nkReceivingUnit) return [];
+      const validIds = [nkReceivingUnit, ...getAllSubordinateIds(nkReceivingUnit, donViList)];
+      const filteredNs = nhansuData.filter(ns => validIds.includes(ns.id_don_vi));
+      return Array.from(new Set(filteredNs.map(item => (item as any).ma_so_nhan_vien || (item as any).ma_nv).filter(Boolean))) as string[];
+    }
+
+    // 2. Nếu là Cấp phát liên đơn vị (Mượn tạm)
+    const isAssignEvent = nkFormData.loai_nhat_ky === 'Cấp mới' || nkFormData.loai_nhat_ky === 'Cấp máy đã qua sử dụng';
+    if (isAssignEvent && isCrossUnitSearch) {
+      // Trả về toàn bộ nhân sự hệ thống
+      return Array.from(new Set(nhansuData.map(item => (item as any).ma_so_nhan_vien || (item as any).ma_nv).filter(Boolean))) as string[];
+    }
+
+    // 3. Mặc định: Lọc theo đơn vị hiện tại của thiết bị
     const unitId = selectedTbForNk.id_don_vi;
     const validIds = [unitId, ...getAllSubordinateIds(unitId, donViList)];
-
     const filteredNs = nhansuData.filter(ns => validIds.includes(ns.id_don_vi));
     // Hỗ trợ cả ma_so_nhan_vien hoặc ma_nv
     return Array.from(new Set(filteredNs.map(item => (item as any).ma_so_nhan_vien || (item as any).ma_nv).filter(Boolean))) as string[];
-  }, [nhansuData, selectedTbForNk, donViList]);
+  }, [nhansuData, selectedTbForNk, donViList, nkFormData.loai_nhat_ky, nkReceivingUnit, isCrossUnitSearch]);
 
   const getEquipmentDescription = (item: any) => {
     if (isITEquipment(item.nhom_thiet_bi || '')) {
@@ -509,16 +873,27 @@ export default function EquipmentPage() {
 
     if (item) {
       const initialMonths = calculateWarrantyMonths(item.ngay_mua, item.han_bao_hanh);
+      let loaiChiTiet = item.quy_cach_chat_lieu || '';
+      let isCustomDetail = false;
+      const groupInfo = NHOM_THIETBI_INFO[item.nhom_thiet_bi];
+      if (loaiChiTiet && groupInfo) {
+        const isStandard = groupInfo.items.includes(loaiChiTiet);
+        isCustomDetail = !isStandard;
+      }
+
       setTbFormData({
         ...item,
-        so_thang_bh: initialMonths > 0 ? initialMonths : ''
+        so_thang_bh: initialMonths > 0 ? initialMonths : '',
+        loai_chi_tiet: loaiChiTiet,
+        is_custom_detail: isCustomDetail
       });
     } else {
       setTbFormData({
         id: '', id_don_vi: selectedUnitFilter || (defaultDonViId !== 'ALL' ? defaultDonViId : ''), tai_san_thuoc: '', ma_tai_san: '', ten_thiet_bi: '', nhom_thiet_bi: '',
         so_luong: '1', don_vi_tinh: 'Cái', vi_tri_bo_tri: '', mo_ta_dac_diem: '', quy_cach_chat_lieu: '', thong_so_ky_thuat: '',
         nha_cung_cap: '', id_ncc: null, ngay_mua: '', gia_mua: '', han_bao_hanh: '', so_thang_bh: '', thoi_gian_khau_hao: '', tinh_trang: 'Đang sử dụng', link_hinh_anh: '', link_ho_so: '',
-        so_seri: '', cpu: '', ram: '', ssd: '', hdd: '', vga: '', man_hinh: '', phu_kien: ''
+        so_seri: '', cpu: '', ram: '', ssd: '', hdd: '', vga: '', man_hinh: '', phu_kien: '',
+        loai_chi_tiet: '', is_custom_detail: false
       });
     }
     setIsTbModalOpen(true); setError(null);
@@ -547,7 +922,7 @@ export default function EquipmentPage() {
     { key: 'man_hinh', label: 'Màn hình', type: 'text', required: false },
     { key: 'thong_so_ky_thuat', label: 'Thông số kỹ thuật chung', type: 'text', required: false },
     { key: 'tinh_trang', label: 'Tình trạng', type: 'text', required: false },
-    { key: 'quy_cach_chat_lieu', label: 'Quy cách/chất liệu', type: 'text', required: false },
+    { key: 'quy_cach_chat_lieu', label: 'Phân loại chi tiết (Laptop/PC/Bàn...)', type: 'text', required: false },
     { key: 'so_seri', label: 'Số seri', type: 'text', required: false },
     { key: 'phu_kien', label: 'Phụ kiện/Ghi chú thêm', type: 'text', required: false },
     { key: 'mo_ta_dac_diem', label: 'Mô tả đặc điểm', type: 'text', required: false },
@@ -559,26 +934,42 @@ export default function EquipmentPage() {
     const errors: Record<string, string> = {};
     const warnings: Record<string, string> = {};
 
-    // 1. Validate Mã tài sản
+    // 0. Làm sạch chuỗi kỹ thuật (xóa khoảng trắng quanh dấu -) & Tự thêm đơn vị GB cho RAM/SSD/HDD
+    if (row.cpu) row.cpu = cleanTechnicalString(row.cpu);
+    if (row.vga) row.vga = cleanTechnicalString(row.vga);
+    if (row.ma_tai_san) row.ma_tai_san = cleanTechnicalString(row.ma_tai_san);
+    if (row.so_seri) row.so_seri = cleanTechnicalString(row.so_seri);
+
+    if (row.ram) row.ram = formatMemorySize(row.ram);
+    if (row.ssd) row.ssd = formatMemorySize(row.ssd);
+    if (row.hdd) row.hdd = formatMemorySize(row.hdd);
+
+    // 1. Validate Mã tài sản (Bỏ kiểm tra trùng Mã tài sản theo yêu cầu để hỗ trợ nhập bộ máy tính chia nhỏ)
     const maTS = String(row.ma_tai_san || '').trim();
-    if (maTS) {
-      // 1a. Trùng với mã hiện có trong CSDL
-      const isDuplicateInDb = tbData.some(existing =>
-        existing.ma_tai_san &&
-        String(existing.ma_tai_san).trim().toLowerCase() === maTS.toLowerCase()
+    if (!maTS) {
+      errors['ma_tai_san'] = 'Mã tài sản là bắt buộc.';
+    }
+
+    // 1b. Validate Số seri (Chặn trùng Số seri đối với DB và danh sách dán nếu có nhập)
+    const soSeri = String(row.so_seri || '').trim();
+    if (soSeri) {
+      // Kiểm tra trùng trong DB
+      const isSeriDuplicateInDb = tbData.some(existing =>
+        existing.so_seri &&
+        String(existing.so_seri).trim().toLowerCase() === soSeri.toLowerCase()
       );
-      if (isDuplicateInDb) {
-        errors['ma_tai_san'] = 'Mã tài sản đã tồn tại trong cơ sở dữ liệu (Không cho phép ghi đè).';
+      if (isSeriDuplicateInDb) {
+        errors['so_seri'] = 'Số seri đã tồn tại trong cơ sở dữ liệu (Không cho phép ghi đè).';
       }
 
-      // 1b. Trùng ngay trong cùng phiên dán Excel
+      // Kiểm tra trùng trong cùng phiên dán Excel
       if (allRows) {
         const matches = allRows.filter(r =>
-          r.ma_tai_san &&
-          String(r.ma_tai_san).trim().toLowerCase() === maTS.toLowerCase()
+          r.so_seri &&
+          String(r.so_seri).trim().toLowerCase() === soSeri.toLowerCase()
         );
         if (matches.length > 1) {
-          errors['ma_tai_san'] = 'Mã tài sản bị trùng lặp trong danh sách dán.';
+          errors['so_seri'] = 'Số seri bị trùng lặp trong danh sách dán.';
         }
       }
     }
@@ -706,7 +1097,7 @@ export default function EquipmentPage() {
         };
 
         const ngay_mua = convertToIsoDate(item.ngay_mua);
-        
+
         let han_bao_hanh = '';
         const rawBh = String(item.han_bao_hanh || '').trim();
         if (rawBh) {
@@ -809,10 +1200,26 @@ export default function EquipmentPage() {
       finalData.id_ncc = null;
     }
     delete finalData.so_thang_bh;
+
+    const isCustomDetail = !!finalData.is_custom_detail;
+    const loaiChiTietVal = String(finalData.loai_chi_tiet || '').trim();
+    delete finalData.loai_chi_tiet;
+    delete finalData.is_custom_detail;
+    delete finalData.is_custom_phap_nhan;
+
+    finalData.quy_cach_chat_lieu = loaiChiTietVal;
+
     if (!isITEquipment(finalData.nhom_thiet_bi)) {
       ['cpu', 'ram', 'ssd', 'hdd', 'vga', 'man_hinh'].forEach(k => finalData[k] = '');
+    } else {
+      if (finalData.cpu) finalData.cpu = cleanTechnicalString(finalData.cpu);
+      if (finalData.vga) finalData.vga = cleanTechnicalString(finalData.vga);
+      if (finalData.ram) finalData.ram = formatMemorySize(finalData.ram);
+      if (finalData.ssd) finalData.ssd = formatMemorySize(finalData.ssd);
+      if (finalData.hdd) finalData.hdd = formatMemorySize(finalData.hdd);
     }
-    if (!isFurniture(finalData.nhom_thiet_bi)) finalData.quy_cach_chat_lieu = '';
+    if (finalData.ma_tai_san) finalData.ma_tai_san = cleanTechnicalString(finalData.ma_tai_san);
+    if (finalData.so_seri) finalData.so_seri = cleanTechnicalString(finalData.so_seri);
 
     // 🟢 ĐIỂM FIX: Tự sinh mã ID trước khi ném lên DB nếu là tạo mới
     if (tbModalMode === 'create' && !finalData.id) {
@@ -851,7 +1258,7 @@ export default function EquipmentPage() {
     const { name, value } = e.target;
     setTbFormData((prev: any) => {
       const updated = { ...prev, [name]: name === 'gia_mua' ? value.replace(/\D/g, '') : value };
-      
+
       if (name === 'so_thang_bh') {
         const months = parseInt(value, 10);
         if (!isNaN(months) && months > 0) {
@@ -869,7 +1276,7 @@ export default function EquipmentPage() {
           updated.so_thang_bh = calculateWarrantyMonths(value, updated.han_bao_hanh) || '';
         }
       }
-      
+
       return updated;
     });
   };
@@ -891,20 +1298,41 @@ export default function EquipmentPage() {
     setSelectedTbForNk(tb); setNkModalMode('create');
     setNkFormData({
       id: '', id_ts_thiet_bi: tb.id, id_don_vi: tb.id_don_vi, ngay_ghi_nhan: new Date().toISOString().split('T')[0],
-      loai_nhat_ky: 'Cấp phát/Thu hồi', chi_phi: '', msnv_nguoi_dung: '', ho_ten_nguoi_dung: '', bp_quan_ly_su_dung: '',
+      loai_nhat_ky: 'Cấp mới', chi_phi: '', msnv_nguoi_dung: '', ho_ten_nguoi_dung: '', bp_quan_ly_su_dung: '',
       tinh_trang_ghi_nhan_thiet_bi: '', hinh_anh_minh_chung: '', ghi_chu_sua_chua_nang_cap: ''
     });
+    setNkReceivingUnit('');
+    setIsCrossUnitSearch(false);
     setIsNkModalOpen(true);
   };
 
-  const editNk = (nk: any) => { setNkModalMode('update'); setNkFormData({ ...nk }); };
+  const editNk = (nk: any) => {
+    setNkModalMode('update');
+    setNkFormData({ ...nk });
+    if (nk.loai_nhat_ky === 'Điều chuyển đơn vị') {
+      // Nếu là edit bản ghi Điều chuyển đơn vị, ta lấy id_don_vi_nhan nếu có hoặc trích xuất từ bp_quan_ly_su_dung
+      setNkReceivingUnit(nk.id_don_vi_nhan || '');
+    } else {
+      setNkReceivingUnit('');
+    }
+    setIsCrossUnitSearch(false);
+  };
 
   // 2. CẬP NHẬT HÀM LƯU NHẬT KÝ THIẾT BỊ
   const handleNkSave = async (e: React.FormEvent) => {
     e.preventDefault(); setSubmitting(true); setError(null);
     try {
       let finalData = { ...nkFormData };
-      if (!['Sửa chữa/Bảo dưỡng', 'Nâng cấp'].includes(finalData.loai_nhat_ky || '')) finalData.chi_phi = '';
+      if (!['Sửa chữa', 'Bảo dưỡng', 'Nâng cấp', 'Sửa chữa/Bảo dưỡng'].includes(finalData.loai_nhat_ky || '')) finalData.chi_phi = '';
+
+      if (finalData.loai_nhat_ky === 'Điều chuyển đơn vị') {
+        if (!nkReceivingUnit) {
+          toast.error("Vui lòng chọn Đơn vị nhận điều chuyển!");
+          setSubmitting(false);
+          return;
+        }
+        finalData.id_don_vi_nhan = nkReceivingUnit;
+      }
 
       // 🟢 ĐIỂM FIX: Tự sinh mã ID trước khi ném lên DB nếu là tạo mới
       if (nkModalMode === 'create' && !finalData.id) {
@@ -919,20 +1347,40 @@ export default function EquipmentPage() {
       if (nkModalMode === 'create') setNkData(prev => [savedLog, ...prev]);
       else setNkData(prev => prev.map(item => item.id === savedId ? savedLog : item));
 
+      // Thực hiện đổi đơn vị quản lý sở hữu của thiết bị nếu là sự kiện Điều chuyển đơn vị
+      if (finalData.loai_nhat_ky === 'Điều chuyển đơn vị' && selectedTbForNk) {
+        const updatedTb = { ...selectedTbForNk, id_don_vi: nkReceivingUnit };
+        await apiService.save(updatedTb, 'update', 'ts_thiet_bi');
+
+        setTbData(prev => prev.map(item => item.id === selectedTbForNk.id ? updatedTb : item));
+        setSelectedTbForNk(updatedTb);
+
+        toast.success(`Đã điều chuyển thiết bị sang đơn vị mới thành công!`);
+      }
+
       // Reset form
       setNkModalMode('create');
+      setNkReceivingUnit('');
+      setIsCrossUnitSearch(false);
       setNkFormData({
         id: '', id_ts_thiet_bi: selectedTbForNk?.id || '', id_don_vi: selectedTbForNk?.id_don_vi || '',
-        ngay_ghi_nhan: new Date().toISOString().split('T')[0], loai_nhat_ky: 'Cấp phát/Thu hồi', chi_phi: '', msnv_nguoi_dung: '', ho_ten_nguoi_dung: '', bp_quan_ly_su_dung: '',
-        tinh_trang_luu_ghi_nhan_thiet_bi: '', hinh_anh_minh_chung: '', ghi_chu_sua_chua_nang_cap_nang_cap: '', ghi_chu_su_dung: ''
+        ngay_ghi_nhan: new Date().toISOString().split('T')[0], loai_nhat_ky: 'Cấp mới', chi_phi: '', msnv_nguoi_dung: '', ho_ten_nguoi_dung: '', bp_quan_ly_su_dung: '',
+        tinh_trang_ghi_nhan_thiet_bi: '', hinh_anh_minh_chung: '', ghi_chu_sua_chua_nang_cap: ''
       });
+      setNkFormBp('');
+      setNkFormDv('');
     } catch (err: any) { setError(err.message); } finally { setSubmitting(false); }
   };
 
   const handleNkHoTenChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const name = e.target.value;
 
-    const validIds = selectedTbForNk ? [selectedTbForNk.id_don_vi, ...getAllSubordinateIds(selectedTbForNk.id_don_vi, donViList)] : [];
+    let validIds: string[] = [];
+    if (nkFormData.loai_nhat_ky === 'Điều chuyển đơn vị' && nkReceivingUnit) {
+      validIds = [nkReceivingUnit, ...getAllSubordinateIds(nkReceivingUnit, donViList)];
+    } else if (selectedTbForNk) {
+      validIds = [selectedTbForNk.id_don_vi, ...getAllSubordinateIds(selectedTbForNk.id_don_vi, donViList)];
+    }
 
     let foundNs = nhansuData.find(ns => ns.ho_ten === name && validIds.includes(ns.id_don_vi));
 
@@ -1067,76 +1515,115 @@ export default function EquipmentPage() {
               )}
               <div>
                 <h2 className="text-2xl font-bold text-[#05469B] flex items-center gap-2"><Layers size={28} /> Quản lý Tài sản & Thiết bị</h2>
-                <p className="text-sm font-medium text-gray-500 mt-1">Đang xem: <span className="text-emerald-600 font-bold">{selectedUnitName}</span> ({filteredTBs.length} khoản mục)</p>
-              </div>
-            </div>
-            <div className="flex flex-wrap w-full sm:w-auto gap-3 justify-end items-center">
-              {selectedItemsForPrint.length > 0 && (
-                <button
-                  onClick={() => {
-                    const items = tbData.filter(tb => selectedItemsForPrint.includes(tb.id));
-                    setPrintItemsList(items);
-                    setIsPrintModalOpen(true);
-                  }}
-                  className="w-full sm:w-auto flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-lg font-bold shadow-sm transition-all whitespace-nowrap animate-in fade-in zoom-in duration-200"
-                >
-                  <Printer className="w-5 h-5" /> In {selectedItemsForPrint.length} nhãn
-                </button>
-              )}
-              <button
-                onClick={() => setIsScannerOpen(true)}
-                className="w-full sm:w-auto flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-lg font-bold shadow-sm transition-all whitespace-nowrap"
-                title="Quét mã QR qua Camera"
-              >
-                <Camera className="w-5 h-5" /> Quét QR
-              </button>
-              <div className="relative w-full sm:w-64">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-                <input type="text" placeholder="Tìm Mã, Tên, Pháp nhân, Vị trí..." className="w-full pl-9 pr-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#05469B] outline-none shadow-sm text-sm" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
-              </div>
-              {/* Dropdown nút Thêm Tài sản mới */}
-              <div className="relative w-full sm:w-auto" ref={addDropdownRef}>
-                <button
-                  onClick={() => setIsAddDropdownOpen(!isAddDropdownOpen)}
-                  className="w-full sm:w-auto flex items-center justify-center gap-2 bg-[#05469B] hover:bg-[#04367a] text-white px-5 py-2.5 rounded-lg font-bold shadow-sm transition-all whitespace-nowrap cursor-pointer"
-                >
-                  <Plus className="w-5 h-5" />
-                  <span>Thêm Tài sản</span>
-                  <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${isAddDropdownOpen ? 'rotate-180' : ''}`} />
-                </button>
-
-                {isAddDropdownOpen && (
-                  <div className="absolute right-0 mt-2 w-56 bg-white border border-gray-150 rounded-xl shadow-xl py-2 z-[60] animate-in fade-in slide-in-from-top-2 duration-150">
+                <div className="flex flex-wrap items-center gap-3.5 mt-1.5">
+                  <p className="text-sm font-medium text-gray-500">Đang xem: <span className="text-emerald-600 font-bold">{selectedUnitName}</span> ({filteredTBs.length} khoản mục)</p>
+                  <div className="w-px h-3.5 bg-gray-300 hidden sm:inline"></div>
+                  {/* Thanh chuyển Tab */}
+                  <div className="flex bg-gray-200/60 p-0.5 rounded-lg border border-gray-200">
                     <button
-                      onClick={() => {
-                        setIsAddDropdownOpen(false);
-                        openTbModal('create');
-                      }}
-                      className="w-full text-left px-4 py-2.5 hover:bg-gray-50 text-gray-700 font-semibold text-sm flex items-center gap-2.5 transition-colors cursor-pointer"
+                      type="button"
+                      onClick={() => setActiveMainTab('list')}
+                      className={`px-3 py-1 text-xs font-bold rounded-md transition-all flex items-center gap-1 ${activeMainTab === 'list' ? 'bg-[#05469B] text-white shadow-xs' : 'text-gray-600 hover:text-gray-900'}`}
                     >
-                      <Plus size={16} className="text-[#05469B]" />
-                      <span>Thêm từng thiết bị</span>
+                      <Package size={13} /> Danh sách Tài sản
                     </button>
                     <button
+                      type="button"
                       onClick={() => {
-                        setIsAddDropdownOpen(false);
-                        setIsPasteModalOpen(true);
+                        setActiveMainTab('report');
+                        setDrillDownValue(null);
                       }}
-                      className="w-full text-left px-4 py-2.5 hover:bg-gray-50 text-indigo-700 font-semibold text-sm flex items-center gap-2.5 transition-colors cursor-pointer border-t border-gray-100"
+                      className={`px-3 py-1 text-xs font-bold rounded-md transition-all flex items-center gap-1 ${activeMainTab === 'report' ? 'bg-[#05469B] text-white shadow-xs' : 'text-gray-600 hover:text-gray-900'}`}
                     >
-                      <ClipboardPaste size={16} className="text-indigo-600" />
-                      <span>Thêm hàng loạt (Form)</span>
+                      <BarChart3 size={13} /> Báo cáo Thống kê
                     </button>
                   </div>
-                )}
+                </div>
               </div>
             </div>
+            {activeMainTab === 'list' && (
+              <div className="flex flex-wrap w-full sm:w-auto gap-3 justify-end items-center">
+                {selectedItemsForPrint.length > 0 && (
+                  <button
+                    onClick={() => {
+                      const items = tbData.filter(tb => selectedItemsForPrint.includes(tb.id));
+                      setPrintItemsList(items);
+                      setIsPrintModalOpen(true);
+                    }}
+                    className="w-full sm:w-auto flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-lg font-bold shadow-sm transition-all whitespace-nowrap animate-in fade-in zoom-in duration-200"
+                  >
+                    <Printer className="w-5 h-5" /> In {selectedItemsForPrint.length} nhãn
+                  </button>
+                )}
+                <button
+                  onClick={() => setIsScannerOpen(true)}
+                  className="w-full sm:w-auto flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-lg font-bold shadow-sm transition-all whitespace-nowrap"
+                  title="Quét mã QR qua Camera"
+                >
+                  <Camera className="w-5 h-5" /> Quét QR
+                </button>
+                {/* Lọc Phân loại chi tiết */}
+                <div className="w-full sm:w-48">
+                  <select
+                    value={detailTypeFilter}
+                    onChange={(e) => setDetailTypeFilter(e.target.value)}
+                    className="w-full px-3 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#05469B] outline-none shadow-sm text-sm font-bold text-gray-700 cursor-pointer"
+                  >
+                    <option value="">-- Tất cả loại --</option>
+                    {uniqueDetailTypes.map(type => (
+                      <option key={type} value={type}>{type}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="relative w-full sm:w-64">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                  <input type="text" placeholder="Tìm Mã, Tên, Pháp nhân, Vị trí..." className="w-full pl-9 pr-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#05469B] outline-none shadow-sm text-sm" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                </div>
+                {/* Dropdown nút Thêm Tài sản mới */}
+                <div className="relative w-full sm:w-auto" ref={addDropdownRef}>
+                  <button
+                    onClick={() => setIsAddDropdownOpen(!isAddDropdownOpen)}
+                    className="w-full sm:w-auto flex items-center justify-center gap-2 bg-[#05469B] hover:bg-[#04367a] text-white px-5 py-2.5 rounded-lg font-bold shadow-sm transition-all whitespace-nowrap cursor-pointer"
+                  >
+                    <Plus className="w-5 h-5" />
+                    <span>Thêm Tài sản</span>
+                    <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${isAddDropdownOpen ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  {isAddDropdownOpen && (
+                    <div className="absolute right-0 mt-2 w-56 bg-white border border-gray-150 rounded-xl shadow-xl py-2 z-[60] animate-in fade-in slide-in-from-top-2 duration-150">
+                      <button
+                        onClick={() => {
+                          setIsAddDropdownOpen(false);
+                          openTbModal('create');
+                        }}
+                        className="w-full text-left px-4 py-2.5 hover:bg-gray-50 text-gray-700 font-semibold text-sm flex items-center gap-2.5 transition-colors cursor-pointer"
+                      >
+                        <Plus size={16} className="text-[#05469B]" />
+                        <span>Thêm từng thiết bị</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setIsAddDropdownOpen(false);
+                          setIsPasteModalOpen(true);
+                        }}
+                        className="w-full text-left px-4 py-2.5 hover:bg-gray-50 text-indigo-700 font-semibold text-sm flex items-center gap-2.5 transition-colors cursor-pointer border-t border-gray-100"
+                      >
+                        <ClipboardPaste size={16} className="text-indigo-600" />
+                        <span>Thêm hàng loạt (Form)</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           {error && <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-500 text-red-700 flex items-start gap-3 rounded-r-lg shadow-sm"><AlertCircle className="w-5 h-5 shrink-0 mt-0.5" /><p>{error}</p></div>}
 
           {/* 🟢 THANH CẢNH BÁO HẠN BẢO HÀNH (ĐỒNG BỘ VỚI DASHBOARD) */}
-          {expiringEquipments.length > 0 && !isDismissed && (
+          {/* 🟢 THANH CẢNH BÁO HẠN BẢO HÀNH (ĐỒNG BỘ VỚI DASHBOARD) */}
+          {activeMainTab === 'list' && expiringEquipments.length > 0 && !isDismissed && (
             <div className={`mb-6 transition-all duration-300 ${isListCollapsed ? 'md:ml-10' : ''}`}>
               <div className="bg-red-50 border border-red-200 rounded-xl overflow-hidden shadow-sm">
 
@@ -1219,199 +1706,442 @@ export default function EquipmentPage() {
         </div>
 
         {/* BẢNG DỮ LIỆU CHÍNH */}
-        <div className={`flex flex-col flex-1 min-h-0 gap-4 transition-all duration-300 ${isListCollapsed ? 'md:ml-10 lg:ml-0' : ''}`}>
+        {activeMainTab === 'list' && (
+          <div className={`flex flex-col flex-1 min-h-0 gap-4 transition-all duration-300 ${isListCollapsed ? 'md:ml-10 lg:ml-0' : ''}`}>
 
-          {/* BẢNG DỮ LIỆU PC */}
-          <div className="hidden md:block bg-white rounded-xl shadow-sm border border-gray-200 w-full flex-1 min-h-0 overflow-auto custom-scrollbar">
-            <table className="w-full text-left border-collapse min-w-[1000px]">
-              <thead className="sticky top-0 bg-[#f8fafc] z-10">
-                <tr className="bg-[#f8fafc] border-b border-gray-200 text-xs font-bold text-gray-600 uppercase tracking-wider">
-                  <th className="p-4 w-12 text-center">
-                    <input
-                      type="checkbox"
-                      checked={currentTableData.length > 0 && currentTableData.every(item => selectedItemsForPrint.includes(item.id))}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          const newSelected = [...selectedItemsForPrint];
-                          currentTableData.forEach(item => {
-                            if (!newSelected.includes(item.id)) newSelected.push(item.id);
-                          });
-                          setSelectedItemsForPrint(newSelected);
-                        } else {
-                          setSelectedItemsForPrint(selectedItemsForPrint.filter(id => !currentTableData.some(item => item.id === id)));
-                        }
-                      }}
-                      className="w-4 h-4 text-[#05469B] border-gray-300 rounded focus:ring-[#05469B] cursor-pointer"
-                    />
-                  </th>
-                  <th className="p-4 w-32">Mã / Nhóm</th>
-                  <th className="p-4 w-56">Tên Tài sản / Thiết bị</th>
-                  <th className="p-4 w-32">Vị trí &amp; SL</th>
-                  <th className="p-4 w-50">Đơn Vị / Pháp Nhân</th>
-                  <th className="p-4">Thông số / Mô tả</th>
-                  <th className="p-4 w-30">Tình trạng</th>
-                  <th className="p-4 text-center w-36">Thao tác</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {loading ? (<tr><td colSpan={8} className="p-12 text-center text-gray-500"><Loader2 className="w-8 h-8 animate-spin mx-auto mb-3 text-[#05469B]" />Đang tải...</td></tr>) : filteredTBs.length === 0 ? (<tr><td colSpan={8} className="p-16 text-center text-gray-500"><Package size={48} className="mx-auto text-gray-300 mb-4" /><p className="text-lg font-medium">Không có tài sản nào hiển thị.</p></td></tr>) : (
-                  currentTableData.map((item) => (
-                    <tr key={item.id} className="hover:bg-blue-50/50 transition-colors group">
-                      <td className="p-4 align-top text-center">
-                        <input
-                          type="checkbox"
-                          checked={selectedItemsForPrint.includes(item.id)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setSelectedItemsForPrint([...selectedItemsForPrint, item.id]);
-                            } else {
-                              setSelectedItemsForPrint(selectedItemsForPrint.filter(id => id !== item.id));
-                            }
-                          }}
-                          className="w-4 h-4 text-[#05469B] border-gray-300 rounded focus:ring-[#05469B] cursor-pointer mt-1"
-                        />
-                      </td>
-                      <td className="p-4 align-top">
-                        <div className="font-black text-[#05469B] text-[13px] whitespace-nowrap mb-1">🏷️ {item.ma_tai_san || 'Chưa cấp mã'}</div>
-                        <span className="inline-block px-1.5 py-0.5 bg-indigo-50 text-indigo-700 rounded text-[10px] font-bold border border-indigo-100">{item.nhom_thiet_bi || 'Khác'}</span>
-                      </td>
-                      <td className="p-4 align-top font-bold text-gray-800 text-sm">{item.ten_thiet_bi}</td>
-                      <td className="p-4 align-top">
-                        <div className="flex flex-col gap-1 text-xs">
-                          <span className="font-bold text-gray-700 flex items-center gap-1"><MapPin size={12} className="text-orange-500" /> {item.vi_tri_bo_tri || 'Chưa rõ'}</span>
-                          <span className="text-gray-500 font-medium">SL: <b className="text-[#05469B]">{item.so_luong || 1}</b> {item.don_vi_tinh || 'Cái'}</span>
-                        </div>
-                      </td>
-                      <td className="p-4 align-top">
-                        <p className="text-xs font-bold text-gray-700">{donViMap[item.id_don_vi] || '-'}</p>
-                        {item.tai_san_thuoc && <p className="text-[10px] text-gray-500 font-medium mt-1 uppercase" title="Pháp nhân sở hữu">{item.tai_san_thuoc}</p>}
-                      </td>
-                      <td className="p-4 align-top">
-                        <p className="text-[11px] text-gray-600 font-medium line-clamp-3 leading-relaxed" title={getEquipmentDescription(item)}>
-                          {getEquipmentDescription(item)}
-                        </p>
-                      </td>
-                      <td className="p-4 align-top">
-                        <span className={`px-2 py-1 rounded text-[10px] font-bold whitespace-nowrap border 
+            {/* BẢNG DỮ LIỆU PC */}
+            <div className="hidden md:block bg-white rounded-xl shadow-sm border border-gray-200 w-full flex-1 min-h-0 overflow-auto custom-scrollbar">
+              <table className="w-full text-left border-collapse min-w-[1000px]">
+                <thead className="sticky top-0 bg-[#f8fafc] z-10">
+                  <tr className="bg-[#f8fafc] border-b border-gray-200 text-xs font-bold text-gray-600 uppercase tracking-wider">
+                    <th className="p-4 w-12 text-center">
+                      <input
+                        type="checkbox"
+                        checked={currentTableData.length > 0 && currentTableData.every(item => selectedItemsForPrint.includes(item.id))}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            const newSelected = [...selectedItemsForPrint];
+                            currentTableData.forEach(item => {
+                              if (!newSelected.includes(item.id)) newSelected.push(item.id);
+                            });
+                            setSelectedItemsForPrint(newSelected);
+                          } else {
+                            setSelectedItemsForPrint(selectedItemsForPrint.filter(id => !currentTableData.some(item => item.id === id)));
+                          }
+                        }}
+                        className="w-4 h-4 text-[#05469B] border-gray-300 rounded focus:ring-[#05469B] cursor-pointer"
+                      />
+                    </th>
+                    <th className="p-4 w-32">Mã / Nhóm</th>
+                    <th className="p-4 w-56">Tên Tài sản / Thiết bị</th>
+                    <th className="p-4 w-32">Vị trí &amp; SL</th>
+                    <th className="p-4 w-50">Đơn Vị / Pháp Nhân</th>
+                    <th className="p-4">Thông số / Mô tả</th>
+                    <th className="p-4 w-30">Tình trạng</th>
+                    <th className="p-4 text-center w-36">Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {loading ? (<tr><td colSpan={8} className="p-12 text-center text-gray-500"><Loader2 className="w-8 h-8 animate-spin mx-auto mb-3 text-[#05469B]" />Đang tải...</td></tr>) : filteredTBs.length === 0 ? (<tr><td colSpan={8} className="p-16 text-center text-gray-500"><Package size={48} className="mx-auto text-gray-300 mb-4" /><p className="text-lg font-medium">Không có tài sản nào hiển thị.</p></td></tr>) : (
+                    currentTableData.map((item) => (
+                      <tr key={item.id} className="hover:bg-blue-50/50 transition-colors group">
+                        <td className="p-4 align-top text-center">
+                          <input
+                            type="checkbox"
+                            checked={selectedItemsForPrint.includes(item.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedItemsForPrint([...selectedItemsForPrint, item.id]);
+                              } else {
+                                setSelectedItemsForPrint(selectedItemsForPrint.filter(id => id !== item.id));
+                              }
+                            }}
+                            className="w-4 h-4 text-[#05469B] border-gray-300 rounded focus:ring-[#05469B] cursor-pointer mt-1"
+                          />
+                        </td>
+                        <td className="p-4 align-top">
+                          <div className="font-black text-[#05469B] text-[13px] whitespace-nowrap mb-1">🏷️ {item.ma_tai_san || 'Chưa cấp mã'}</div>
+                          <span className="inline-block px-1.5 py-0.5 bg-indigo-50 text-indigo-700 rounded text-[10px] font-bold border border-indigo-100">{item.nhom_thiet_bi || 'Khác'}</span>
+                        </td>
+                        <td className="p-4 align-top font-bold text-gray-800 text-sm">{item.ten_thiet_bi}</td>
+                        <td className="p-4 align-top">
+                          <div className="flex flex-col gap-1 text-xs">
+                            <span className="font-bold text-gray-700 flex items-center gap-1"><MapPin size={12} className="text-orange-500" /> {item.vi_tri_bo_tri || 'Chưa rõ'}</span>
+                            <span className="text-gray-500 font-medium">SL: <b className="text-[#05469B]">{item.so_luong || 1}</b> {item.don_vi_tinh || 'Cái'}</span>
+                          </div>
+                        </td>
+                        <td className="p-4 align-top">
+                          <p className="text-xs font-bold text-gray-700">{donViMap[item.id_don_vi] || '-'}</p>
+                          {item.tai_san_thuoc && <p className="text-[10px] text-gray-500 font-medium mt-1 uppercase" title="Pháp nhân sở hữu">{item.tai_san_thuoc}</p>}
+                        </td>
+                        <td className="p-4 align-top">
+                          <p className="text-[11px] text-gray-600 font-medium line-clamp-3 leading-relaxed" title={getEquipmentDescription(item)}>
+                            {getEquipmentDescription(item)}
+                          </p>
+                        </td>
+                        <td className="p-4 align-top">
+                          <span className={`px-2 py-1 rounded text-[10px] font-bold whitespace-nowrap border 
                           ${item.tinh_trang === 'Đang sử dụng' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' :
+                              item.tinh_trang === 'Lưu kho - Chờ sử dụng' ? 'bg-blue-50 text-blue-600 border-blue-200' :
+                                item.tinh_trang === 'Lưu kho - Chờ thanh lý' ? 'bg-gray-100 text-gray-600 border-gray-300' :
+                                  item.tinh_trang === 'Đang sửa chữa' ? 'bg-orange-50 text-orange-600 border-orange-200' : 'bg-red-50 text-red-600 border-red-200'}`}>
+                            {item.tinh_trang || 'Đang sử dụng'}
+                          </span>
+                        </td>
+                        <td className="p-4 align-top w-36">
+                          <div className="flex flex-col gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity w-full max-w-[120px] mx-auto">
+                            <button onClick={() => openNkModal(item)} className="w-full py-1 bg-white border border-purple-200 text-purple-600 hover:bg-purple-50 rounded text-[11px] font-bold flex items-center justify-center gap-1 shadow-sm"><History size={13} /> Nhật ký</button>
+                            <div className="grid grid-cols-4 gap-1">
+                              <button onClick={() => { setViewData(item); setIsViewModalOpen(true); }} className="py-1 bg-white border border-emerald-200 text-emerald-600 hover:bg-emerald-50 rounded flex items-center justify-center shadow-sm" title="Xem chi tiết"><Eye size={13} /></button>
+                              <button onClick={() => openTbModal('update', item)} className="py-1 bg-white border border-blue-200 text-blue-600 hover:bg-blue-50 rounded flex items-center justify-center shadow-sm" title="Sửa"><Edit size={13} /></button>
+                              <button onClick={() => { setPrintItemsList([item]); setIsPrintModalOpen(true); }} className="py-1 bg-white border border-indigo-200 text-indigo-600 hover:bg-indigo-50 rounded flex items-center justify-center shadow-sm" title="In nhãn tem QR"><QrCode size={13} /></button>
+                              <button onClick={() => { setItemToDelete({ id: item.id, type: 'tb' }); setIsConfirmOpen(true); }} className="py-1 bg-white border border-red-200 text-red-600 hover:bg-red-50 rounded flex items-center justify-center shadow-sm" title="Xóa"><Trash2 size={13} /></button>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* 🟢 VIEW TRÊN MOBILE: THẺ CARD DỌC */}
+            <div className="block md:hidden flex-1 min-h-0 overflow-y-auto space-y-4 custom-scrollbar">
+              {filteredTBs.length === 0 ? (
+                <div className="bg-white p-8 rounded-2xl border border-gray-200 text-center text-gray-400 italic">Không có tài sản nào hiển thị.</div>
+              ) : (
+                currentTableData.map((item) => (
+                  <div
+                    key={item.id}
+                    className="p-4 bg-white rounded-2xl border border-gray-100 shadow-sm relative flex flex-col gap-3 transition-all"
+                  >
+                    {/* Header: Mã & Nhóm & Tên */}
+                    <div className="pb-2.5 border-b border-gray-100">
+                      <div className="flex items-center justify-between gap-1 mb-1">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={selectedItemsForPrint.includes(item.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedItemsForPrint([...selectedItemsForPrint, item.id]);
+                              } else {
+                                setSelectedItemsForPrint(selectedItemsForPrint.filter(id => id !== item.id));
+                              }
+                            }}
+                            className="w-4 h-4 text-[#05469B] border-gray-300 rounded focus:ring-[#05469B] cursor-pointer"
+                          />
+                          <span className="text-[10px] text-gray-400 font-mono">🏷️ {item.ma_tai_san || 'Chưa cấp mã'}</span>
+                        </div>
+                        <span className="inline-block px-1.5 py-0.5 bg-indigo-50 text-indigo-700 rounded text-[9px] font-bold border border-indigo-100">{item.nhom_thiet_bi || 'Khác'}</span>
+                      </div>
+                      <h4 className="font-extrabold text-[#05469B] text-sm leading-snug">{item.ten_thiet_bi}</h4>
+                    </div>
+
+                    {/* Body: Details */}
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-xs">
+                      <div>
+                        <p className="text-[10px] font-bold text-gray-400 uppercase">Vị trí &amp; SL</p>
+                        <p className="font-bold text-gray-700 flex items-center gap-1 mt-0.5"><MapPin size={11} className="text-orange-500" /> {item.vi_tri_bo_tri || 'Chưa rõ'}</p>
+                        <p className="text-[10px] font-medium text-gray-500 mt-0.5">SL: <b className="text-[#05469B]">{item.so_luong || 1}</b> {item.don_vi_tinh || 'Cái'}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-bold text-gray-400 uppercase">Tình trạng</p>
+                        <span className={`mt-1 inline-block px-1.5 py-0.5 rounded text-[9px] font-bold border 
+                        ${item.tinh_trang === 'Đang sử dụng' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' :
                             item.tinh_trang === 'Lưu kho - Chờ sử dụng' ? 'bg-blue-50 text-blue-600 border-blue-200' :
                               item.tinh_trang === 'Lưu kho - Chờ thanh lý' ? 'bg-gray-100 text-gray-600 border-gray-300' :
                                 item.tinh_trang === 'Đang sửa chữa' ? 'bg-orange-50 text-orange-600 border-orange-200' : 'bg-red-50 text-red-600 border-red-200'}`}>
                           {item.tinh_trang || 'Đang sử dụng'}
                         </span>
-                      </td>
-                      <td className="p-4 align-top w-36">
-                        <div className="flex flex-col gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity w-full max-w-[120px] mx-auto">
-                          <button onClick={() => openNkModal(item)} className="w-full py-1 bg-white border border-purple-200 text-purple-600 hover:bg-purple-50 rounded text-[11px] font-bold flex items-center justify-center gap-1 shadow-sm"><History size={13} /> Nhật ký</button>
-                          <div className="grid grid-cols-4 gap-1">
-                            <button onClick={() => { setViewData(item); setIsViewModalOpen(true); }} className="py-1 bg-white border border-emerald-200 text-emerald-600 hover:bg-emerald-50 rounded flex items-center justify-center shadow-sm" title="Xem chi tiết"><Eye size={13} /></button>
-                            <button onClick={() => openTbModal('update', item)} className="py-1 bg-white border border-blue-200 text-blue-600 hover:bg-blue-50 rounded flex items-center justify-center shadow-sm" title="Sửa"><Edit size={13} /></button>
-                            <button onClick={() => { setPrintItemsList([item]); setIsPrintModalOpen(true); }} className="py-1 bg-white border border-indigo-200 text-indigo-600 hover:bg-indigo-50 rounded flex items-center justify-center shadow-sm" title="In nhãn tem QR"><QrCode size={13} /></button>
-                            <button onClick={() => { setItemToDelete({ id: item.id, type: 'tb' }); setIsConfirmOpen(true); }} className="py-1 bg-white border border-red-200 text-red-600 hover:bg-red-50 rounded flex items-center justify-center shadow-sm" title="Xóa"><Trash2 size={13} /></button>
-                          </div>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* 🟢 VIEW TRÊN MOBILE: THẺ CARD DỌC */}
-          <div className="block md:hidden flex-1 min-h-0 overflow-y-auto space-y-4 custom-scrollbar">
-            {filteredTBs.length === 0 ? (
-              <div className="bg-white p-8 rounded-2xl border border-gray-200 text-center text-gray-400 italic">Không có tài sản nào hiển thị.</div>
-            ) : (
-              currentTableData.map((item) => (
-                <div
-                  key={item.id}
-                  className="p-4 bg-white rounded-2xl border border-gray-100 shadow-sm relative flex flex-col gap-3 transition-all"
-                >
-                  {/* Header: Mã & Nhóm & Tên */}
-                  <div className="pb-2.5 border-b border-gray-100">
-                    <div className="flex items-center justify-between gap-1 mb-1">
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          checked={selectedItemsForPrint.includes(item.id)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setSelectedItemsForPrint([...selectedItemsForPrint, item.id]);
-                            } else {
-                              setSelectedItemsForPrint(selectedItemsForPrint.filter(id => id !== item.id));
-                            }
-                          }}
-                          className="w-4 h-4 text-[#05469B] border-gray-300 rounded focus:ring-[#05469B] cursor-pointer"
-                        />
-                        <span className="text-[10px] text-gray-400 font-mono">🏷️ {item.ma_tai_san || 'Chưa cấp mã'}</span>
                       </div>
-                      <span className="inline-block px-1.5 py-0.5 bg-indigo-50 text-indigo-700 rounded text-[9px] font-bold border border-indigo-100">{item.nhom_thiet_bi || 'Khác'}</span>
+                      <div className="col-span-2">
+                        <p className="text-[10px] font-bold text-gray-400 uppercase">Đơn vị quản lý</p>
+                        <p className="font-bold text-gray-700 mt-0.5 text-xs">{donViMap[item.id_don_vi] || '-'}</p>
+                        {item.tai_san_thuoc && <p className="text-[9px] text-gray-400 font-medium uppercase mt-0.5">{item.tai_san_thuoc}</p>}
+                      </div>
+                      {getEquipmentDescription(item) && (
+                        <div className="col-span-2 bg-gray-50 p-2 rounded-lg border border-gray-100">
+                          <p className="text-[9px] font-bold text-gray-400 uppercase mb-0.5">Thông số / Mô tả</p>
+                          <p className="text-[11px] text-gray-600 font-medium leading-relaxed line-clamp-3">{getEquipmentDescription(item)}</p>
+                        </div>
+                      )}
                     </div>
-                    <h4 className="font-extrabold text-[#05469B] text-sm leading-snug">{item.ten_thiet_bi}</h4>
-                  </div>
 
-                  {/* Body: Details */}
-                  <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-xs">
-                    <div>
-                      <p className="text-[10px] font-bold text-gray-400 uppercase">Vị trí &amp; SL</p>
-                      <p className="font-bold text-gray-700 flex items-center gap-1 mt-0.5"><MapPin size={11} className="text-orange-500" /> {item.vi_tri_bo_tri || 'Chưa rõ'}</p>
-                      <p className="text-[10px] font-medium text-gray-500 mt-0.5">SL: <b className="text-[#05469B]">{item.so_luong || 1}</b> {item.don_vi_tinh || 'Cái'}</p>
+                    {/* Footer: Actions */}
+                    <div className="flex items-center justify-between gap-1.5 pt-2.5 border-t border-gray-100 mt-1">
+                      <button onClick={() => openNkModal(item)} className="py-1.5 px-2 bg-white border border-purple-200 text-purple-600 hover:bg-purple-50 rounded-lg text-[11px] font-bold flex items-center justify-center gap-1 shadow-2xs" title="Xem nhật ký lịch sử thiết bị"><History size={13} /> Lịch sử</button>
+                      <div className="flex items-center gap-1.5">
+                        <button onClick={() => { setViewData(item); setIsViewModalOpen(true); }} className="p-1.5 text-emerald-600 bg-emerald-50 border border-emerald-100 hover:bg-emerald-100 rounded-lg transition-colors flex items-center gap-1 text-[11px] font-bold shadow-2xs" title="Xem chi tiết"><Eye size={13} /> Xem</button>
+                        <button onClick={() => openTbModal('update', item)} className="p-1.5 text-blue-600 bg-blue-50 border border-blue-100 hover:bg-blue-100 rounded-lg transition-colors flex items-center gap-1 text-[11px] font-bold shadow-2xs" title="Sửa"><Edit size={13} /> Sửa</button>
+                        <button onClick={() => { setPrintItemsList([item]); setIsPrintModalOpen(true); }} className="p-1.5 text-indigo-600 bg-indigo-50 border border-indigo-100 hover:bg-indigo-100 rounded-lg transition-colors flex items-center gap-1 text-[11px] font-bold shadow-2xs" title="In nhãn tem QR"><QrCode size={13} /></button>
+                        <button onClick={() => { setItemToDelete({ id: item.id, type: 'tb' }); setIsConfirmOpen(true); }} className="p-1.5 text-red-600 bg-red-50 border border-red-100 hover:bg-red-100 rounded-lg transition-colors flex items-center gap-1 text-[11px] font-bold shadow-2xs" title="Xóa"><Trash2 size={13} /></button>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-[10px] font-bold text-gray-400 uppercase">Tình trạng</p>
-                      <span className={`mt-1 inline-block px-1.5 py-0.5 rounded text-[9px] font-bold border 
-                        ${item.tinh_trang === 'Đang sử dụng' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' :
-                          item.tinh_trang === 'Lưu kho - Chờ sử dụng' ? 'bg-blue-50 text-blue-600 border-blue-200' :
-                            item.tinh_trang === 'Lưu kho - Chờ thanh lý' ? 'bg-gray-100 text-gray-600 border-gray-300' :
-                              item.tinh_trang === 'Đang sửa chữa' ? 'bg-orange-50 text-orange-600 border-orange-200' : 'bg-red-50 text-red-600 border-red-200'}`}>
-                        {item.tinh_trang || 'Đang sử dụng'}
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="shrink-0 pt-2">
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+                rowsPerPage={rowsPerPage}
+                onRowsPerPageChange={(rows) => {
+                  setRowsPerPage(rows);
+                  setCurrentPage(1);
+                }}
+                totalRows={filteredTBs.length}
+                itemName="tài sản"
+              />
+            </div>
+
+          </div>
+        )}
+
+        {/* 🟢 TAB 2: BÁO CÁO THỐNG KÊ */}
+        {activeMainTab === 'report' && (
+          <div className="flex-1 min-h-0 flex flex-col gap-5 animate-in fade-in duration-200">
+            {/* 1. THẺ CHỈ SỐ TỔNG QUAN Ở TRÊN */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 shrink-0">
+              <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-xs">
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Tổng số lượng</p>
+                <p className="text-xl sm:text-2xl font-black text-gray-800 mt-1">{statsSummary.totalQty} cái</p>
+              </div>
+              <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-xs">
+                <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">Tổng giá trị</p>
+                <p className="text-xl sm:text-2xl font-black text-emerald-700 mt-1">{formatCurrency(statsSummary.totalVal)}</p>
+              </div>
+              <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-xs">
+                <p className="text-[10px] font-bold text-blue-600 uppercase tracking-wider">Đơn giá trung bình</p>
+                <p className="text-xl sm:text-2xl font-black text-blue-700 mt-1">
+                  {statsSummary.totalQty > 0 ? formatCurrency(statsSummary.totalVal / statsSummary.totalQty) : '0đ'}
+                </p>
+              </div>
+              <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-xs min-w-0">
+                <p className="text-[10px] font-bold text-purple-600 uppercase tracking-wider truncate" title="Đơn giá cao nhất">Giá trị lớn nhất</p>
+                <p className="text-xl sm:text-2xl font-black text-purple-700 mt-1 truncate" title={formatCurrency(statsSummary.maxPrice)}>
+                  {formatCurrency(statsSummary.maxPrice)}
+                </p>
+              </div>
+            </div>
+
+            {/* 2. CHỌN TIÊU CHÍ THỐNG KÊ */}
+            <div className="bg-white border border-gray-200 rounded-xl p-4 shrink-0 shadow-xs flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+              <div className="flex items-center gap-2">
+                <BarChart3 className="text-[#05469B] w-5 h-5 shrink-0" />
+                <span className="font-bold text-sm text-gray-800">Thống kê động theo:</span>
+              </div>
+              <div className="flex flex-wrap gap-1.5 w-full sm:w-auto">
+                <button
+                  type="button"
+                  onClick={() => { setReportDimension('location'); setDrillDownValue(null); }}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${reportDimension === 'location' ? 'bg-[#05469B] text-white border-[#05469B]' : 'bg-gray-50 text-gray-600 hover:bg-gray-100 border-gray-200'}`}
+                >
+                  Vị trí / Địa điểm
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setReportDimension('department'); setDrillDownValue(null); }}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${reportDimension === 'department' ? 'bg-[#05469B] text-white border-[#05469B]' : 'bg-gray-50 text-gray-600 hover:bg-gray-100 border-gray-200'}`}
+                >
+                  Phòng ban / Bộ phận
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setReportDimension('type'); setDrillDownValue(null); }}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${reportDimension === 'type' ? 'bg-[#05469B] text-white border-[#05469B]' : 'bg-gray-50 text-gray-600 hover:bg-gray-100 border-gray-200'}`}
+                >
+                  Phân loại chi tiết
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setReportDimension('supplier'); setDrillDownValue(null); }}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${reportDimension === 'supplier' ? 'bg-[#05469B] text-white border-[#05469B]' : 'bg-gray-50 text-gray-600 hover:bg-gray-100 border-gray-200'}`}
+                >
+                  Nhà cung cấp
+                </button>
+              </div>
+            </div>
+
+            {/* 3. SPLIT LAYOUT: TRÁI CHỌN NHÓM - PHẢI DRILL-DOWN */}
+            <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-10 gap-5">
+              {/* Cột trái (35% width on large screens) */}
+              <div className="lg:col-span-4 bg-white border border-gray-200 rounded-xl shadow-xs flex flex-col overflow-hidden min-h-[300px]">
+                <div className="p-3.5 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center shrink-0">
+                  <span className="font-bold text-xs text-gray-700 uppercase tracking-wider">
+                    {reportDimension === 'location' ? 'Địa điểm' : reportDimension === 'department' ? 'Phòng ban' : reportDimension === 'type' ? 'Phân loại' : 'Nhà cung cấp'}
+                  </span>
+                  <span className="font-bold text-[11px] text-[#05469B] bg-blue-50 px-2.5 py-0.5 rounded-full">{reportSummary.length} nhóm</span>
+                </div>
+                <div className="flex-1 overflow-y-auto custom-scrollbar divide-y divide-gray-100">
+                  {reportSummary.map((grp, idx) => (
+                    <div
+                      key={idx}
+                      onClick={() => setDrillDownValue(grp.name)}
+                      className={`p-3.5 flex justify-between items-center cursor-pointer transition-all hover:bg-blue-50/20 ${drillDownValue === grp.name ? 'bg-blue-50/40 border-l-4 border-[#05469B] pl-2.5' : ''}`}
+                    >
+                      <div className="min-w-0 flex-1 pr-2">
+                        <span className={`text-xs block truncate ${drillDownValue === grp.name ? 'font-bold text-[#05469B]' : 'font-semibold text-gray-800'}`}>
+                          {grp.name}
+                        </span>
+                        <span className="text-[10px] text-gray-400 font-semibold block mt-0.5">{formatCurrency(grp.value)}</span>
+                      </div>
+                      <span className="px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full font-bold text-[11px] shrink-0">
+                        {grp.count} cái
                       </span>
                     </div>
-                    <div className="col-span-2">
-                      <p className="text-[10px] font-bold text-gray-400 uppercase">Đơn vị quản lý</p>
-                      <p className="font-bold text-gray-700 mt-0.5 text-xs">{donViMap[item.id_don_vi] || '-'}</p>
-                      {item.tai_san_thuoc && <p className="text-[9px] text-gray-400 font-medium uppercase mt-0.5">{item.tai_san_thuoc}</p>}
-                    </div>
-                    {getEquipmentDescription(item) && (
-                      <div className="col-span-2 bg-gray-50 p-2 rounded-lg border border-gray-100">
-                        <p className="text-[9px] font-bold text-gray-400 uppercase mb-0.5">Thông số / Mô tả</p>
-                        <p className="text-[11px] text-gray-600 font-medium leading-relaxed line-clamp-3">{getEquipmentDescription(item)}</p>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Footer: Actions */}
-                  <div className="flex items-center justify-between gap-1.5 pt-2.5 border-t border-gray-100 mt-1">
-                    <button onClick={() => openNkModal(item)} className="py-1.5 px-2 bg-white border border-purple-200 text-purple-600 hover:bg-purple-50 rounded-lg text-[11px] font-bold flex items-center justify-center gap-1 shadow-2xs" title="Xem nhật ký lịch sử thiết bị"><History size={13} /> Lịch sử</button>
-                    <div className="flex items-center gap-1.5">
-                      <button onClick={() => { setViewData(item); setIsViewModalOpen(true); }} className="p-1.5 text-emerald-600 bg-emerald-50 border border-emerald-100 hover:bg-emerald-100 rounded-lg transition-colors flex items-center gap-1 text-[11px] font-bold shadow-2xs" title="Xem chi tiết"><Eye size={13} /> Xem</button>
-                      <button onClick={() => openTbModal('update', item)} className="p-1.5 text-blue-600 bg-blue-50 border border-blue-100 hover:bg-blue-100 rounded-lg transition-colors flex items-center gap-1 text-[11px] font-bold shadow-2xs" title="Sửa"><Edit size={13} /> Sửa</button>
-                      <button onClick={() => { setPrintItemsList([item]); setIsPrintModalOpen(true); }} className="p-1.5 text-indigo-600 bg-indigo-50 border border-indigo-100 hover:bg-indigo-100 rounded-lg transition-colors flex items-center gap-1 text-[11px] font-bold shadow-2xs" title="In nhãn tem QR"><QrCode size={13} /></button>
-                      <button onClick={() => { setItemToDelete({ id: item.id, type: 'tb' }); setIsConfirmOpen(true); }} className="p-1.5 text-red-600 bg-red-50 border border-red-100 hover:bg-red-100 rounded-lg transition-colors flex items-center gap-1 text-[11px] font-bold shadow-2xs" title="Xóa"><Trash2 size={13} /></button>
-                    </div>
-                  </div>
+                  ))}
+                  {reportSummary.length === 0 && (
+                    <div className="text-center py-10 text-xs text-gray-400 font-bold">Chưa có dữ liệu thống kê.</div>
+                  )}
                 </div>
-              ))
-            )}
-          </div>
+              </div>
 
-          <div className="shrink-0 pt-2">
-            <Pagination
-              currentPage={currentPage}
-              totalPages={totalPages}
-              onPageChange={setCurrentPage}
-              rowsPerPage={rowsPerPage}
-              onRowsPerPageChange={(rows) => {
-                setRowsPerPage(rows);
-                setCurrentPage(1);
-              }}
-              totalRows={filteredTBs.length}
-              itemName="tài sản"
-            />
-          </div>
+              {/* Cột phải (65% width on large screens) */}
+              <div className="lg:col-span-6 bg-white border border-gray-200 rounded-xl shadow-xs flex flex-col overflow-hidden min-h-[300px]">
+                {drillDownValue ? (
+                  (() => {
+                    const selectedGrp = reportSummary.find(g => g.name === drillDownValue);
+                    const groupItems = selectedGrp ? selectedGrp.items : [];
+                    const itConfig = getITConfigStats(groupItems);
+                    const hasItSpecs = itConfig.cpu.length > 0 || itConfig.ram.length > 0 || itConfig.vga.length > 0;
 
-        </div>
+                    return (
+                      <div className="flex-1 min-h-0 flex flex-col overflow-hidden animate-in fade-in duration-200">
+                        {/* Header của Drill-down */}
+                        <div className="p-3.5 border-b border-gray-100 bg-[#05469B] text-white flex justify-between items-center shrink-0">
+                          <div className="min-w-0 flex-1 pr-3">
+                            <p className="text-[10px] font-bold uppercase tracking-wider text-blue-200">Danh sách chi tiết</p>
+                            <p className="font-bold text-sm truncate" title={drillDownValue}>{drillDownValue}</p>
+                          </div>
+                          <span className="px-3 py-0.5 bg-white/20 text-white rounded-full font-black text-xs shrink-0">{groupItems.length} tài sản</span>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-5">
+                          {/* 🟢 PHÂN TÍCH CẤU HÌNH PHẦN CỨNG IT (Nếu có thông số IT) */}
+                          {hasItSpecs && (
+                            <div className="bg-gradient-to-br from-blue-500/5 to-indigo-500/5 border border-blue-100 rounded-xl p-4 space-y-4">
+                              <h4 className="font-black text-xs text-blue-900 uppercase flex items-center gap-1.5 border-b border-blue-100 pb-2">
+                                <Cpu size={14} /> Thống kê Cấu hình phần cứng IT
+                              </h4>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                {/* CPU */}
+                                <div>
+                                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1.5">Bộ vi xử lý (CPU)</span>
+                                  <div className="space-y-1">
+                                    {itConfig.cpu.map((item, idx) => (
+                                      <div key={idx} className="flex justify-between items-center text-xs bg-white/80 p-1.5 rounded border border-gray-100">
+                                        <span className="font-semibold text-gray-700 truncate pr-1">{item.name}</span>
+                                        <span className="font-bold text-blue-700 shrink-0 bg-blue-50 px-1.5 py-0.5 rounded">{item.count}</span>
+                                      </div>
+                                    ))}
+                                    {itConfig.cpu.length === 0 && <span className="text-xs text-gray-400">---</span>}
+                                  </div>
+                                </div>
+                                {/* Card màn hình VGA */}
+                                <div>
+                                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1.5">Đồ họa (VGA)</span>
+                                  <div className="space-y-1">
+                                    {itConfig.vga.map((item, idx) => (
+                                      <div key={idx} className="flex justify-between items-center text-xs bg-white/80 p-1.5 rounded border border-gray-100">
+                                        <span className="font-semibold text-gray-700 truncate pr-1">{item.name}</span>
+                                        <span className="font-bold text-blue-700 shrink-0 bg-blue-50 px-1.5 py-0.5 rounded">{item.count}</span>
+                                      </div>
+                                    ))}
+                                    {itConfig.vga.length === 0 && <span className="text-xs text-gray-400">---</span>}
+                                  </div>
+                                </div>
+                                {/* RAM */}
+                                <div>
+                                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1.5">Bộ nhớ trong (RAM)</span>
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {itConfig.ram.map((item, idx) => (
+                                      <span key={idx} className="inline-flex items-center gap-1.5 px-2 py-1 bg-white border border-gray-100 rounded-md text-xs font-bold text-gray-700">
+                                        {item.name}: <span className="text-indigo-600 font-extrabold">{item.count} máy</span>
+                                      </span>
+                                    ))}
+                                    {itConfig.ram.length === 0 && <span className="text-xs text-gray-400">---</span>}
+                                  </div>
+                                </div>
+                                {/* Storage */}
+                                <div>
+                                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1.5">Ổ cứng lưu trữ</span>
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {itConfig.storage.map((item, idx) => (
+                                      <span key={idx} className="inline-flex items-center gap-1.5 px-2 py-1 bg-white border border-gray-100 rounded-md text-xs font-bold text-gray-700">
+                                        {item.name}: <span className="text-indigo-600 font-extrabold">{item.count} ổ</span>
+                                      </span>
+                                    ))}
+                                    {itConfig.storage.length === 0 && <span className="text-xs text-gray-400">---</span>}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* BẢNG DANH SÁCH CHI TIẾT TẬP TÀI SẢN */}
+                          <div className="border border-gray-200 rounded-lg overflow-hidden bg-white shrink-0">
+                            <div className="overflow-x-auto custom-scrollbar">
+                              <table className="w-full text-left text-xs border-collapse">
+                                <thead>
+                                  <tr className="bg-gray-50 border-b border-gray-200 text-[10px] uppercase font-bold text-gray-500 tracking-wider">
+                                    <th className="p-3 w-32">Mã / Seri</th>
+                                    <th className="p-3">Tên thiết bị</th>
+                                    <th className="p-3 w-36">Người sử dụng</th>
+                                    <th className="p-3 w-28 text-center">Tình trạng</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                  {groupItems.map((tb, idx) => {
+                                    const latestUser = getLatestUserFull(tb.id);
+                                    return (
+                                      <tr key={idx} className="hover:bg-gray-50/50">
+                                        <td className="p-3 font-mono">
+                                          <span className="block font-bold text-gray-800">{tb.ma_tai_san || '---'}</span>
+                                          {tb.so_seri && <span className="block text-[9px] text-gray-400 mt-0.5">S/N: {tb.so_seri}</span>}
+                                        </td>
+                                        <td className="p-3">
+                                          <span className="font-bold text-[#05469B] block">{tb.ten_thiet_bi}</span>
+                                          <span className="block text-[9px] text-gray-400 mt-0.5">
+                                            {tb.quy_cach_chat_lieu || 'Chưa phân loại'}
+                                            {tb.vi_tri_bo_tri && ` | ${tb.vi_tri_bo_tri}`}
+                                          </span>
+                                        </td>
+                                        <td className="p-3">
+                                          <span className="font-bold text-gray-700 block">{latestUser.name}</span>
+                                          <span className="block text-[9px] text-gray-400 mt-0.5 truncate" title={latestUser.department}>{latestUser.department}</span>
+                                        </td>
+                                        <td className="p-3 text-center">
+                                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${tb.tinh_trang === 'Đang sử dụng' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-red-50 text-red-700 border-red-100'}`}>
+                                            {tb.tinh_trang || 'Chưa rõ'}
+                                          </span>
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()
+                ) : (
+                  <div className="flex-1 flex flex-col justify-center items-center text-center p-8">
+                    <BarChart3 className="w-12 h-12 text-gray-300 animate-bounce mb-2" />
+                    <p className="font-bold text-sm text-gray-500">Xem phân tích & khoan sâu danh sách</p>
+                    <p className="text-xs text-gray-400 max-w-xs mt-1">Chọn một nhóm phân loại ở cột bên trái để xem danh sách tài sản và thống kê cấu hình phần cứng chi tiết của nhóm đó.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* --- DATALISTS --- */}
@@ -1636,24 +2366,65 @@ export default function EquipmentPage() {
                     <div className="flex flex-col md:flex-row gap-4">
                       <div className="w-full md:w-1/4">
                         <label className="block text-xs font-bold text-gray-700 mb-1">Đơn vị quản lý *</label>
-                        <select required name="id_don_vi" value={tbFormData.id_don_vi || ''} onChange={handleTbChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-bold text-[#05469B]" style={{ fontFamily: 'monospace, sans-serif' }}>
+                        <select required name="id_don_vi" value={tbFormData.id_don_vi || ''} onChange={handleTbChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-bold text-gray-900" style={{ fontFamily: 'monospace, sans-serif' }}>
                           <option value="">-- Chọn đơn vị --</option>
                           {buildHierarchicalOptions(donViList.filter(dv => allowedDonViIds.includes(dv.id))).map(({ unit, prefix }) => (<option key={unit.id} value={unit.id} className="font-normal text-gray-700">{prefix}{getUnitEmoji(unit.loai_hinh)} {unit.ten_don_vi}</option>))}
                         </select>
                       </div>
                       <div className="w-full md:w-2/4">
                         <label className="block text-xs font-bold text-gray-700 mb-1">Tài sản thuộc Pháp nhân (Công ty)</label>
-                        <input list="suggest-phapnhan" type="text" name="tai_san_thuoc" value={tbFormData.tai_san_thuoc || ''} onChange={handleTbChange} placeholder="VD: Công ty TNHH MTV..." className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-bold text-[#05469B]" />
+                        {tbFormData.is_custom_phap_nhan || (tbFormData.tai_san_thuoc && suggestPhapNhanOptions.length > 0 && !suggestPhapNhanOptions.includes(tbFormData.tai_san_thuoc)) ? (
+                          <div className="relative">
+                            <input
+                              type="text"
+                              name="tai_san_thuoc"
+                              value={tbFormData.tai_san_thuoc || ''}
+                              onChange={handleTbChange}
+                              placeholder="Nhập tên pháp nhân tự do..."
+                              className="w-full p-2.5 pr-8 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-bold text-gray-900"
+                            />
+                            {suggestPhapNhanOptions.length > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => setTbFormData({ ...tbFormData, is_custom_phap_nhan: false, tai_san_thuoc: suggestPhapNhanOptions[0] || '' })}
+                                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500 bg-white rounded-full p-0.5 shadow-sm"
+                                title="Quay lại danh sách chọn"
+                              >
+                                <X size={14} />
+                              </button>
+                            )}
+                          </div>
+                        ) : (
+                          <select
+                            name="tai_san_thuoc"
+                            value={tbFormData.tai_san_thuoc || ''}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              if (val === 'custom') {
+                                setTbFormData({ ...tbFormData, is_custom_phap_nhan: true, tai_san_thuoc: '' });
+                              } else {
+                                setTbFormData({ ...tbFormData, tai_san_thuoc: val, is_custom_phap_nhan: false });
+                              }
+                            }}
+                            className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-bold text-gray-900 cursor-pointer"
+                          >
+                            <option value="">-- Chọn Pháp nhân ({suggestPhapNhanOptions.length}) --</option>
+                            {suggestPhapNhanOptions.map((pnName, idx) => (
+                              <option key={idx} value={pnName}>{pnName}</option>
+                            ))}
+                            <option value="custom" className="text-[#05469B] font-bold">➕ Khác (Tự nhập...)</option>
+                          </select>
+                        )}
                       </div>
                       <div className="w-full md:w-1/4">
                         <label className="block text-xs font-bold text-gray-700 mb-1">Mã Tài Sản</label>
-                        <input type="text" name="ma_tai_san" value={tbFormData.ma_tai_san || ''} onChange={handleTbChange} placeholder="VD: SR-BAN-01" className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-bold tracking-wider" />
+                        <input type="text" name="ma_tai_san" value={tbFormData.ma_tai_san || ''} onChange={handleTbChange} placeholder="VD: SR-BAN-01" className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-bold text-gray-900 tracking-wider" />
                       </div>
                     </div>
 
                     {/* Dòng 2: Nhóm TS SMART DROPDOWN - Tên - SL - ĐVT - Tình trạng */}
                     <div className="flex flex-col md:flex-row gap-4">
-                      <div className="w-full md:w-[20%] relative" onMouseLeave={() => setShowNhomTBTooltip(false)}>
+                      <div className="w-full md:w-[30%] relative" onMouseLeave={() => setShowNhomTBTooltip(false)}>
                         <div className="flex items-center justify-between mb-1">
                           <label className="block text-xs font-bold text-gray-700">Nhóm Thiết bị *</label>
                           <button
@@ -1675,9 +2446,9 @@ export default function EquipmentPage() {
                               name="nhom_thiet_bi"
                               value={tbFormData.nhom_thiet_bi === 'Khác' ? '' : (tbFormData.nhom_thiet_bi || '')}
                               onChange={handleTbChange}
-                              className="w-full p-2.5 pr-8 border border-indigo-300 rounded-lg bg-indigo-50 outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-indigo-800"
+                              className="w-full p-2.5 pr-8 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-bold text-gray-900"
                             />
-                            <button type="button" onClick={() => setTbFormData({ ...tbFormData, nhom_thiet_bi: ASSET_GROUPS[0] })} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500 bg-white rounded-full p-0.5 shadow-sm" title="Hủy nhập tay"><X size={14} /></button>
+                            <button type="button" onClick={() => setTbFormData({ ...tbFormData, nhom_thiet_bi: ASSET_GROUPS[0], loai_chi_tiet: NHOM_THIETBI_INFO[ASSET_GROUPS[0]]?.items[0] || '', is_custom_detail: false })} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500 bg-white rounded-full p-0.5 shadow-sm" title="Hủy nhập tay"><X size={14} /></button>
                           </div>
                         ) : (
                           <select
@@ -1685,11 +2456,17 @@ export default function EquipmentPage() {
                             name="nhom_thiet_bi"
                             value={tbFormData.nhom_thiet_bi || ''}
                             onChange={(e) => {
-                              setTbFormData({ ...tbFormData, nhom_thiet_bi: e.target.value });
+                              const val = e.target.value;
+                              setTbFormData({
+                                ...tbFormData,
+                                nhom_thiet_bi: val,
+                                loai_chi_tiet: NHOM_THIETBI_INFO[val] ? NHOM_THIETBI_INFO[val].items[0] : '',
+                                is_custom_detail: false
+                              });
                               setShowNhomTBTooltip(true);
                             }}
                             onFocus={() => setShowNhomTBTooltip(true)}
-                            className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-bold text-indigo-700 cursor-pointer"
+                            className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-bold text-gray-900 cursor-pointer"
                           >
                             <option value="" disabled>-- Chọn Nhóm --</option>
                             {ASSET_GROUPS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
@@ -1721,21 +2498,75 @@ export default function EquipmentPage() {
                           </div>
                         )}
                       </div>
-                      <div className="w-full md:w-[35%]">
+
+                      {/* Phân loại chi tiết (Dropdown động) */}
+                      <div className="w-full md:w-[30%] relative">
+                        <label className="block text-xs font-bold text-gray-700 mb-1">
+                          Phân loại chi tiết (Loại thiết bị) *
+                        </label>
+                        {tbFormData.is_custom_detail || !NHOM_THIETBI_INFO[tbFormData.nhom_thiet_bi] ? (
+                          <div className="relative">
+                            <input
+                              type="text"
+                              required
+                              placeholder="Nhập loại thiết bị (Laptop, PC, Bàn...)..."
+                              name="loai_chi_tiet"
+                              value={tbFormData.loai_chi_tiet || ''}
+                              onChange={handleTbChange}
+                              className="w-full p-2.5 pr-8 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-bold text-gray-900"
+                            />
+                            {NHOM_THIETBI_INFO[tbFormData.nhom_thiet_bi] && (
+                              <button
+                                type="button"
+                                onClick={() => setTbFormData({ ...tbFormData, is_custom_detail: false, loai_chi_tiet: NHOM_THIETBI_INFO[tbFormData.nhom_thiet_bi].items[0] || '' })}
+                                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500 bg-white rounded-full p-0.5 shadow-sm"
+                                title="Quay lại danh sách chọn"
+                              >
+                                <X size={14} />
+                              </button>
+                            )}
+                          </div>
+                        ) : (
+                          <select
+                            required
+                            name="loai_chi_tiet"
+                            value={tbFormData.loai_chi_tiet || ''}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              if (val === 'custom') {
+                                setTbFormData({ ...tbFormData, is_custom_detail: true, loai_chi_tiet: '' });
+                              } else {
+                                setTbFormData({ ...tbFormData, loai_chi_tiet: val });
+                              }
+                            }}
+                            className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-bold text-gray-900 cursor-pointer"
+                          >
+                            <option value="" disabled>-- Chọn Loại thiết bị --</option>
+                            {NHOM_THIETBI_INFO[tbFormData.nhom_thiet_bi].items.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                            <option value="custom">➕ Khác (Tự nhập...)</option>
+                          </select>
+                        )}
+                      </div>
+
+                      <div className="w-full md:w-[40%]">
                         <label className="block text-xs font-bold text-gray-700 mb-1">Tên Tài sản / Thiết bị *</label>
-                        <input type="text" required name="ten_thiet_bi" value={tbFormData.ten_thiet_bi || ''} onChange={handleTbChange} placeholder="VD: Bàn họp lễ tân, Laptop Dell..." className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-bold text-lg" />
+                        <input type="text" required name="ten_thiet_bi" value={tbFormData.ten_thiet_bi || ''} onChange={handleTbChange} placeholder="VD: Bàn họp lễ tân, Laptop Dell..." className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-bold text-gray-900" />
                       </div>
-                      <div className="w-full md:w-[10%]">
+                    </div>
+
+                    {/* Dòng 3: Số lượng (15%) - Đơn vị tính (15%) - Tình trạng (30%) - Vị trí (40%) */}
+                    <div className="flex flex-col md:flex-row gap-4">
+                      <div className="w-full md:w-[15%]">
                         <label className="block text-xs font-bold text-gray-700 mb-1">Số lượng *</label>
-                        <input type="number" required min="1" name="so_luong" value={tbFormData.so_luong || '1'} onChange={handleTbChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-[#05469B] font-bold text-center text-xl" />
+                        <input type="number" required min="1" name="so_luong" value={tbFormData.so_luong || '1'} onChange={handleTbChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-bold text-center text-gray-900" />
                       </div>
-                      <div className="w-full md:w-[10%]">
+                      <div className="w-full md:w-[15%]">
                         <label className="block text-xs font-bold text-gray-700 mb-1">Đơn vị tính *</label>
-                        <input type="text" required name="don_vi_tinh" value={tbFormData.don_vi_tinh || 'Cái'} onChange={handleTbChange} placeholder="Cái, Bộ..." className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-[#05469B] text-center" />
+                        <input type="text" required name="don_vi_tinh" value={tbFormData.don_vi_tinh || 'Cái'} onChange={handleTbChange} placeholder="Cái, Bộ..." className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-bold text-center text-gray-900" />
                       </div>
-                      <div className="w-full md:w-[25%]">
+                      <div className="w-full md:w-[30%]">
                         <label className="block text-xs font-bold text-gray-700 mb-1">Tình trạng *</label>
-                        <select required name="tinh_trang" value={tbFormData.tinh_trang || 'Đang sử dụng'} onChange={handleTbChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-bold">
+                        <select required name="tinh_trang" value={tbFormData.tinh_trang || 'Đang sử dụng'} onChange={handleTbChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-bold text-gray-900">
                           <option value="Đang sử dụng">Đang sử dụng</option>
                           <option value="Lưu kho - Chờ sử dụng">Lưu kho - Chờ sử dụng</option>
                           <option value="Lưu kho - Chờ thanh lý">Lưu kho - Chờ thanh lý</option>
@@ -1743,23 +2574,23 @@ export default function EquipmentPage() {
                           <option value="Đã thanh lý / Hỏng hóc">Đã thanh lý / Hỏng hóc</option>
                         </select>
                       </div>
+                      <div className="w-full md:w-[40%]">
+                        <label className="block text-xs font-bold text-gray-700 mb-1">Vị trí bố trí (Phòng ban/Khu vực)</label>
+                        <input list="suggest-vitri" type="text" name="vi_tri_bo_tri" value={tbFormData.vi_tri_bo_tri || ''} onChange={handleTbChange} placeholder="VD: Quầy Lễ tân, Sảnh..." className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-bold text-gray-900" />
+                      </div>
                     </div>
 
-                    {/* Dòng 3: Vị trí (40%) - Mô tả (30%) - Link ảnh (30%) */}
+                    {/* Dòng 4: Mô tả (50%) - Link ảnh (50%) */}
                     <div className="flex flex-col md:flex-row gap-4">
-                      <div className="w-full md:w-[40%]">
-                        <label className="block text-xs font-bold text-orange-600 mb-1">Vị trí bố trí (Phòng ban/Khu vực)</label>
-                        <input list="suggest-vitri" type="text" name="vi_tri_bo_tri" value={tbFormData.vi_tri_bo_tri || ''} onChange={handleTbChange} placeholder="VD: Quầy Lễ tân, Sảnh..." className="w-full p-2.5 border border-orange-200 rounded-lg bg-orange-50 outline-none focus:ring-2 focus:ring-orange-500 font-bold" />
-                      </div>
-                      <div className="w-full md:w-[30%]">
+                      <div className="w-full md:w-[50%]">
                         <label className="block text-xs font-bold text-gray-700 mb-1">Mô tả đặc điểm / Ghi chú</label>
-                        <input type="text" name="mo_ta_dac_diem" value={tbFormData.mo_ta_dac_diem || ''} onChange={handleTbChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-[#05469B]" placeholder="Màu sắc, tình trạng..." />
+                        <input type="text" name="mo_ta_dac_diem" value={tbFormData.mo_ta_dac_diem || ''} onChange={handleTbChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-bold text-gray-900" placeholder="Màu sắc, tình trạng..." />
                       </div>
-                      <div className="w-full md:w-[30%]">
+                      <div className="w-full md:w-[50%]">
                         <label className="block text-xs font-bold text-gray-700 mb-1">Link Ảnh tài sản thực tế</label>
                         <div className="relative">
                           <ImageIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-                          <input type="url" name="link_hinh_anh" value={tbFormData.link_hinh_anh || ''} onChange={handleTbChange} className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-[#05469B] text-blue-600 text-sm" placeholder="Dán link Drive..." />
+                          <input type="url" name="link_hinh_anh" value={tbFormData.link_hinh_anh || ''} onChange={handleTbChange} className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-bold text-gray-900 text-sm" placeholder="Dán link Drive..." />
                         </div>
                       </div>
                     </div>
@@ -1788,7 +2619,7 @@ export default function EquipmentPage() {
                   <div className="bg-amber-50/40 p-5 rounded-xl border border-amber-100 animate-in fade-in zoom-in duration-200">
                     <h4 className="font-bold text-amber-800 mb-4 flex items-center gap-2"><Sofa size={18} /> 2. Thuộc tính Nội thất</h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                      <div><label className="block text-xs font-bold text-amber-800 mb-1">Kích thước / Chất liệu (Quy cách)</label><textarea name="quy_cach_chat_lieu" value={tbFormData.quy_cach_chat_lieu || ''} onChange={handleTbChange} rows={2} placeholder="VD: Bàn gỗ MDF 1m2 x 0.6m, chân sắt..." className="w-full p-2.5 border border-amber-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-amber-500 resize-none font-medium"></textarea></div>
+                      <div><label className="block text-xs font-bold text-amber-800 mb-1">Kích thước / Chất liệu (Quy cách)</label><textarea name="thong_so_ky_thuat" value={tbFormData.thong_so_ky_thuat || ''} onChange={handleTbChange} rows={2} placeholder="VD: Gỗ công nghiệp MDF 1m2 x 0.6m, chân sắt..." className="w-full p-2.5 border border-amber-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-amber-500 resize-none font-medium"></textarea></div>
                       <div><label className="block text-xs font-bold text-amber-800 mb-1">Ghi chú bổ sung</label><textarea name="phu_kien" value={tbFormData.phu_kien || ''} onChange={handleTbChange} rows={2} placeholder="VD: Kèm 1 hộc tủ di động..." className="w-full p-2.5 border border-amber-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-amber-500 resize-none"></textarea></div>
                     </div>
                   </div>
@@ -1831,7 +2662,7 @@ export default function EquipmentPage() {
                               value={tbFormData.nha_cung_cap || ''}
                               onChange={handleTbChange}
                               placeholder="Nhập tên nhà cung cấp tự do..."
-                              className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] pr-10 font-semibold"
+                              className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] pr-10 font-bold text-gray-900"
                             />
                             <button
                               type="button"
@@ -1862,7 +2693,7 @@ export default function EquipmentPage() {
                                   }));
                                 }
                               }}
-                              className="flex-1 p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-semibold text-gray-700"
+                              className="flex-1 p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-bold text-gray-900"
                             >
                               <option value="">-- Chọn Nhà cung cấp --</option>
                               {displayedNccList.map(ncc => (
@@ -1881,7 +2712,7 @@ export default function EquipmentPage() {
                     <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                       <div>
                         <label className="block text-xs font-bold text-gray-700 mb-1">Ngày mua</label>
-                        <input type="date" name="ngay_mua" value={tbFormData.ngay_mua || ''} onChange={handleTbChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" />
+                        <input type="date" name="ngay_mua" value={tbFormData.ngay_mua || ''} onChange={handleTbChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-bold text-gray-900" />
                       </div>
                       <div>
                         <label className="block text-xs font-bold text-gray-700 mb-1">Thời hạn BH (tháng)</label>
@@ -1892,12 +2723,12 @@ export default function EquipmentPage() {
                           onChange={handleTbChange}
                           min={0}
                           placeholder="VD: 12"
-                          className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-semibold text-gray-800"
+                          className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-bold text-gray-900"
                         />
                       </div>
                       <div>
                         <label className="block text-xs font-bold text-gray-700 mb-1">Hạn bảo hành</label>
-                        <input type="date" name="han_bao_hanh" value={tbFormData.han_bao_hanh || ''} onChange={handleTbChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" />
+                        <input type="date" name="han_bao_hanh" value={tbFormData.han_bao_hanh || ''} onChange={handleTbChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-bold text-gray-900" />
                       </div>
                       <div>
                         <label className="block text-xs font-bold text-red-600 mb-1">Đơn giá (VNĐ)</label>
@@ -1915,7 +2746,7 @@ export default function EquipmentPage() {
                       </div>
                       <div>
                         <label className="block text-xs font-bold text-gray-700 mb-1">Khấu hao (Tháng)</label>
-                        <input type="number" name="thoi_gian_khau_hao" value={tbFormData.thoi_gian_khau_hao || ''} onChange={handleTbChange} placeholder="VD: 36" className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" />
+                        <input type="number" name="thoi_gian_khau_hao" value={tbFormData.thoi_gian_khau_hao || ''} onChange={handleTbChange} placeholder="VD: 36" className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-bold text-gray-900" />
                       </div>
                     </div>
 
@@ -1925,7 +2756,7 @@ export default function EquipmentPage() {
                         <label className="block text-xs font-bold text-gray-700 mb-1">Link Hồ sơ (BB Bàn giao, Phiếu xuất kho, Hợp đồng...)</label>
                         <div className="relative">
                           <FileText className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-                          <input type="url" name="link_ho_so" value={tbFormData.link_ho_so || ''} onChange={handleTbChange} className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] text-blue-600 text-sm" placeholder="Dán link thư mục Drive..." />
+                          <input type="url" name="link_ho_so" value={tbFormData.link_ho_so || ''} onChange={handleTbChange} className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-bold text-gray-900 text-sm" placeholder="Dán link thư mục Drive..." />
                         </div>
                       </div>
                     </div>
@@ -1960,10 +2791,87 @@ export default function EquipmentPage() {
 
             <div className="flex-1 overflow-y-auto bg-gray-50 flex flex-col custom-scrollbar">
               <form onSubmit={handleNkSave} className="p-5 bg-white border-b shadow-sm space-y-4 z-10 shrink-0">
-                <div className="flex justify-between items-center mb-2"><h4 className="font-bold text-gray-800 text-sm uppercase flex items-center gap-1.5"><Calendar size={16} className="text-purple-600" /> Khai báo nhật ký mới</h4>{nkModalMode === 'update' && <button type="button" onClick={() => { setNkModalMode('create'); setNkFormData({ id: '', id_ts_thiet_bi: selectedTbForNk.id, id_don_vi: selectedTbForNk.id_don_vi, ngay_ghi_nhan: new Date().toISOString().split('T')[0], loai_nhat_ky: 'Cấp phát/Thu hồi', chi_phi: '', msnv_nguoi_dung: '', ho_ten_nguoi_dung: '', bp_quan_ly_su_dung: '', tinh_trang_ghi_nhan_thiet_bi: '', hinh_anh_minh_chung: '', ghi_chu_sua_chua_nang_cap: '' }) }} className="text-xs font-bold text-purple-600 flex items-center"><Plus size={14} /> Thêm mới</button>}</div>
+                <div className="flex justify-between items-center mb-2"><h4 className="font-bold text-gray-800 text-sm uppercase flex items-center gap-1.5"><Calendar size={16} className="text-purple-600" /> Khai báo nhật ký mới</h4>{nkModalMode === 'update' && <button type="button" onClick={() => { setNkModalMode('create'); setNkFormData({ id: '', id_ts_thiet_bi: selectedTbForNk.id, id_don_vi: selectedTbForNk.id_don_vi, ngay_ghi_nhan: new Date().toISOString().split('T')[0], loai_nhat_ky: 'Cấp mới', chi_phi: '', msnv_nguoi_dung: '', ho_ten_nguoi_dung: '', bp_quan_ly_su_dung: '', tinh_trang_ghi_nhan_thiet_bi: '', hinh_anh_minh_chung: '', ghi_chu_sua_chua_nang_cap: '' }); setNkReceivingUnit(''); setIsCrossUnitSearch(false); }} className="text-xs font-bold text-purple-600 flex items-center"><Plus size={14} /> Thêm mới</button>}</div>
                 <div className="grid grid-cols-2 gap-4">
                   <div><label className="block text-xs font-bold text-gray-600 mb-1">Ngày ghi nhận *</label><input type="date" required name="ngay_ghi_nhan" value={nkFormData.ngay_ghi_nhan || ''} onChange={(e) => setNkFormData((prev: any) => ({ ...prev, ngay_ghi_nhan: e.target.value }))} className="w-full p-2 border rounded-lg bg-[#FFFFF0] font-bold text-purple-900" /></div>
-                  <div><label className="block text-xs font-bold text-gray-600 mb-1">Loại sự kiện *</label><select required name="loai_nhat_ky" value={nkFormData.loai_nhat_ky || 'Cấp phát/Thu hồi'} onChange={(e) => setNkFormData((prev: any) => ({ ...prev, loai_nhat_ky: e.target.value }))} className="w-full p-2 border rounded-lg bg-[#FFFFF0] font-bold text-indigo-700"><option value="Cấp phát/Thu hồi">Cấp phát / Thu hồi</option><option value="Sửa chữa/Bảo dưỡng">Sửa chữa / Bảo dưỡng</option><option value="Nâng cấp">Nâng cấp</option><option value="Kiểm kê">Kiểm kê</option><option value="Báo hỏng">Báo hỏng / Báo mất</option></select></div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-600 mb-1">Loại sự kiện *</label>
+                    <select
+                      required
+                      name="loai_nhat_ky"
+                      value={nkFormData.loai_nhat_ky || 'Cấp mới'}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setNkFormData((prev: any) => ({ ...prev, loai_nhat_ky: val }));
+                        if (val !== 'Điều chuyển đơn vị') setNkReceivingUnit('');
+                        if (!['Cấp mới', 'Cấp máy đã qua sử dụng'].includes(val)) setIsCrossUnitSearch(false);
+                      }}
+                      className="w-full p-2 border rounded-lg bg-[#FFFFF0] font-bold text-indigo-700"
+                    >
+                      <option value="Cấp mới">Cấp mới</option>
+                      <option value="Thu hồi lưu kho">Thu hồi lưu kho</option>
+                      <option value="Cấp máy đã qua sử dụng">Cấp máy đã qua sử dụng</option>
+                      <option value="Sửa chữa">Sửa chữa</option>
+                      <option value="Bảo dưỡng">Bảo dưỡng</option>
+                      <option value="Báo hỏng">Báo hỏng / Báo mất</option>
+                      <option value="Điều chuyển đơn vị">Điều chuyển đơn vị</option>
+                    </select>
+                  </div>
+
+                  {/* HÀNG PHỤ TRỢ: CHỌN ĐƠN VỊ NHẬN (ĐIỀU CHUYỂN) HOẶC TICK CHỌN MƯỢN LIÊN ĐƠN VỊ (CẤP PHÁT) */}
+                  {nkFormData.loai_nhat_ky === 'Điều chuyển đơn vị' && (
+                    <div className="col-span-2 bg-blue-50 border border-blue-200 rounded-lg p-3 animate-in fade-in duration-200">
+                      <label className="block text-xs font-bold text-blue-900 mb-1">Đơn vị nhận điều chuyển *</label>
+                      <select
+                        required
+                        value={nkReceivingUnit}
+                        onChange={(e) => {
+                          setNkReceivingUnit(e.target.value);
+                          setNkFormData(prev => ({
+                            ...prev,
+                            msnv_nguoi_dung: '',
+                            ho_ten_nguoi_dung: '',
+                            bp_quan_ly_su_dung: ''
+                          }));
+                          setNkFormBp('');
+                          setNkFormDv('');
+                        }}
+                        className="w-full p-2.5 border border-blue-300 rounded bg-[#FFFFF0] text-blue-800 font-bold outline-none"
+                      >
+                        <option value="">-- Chọn đơn vị nhận --</option>
+                        {buildHierarchicalOptions(donViList).map(({ unit, prefix }) => (
+                          <option key={unit.id} value={unit.id}>
+                            {prefix}{getUnitEmoji(unit.loai_hinh)} {unit.ten_don_vi}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {(nkFormData.loai_nhat_ky === 'Cấp mới' || nkFormData.loai_nhat_ky === 'Cấp máy đã qua sử dụng') && (
+                    <div className="col-span-2 flex items-center gap-2 bg-blue-50/50 border border-blue-100/50 rounded-lg p-3 animate-in fade-in duration-200">
+                      <input
+                        type="checkbox"
+                        id="isCrossUnitSearch"
+                        checked={isCrossUnitSearch}
+                        onChange={(e) => {
+                          setIsCrossUnitSearch(e.target.checked);
+                          setNkFormData(prev => ({
+                            ...prev,
+                            msnv_nguoi_dung: '',
+                            ho_ten_nguoi_dung: '',
+                            bp_quan_ly_su_dung: ''
+                          }));
+                          setNkFormBp('');
+                          setNkFormDv('');
+                        }}
+                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
+                      />
+                      <label htmlFor="isCrossUnitSearch" className="text-xs font-bold text-blue-855 cursor-pointer select-none">
+                        Cấp phát cho nhân sự liên đơn vị (Mượn tạm thiết bị)
+                      </label>
+                    </div>
+                  )}
 
                   <div className="col-span-2 flex flex-row gap-3">
                     <div className="w-[35%] shrink-0">
@@ -1979,13 +2887,13 @@ export default function EquipmentPage() {
                     </div>
                     <div className="flex-1">
                       <label className="block text-xs font-bold text-gray-600 mb-1">Họ và tên *</label>
-                      <input
-                        type="text"
+                      <CustomAutocomplete
                         name="ho_ten_nguoi_dung"
                         value={nkFormData.ho_ten_nguoi_dung || ''}
-                        onChange={(e) => setNkFormData((prev: any) => ({ ...prev, ho_ten_nguoi_dung: e.target.value }))}
+                        onChange={handleNkHoTenChange}
+                        suggestions={suggestHoTen}
                         placeholder="Tên nhân sự..."
-                        className="w-full p-2 border border-gray-200 rounded-lg bg-white font-bold"
+                        className="w-full p-2 border border-gray-200 rounded-lg bg-white font-bold animate-in fade-in duration-200"
                       />
                     </div>
                   </div>
@@ -2153,7 +3061,7 @@ export default function EquipmentPage() {
                   {(() => {
                     const matchedNcc = nccList.find(n => n.id === viewData.id_ncc);
                     if (matchedNcc) {
-                      const displayPhone = matchedNcc.sdt_lh || matchedNcc.sdt_ddpl;
+                      const displayPhone = matchedNcc.sdt_dau_moi || matchedNcc.sdt_ddpl;
                       return (
                         <div className="space-y-0.5">
                           <p className="font-bold text-gray-800 uppercase leading-snug">{matchedNcc.ten_cong_ty}</p>
@@ -2217,6 +3125,65 @@ export default function EquipmentPage() {
             <h3 className="text-xl font-bold text-gray-900 mb-2">Xác nhận xóa</h3>
             <p className="text-gray-500 text-sm mb-6">Hành động này sẽ xóa dữ liệu vĩnh viễn.</p>
             <div className="flex gap-3"><button onClick={() => setIsConfirmOpen(false)} className="flex-1 py-3 bg-gray-100 text-gray-700 hover:bg-gray-200 rounded-xl font-bold transition-colors">Hủy</button><button onClick={confirmDelete} disabled={submitting} className="flex-1 py-3 text-white bg-red-600 hover:bg-red-700 rounded-xl font-bold flex justify-center gap-2 shadow-md">{submitting ? <Loader2 className="animate-spin" /> : <Trash2 />} Xóa</button></div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* 🟢 MODAL HIỂN THỊ DANH SÁCH THIẾT BỊ TRÙNG MÃ TÀI SẢN (Bộ máy bàn) */}
+      {isQrMatchesModalOpen && qrMultipleMatches.length > 0 && createPortal(
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col animate-in zoom-in duration-200 overflow-hidden max-h-[85vh]">
+            <div className="p-4 bg-[#05469B] text-white flex justify-between items-center shrink-0">
+              <h3 className="font-bold text-base flex items-center gap-1.5"><QrCode size={20} /> Thiết bị trùng Mã tài sản</h3>
+              <button onClick={() => setIsQrMatchesModalOpen(false)} className="text-blue-100 hover:text-white p-1 rounded-full"><X size={20} /></button>
+            </div>
+
+            <div className="p-4 bg-blue-50/50 border-b border-blue-100 shrink-0">
+              <p className="text-xs font-semibold text-blue-900">
+                Tìm thấy <span className="font-black text-blue-700">{qrMultipleMatches.length} thiết bị</span> dùng chung Mã tài sản <span className="font-black text-blue-700">"{qrMultipleMatches[0]?.ma_tai_san}"</span>. Vui lòng chọn linh kiện chi tiết dưới đây để đối chiếu hoặc kiểm kê:
+              </p>
+            </div>
+
+            <div className="flex-1 overflow-y-auto custom-scrollbar p-4 divide-y divide-gray-100">
+              {qrMultipleMatches.map((item, idx) => {
+                const latestUser = getLatestUser(item.id);
+                return (
+                  <div key={idx} className="py-3 flex justify-between items-start gap-4 first:pt-0 last:pb-0">
+                    <div className="min-w-0 flex-1">
+                      <p className="font-bold text-sm text-[#05469B]">{item.ten_thiet_bi}</p>
+                      <p className="text-xs text-gray-400 font-semibold mt-0.5">
+                        Phân loại: {item.quy_cach_chat_lieu || 'Chưa phân loại'}
+                        {item.so_seri && ` | S/N: ${item.so_seri}`}
+                      </p>
+                      <p className="text-[11px] text-gray-500 mt-1">
+                        Sử dụng: <span className="font-bold text-gray-700">{latestUser.name}</span>
+                        {item.vi_tri_bo_tri && ` (${item.vi_tri_bo_tri})`}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setViewData(item);
+                        setIsQrMatchesModalOpen(false);
+                        setIsViewModalOpen(true);
+                      }}
+                      className="px-3.5 py-1.5 bg-[#05469B] hover:bg-[#04367a] text-white rounded-lg text-xs font-bold shrink-0 transition-colors shadow-sm"
+                    >
+                      Xem chi tiết
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="p-4 border-t border-gray-100 bg-gray-50 flex justify-end shrink-0">
+              <button
+                onClick={() => setIsQrMatchesModalOpen(false)}
+                className="px-5 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold rounded-lg transition-colors text-xs"
+              >
+                Đóng
+              </button>
+            </div>
           </div>
         </div>,
         document.body

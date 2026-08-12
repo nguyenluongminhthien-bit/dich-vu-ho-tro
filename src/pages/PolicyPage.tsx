@@ -28,6 +28,10 @@ export default function PolicyPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isListCollapsed, setIsListCollapsed] = useState(false);
   const [selectedNghiepvu, setSelectedNghiepvu] = useState<string | null>(null);
+  const [selectedBoPhans, setSelectedBoPhans] = useState<string[]>([]);
+  const [isBoPhanDropdownOpen, setIsBoPhanDropdownOpen] = useState(false);
+  const [vtltBoPhanList, setVtltBoPhanList] = useState<string[]>([]);
+  const boPhanDropdownRef = useRef<HTMLDivElement>(null);
 
   // Modals
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -86,6 +90,12 @@ export default function PolicyPage() {
       });
 
       setQdData(combinedData);
+
+      // Extract unique bo_phan_lay_so from VTLT vbResult
+      const vbBpList = vbResult
+        ? Array.from(new Set(vbResult.map((item: any) => item.bo_phan_lay_so).filter(Boolean)))
+        : [];
+      setVtltBoPhanList(vbBpList as string[]);
     } catch (err: any) {
       setError(err.message || 'Lỗi tải dữ liệu Hệ thống.');
     } finally {
@@ -95,8 +105,28 @@ export default function PolicyPage() {
 
   useEffect(() => { loadData(); }, []);
 
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (boPhanDropdownRef.current && !boPhanDropdownRef.current.contains(event.target as Node)) {
+        setIsBoPhanDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
   const uniqueNghiepvu = useMemo(() => {
-    const list = qdData.map(item => item.nghiep_vu).filter(Boolean);
+    const list: string[] = [];
+    qdData.forEach(item => {
+      if (item.nghiep_vu) {
+        item.nghiep_vu.split(';').forEach(p => {
+          const trimmed = p.trim();
+          if (trimmed) list.push(trimmed);
+        });
+      }
+    });
     return Array.from(new Set(list)).sort();
   }, [qdData]);
 
@@ -105,11 +135,23 @@ export default function PolicyPage() {
     return Array.from(new Set(list)).sort();
   }, [qdData]);
 
+  const uniqueBoPhan = useMemo(() => {
+    const list = qdData.map(item => item.bo_phan_lay_so).filter(Boolean);
+    return Array.from(new Set(list)).sort() as string[];
+  }, [qdData]);
+
   const filteredDocs = useMemo(() => {
     let result = qdData;
 
     if (selectedNghiepvu) {
-      result = result.filter(item => item.nghiep_vu === selectedNghiepvu);
+      result = result.filter(item => {
+        if (!item.nghiep_vu) return false;
+        return item.nghiep_vu.split(';').map(p => p.trim()).includes(selectedNghiepvu);
+      });
+    }
+
+    if (selectedBoPhans.length > 0) {
+      result = result.filter(item => item.bo_phan_lay_so && selectedBoPhans.includes(item.bo_phan_lay_so));
     }
 
     if (searchTerm) {
@@ -118,7 +160,8 @@ export default function PolicyPage() {
         stripAccents(item.so_hieu || '').includes(cleanSearch) ||
         stripAccents(item.tieu_de || '').includes(cleanSearch) ||
         stripAccents(item.nghiep_vu || '').includes(cleanSearch) ||
-        stripAccents(item.phan_loai || '').includes(cleanSearch)
+        stripAccents(item.phan_loai || '').includes(cleanSearch) ||
+        stripAccents(item.bo_phan_lay_so || '').includes(cleanSearch)
       );
     }
 
@@ -131,7 +174,7 @@ export default function PolicyPage() {
       const dateB = b.ngay_ban_hanh ? new Date(b.ngay_ban_hanh).getTime() : 0;
       return dateB - dateA;
     });
-  }, [qdData, searchTerm, selectedNghiepvu]);
+  }, [qdData, searchTerm, selectedNghiepvu, selectedBoPhans]);
 
   const openModal = (mode: 'create' | 'update', item?: PolicyItem) => {
     setModalMode(mode);
@@ -142,7 +185,7 @@ export default function PolicyPage() {
         id: '', phan_loai: 'Quy trình', so_hieu: '',
         ngay_ban_hanh: new Date().toISOString().split('T')[0],
         tieu_de: '', noi_dung: '', nghiep_vu: selectedNghiepvu || '', link_vb: '',
-        hieu_luc: 'Còn hiệu lực'
+        hieu_luc: 'Còn hiệu lực', bo_phan_lay_so: ''
       });
     }
     setIsModalOpen(true); setError(null);
@@ -208,6 +251,87 @@ export default function PolicyPage() {
     toast.info(`Đây là tài liệu được đồng bộ từ mục "Văn bản - Thông báo".\n\nVui lòng sang mục Văn bản để ${action} tài liệu này!`);
   };
 
+  const exportToExcel = () => {
+    // Sắp xếp theo Nghiệp vụ (A-Z) và Ngày ban hành (mới đến cũ)
+    const sortedExportDocs = [...filteredDocs].sort((a, b) => {
+      const nvA = a.nghiep_vu || '';
+      const nvB = b.nghiep_vu || '';
+      const compNv = nvA.localeCompare(nvB, 'vi', { sensitivity: 'base' });
+      if (compNv !== 0) return compNv;
+
+      const dateA = a.ngay_ban_hanh ? new Date(a.ngay_ban_hanh).getTime() : 0;
+      const dateB = b.ngay_ban_hanh ? new Date(b.ngay_ban_hanh).getTime() : 0;
+      return dateB - dateA;
+    });
+
+    const rowsHTML = sortedExportDocs.map((item, idx) => {
+      const linkHTML = item.link_vb 
+        ? `<a href="${item.link_vb}">Link</a>` 
+        : '';
+      
+      const formattedDate = item.ngay_ban_hanh 
+        ? new Date(item.ngay_ban_hanh).toLocaleDateString('vi-VN') 
+        : '';
+
+      return `
+        <tr>
+          <td style="text-align: center;">${idx + 1}</td>
+          <td style="mso-number-format:'\\@'; font-weight: bold;">${item.so_hieu || ''}</td>
+          <td>${item.tieu_de || ''}</td>
+          <td>${item.noi_dung || ''}</td>
+          <td>${item.nghiep_vu || ''}</td>
+          <td>${item.bo_phan_lay_so || ''}</td>
+          <td style="text-align: center;">${formattedDate}</td>
+          <td style="text-align: center; color: #05469B; text-decoration: underline;">${linkHTML}</td>
+        </tr>
+      `;
+    }).join('');
+
+    const excelTemplate = `
+      <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+      <head>
+        <meta charset="UTF-8">
+        <style>
+          table { border-collapse: collapse; font-family: 'Times New Roman', serif; font-size: 12px; }
+          th { border: 1px solid #000000; padding: 8px; font-weight: bold; text-align: center; background-color: #05469B; color: #ffffff; }
+          td { border: 1px solid #000000; padding: 6px; vertical-align: middle; }
+          .title { font-size: 16px; font-weight: bold; color: #05469B; text-align: center; padding-bottom: 15px; }
+        </style>
+      </head>
+      <body>
+        <table>
+          <tr><td colspan="8" class="title">DANH SÁCH QUY ĐỊNH & QUY TRÌNH</td></tr>
+          <thead>
+            <tr>
+              <th style="width: 50px;">STT</th>
+              <th style="width: 150px;">Số hiệu</th>
+              <th style="width: 250px;">Nội dung (tiêu đề)</th>
+              <th style="width: 350px;">Trích yếu</th>
+              <th style="width: 150px;">Nghiệp vụ</th>
+              <th style="width: 180px;">Bộ phận ban hành</th>
+              <th style="width: 120px;">Ngày ban hành</th>
+              <th style="width: 100px;">Đính kèm</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rowsHTML}
+          </tbody>
+        </table>
+      </body>
+      </html>
+    `;
+
+    const blob = new Blob([excelTemplate], { type: 'application/vnd.ms-excel' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Quy_Dinh_Quy_Trinh_${new Date().toISOString().slice(0, 10)}.xls`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
 
   if (loading) return <PageWithFilterSkeleton rows={8} />;
   return (
@@ -246,7 +370,7 @@ export default function PolicyPage() {
                     <span className="truncate">{nv}</span>
                   </div>
                   <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${selectedNghiepvu === nv ? 'bg-[#05469B] text-white' : 'bg-gray-100 text-gray-500'}`}>
-                    {qdData.filter(d => d.nghiep_vu === nv).length}
+                    {qdData.filter(d => d.nghiep_vu && d.nghiep_vu.split(';').map(p => p.trim()).includes(nv)).length}
                   </span>
                 </button>
               ))}
@@ -258,7 +382,7 @@ export default function PolicyPage() {
       <div className="flex-1 min-w-0 max-w-full overflow-hidden p-4 sm:p-6 relative transition-all duration-300 w-full flex flex-col">
 
         {/* FIXED HEADER */}
-        <div className="shrink-0 flex flex-col z-10">
+        <div className="shrink-0 flex flex-col z-20">
           <div className={`flex flex-col sm:flex-row justify-between items-center mb-6 gap-4 transition-all duration-300 ${isListCollapsed ? 'md:pl-10' : ''}`}>
             <div className="flex items-center gap-2.5 w-full sm:w-auto">
               {isListCollapsed && (
@@ -275,11 +399,80 @@ export default function PolicyPage() {
                 <p className="text-sm font-medium text-gray-500 mt-1">Lọc theo: <span className="text-emerald-600 font-bold">{selectedNghiepvu || 'Tất cả nghiệp vụ'}</span> ({filteredDocs.length} tài liệu)</p>
               </div>
             </div>
-            <div className="flex w-full sm:w-auto gap-3">
-              <div className="relative w-full sm:w-80">
+            <div className="flex flex-wrap w-full sm:w-auto gap-3 items-center">
+              <div className="relative w-full sm:w-64">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-                <input type="text" placeholder="Tìm số hiệu, tiêu đề, loại..." className="w-full pl-9 pr-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#05469B] outline-none shadow-sm text-sm" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                <input type="text" placeholder="Tìm số hiệu, tiêu đề, bộ phận..." className="w-full pl-9 pr-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#05469B] outline-none shadow-sm text-sm" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
               </div>
+
+              {/* Bộ lọc Bộ phận lấy số (Multi-select Dropdown) */}
+              <div className="relative w-full sm:w-auto" ref={boPhanDropdownRef}>
+                <button
+                  type="button"
+                  onClick={() => setIsBoPhanDropdownOpen(!isBoPhanDropdownOpen)}
+                  className={`w-full sm:w-auto flex items-center justify-between gap-2 bg-white border ${selectedBoPhans.length > 0 ? 'border-[#05469B] text-[#05469B] bg-blue-50/30' : 'border-gray-200 text-gray-700'} hover:bg-gray-50 px-4 py-2.5 rounded-lg text-sm font-medium shadow-sm transition-all`}
+                >
+                  <div className="flex items-center gap-1.5 truncate">
+                    <Filter size={16} />
+                    <span className="truncate">
+                      {selectedBoPhans.length === 0 
+                        ? 'Bộ phận ban hành' 
+                        : `Bộ phận (${selectedBoPhans.length})`}
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-gray-400">▼</span>
+                </button>
+
+                {isBoPhanDropdownOpen && (
+                  <div className="absolute right-0 mt-2 w-64 bg-white border border-gray-200 rounded-xl shadow-xl z-30 py-2 animate-in fade-in slide-in-from-top-2 duration-150">
+                    <div className="px-3 py-1.5 border-b border-gray-100 flex justify-between items-center">
+                      <span className="text-xs font-bold text-gray-500">Lọc theo bộ phận</span>
+                      {selectedBoPhans.length > 0 && (
+                        <button 
+                          onClick={() => setSelectedBoPhans([])} 
+                          className="text-[10px] text-red-500 hover:underline font-bold"
+                        >
+                          Xóa lọc
+                        </button>
+                      )}
+                    </div>
+                    <div className="max-h-60 overflow-y-auto p-1 custom-scrollbar">
+                      {uniqueBoPhan.length === 0 ? (
+                        <div className="text-center p-3 text-xs text-gray-400">Không có bộ phận nào</div>
+                      ) : (
+                        uniqueBoPhan.map((bp) => {
+                          const isChecked = selectedBoPhans.includes(bp);
+                          return (
+                            <label 
+                              key={bp} 
+                              className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-gray-700 hover:bg-blue-50/50 cursor-pointer transition-colors"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={() => {
+                                  if (isChecked) {
+                                    setSelectedBoPhans(prev => prev.filter(item => item !== bp));
+                                  } else {
+                                    setSelectedBoPhans(prev => [...prev, bp]);
+                                  }
+                                }}
+                                className="w-4 h-4 rounded text-[#05469B] focus:ring-[#05469B] border-gray-300"
+                              />
+                              <span className="truncate">{bp}</span>
+                            </label>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <button onClick={exportToExcel} className="w-full sm:w-auto flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-lg font-bold shadow-sm transition-all whitespace-nowrap">
+                <FileText className="w-5 h-5" /> Xuất Excel
+              </button>
+
               <button onClick={() => openModal('create')} className="w-full sm:w-auto flex items-center justify-center gap-2 bg-[#05469B] hover:bg-[#04367a] text-white px-5 py-2.5 rounded-lg font-bold shadow-sm transition-all whitespace-nowrap"><Plus className="w-5 h-5" /> Ban hành mới</button>
             </div>
           </div>
@@ -296,7 +489,7 @@ export default function PolicyPage() {
                   <th className="p-4 w-[230px] h-[35px]">Số hiệu / Phân loại</th>
                   <th className="p-4 w-32">Ngày BH</th>
                   <th className="p-4 w-[410px]">Tiêu đề & Trích yếu</th>
-                  <th className="p-4 w-[130px]">Nghiệp vụ</th>
+                  <th className="p-4 w-[150px]">Nghiệp vụ / Bộ phận</th>
                   <th className="p-4 w-[130px] text-center">Hiệu lực</th>
                   <th className="p-4 text-center w-36">Thao tác</th>
                 </tr>
@@ -334,8 +527,17 @@ export default function PolicyPage() {
                         )}
                       </td>
 
-                      <td className="py-4 pl-[6px] pr-[14px] w-[130px] h-[130px]">
-                        <span className="px-0 pt-0 pb-[1px] m-0 bg-indigo-50 text-indigo-700 rounded-md text-xs font-bold border border-indigo-100">{item.nghiep_vu}</span>
+                      <td className="py-4 pl-[6px] pr-[14px] w-[150px] h-[130px]">
+                        <div className="flex flex-col gap-1.5 items-start">
+                          {(item.nghiep_vu || '').split(';').map(p => p.trim()).filter(Boolean).map((nv, idx) => (
+                            <span key={idx} className="px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded text-xs font-bold border border-indigo-100">{nv}</span>
+                          ))}
+                          {item.bo_phan_lay_so && (
+                            <span className="px-2 py-0.5 bg-slate-100 text-slate-700 rounded text-[10px] font-bold border border-slate-200 uppercase tracking-wide truncate max-w-[130px]" title={item.bo_phan_lay_so}>
+                              {item.bo_phan_lay_so}
+                            </span>
+                          )}
+                        </div>
                       </td>
 
                       <td className="p-4 text-center w-[115px] h-[130px]">
@@ -378,6 +580,7 @@ export default function PolicyPage() {
         </div>
       </div>
 
+      <datalist id="suggest-bophan">{vtltBoPhanList.map(v => <option key={v} value={v} />)}</datalist>
       <datalist id="suggest-nghiepvu">{uniqueNghiepvu.map(v => <option key={v} value={v} />)}</datalist>
       <datalist id="suggest-phanloai">{uniquePhanloai.map(v => <option key={v} value={v} />)}</datalist>
 
@@ -394,20 +597,24 @@ export default function PolicyPage() {
 
                 <div className="bg-blue-50/40 p-5 rounded-xl border border-blue-100">
                   <h4 className="font-bold text-[#05469B] mb-4 flex items-center gap-2"><div className="w-2 h-6 bg-[#05469B] rounded-full"></div> Phân loại & Hệ thống</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-5 gap-5">
-                    <div className="md:col-span-2">
+                  <div className="grid grid-cols-1 md:grid-cols-6 gap-5">
+                    <div className="md:col-span-3">
+                      <label className="block text-xs font-bold text-gray-700 mb-1">Bộ phận lấy số</label>
+                      <input list="suggest-bophan" type="text" name="bo_phan_lay_so" value={formData.bo_phan_lay_so || ''} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" placeholder="Chọn hoặc nhập bộ phận..." />
+                    </div>
+                    <div className="md:col-span-3">
                       <label className="block text-xs font-bold text-gray-700 mb-1">Nghiệp vụ áp dụng *</label>
                       <input list="suggest-nghiepvu" type="text" required name="nghiep_vu" value={formData.nghiep_vu || ''} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-bold text-indigo-700" placeholder="Kinh doanh, Kế toán, Nhân sự..." />
                     </div>
-                    <div>
+                    <div className="md:col-span-2">
                       <label className="block text-xs font-bold text-gray-700 mb-1">Phân loại tài liệu *</label>
                       <input list="suggest-phanloai" type="text" required name="phan_loai" value={formData.phan_loai || ''} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" placeholder="Quy định, Quy trình..." />
                     </div>
-                    <div>
+                    <div className="md:col-span-2">
                       <label className="block text-xs font-bold text-gray-700 mb-1">Ngày ban hành *</label>
                       <input type="date" required name="ngay_ban_hanh" value={formData.ngay_ban_hanh || ''} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-bold" />
                     </div>
-                    <div>
+                    <div className="md:col-span-2">
                       <label className="block text-xs font-bold text-gray-700 mb-1">Hiệu lực</label>
                       <select
                         name="hieu_luc"
@@ -483,7 +690,11 @@ export default function PolicyPage() {
                 <div className="flex items-center gap-3 mb-2 flex-wrap">
                   <span className="bg-blue-100 text-[#05469B] font-black px-3 py-1 rounded text-lg border border-blue-200">{viewData.so_hieu}</span>
                   <span className="bg-emerald-100 text-emerald-700 font-bold px-2 py-1 rounded text-xs uppercase border border-emerald-200">{viewData.phan_loai}</span>
-                  <span className="bg-indigo-100 text-indigo-700 font-bold px-2 py-1 rounded text-xs uppercase border border-indigo-200 flex items-center gap-1"><Briefcase size={12} /> {viewData.nghiep_vu}</span>
+                  {(viewData.nghiep_vu || '').split(';').map(p => p.trim()).filter(Boolean).map((nv, idx) => (
+                    <span key={idx} className="bg-indigo-100 text-indigo-700 font-bold px-2 py-1 rounded text-xs uppercase border border-indigo-200 flex items-center gap-1">
+                      <Briefcase size={12} /> {nv}
+                    </span>
+                  ))}
 
                   <span className={`font-bold px-2 py-1 rounded text-xs uppercase border flex items-center gap-1 ${viewData.hieu_luc === 'Hết hiệu lực' ? 'bg-red-100 text-red-700 border-red-200' :
                     viewData.hieu_luc === 'Sắp có hiệu lực' ? 'bg-orange-100 text-orange-700 border-orange-200' :
@@ -500,24 +711,35 @@ export default function PolicyPage() {
                 {viewData.noi_dung || <span className="italic text-gray-400">Không có trích yếu nội dung.</span>}
               </div>
 
-              {/* 🟢 KHỐI NGƯỜI KÝ & NGHIỆP VỤ BỔ SUNG NẰM NGANG */}
-              {viewData.isFromVB && (
+              {/* 🟢 KHỐI NGƯỜI KÝ & BỘ PHẬN BAN HÀNH */}
+              {(viewData.isFromVB || viewData.bo_phan_lay_so) && (
                 <div className="bg-white p-4 rounded-xl border border-blue-100 shadow-sm mb-6">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="flex items-start justify-between border-b sm:border-b-0 sm:border-r border-gray-100 pb-3 sm:pb-0 sm:pr-4">
-                      <span className="text-xs text-gray-500 font-bold flex items-center gap-1.5"><PenTool size={14} /> Người ký:</span>
-                      <div className="text-right">
-                        <p className="font-bold text-gray-800 text-sm">{viewData.nguoi_ky || '---'}</p>
-                        <p className="text-[10px] text-gray-500 uppercase mt-0.5 font-semibold">{viewData.chuc_vu || '---'}</p>
+                    {viewData.isFromVB ? (
+                      <>
+                        <div className="flex items-start justify-between border-b sm:border-b-0 sm:border-r border-gray-100 pb-3 sm:pb-0 sm:pr-4">
+                          <span className="text-xs text-gray-500 font-bold flex items-center gap-1.5"><PenTool size={14} /> Người ký:</span>
+                          <div className="text-right">
+                            <p className="font-bold text-gray-800 text-sm">{viewData.nguoi_ky || '---'}</p>
+                            <p className="text-[10px] text-gray-500 uppercase mt-0.5 font-semibold">{viewData.chuc_vu || '---'}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-start justify-between">
+                          <span className="text-xs text-gray-500 font-bold flex items-center gap-1.5"><Hash size={14} /> Lấy số bởi:</span>
+                          <div className="text-right">
+                            <p className="font-bold text-gray-800 text-sm">{viewData.nguoi_lay_so || '---'}</p>
+                            <p className="text-[10px] text-gray-500 uppercase mt-0.5 font-semibold">{viewData.bo_phan_lay_so || '---'}</p>
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="flex items-start justify-between col-span-2">
+                        <span className="text-xs text-gray-500 font-bold flex items-center gap-1.5"><Hash size={14} /> Bộ phận ban hành:</span>
+                        <div className="text-right font-bold text-gray-800 text-sm">
+                          {viewData.bo_phan_lay_so || '---'}
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex items-start justify-between">
-                      <span className="text-xs text-gray-500 font-bold flex items-center gap-1.5"><Hash size={14} /> Lấy số bởi:</span>
-                      <div className="text-right">
-                        <p className="font-bold text-gray-800 text-sm">{viewData.nguoi_lay_so || '---'}</p>
-                        <p className="text-[10px] text-gray-500 uppercase mt-0.5 font-semibold">{viewData.bo_phan_lay_so || '---'}</p>
-                      </div>
-                    </div>
+                    )}
                   </div>
                 </div>
               )}

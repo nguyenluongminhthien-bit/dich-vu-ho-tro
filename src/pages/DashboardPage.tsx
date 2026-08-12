@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { apiService } from '../services/api';
-import { DonVi, Personnel, ThietBi, TS_Xe } from '../types';
+import { DonVi, Personnel, ThietBi, TS_Xe, NhaCungCap } from '../types';
 import { getUnitEmoji } from '../utils/hierarchy';
 import { formatCurrency, parseDateStrict } from '../utils/formatters';
 import { DashboardSkeleton } from '../components/SkeletonLoader';
@@ -21,6 +21,22 @@ import DashboardCustomizerModal, { WidgetConfig } from '../components/dashboard/
 import PersonnelDoughnutChart from '../components/dashboard/PersonnelDoughnutChart';
 import ExpiryAlertPanel from '../components/dashboard/ExpiryAlertPanel';
 import KpiSection from '../components/dashboard/KpiSection';
+
+const getEffectiveExpiryDate = (
+  ngay_het_han_hd: string | null | undefined,
+  gia_han_tu_dong: number | null | undefined
+): string | null => {
+  if (!ngay_het_han_hd) return null;
+  if (!gia_han_tu_dong || gia_han_tu_dong <= 0) return ngay_het_han_hd;
+
+  const date = new Date(ngay_het_han_hd);
+  date.setMonth(date.getMonth() + gia_han_tu_dong);
+
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const dd = String(date.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+};
 
 // 🟢 2. THUẬT TOÁN TỰ ĐỘNG CỘNG THÁNG VÀO NGÀY BẮT ĐẦU
 const extractDateAndAddDuration = (durationRaw: any, startDateRaw: any): Date | null => {
@@ -253,6 +269,7 @@ export default function DashboardPage() {
   const [xeData, setXeData] = useState<TS_Xe[]>([]);
   const [atvsldData, setAtvsldData] = useState<any[]>([]);
   const [pcccData, setPcccData] = useState<any[]>([]);
+  const [nccData, setNccData] = useState<NhaCungCap[]>([]);
 
   const [loading, setLoading] = useState(true);
 
@@ -266,7 +283,7 @@ export default function DashboardPage() {
   const [docYear, setDocYear] = useState<number>(currentYear);
 
   // 🟢 STATE BỘ LỌC CẢNH BÁO
-  const [activeNotifTab, setActiveNotifTab] = useState<'all' | 'vehicle' | 'equipment' | 'personnel_cert' | 'personnel_event'>('all');
+  const [activeNotifTab, setActiveNotifTab] = useState<'all' | 'personnel_cert' | 'vehicle' | 'equipment' | 'supplier' | 'personnel_event'>('all');
   const [isNotifHubOpen, setIsNotifHubOpen] = useState(false);
 
   // 🟢 STATE TÙY CHỈNH & GHIM WIDGET DASHBOARD
@@ -343,7 +360,7 @@ export default function DashboardPage() {
       };
 
       try {
-        const [dvRes, nsRes, tbRes, tsPcccRes, vbRes, anNinhRes, xeRes, atvsldRes, pcccRes] = await Promise.all([
+        const [dvRes, nsRes, tbRes, tsPcccRes, vbRes, anNinhRes, xeRes, atvsldRes, pcccRes, nccRes] = await Promise.all([
           safeCall(apiService.getDonVi),
           safeCall(apiService.getPersonnel),
           safeCall(apiService.getThietBi),
@@ -352,7 +369,8 @@ export default function DashboardPage() {
           safeCall((apiService as any).getAnNinh),
           safeCall((apiService as any).getXe),
           safeCall((apiService as any).getATVSLD),
-          safeCall((apiService as any).getPCCC)
+          safeCall((apiService as any).getPCCC),
+          safeCall(apiService.getNhaCungCap)
         ]);
 
         setDonViList(dvRes);
@@ -364,6 +382,7 @@ export default function DashboardPage() {
         setXeData(xeRes);
         setAtvsldData(atvsldRes);
         setPcccData(pcccRes);
+        setNccData(nccRes);
       } catch (error) {
         console.error("Lỗi tải dữ liệu Dashboard:", error);
       } finally {
@@ -982,6 +1001,31 @@ export default function DashboardPage() {
       }
     });
 
+    // 3B. Quét Nhà cung cấp
+    nccData.forEach((item: any) => {
+      if (item.trang_thai === 'Ngừng hợp tác') return;
+      if (item.id_don_vi && !currentSubordinateIds.includes(item.id_don_vi)) return;
+
+      const effectiveExpiry = getEffectiveExpiryDate(item.ngay_het_han_hd, item.gia_han_tu_dong);
+      if (!effectiveExpiry) return;
+
+      const expDate = new Date(effectiveExpiry);
+      expDate.setHours(0, 0, 0, 0);
+      const diff = Math.ceil((expDate.getTime() - today.getTime()) / 86400000);
+      if (diff <= WARNING_DAYS) {
+        list.push({
+          id: `ncc-${item.id}`,
+          category: 'supplier',
+          title: 'Hợp đồng sắp/đã hết hạn',
+          detail: `${item.ten_cong_ty} (${item.nhom_dich_vu})`,
+          dateStr: expDate.toLocaleDateString('vi-VN'),
+          daysLeft: diff,
+          type: diff < 0 ? 'expired' : 'warning',
+          unitName: donViMap[item.id_don_vi] || 'Toàn hệ thống'
+        });
+      }
+    });
+
     // 4. Quét Sinh nhật trong tháng
     nsData.forEach((ns: any) => {
       if (!currentSubordinateIds.includes(ns.id_don_vi)) return;
@@ -1024,7 +1068,7 @@ export default function DashboardPage() {
       if (b.category === 'personnel_event') return -1;
       return a.daysLeft - b.daysLeft;
     });
-  }, [xeData, tbData, nsData, atvsldData, pcccData, anNinhData, currentSubordinateIds, donViMap]);
+  }, [xeData, tbData, nsData, atvsldData, pcccData, anNinhData, nccData, currentSubordinateIds, donViMap]);
 
   const { expiredCount, warningCount, birthdayCount } = useMemo(() => {
     let exp = 0;
