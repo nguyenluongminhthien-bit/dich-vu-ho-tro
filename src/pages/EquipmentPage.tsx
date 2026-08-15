@@ -19,6 +19,7 @@ import UnitFilterSidebar from '../components/ui/UnitFilterSidebar';
 import Pagination from '../components/ui/Pagination';
 import { useAllowedUnits } from '../hooks/useAllowedUnits';
 import CustomAutocomplete from '../components/ui/CustomAutocomplete';
+import { motion } from 'motion/react';
 // @ts-ignore
 import { QRCodeSVG } from 'qrcode.react';
 import PasteImportModal, { ColumnMapItem } from '../components/ui/PasteImportModal';
@@ -1502,8 +1503,9 @@ export default function EquipmentPage() {
 
         {/* FIXED HEADER & WARNINGS */}
         <div className="shrink-0 flex flex-col z-30">
-          <div className={`flex flex-col sm:flex-row justify-between items-center mb-6 gap-4 ${isListCollapsed ? 'md:pl-10' : ''}`}>
-            <div className="flex items-center gap-2.5 w-full sm:w-auto">
+          <div className={`flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 gap-4 ${isListCollapsed ? 'md:pl-10' : ''}`}>
+            {/* Bên trái: Tiêu đề & Thông tin Đơn vị */}
+            <div className="flex items-center gap-2.5 w-full lg:w-auto">
               {isListCollapsed && (
                 <button
                   onClick={() => setIsListCollapsed(false)}
@@ -1514,35 +1516,14 @@ export default function EquipmentPage() {
                 </button>
               )}
               <div>
-                <h2 className="text-2xl font-bold text-[#05469B] flex items-center gap-2"><Layers size={28} /> Quản lý Tài sản & Thiết bị</h2>
-                <div className="flex flex-wrap items-center gap-3.5 mt-1.5">
-                  <p className="text-sm font-medium text-gray-500">Đang xem: <span className="text-emerald-600 font-bold">{selectedUnitName}</span> ({filteredTBs.length} khoản mục)</p>
-                  <div className="w-px h-3.5 bg-gray-300 hidden sm:inline"></div>
-                  {/* Thanh chuyển Tab */}
-                  <div className="flex bg-gray-200/60 p-0.5 rounded-lg border border-gray-200">
-                    <button
-                      type="button"
-                      onClick={() => setActiveMainTab('list')}
-                      className={`px-3 py-1 text-xs font-bold rounded-md transition-all flex items-center gap-1 ${activeMainTab === 'list' ? 'bg-[#05469B] text-white shadow-xs' : 'text-gray-600 hover:text-gray-900'}`}
-                    >
-                      <Package size={13} /> Danh sách Tài sản
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setActiveMainTab('report');
-                        setDrillDownValue(null);
-                      }}
-                      className={`px-3 py-1 text-xs font-bold rounded-md transition-all flex items-center gap-1 ${activeMainTab === 'report' ? 'bg-[#05469B] text-white shadow-xs' : 'text-gray-600 hover:text-gray-900'}`}
-                    >
-                      <BarChart3 size={13} /> Báo cáo Thống kê
-                    </button>
-                  </div>
-                </div>
+                <h2 className="text-2xl font-bold text-[#05469B] flex items-center gap-2"><Layers size={28} /> Quản lý Trang thiết bị VP/Tài sản</h2>
+                <p className="text-sm font-medium text-gray-500 mt-1.5">Đang xem: <span className="text-emerald-600 font-bold">{selectedUnitName}</span> ({filteredTBs.length} khoản mục)</p>
               </div>
             </div>
+
+            {/* Bên phải: Nút thêm, Tìm kiếm, Lọc, Quét QR */}
             {activeMainTab === 'list' && (
-              <div className="flex flex-wrap w-full sm:w-auto gap-3 justify-end items-center">
+              <div className="flex flex-wrap w-full lg:w-auto gap-3 justify-start lg:justify-end items-center">
                 {selectedItemsForPrint.length > 0 && (
                   <button
                     onClick={() => {
@@ -1563,7 +1544,7 @@ export default function EquipmentPage() {
                   <Camera className="w-5 h-5" /> Quét QR
                 </button>
                 {/* Lọc Phân loại chi tiết */}
-                <div className="w-full sm:w-48">
+                <div className="w-full sm:w-44">
                   <select
                     value={detailTypeFilter}
                     onChange={(e) => setDetailTypeFilter(e.target.value)}
@@ -1575,18 +1556,18 @@ export default function EquipmentPage() {
                     ))}
                   </select>
                 </div>
-                <div className="relative w-full sm:w-64">
+                <div className="relative w-full sm:w-60">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-                  <input type="text" placeholder="Tìm Mã, Tên, Pháp nhân, Vị trí..." className="w-full pl-9 pr-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#05469B] outline-none shadow-sm text-sm" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                  <input type="text" placeholder="Tìm kiếm..." className="w-full pl-9 pr-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#05469B] outline-none shadow-sm text-sm" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
                 </div>
-                {/* Dropdown nút Thêm Tài sản mới */}
+                {/* Dropdown nút Thêm mới */}
                 <div className="relative w-full sm:w-auto" ref={addDropdownRef}>
                   <button
                     onClick={() => setIsAddDropdownOpen(!isAddDropdownOpen)}
                     className="w-full sm:w-auto flex items-center justify-center gap-2 bg-[#05469B] hover:bg-[#04367a] text-white px-5 py-2.5 rounded-lg font-bold shadow-sm transition-all whitespace-nowrap cursor-pointer"
                   >
                     <Plus className="w-5 h-5" />
-                    <span>Thêm Tài sản</span>
+                    <span>Thêm mới</span>
                     <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${isAddDropdownOpen ? 'rotate-180' : ''}`} />
                   </button>
 
@@ -1617,6 +1598,53 @@ export default function EquipmentPage() {
                 </div>
               </div>
             )}
+          </div>
+
+          {/* HÀNG DƯỚI: TAB BAR */}
+          <div className={`mb-4 transition-all duration-300 ${isListCollapsed ? 'md:pl-10' : ''}`}>
+            <nav className="flex bg-gray-100/80 dark:bg-slate-800 p-1 rounded-xl border border-gray-200/50 dark:border-slate-700/50 relative space-x-1 w-fit" aria-label="Tabs">
+              <button
+                type="button"
+                onClick={() => setActiveMainTab('list')}
+                className={`relative flex items-center gap-1.5 px-4 py-2 text-xs sm:text-sm font-bold rounded-lg transition-colors duration-200 cursor-pointer ${
+                  activeMainTab === 'list' ? 'text-white' : 'text-gray-500 hover:text-[#005698]'
+                }`}
+              >
+                <span className="relative z-10 flex items-center gap-1.5">
+                  <Package size={14} />
+                  Danh mục TTB/Tài sản
+                </span>
+                {activeMainTab === 'list' && (
+                  <motion.div
+                    layoutId="equipmentActiveBg"
+                    className="absolute inset-0 rounded-lg bg-[#005698] z-0"
+                    transition={{ type: 'spring', duration: 0.35, bounce: 0.05 }}
+                  />
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveMainTab('report');
+                  setDrillDownValue(null);
+                }}
+                className={`relative flex items-center gap-1.5 px-4 py-2 text-xs sm:text-sm font-bold rounded-lg transition-colors duration-200 cursor-pointer ${
+                  activeMainTab === 'report' ? 'text-white' : 'text-gray-500 hover:text-[#005698]'
+                }`}
+              >
+                <span className="relative z-10 flex items-center gap-1.5">
+                  <BarChart3 size={14} />
+                  Thống kê
+                </span>
+                {activeMainTab === 'report' && (
+                  <motion.div
+                    layoutId="equipmentActiveBg"
+                    className="absolute inset-0 rounded-lg bg-[#005698] z-0"
+                    transition={{ type: 'spring', duration: 0.35, bounce: 0.05 }}
+                  />
+                )}
+              </button>
+            </nav>
           </div>
 
           {error && <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-500 text-red-700 flex items-start gap-3 rounded-r-lg shadow-sm"><AlertCircle className="w-5 h-5 shrink-0 mt-0.5" /><p>{error}</p></div>}

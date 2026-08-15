@@ -20,6 +20,8 @@ import Pagination from '../components/ui/Pagination';
 import { useAllowedUnits } from '../hooks/useAllowedUnits';
 import LineTabs from '../components/ui/LineTabs';
 import PersonnelModal from '../components/personnel/PersonnelModal';
+import { motion } from 'motion/react';
+
 import { calcGiaTriDen, getChungNhanByNhom } from '../utils/atvsld';
 import CuocDiDongTab from '../components/personnel/CuocDiDongTab';
 import PersonnelDetailCuocChart from '../components/personnel/PersonnelDetailCuocChart';
@@ -397,9 +399,9 @@ export default function PersonnelPage() {
   }, [donViList, user, allowedDonViIds]);
 
   const personnelTabs = useMemo(() => [
-    { id: 'info', label: 'Danh sách Thông tin', icon: <Users size={18} /> },
-    { id: 'stats', label: 'Thống kê Phân tích', icon: <BarChart3 size={18} /> },
-    { id: 'cuoc', label: 'Cước ĐTDĐ', icon: <Phone size={18} /> }
+    { id: 'info', label: 'Danh sách nhân sự', icon: <Users size={18} /> },
+    { id: 'stats', label: 'Thống kê', icon: <BarChart3 size={18} /> },
+    { id: 'cuoc', label: 'Cước điện thoại', icon: <Phone size={18} /> }
   ], []);
 
   const calculateSeniority = (startDate: string, trangThai: string, endDate: string) => {
@@ -494,7 +496,7 @@ export default function PersonnelPage() {
         newItems.push(item);
       } else {
         const changes: any[] = [];
-        
+
         const fieldLabels: Record<string, string> = {
           ho_ten: 'Họ tên',
           chuc_vu: 'Chức vụ',
@@ -523,11 +525,11 @@ export default function PersonnelPage() {
 
         Object.keys(item).forEach(col => {
           if (col === 'id_don_vi') return;
-          
+
           const valIncoming = item[col];
           if (valIncoming !== undefined && valIncoming !== null && String(valIncoming).trim() !== '') {
             const valExisting = existing[col];
-            
+
             const strIncoming = String(valIncoming).trim().toLowerCase();
             const strExisting = String(valExisting || '').trim().toLowerCase();
 
@@ -1312,7 +1314,7 @@ export default function PersonnelPage() {
         successMsg = `Thao tác thành công! Đã thêm mới ${createCount} người, cập nhật ${updateCount} người và điều chuyển/nghỉ việc ${offboardCount} người.`;
       }
       toast.success(successMsg);
-      
+
       await loadData(true);
 
       setIsBulkImportOpen(false);
@@ -1589,14 +1591,14 @@ export default function PersonnelPage() {
         let newCount = 0;
         let updateCount = 0;
         let missingCount = 0;
-        
+
         const dbMap = new Map<string, any>();
         activeDbList.forEach(ns => {
           if (ns.ma_so_nhan_vien) {
             dbMap.set(String(ns.ma_so_nhan_vien).trim().toLowerCase(), ns);
           }
         });
-        
+
         incoming.forEach((item: any) => {
           const key = String(item.ma_so_nhan_vien).trim().toLowerCase();
           const existing = dbMap.get(key);
@@ -1625,7 +1627,7 @@ export default function PersonnelPage() {
             if (hasChanged) updateCount++;
           }
         });
-        
+
         const incomingMsnvs = new Set(incoming.map(item => String(item.ma_so_nhan_vien).trim().toLowerCase()));
         activeDbList.forEach(ns => {
           const msnv = String(ns.ma_so_nhan_vien || '').trim().toLowerCase();
@@ -1633,7 +1635,7 @@ export default function PersonnelPage() {
             missingCount++;
           }
         });
-        
+
         if (newCount > 0) setActiveReconcileTab('new');
         else if (updateCount > 0) setActiveReconcileTab('update');
         else if (missingCount > 0) setActiveReconcileTab('missing');
@@ -2113,13 +2115,34 @@ export default function PersonnelPage() {
           )}
 
           <div className={`mb-4 transition-all duration-300 ${isListCollapsed ? 'md:ml-10 lg:ml-0' : ''} shrink-0`}>
-            <LineTabs
-              tabs={personnelTabs}
-              activeTab={activeTab}
-              onChange={(id) => setActiveTab(id as 'info' | 'stats' | 'cuoc')}
-              layoutId="personnelTabUnderline"
-              color="#05469B"
-            />
+            <nav className="bg-gray-100/80 dark:bg-slate-800 rounded-xl w-fit flex space-x-1 p-1 border border-gray-200/50 dark:border-slate-700/50" aria-label="Tabs">
+              {personnelTabs.map((tab) => {
+                const isActive = activeTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setActiveTab(tab.id as 'info' | 'stats' | 'cuoc')}
+                    className={`relative flex items-center gap-2 px-4 py-2 text-xs sm:text-sm font-bold rounded-lg transition-colors duration-200 cursor-pointer ${isActive
+                        ? 'text-white'
+                        : 'text-gray-400 hover:text-[#005698]'
+                      }`}
+                  >
+                    <span className="relative z-10 flex items-center gap-2">
+                      {tab.icon}
+                      <span>{tab.label}</span>
+                    </span>
+                    {isActive && (
+                      <motion.div
+                        layoutId="personnelActiveBg"
+                        className="absolute inset-0 rounded-lg bg-[#005698] z-0"
+                        transition={{ type: 'spring', duration: 0.35, bounce: 0.05 }}
+                      />
+                    )}
+                  </button>
+                );
+              })}
+            </nav>
           </div>
         </div>
 
@@ -3102,9 +3125,9 @@ export default function PersonnelPage() {
               <h3 className="text-xl font-black text-indigo-800 flex items-center gap-2"><ClipboardPaste size={24} /> Dán Dữ Liệu Hàng Loạt</h3>
               <button onClick={() => { setIsBulkImportOpen(false); setBulkImportData([]); setBulkImportText(''); setIgnoredUpdates(new Set()); }} className="text-indigo-400 hover:text-red-500 rounded-full p-1.5 bg-white shadow-sm transition-colors"><X size={24} /></button>
             </div>
-            
+
             <div className="p-6 overflow-y-auto space-y-5 custom-scrollbar bg-gray-55/30">
-              
+
               {!reconciliationResult && (
                 <div className="bg-indigo-50/50 p-5 rounded-2xl border border-indigo-100 space-y-3">
                   <div className="flex items-center gap-1.5 text-xs text-indigo-800 font-bold">
@@ -3149,11 +3172,11 @@ export default function PersonnelPage() {
 
               {!reconciliationResult ? (
                 <div className="space-y-4">
-                  <textarea 
-                    value={bulkImportText} 
-                    onChange={handlePasteBulkData} 
-                    disabled={isAnalyzingBulk} 
-                    placeholder="Ctrl+V bảng Excel vào đây..." 
+                  <textarea
+                    value={bulkImportText}
+                    onChange={handlePasteBulkData}
+                    disabled={isAnalyzingBulk}
+                    placeholder="Ctrl+V bảng Excel vào đây..."
                     className="w-full h-44 p-4 text-sm border-2 border-dashed border-indigo-300 rounded-2xl outline-none focus:border-indigo-500 bg-white resize-none shadow-inner"
                   ></textarea>
                   {isAnalyzingBulk && (
@@ -3166,30 +3189,26 @@ export default function PersonnelPage() {
                 <div className="space-y-5 animate-in fade-in duration-200">
                   {/* Summary Metric Cards */}
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div 
+                    <div
                       onClick={() => { if (reconciliationResult.newItems.length > 0) setActiveReconcileTab('new'); }}
-                      className={`p-4 rounded-2xl border transition-all shadow-sm ${
-                        reconciliationResult.newItems.length > 0 ? 'cursor-pointer hover:scale-[1.02]' : 'opacity-50 cursor-not-allowed'
-                      } ${
-                        activeReconcileTab === 'new' 
-                          ? 'bg-emerald-50 border-emerald-300 text-emerald-900 ring-2 ring-emerald-400/20' 
+                      className={`p-4 rounded-2xl border transition-all shadow-sm ${reconciliationResult.newItems.length > 0 ? 'cursor-pointer hover:scale-[1.02]' : 'opacity-50 cursor-not-allowed'
+                        } ${activeReconcileTab === 'new'
+                          ? 'bg-emerald-50 border-emerald-300 text-emerald-900 ring-2 ring-emerald-400/20'
                           : 'bg-white border-gray-150 text-gray-500'
-                      }`}
+                        }`}
                     >
                       <div className="text-[10px] font-black uppercase tracking-wider text-emerald-600 flex items-center gap-1.5">🟢 Thêm mới</div>
                       <div className="text-3xl font-black mt-2 text-emerald-800">{reconciliationResult.newItems.length}</div>
                       <div className="text-[10px] opacity-75 mt-1">MSNV chưa có trên hệ thống</div>
                     </div>
 
-                    <div 
+                    <div
                       onClick={() => { if (reconciliationResult.updateItems.length > 0) setActiveReconcileTab('update'); }}
-                      className={`p-4 rounded-2xl border transition-all shadow-sm ${
-                        reconciliationResult.updateItems.length > 0 ? 'cursor-pointer hover:scale-[1.02]' : 'opacity-50 cursor-not-allowed'
-                      } ${
-                        activeReconcileTab === 'update' 
-                          ? 'bg-amber-50 border-amber-300 text-amber-900 ring-2 ring-amber-400/20' 
+                      className={`p-4 rounded-2xl border transition-all shadow-sm ${reconciliationResult.updateItems.length > 0 ? 'cursor-pointer hover:scale-[1.02]' : 'opacity-50 cursor-not-allowed'
+                        } ${activeReconcileTab === 'update'
+                          ? 'bg-amber-50 border-amber-300 text-amber-900 ring-2 ring-amber-400/20'
                           : 'bg-white border-gray-150 text-gray-500'
-                      }`}
+                        }`}
                     >
                       <div className="text-[10px] font-black uppercase tracking-wider text-amber-600 flex items-center gap-1.5">🟡 Thay đổi</div>
                       <div className="text-3xl font-black mt-2 text-amber-800">
@@ -3198,30 +3217,26 @@ export default function PersonnelPage() {
                       <div className="text-[10px] opacity-75 mt-1">Cập nhật thông tin mới / Tổng số</div>
                     </div>
 
-                    <div 
+                    <div
                       onClick={() => { if (reconciliationResult.unchangedItems.length > 0) setActiveReconcileTab('unchanged'); }}
-                      className={`p-4 rounded-2xl border transition-all shadow-sm ${
-                        reconciliationResult.unchangedItems.length > 0 ? 'cursor-pointer hover:scale-[1.02]' : 'opacity-50 cursor-not-allowed'
-                      } ${
-                        activeReconcileTab === 'unchanged' 
-                          ? 'bg-slate-100 border-slate-300 text-slate-900 ring-2 ring-slate-400/20' 
+                      className={`p-4 rounded-2xl border transition-all shadow-sm ${reconciliationResult.unchangedItems.length > 0 ? 'cursor-pointer hover:scale-[1.02]' : 'opacity-50 cursor-not-allowed'
+                        } ${activeReconcileTab === 'unchanged'
+                          ? 'bg-slate-100 border-slate-300 text-slate-900 ring-2 ring-slate-400/20'
                           : 'bg-white border-gray-150 text-gray-500'
-                      }`}
+                        }`}
                     >
                       <div className="text-[10px] font-black uppercase tracking-wider text-slate-500 flex items-center gap-1.5">⚪ Giữ nguyên</div>
                       <div className="text-3xl font-black mt-2 text-slate-800">{reconciliationResult.unchangedItems.length}</div>
                       <div className="text-[10px] opacity-75 mt-1">Dữ liệu khớp 100% (Sẽ bỏ qua)</div>
                     </div>
 
-                    <div 
+                    <div
                       onClick={() => { if (reconciliationResult.missingItems.length > 0) setActiveReconcileTab('missing'); }}
-                      className={`p-4 rounded-2xl border transition-all shadow-sm ${
-                        reconciliationResult.missingItems.length > 0 ? 'cursor-pointer hover:scale-[1.02]' : 'opacity-50 cursor-not-allowed'
-                      } ${
-                        activeReconcileTab === 'missing' 
-                          ? 'bg-red-50 border-red-300 text-red-900 ring-2 ring-red-400/20' 
+                      className={`p-4 rounded-2xl border transition-all shadow-sm ${reconciliationResult.missingItems.length > 0 ? 'cursor-pointer hover:scale-[1.02]' : 'opacity-50 cursor-not-allowed'
+                        } ${activeReconcileTab === 'missing'
+                          ? 'bg-red-50 border-red-300 text-red-900 ring-2 ring-red-400/20'
                           : 'bg-white border-gray-150 text-gray-500'
-                      }`}
+                        }`}
                     >
                       <div className="text-[10px] font-black uppercase tracking-wider text-red-600 flex items-center gap-1.5">🔴 Nhân sự dôi dư</div>
                       <div className="text-3xl font-black mt-2 text-red-800">
@@ -3334,7 +3349,7 @@ export default function PersonnelPage() {
                                     </div>
                                   </td>
                                   <td className="p-3 text-center align-middle">
-                                    <input 
+                                    <input
                                       type="checkbox"
                                       checked={!isIgnored}
                                       onChange={() => {
@@ -3417,7 +3432,7 @@ export default function PersonnelPage() {
                             {reconciliationResult.missingItems.map((item, idx) => {
                               const isOffboarded = pendingOffboards.has(item.ma_so_nhan_vien);
                               const offboardInfo = pendingOffboards.get(item.ma_so_nhan_vien);
-                              
+
                               let statusBadge = null;
                               if (isOffboarded && offboardInfo) {
                                 if (offboardInfo.transferType === 'OFFBOARD') {
@@ -3448,7 +3463,7 @@ export default function PersonnelPage() {
                                   <td className="p-3">
                                     <div className={`font-semibold text-gray-800 ${isOffboarded ? 'line-through text-gray-400' : ''}`}>{item.ho_ten}</div>
                                     {statusBadge && (
-                                      <div 
+                                      <div
                                         onClick={() => handleOffboardClick(item)}
                                         className="mt-1 flex items-center cursor-pointer hover:opacity-80 w-fit"
                                         title="Click để điều chỉnh thông tin Điều chuyển / Nghỉ việc"
@@ -3460,7 +3475,7 @@ export default function PersonnelPage() {
                                   <td className={`p-3 text-gray-600 ${isOffboarded ? 'line-through text-gray-400' : ''}`}>{item.chuc_vu || '---'}</td>
                                   <td className={`p-3 text-gray-600 ${isOffboarded ? 'line-through text-gray-400' : ''}`}>{item.phong_ban || '---'}</td>
                                   <td className="p-3 text-center">
-                                    <input 
+                                    <input
                                       type="checkbox"
                                       checked={!isOffboarded}
                                       onChange={() => toggleMissingItemKeep(item)}
@@ -3479,39 +3494,39 @@ export default function PersonnelPage() {
                 </div>
               )}
             </div>
-            
+
             <div className="p-5 border-t bg-gray-50 flex justify-between items-center">
               {reconciliationResult ? (
-                <button 
+                <button
                   onClick={() => {
                     setBulkImportData([]);
                     setBulkImportText('');
                     setIgnoredUpdates(new Set());
                     setPendingOffboards(new Map());
-                  }} 
+                  }}
                   className="px-6 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold rounded-xl transition-colors"
                 >
                   Quay lại dán Excel
                 </button>
               ) : (
-                <button 
-                  onClick={() => { setIsBulkImportOpen(false); setBulkImportData([]); setBulkImportText(''); setIgnoredUpdates(new Set()); setPendingOffboards(new Map()); }} 
+                <button
+                  onClick={() => { setIsBulkImportOpen(false); setBulkImportData([]); setBulkImportText(''); setIgnoredUpdates(new Set()); setPendingOffboards(new Map()); }}
                   className="px-6 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold rounded-xl transition-colors"
                 >
                   Hủy
                 </button>
               )}
-              
-              <button 
-                onClick={confirmBulkSave} 
+
+              <button
+                onClick={confirmBulkSave}
                 disabled={submitting || (reconciliationResult ? (
-                  reconciliationResult.newItems.length === 0 && 
+                  reconciliationResult.newItems.length === 0 &&
                   reconciliationResult.updateItems.length === 0 &&
                   pendingOffboards.size === 0
-                ) : bulkImportData.length === 0)} 
+                ) : bulkImportData.length === 0)}
                 className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 transition-colors text-white rounded-xl font-bold flex items-center gap-2 shadow-md shadow-indigo-500/20"
               >
-                {submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <CheckCheck size={20} />} 
+                {submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <CheckCheck size={20} />}
                 {reconciliationResult ? 'Xác nhận Lưu thay đổi' : 'Xác nhận Lưu'}
               </button>
             </div>
