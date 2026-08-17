@@ -81,7 +81,7 @@ const getBrandBadgeStyle = (brandStr: string = '') => {
 // Cập nhật danh sách model tại đây khi cần
 const VEHICLE_MODELS: Record<string, string[]> = {
   "THACO":       ["Ollin 350", "Ollin 500", "Ollin 700", "Ollin 720", "Towner 800", "Towner Van", "Frontier K200", "Frontier K250", "TL700", "Bus 29 chỗ"],
-  "KIA":         ["Morning", "Soluto", "Sonet", "Seltos", "Sportage", "Carnival", "Sorento", "Telluride", "K3", "K5", "EV6", "EV9", "Stonic", "Carens"],
+  "KIA":         ["Morning", "Soluto", "Sonet", "Seltos", "Sportage", "Sedona", "Carnival", "Sorento", "Telluride", "K3", "K5", "EV6", "EV9", "Stonic", "Carens"],
   "MAZDA":       ["Mazda2", "Mazda3", "Mazda6", "CX-3", "CX-30", "CX-5", "CX-8", "CX-60", "CX-90", "MX-5", "BT-50"],
   "PEUGEOT":     ["208", "2008", "3008", "5008", "408", "508", "508 SW", "Rifter", "Partner", "Expert", "Traveller", "Boxer"],
   "BMW":         ["118i", "218i", "320i", "330i", "520i", "530i", "730Li", "740Li", "X1", "X2", "X3", "X4", "X5", "X6", "X7", "M3", "M4", "M5", "iX", "i4"],
