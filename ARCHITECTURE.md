@@ -65,7 +65,7 @@ src/
 | Nhân sự (`personnel`) | `PersonnelPage.tsx` (2868 dòng) | `PersonnelModal`, component `LineTabs.tsx`; module con **Cước ĐTDĐ**: `CuocDiDongTab.tsx` (3366 dòng — **file lớn nhất toàn repo**), `ThueBaoCuocHistorySection`, `BatchCostEntryModal`, `PersonnelDetailCuocChart`, `ThueBaoDetailCuocChart` | `ns_dich_vu` (hồ sơ NS); Cước ĐTDĐ dùng `dm_thue_bao` + `cp_cuoc_thang` | ✅ |
 | An toàn PCCC (`firesafety`) | `FireSafetyPage.tsx` (1117 dòng) | dùng chung `PcccModal` (ở `components/department/`) | `hs_pccc`, `ts_pccc` | ✅ |
 | ATVSLĐ (`atvsld`) | `AtvsldPage.tsx` (676 dòng) — có 4 tab cấp 1: `hoso`, `daotao` (2 tab con `kehoach`/`khoahoc`), `thietbi`, `khamsuckhoe` | `HoSoTab.tsx`, `KeHoachTab.tsx`, `KhoaHocTab.tsx` (975 dòng), `StrictEquipmentTab.tsx` (996 dòng), modal `AtvsldModal`, component `LineTabs.tsx` | `hs_an_toan_lao_dong` (hồ sơ), `hs_khoa_huan_luyen`+`hs_hoc_vien_khoa_huan_luyen` (khóa học), `ts_thiet_bi_nghiem_ngat`+`nk_kiem_dinh_tbnn` (thiết bị nghiêm ngặt), `dm_chu_ky_atvsld` (định nghĩa, chưa thấy nơi ghi/đọc trực tiếp — kiểm tra lại) | 🔧 Tab `khamsuckhoe` **CHƯA XÂY** — hiện chỉ là khung placeholder "sắp cập nhật" (xem mục 7) |
-| Phương tiện (`vehicles`) | `VehiclePage.tsx` (1380 dòng) | — | `ts_xe`, `cp_hoat_dong_xe` | ✅ |
+| Phương tiện (`vehicles`) | `VehiclePage.tsx` (1380 dòng) | — | `ts_xe`, `cp_hoat_dong_xe`, `nk_su_dung_xe` | ✅ |
 | Tài sản-Thiết bị (`equipments`) | `EquipmentPage.tsx` (3205 dòng) | `PasteImportModal`, `CustomAutocomplete` | `ts_thiet_bi`, `nk_thiet_bi`, `dm_phap_nhan` (lọc theo `id_don_vi`) | ✅ |
 | Nhà cung cấp (`suppliers`) | `SupplierPage.tsx` (khoảng 600 dòng) | modal xem chi tiết, modal thêm/sửa | `dm_ncc` | ✅ |
 | Tài liệu (`documents`) | `DocumentPage.tsx` (1674 dòng) | Các component con hiển thị bảng theo tab nằm trong `src/components/document/` (`AllDocTable.tsx`, `ThongBaoTable.tsx`, `QuyetDinhTable.tsx`, `CongVanDenTable.tsx`, `CongVanDiTable.tsx`, `ToTrinhTable.tsx`), file helper `documentHelpers.ts`, component `LineTabs.tsx`. | `vb_tb` | ✅ |
@@ -77,9 +77,9 @@ src/
 
 > **Cách dùng bảng này:** Tìm theo tên menu hiển thị trên Sidebar → biết ngay Page, Modal/Tab con, và bảng dữ liệu thật liên quan.
 
-## 4. TOÀN BỘ 26 BẢNG SUPABASE THẬT (từ `services/api/modules.ts`)
+## 4. TOÀN BỘ 27 BẢNG SUPABASE THẬT (từ `services/api/modules.ts`)
 
-`ns_dich_vu`, `dm_don_vi`, `hs_an_ninh`, `ts_xe`, `cp_hoat_dong_xe`, `dm_phap_nhan`, `dm_phong_hop`, `qd_qt`, `ts_thiet_bi`, `nk_thiet_bi`, `vb_tb`, `hs_pvhc`, `hs_an_toan_lao_dong`, `hs_pctt`, `hs_pccc`, `ts_pccc`, `config_users`, `sys_logs`, `dm_thue_bao`, `cp_cuoc_thang`, `hs_khoa_huan_luyen`, `hs_hoc_vien_khoa_huan_luyen`, `dm_chu_ky_atvsld`, `ts_thiet_bi_nghiem_ngat`, `nk_kiem_dinh_tbnn`, `dm_ncc`.
+`ns_dich_vu`, `dm_don_vi`, `hs_an_ninh`, `ts_xe`, `cp_hoat_dong_xe`, `nk_su_dung_xe`, `dm_phap_nhan`, `dm_phong_hop`, `qd_qt`, `ts_thiet_bi`, `nk_thiet_bi`, `vb_tb`, `hs_pvhc`, `hs_an_toan_lao_dong`, `hs_pctt`, `hs_pccc`, `ts_pccc`, `config_users`, `sys_logs`, `dm_thue_bao`, `cp_cuoc_thang`, `hs_khoa_huan_luyen`, `hs_hoc_vien_khoa_huan_luyen`, `dm_chu_ky_atvsld`, `ts_thiet_bi_nghiem_ngat`, `nk_kiem_dinh_tbnn`, `dm_ncc`.
 
 ## 5. GATEWAY GHI DỮ LIỆU (xác thực từ `modules.ts`)
 
