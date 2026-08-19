@@ -30,7 +30,7 @@ export default function ReportPreviewTable({
   // Hàm xác định loại văn bản
   const getDocumentSheetType = (item: any): string => {
     const pl = String(item.phan_loai || '').trim();
-    if (pl === 'Quyết định' || pl === 'Thông báo' || pl === 'Tờ trình' || pl === 'Công văn đến' || pl === 'Công văn đi') {
+    if (pl === 'Quyết định' || pl === 'Thông báo' || pl === 'Thông báo BĐH' || pl === 'Tờ trình' || pl === 'Công văn đến' || pl === 'Công văn đi') {
       return pl;
     }
     const soHieu = String(item.so_hieu || '').toUpperCase();
@@ -129,6 +129,7 @@ export default function ReportPreviewTable({
               { id: 'Tất cả', label: 'Tất cả', count: sortedData.length },
               { id: 'Quyết định', label: 'Quyết định', count: docCounts['Quyết định'] || 0 },
               { id: 'Thông báo', label: 'Thông báo', count: docCounts['Thông báo'] || 0 },
+              { id: 'Thông báo BĐH', label: 'Thông báo BĐH', count: docCounts['Thông báo BĐH'] || 0 },
               { id: 'Tờ trình', label: 'Tờ trình', count: docCounts['Tờ trình'] || 0 },
               { id: 'Công văn đến', label: 'Công văn đến (CVĐ)', count: docCounts['Công văn đến'] || 0 },
               { id: 'Công văn đi', label: 'Công văn đi (CV)', count: docCounts['Công văn đi'] || 0 }

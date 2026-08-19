@@ -5,7 +5,7 @@ import {
   Search, Plus, Edit, Trash2, X, AlertCircle, Loader2, Save,
   FileText, Building2, MapPin, ChevronDown, ChevronLeft, ChevronRight, PanelLeftClose, PanelLeftOpen,
   Link as LinkIcon, Calendar, CheckCircle2, Bookmark, Eye, Lock, Zap, Clock, Send,
-  PenTool, Hash, Briefcase, Layers, ExternalLink, Filter, Copy
+  PenTool, Hash, Briefcase, Layers, ExternalLink, Filter, Copy, Megaphone, Inbox
 } from 'lucide-react';
 import { apiService } from '../services/api';
 import { DonVi, VB_TB, Personnel } from '../types';
@@ -16,7 +16,7 @@ import { PageWithFilterSkeleton } from '../components/SkeletonLoader';
 import UnitFilterSidebar from '../components/ui/UnitFilterSidebar';
 import Pagination from '../components/ui/Pagination';
 import { useAllowedUnits } from '../hooks/useAllowedUnits';
-import LineTabs from '../components/ui/LineTabs';
+import SegmentTabs from '../components/ui/SegmentTabs';
 
 import {
   isMatDocument, isNewDocument, normalizeSignerName, isReplacedStatus, isExpiredOrReplaced, getNoiGuiNhanLabel
@@ -257,6 +257,8 @@ const generateAutoSoHieu = (
   switch (phanLoai) {
     case 'Thông báo':
       return `${nextNum}/${year}/TB-${unitAbbr}`;
+    case 'Thông báo BĐH':
+      return `${nextNum}/${year}/TB-THACO INDUSTRIES&AUTO`;
     case 'Công văn đi':
       return `${nextNum}/${year}/CV-${unitAbbr}`;
     case 'Công văn đến':
@@ -609,16 +611,16 @@ export default function DocumentPage() {
 
     if (isViewerHanChe) {
       result = result.filter(item =>
-        item.phan_loai === 'Thông báo' || item.phan_loai === 'Quyết định'
+        item.phan_loai === 'Thông báo' || item.phan_loai === 'Thông báo BĐH' || item.phan_loai === 'Quyết định'
       );
     }
 
     if (advancedRules.includes('VB_ONLY_TB') && !advancedRules.includes('VB_ONLY_QD')) {
-      result = result.filter(item => item.phan_loai === 'Thông báo');
+      result = result.filter(item => item.phan_loai === 'Thông báo' || item.phan_loai === 'Thông báo BĐH');
     } else if (advancedRules.includes('VB_ONLY_QD') && !advancedRules.includes('VB_ONLY_TB')) {
       result = result.filter(item => item.phan_loai === 'Quyết định');
     } else if (advancedRules.includes('VB_ONLY_TB') && advancedRules.includes('VB_ONLY_QD')) {
-      result = result.filter(item => item.phan_loai === 'Thông báo' || item.phan_loai === 'Quyết định');
+      result = result.filter(item => item.phan_loai === 'Thông báo' || item.phan_loai === 'Thông báo BĐH' || item.phan_loai === 'Quyết định');
     }
 
     if (selectedUnitFilter) result = result.filter(item => String(item.id_don_vi) === String(selectedUnitFilter) || String(item.pham_vi_ap_dung) === String(selectedUnitFilter));
@@ -670,6 +672,7 @@ export default function DocumentPage() {
     const counts = {
       all: filteredDocsWithoutPhanLoai.length,
       thongBao: 0,
+      thongBaoBdh: 0,
       quyetDinh: 0,
       cvDen: 0,
       cvDi: 0,
@@ -678,6 +681,7 @@ export default function DocumentPage() {
     filteredDocsWithoutPhanLoai.forEach(doc => {
       const type = String(doc.phan_loai || '').trim();
       if (type === 'Thông báo') counts.thongBao++;
+      else if (type === 'Thông báo BĐH') counts.thongBaoBdh++;
       else if (type === 'Quyết định') counts.quyetDinh++;
       else if (type === 'Công văn đến') counts.cvDen++;
       else if (type === 'Công văn đi') counts.cvDi++;
@@ -692,18 +696,19 @@ export default function DocumentPage() {
   }, [filteredDocsWithoutPhanLoai, selectedPhanLoai]);
 
   const docTabs = useMemo(() => {
-    const list: { id: string; label: string; count: number }[] = [];
+    const list: { id: string; label: string; count: number; icon: React.ReactNode }[] = [];
 
-    list.push({ id: 'Quyết định', label: 'Quyết định', count: tabCounts.quyetDinh });
-    list.push({ id: 'Thông báo', label: 'Thông báo', count: tabCounts.thongBao });
+    list.push({ id: 'Quyết định', label: 'Quyết định', count: tabCounts.quyetDinh, icon: <FileText size={16} /> });
+    list.push({ id: 'Thông báo', label: 'Thông báo', count: tabCounts.thongBao, icon: <Megaphone size={16} /> });
+    list.push({ id: 'Thông báo BĐH', label: 'Ban điều hành TB', count: tabCounts.thongBaoBdh, icon: <Briefcase size={16} /> });
 
     if (!isViewerHanChe) {
-      list.push({ id: 'Tờ trình', label: 'Tờ trình', count: tabCounts.toTrinh });
-      list.push({ id: 'Công văn đi', label: 'Công văn đi', count: tabCounts.cvDi });
-      list.push({ id: 'Công văn đến', label: 'Công văn đến', count: tabCounts.cvDen });
+      list.push({ id: 'Tờ trình', label: 'Tờ trình', count: tabCounts.toTrinh, icon: <Bookmark size={16} /> });
+      list.push({ id: 'Công văn đi', label: 'Công văn đi', count: tabCounts.cvDi, icon: <Send size={16} /> });
+      list.push({ id: 'Công văn đến', label: 'Công văn đến', count: tabCounts.cvDen, icon: <Inbox size={16} /> });
     }
 
-    list.push({ id: 'all', label: 'Tất cả', count: tabCounts.all });
+    list.push({ id: 'all', label: 'Tất cả', count: tabCounts.all, icon: <Layers size={16} /> });
 
     return list;
   }, [tabCounts, isViewerHanChe]);
@@ -767,7 +772,7 @@ export default function DocumentPage() {
     } else {
       setFormData({
         id: '', id_don_vi: selectedUnitFilter || (defaultDonViId !== 'ALL' ? defaultDonViId : ''),
-        phan_loai: 'Thông báo', muc_do_khan: 'Bình thường', so_hieu: '', ngay_ban_hanh: new Date().toISOString().split('T')[0],
+        phan_loai: (selectedPhanLoai && selectedPhanLoai !== 'all') ? selectedPhanLoai : 'Thông báo', muc_do_khan: 'Bình thường', so_hieu: '', ngay_ban_hanh: new Date().toISOString().split('T')[0],
         tieu_de: '', noi_dung: '', link_vb: '', noi_goi_nhan: '', so_den: '', ngay_nhan: '',
         bo_phan_xu_ly: '', han_xu_ly: '', trang_thai_xu_ly: 'Chờ xử lý',
         nguoi_ky: '', chuc_vu: '', nguoi_lay_so: '', bo_phan_lay_so: '', pham_vi_ap_dung: selectedUnitFilter || 'Toàn hệ thống',
@@ -784,6 +789,7 @@ export default function DocumentPage() {
 
     let phanLoaiAbbr = viewData.phan_loai || '';
     if (phanLoaiAbbr === 'Thông báo') phanLoaiAbbr = 'TB';
+    else if (phanLoaiAbbr === 'Thông báo BĐH') phanLoaiAbbr = 'TB-BĐH';
     else if (phanLoaiAbbr === 'Quyết định') phanLoaiAbbr = 'QĐ';
     else if (phanLoaiAbbr === 'Tờ trình') phanLoaiAbbr = 'TTr';
     else if (phanLoaiAbbr === 'Công văn đi') phanLoaiAbbr = 'CV';
@@ -1312,15 +1318,14 @@ Anh/chị vui lòng gửi file scan đầy đủ chữ ký và mộc để phụ
 
         {/* 🟢 THANH TAB NGANG CHUYỂN ĐỔI PHÂN LOẠI VĂN BẢN (NẰM NGOÀI BOX ĐỂ THOÁT MẮT) */}
         <div className={`mb-4 shrink-0 transition-all duration-300 ${isListCollapsed ? 'md:ml-10' : ''}`}>
-          <LineTabs
+          <SegmentTabs
             tabs={docTabs}
             activeTab={selectedPhanLoai === null ? 'all' : selectedPhanLoai}
             onChange={(id) => {
               setSelectedPhanLoai(id === 'all' ? null : id);
               setCurrentPage(1);
             }}
-            layoutId="docTabUnderline"
-            color="#05469B"
+            layoutId="docActiveTabBackground"
           />
         </div>
 
@@ -1356,6 +1361,24 @@ Anh/chị vui lòng gửi file scan đầy đủ chữ ký và mộc để phụ
               handleDeleteClick={handleDeleteClick}
               setViewData={setViewData}
               setIsViewModalOpen={setIsViewModalOpen}
+              phanLoai="Thông báo"
+            />
+          )}
+
+          {selectedPhanLoai === 'Thông báo BĐH' && (
+            <ThongBaoTable
+              loading={loading}
+              paginatedDocs={paginatedDocs}
+              filteredDocsCount={filteredDocs.length}
+              donViMap={donViMap}
+              isViewerHanChe={isViewerHanChe}
+              canEditOrDeleteDocument={canEditOrDeleteDocument}
+              handleQuickUpdateStatus={handleQuickUpdateStatus}
+              openModal={openModal}
+              handleDeleteClick={handleDeleteClick}
+              setViewData={setViewData}
+              setIsViewModalOpen={setIsViewModalOpen}
+              phanLoai="Thông báo BĐH"
             />
           )}
 
@@ -1476,6 +1499,7 @@ Anh/chị vui lòng gửi file scan đầy đủ chữ ký và mộc để phụ
                       <label className="block text-[11px] font-bold text-[#05469B] mb-1">Phân loại *</label>
                       <select required name="phan_loai" value={formData.phan_loai || 'Thông báo'} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-bold text-gray-800">
                         <option value="Thông báo">Thông báo</option>
+                        <option value="Thông báo BĐH">Thông báo BĐH</option>
                         <option value="Quyết định">Quyết định</option>
                         <option value="Tờ trình">Tờ trình</option>
                         <option value="Công văn đến">Công văn đến</option>
@@ -1497,7 +1521,7 @@ Anh/chị vui lòng gửi file scan đầy đủ chữ ký và mộc để phụ
                           Số tự động
                         </label>
                       </div>
-                      <input type="text" required name="so_hieu" value={formData.so_hieu || ''} onChange={handleInputChange} className={`w-full p-2.5 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-[#05469B] font-black tracking-wider ${isAutoNumber ? 'bg-gray-100 text-gray-500 cursor-not-allowed border-gray-300' : 'bg-[#FFFFF0] text-gray-800'}`} placeholder={isAutoNumber ? "Hệ thống tự động cấp..." : "VD: 123/TB-THaco..."} readOnly={isAutoNumber} />
+                      <input type="text" required name="so_hieu" value={formData.so_hieu || ''} onChange={handleInputChange} className={`w-full p-2.5 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-[#05469B] font-black tracking-wider ${isAutoNumber ? 'bg-gray-100 text-gray-500 cursor-not-allowed border-gray-300' : 'bg-[#FFFFF0] text-gray-800'}`} placeholder={isAutoNumber ? "Hệ thống tự động cấp..." : "VD: 123/202../TB-THACO AUTO"} readOnly={isAutoNumber} />
                     </div>
                     <div className="md:col-span-2 min-w-0">
                       <label className="block text-[11px] font-bold text-gray-700 mb-1">Ngày ban hành *</label>
@@ -1527,7 +1551,7 @@ Anh/chị vui lòng gửi file scan đầy đủ chữ ký và mộc để phụ
                 </div>
 
                 {/* KHỐI 2: THÔNG TIN LUÂN CHUYỂN (CHÀM) */}
-                {formData.phan_loai !== 'Thông báo' && (
+                {formData.phan_loai !== 'Thông báo' && formData.phan_loai !== 'Thông báo BĐH' && (
                   <div className="bg-white p-5 rounded-2xl border border-indigo-200 animate-in fade-in zoom-in duration-200">
                     <h4 className="font-bold text-indigo-800 mb-5 flex items-center gap-2 text-sm uppercase">
                       <div className="w-1.5 md:w-2 h-5 md:h-6 bg-indigo-600 rounded-full"></div> 2. Thông tin Luân chuyển
@@ -1791,7 +1815,7 @@ Anh/chị vui lòng gửi file scan đầy đủ chữ ký và mộc để phụ
                 </div>
               </div>
 
-              {viewData.phan_loai !== 'Thông báo' && (
+              {viewData.phan_loai !== 'Thông báo' && viewData.phan_loai !== 'Thông báo BĐH' && (
                 <div className="mb-6 md:mb-8 p-4 md:p-5 rounded-xl md:rounded-2xl border border-indigo-100 bg-indigo-50/50 shadow-sm">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className={`min-w-0 ${viewData.phan_loai === 'Công văn đến' ? 'md:col-span-2' : ''}`}>

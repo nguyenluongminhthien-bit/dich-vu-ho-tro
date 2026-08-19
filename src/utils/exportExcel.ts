@@ -35,6 +35,14 @@ const XML_STYLES = `
    <Alignment ss:Vertical="Top" ss:WrapText="1"/>
    <Font ss:FontName="Times New Roman" x:CharSet="163" x:Family="Roman" ss:Size="11"/>
   </Style>
+  <Style ss:ID="sTitle">
+   <Alignment ss:Horizontal="Center" ss:Vertical="Center"/>
+   <Font ss:FontName="Times New Roman" x:CharSet="163" x:Family="Roman" ss:Size="16" ss:Bold="1" ss:Color="#05469B"/>
+  </Style>
+  <Style ss:ID="sSubtitle">
+   <Alignment ss:Horizontal="Center" ss:Vertical="Center"/>
+   <Font ss:FontName="Times New Roman" x:CharSet="163" x:Family="Roman" ss:Size="11" ss:Italic="1"/>
+  </Style>
   <Style ss:ID="sHeader">
    <Alignment ss:Horizontal="Center" ss:Vertical="Center" ss:WrapText="1"/>
    <Font ss:FontName="Times New Roman" x:CharSet="163" x:Family="Roman" ss:Size="12" ss:Bold="1"/>
@@ -55,6 +63,24 @@ const XML_STYLES = `
     <Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1"/>
    </Borders>
   </Style>
+  <Style ss:ID="sDataCenter">
+   <Alignment ss:Horizontal="Center" ss:Vertical="Top" ss:WrapText="1"/>
+   <Borders>
+    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1"/>
+    <Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1"/>
+    <Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1"/>
+    <Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1"/>
+   </Borders>
+  </Style>
+  <Style ss:ID="sDataRight">
+   <Alignment ss:Horizontal="Right" ss:Vertical="Top" ss:WrapText="1"/>
+   <Borders>
+    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1"/>
+    <Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1"/>
+    <Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1"/>
+    <Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1"/>
+   </Borders>
+  </Style>
   <Style ss:ID="sBold">
    <Alignment ss:Vertical="Top" ss:WrapText="1"/>
    <Font ss:FontName="Times New Roman" x:CharSet="163" x:Family="Roman" ss:Bold="1"/>
@@ -64,6 +90,14 @@ const XML_STYLES = `
     <Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1"/>
     <Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1"/>
    </Borders>
+  </Style>
+  <Style ss:ID="sBoldNoBorder">
+   <Alignment ss:Vertical="Center" ss:WrapText="1"/>
+   <Font ss:FontName="Times New Roman" x:CharSet="163" x:Family="Roman" ss:Bold="1"/>
+  </Style>
+  <Style ss:ID="sMetaValue">
+   <Alignment ss:Vertical="Center" ss:WrapText="1"/>
+   <Font ss:FontName="Times New Roman" x:CharSet="163" x:Family="Roman"/>
   </Style>
  </Styles>
 `;
@@ -191,3 +225,178 @@ ${XML_STYLES}`;
 // 🟢 MODULE 2: (CHUẨN BỊ CHO TƯƠNG LAI) XUẤT BÁO CÁO PCCC
 // ============================================================================
 // export const exportPcccReport = (...) => { ... }
+
+// ============================================================================
+// 🟢 MODULE 3: XUẤT NHẬT KÝ SỬ DỤNG XE
+// ============================================================================
+const formatDate = (dateStr: string) => {
+  if (!dateStr) return '';
+  const parts = dateStr.split('-');
+  if (parts.length === 3) {
+    return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  }
+  return dateStr;
+};
+
+export const exportVehicleSchedule = (
+  nhatKyList: any[],
+  xeData: any[],
+  dateStart: string,
+  dateEnd: string,
+  platesToExport: string[]
+) => {
+  const sanitizeSheetName = getSanitizeSheetName();
+
+  let xmlContent = `<?xml version="1.0" encoding="utf-8"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:o="urn:schemas-microsoft-com:office:office"
+ xmlns:x="urn:schemas-microsoft-com:office:excel"
+ xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:html="http://www.w3.org/TR/REC-html40">
+${XML_STYLES}`;
+
+  const groups: Record<string, any[]> = {};
+  
+  const targetPlates = platesToExport && platesToExport.length > 0
+    ? platesToExport
+    : [...new Set(nhatKyList.map(item => item.bien_so).filter(Boolean))];
+
+  targetPlates.forEach(plate => {
+    const logs = nhatKyList.filter(item => item.bien_so === plate);
+    groups[plate] = logs;
+  });
+
+  const plates = Object.keys(groups);
+
+  if (plates.length === 0) {
+    const sName = escapeXML(sanitizeSheetName("Nhat ky"));
+    xmlContent += `
+ <Worksheet ss:Name="${sName}">
+  <Table x:FullColumns="1" x:FullRows="1" ss:DefaultColumnWidth="60">
+   <Column ss:Width="250"/>
+   <Row ss:Height="30">
+    <Cell ss:MergeAcross="8" ss:StyleID="sTitle"><Data ss:Type="String">NHẬT KÝ SỬ DỤNG XE</Data></Cell>
+   </Row>
+   <Row>
+    <Cell ss:MergeAcross="8" ss:StyleID="sSubtitle"><Data ss:Type="String">Không có dữ liệu trong khoảng thời gian được chọn</Data></Cell>
+   </Row>
+  </Table>
+ </Worksheet>`;
+  } else {
+    plates.forEach(plate => {
+      const logs = groups[plate].sort((a, b) => {
+        const dateA = a.created_at || a.id || '';
+        const dateB = b.created_at || b.id || '';
+        return dateA.localeCompare(dateB);
+      });
+
+      const sName = escapeXML(sanitizeSheetName(plate));
+      const xe = xeData.find(x => x.bien_so === plate) || {};
+      const loaiXeText = xe.hieu_xe 
+        ? `${xe.hieu_xe} - ${xe.loai_xe}${xe.phien_ban ? ` (${xe.phien_ban})` : ''}`
+        : '---';
+
+      const kmDau = logs.length > 0 && logs[0].so_km_di ? Number(logs[0].so_km_di) : 0;
+      
+      let kmCuoi = kmDau;
+      if (logs.length > 0) {
+        const lastLog = logs[logs.length - 1];
+        kmCuoi = lastLog.so_km_ve ? Number(lastLog.so_km_ve) : (lastLog.so_km_di ? Number(lastLog.so_km_di) : kmDau);
+      }
+      
+      const tongKmMonth = kmCuoi >= kmDau ? kmCuoi - kmDau : 0;
+
+      xmlContent += `
+ <Worksheet ss:Name="${sName}">
+  <Table x:FullColumns="1" x:FullRows="1" ss:DefaultColumnWidth="60">
+   <Column ss:Width="40"/>
+   <Column ss:Width="160"/>
+   <Column ss:Width="100"/>
+   <Column ss:Width="130"/>
+   <Column ss:Width="180"/>
+   <Column ss:Width="180"/>
+   <Column ss:Width="80"/>
+   <Column ss:Width="80"/>
+   <Column ss:Width="100"/>
+
+   <Row ss:Height="30">
+    <Cell ss:MergeAcross="8" ss:StyleID="sTitle"><Data ss:Type="String">NHẬT KÝ SỬ DỤNG XE</Data></Cell>
+   </Row>
+   <Row ss:Height="22">
+    <Cell ss:MergeAcross="8" ss:StyleID="sSubtitle"><Data ss:Type="String">Từ ngày ${dateStart ? formatDate(dateStart) : '...'} đến ngày ${dateEnd ? formatDate(dateEnd) : '...'}</Data></Cell>
+   </Row>
+   <Row ss:Height="18">
+    <Cell ss:MergeAcross="2" ss:StyleID="sBoldNoBorder"><Data ss:Type="String">Loại xe:</Data></Cell>
+    <Cell ss:MergeAcross="5" ss:StyleID="sMetaValue"><Data ss:Type="String">${escapeXML(loaiXeText)}</Data></Cell>
+   </Row>
+   <Row ss:Height="18">
+    <Cell ss:MergeAcross="2" ss:StyleID="sBoldNoBorder"><Data ss:Type="String">Biển kiểm soát:</Data></Cell>
+    <Cell ss:MergeAcross="5" ss:StyleID="sMetaValue"><Data ss:Type="String">${escapeXML(plate)}</Data></Cell>
+   </Row>
+   <Row ss:Height="18">
+    <Cell ss:MergeAcross="2" ss:StyleID="sBoldNoBorder"><Data ss:Type="String">Số Km đầu khoảng:</Data></Cell>
+    <Cell ss:MergeAcross="5" ss:StyleID="sMetaValue"><Data ss:Type="Number">${kmDau}</Data></Cell>
+   </Row>
+   <Row ss:Height="18">
+    <Cell ss:MergeAcross="2" ss:StyleID="sBoldNoBorder"><Data ss:Type="String">Số Km cuối khoảng:</Data></Cell>
+    <Cell ss:MergeAcross="5" ss:StyleID="sMetaValue"><Data ss:Type="Number">${kmCuoi}</Data></Cell>
+   </Row>
+   <Row ss:Height="18">
+    <Cell ss:MergeAcross="2" ss:StyleID="sBoldNoBorder"><Data ss:Type="String">Tổng số km đi trong khoảng:</Data></Cell>
+    <Cell ss:MergeAcross="5" ss:StyleID="sMetaValue"><Data ss:Type="Number">${tongKmMonth}</Data></Cell>
+   </Row>
+   <Row ss:Height="15"/>
+
+   <Row ss:Height="25">
+    <Cell ss:StyleID="sHeader"><Data ss:Type="String">Stt</Data></Cell>
+    <Cell ss:StyleID="sHeader"><Data ss:Type="String">Giờ, Ngày/tháng/năm</Data></Cell>
+    <Cell ss:StyleID="sHeader"><Data ss:Type="String">Biển kiểm soát xe</Data></Cell>
+    <Cell ss:StyleID="sHeader"><Data ss:Type="String">Mục đích sử dụng</Data></Cell>
+    <Cell ss:StyleID="sHeader"><Data ss:Type="String">Nơi đi</Data></Cell>
+    <Cell ss:StyleID="sHeader"><Data ss:Type="String">Nơi đến</Data></Cell>
+    <Cell ss:StyleID="sHeader"><Data ss:Type="String">Km lúc đi</Data></Cell>
+    <Cell ss:StyleID="sHeader"><Data ss:Type="String">Km lúc về</Data></Cell>
+    <Cell ss:StyleID="sHeader"><Data ss:Type="String">Tổng số Km hành trình</Data></Cell>
+   </Row>`;
+
+      logs.forEach((log, index) => {
+        const rowKmDi = log.so_km_di ? Number(log.so_km_di) : '';
+        const rowKmVe = log.so_km_ve ? Number(log.so_km_ve) : '';
+        const rowTongKm = log.tong_km ? Number(log.tong_km) : '';
+
+        xmlContent += `
+   <Row ss:AutoFitHeight="1">
+    <Cell ss:StyleID="sDataCenter"><Data ss:Type="Number">${index + 1}</Data></Cell>
+    <Cell ss:StyleID="sData"><Data ss:Type="String">${escapeXML(log.thoi_gian_su_dung || '')}</Data></Cell>
+    <Cell ss:StyleID="sDataCenter"><Data ss:Type="String">${escapeXML(log.bien_so || '')}</Data></Cell>
+    <Cell ss:StyleID="sData"><Data ss:Type="String">${escapeXML(log.muc_dich_su_dung || '')}</Data></Cell>
+    <Cell ss:StyleID="sData"><Data ss:Type="String">${escapeXML(log.noi_di || '')}</Data></Cell>
+    <Cell ss:StyleID="sData"><Data ss:Type="String">${escapeXML(log.noi_den || '')}</Data></Cell>
+    <Cell ss:StyleID="sDataRight">${rowKmDi !== '' ? `<Data ss:Type="Number">${rowKmDi}</Data>` : '<Data ss:Type="String"></Data>'}</Cell>
+    <Cell ss:StyleID="sDataRight">${rowKmVe !== '' ? `<Data ss:Type="Number">${rowKmVe}</Data>` : '<Data ss:Type="String"></Data>'}</Cell>
+    <Cell ss:StyleID="sDataRight">${rowTongKm !== '' ? `<Data ss:Type="Number">${rowTongKm}</Data>` : '<Data ss:Type="String"></Data>'}</Cell>
+   </Row>`;
+      });
+
+      xmlContent += `
+  </Table>
+ </Worksheet>`;
+    });
+  }
+
+  xmlContent += `</Workbook>`;
+
+  const blob = new Blob(['\uFEFF' + xmlContent], { type: 'application/vnd.ms-excel;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.setAttribute("href", url);
+  
+  const dateSuffix = new Date().toISOString().slice(0, 10);
+  link.setAttribute("download", `NhatKy_SuDungXe_${dateSuffix}.xls`);
+  
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+};

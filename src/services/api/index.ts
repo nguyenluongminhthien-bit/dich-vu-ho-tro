@@ -28,7 +28,8 @@ import {
   getHocVienKhoaHuanLuyen,
   getChuKyATVSLD,
   getThietBiNghiemNgat,
-  getKiemDinhTBNN
+  getKiemDinhTBNN,
+  getNhatKySuDungXe
 } from './modules';
 
 export const apiService = {
@@ -62,5 +63,6 @@ export const apiService = {
   getHocVienKhoaHuanLuyen,
   getChuKyATVSLD,
   getThietBiNghiemNgat,
-  getKiemDinhTBNN
+  getKiemDinhTBNN,
+  getNhatKySuDungXe
 };

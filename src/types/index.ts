@@ -1,6 +1,6 @@
 export interface User {
   id: string; // Khóa chính (thay cho ID_User)
-  user_name: string; 
+  user_name: string;
   password?: string;
   ho_ten: string;
   id_don_vi: string;
@@ -166,9 +166,9 @@ export interface TS_Xe {
   id_don_vi: string;
   muc_dich_su_dung: string;
   ma_tai_san: string;
-  don_vi_so_huu: string;
+  don_vi_chu_so_huu?: string;
   nguyen_gia: string | number;
-  khau_hao_thue: string | number;
+  khau_hao_thue?: string | number;
   bien_so: string;
   loai_phuong_tien: string;
   hieu_xe: string;
@@ -180,7 +180,7 @@ export interface TS_Xe {
   so_khung: string;
   so_may: string;
   so_cho: string | number;
-  nhien_lieu: string;
+  loai_nhien_lieu: string;
   dung_tich: string;
   cong_thuc_banh: string;
   hinh_thuc_so_huu: string;
@@ -537,6 +537,24 @@ export interface KiemDinhTBNN {
   nguoi_ho_tro?: string;
   tinh_trang_ho_so_luu_tru?: string;
   ghi_chu?: string;
+  created_at?: string;
+  [key: string]: any;
+}
+
+export interface NK_SuDungXe {
+  id: string;
+  id_don_vi: string;
+  bien_so: string;
+  nguoi_de_xuat?: string;
+  lai_xe?: string;
+  muc_dich_su_dung?: string;
+  thoi_gian_su_dung?: string;
+  noi_di?: string;
+  noi_den?: string;
+  so_km_di?: number;
+  so_km_ve?: number;
+  tong_km?: number;
+  file_name?: string;
   created_at?: string;
   [key: string]: any;
 }

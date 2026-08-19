@@ -10,4 +10,5 @@ export interface DocumentTableProps {
   handleDeleteClick: (id: string) => void;
   setViewData: (item: any) => void;
   setIsViewModalOpen: (open: boolean) => void;
+  phanLoai?: string;
 }

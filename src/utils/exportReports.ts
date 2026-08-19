@@ -174,7 +174,7 @@ ${XML_STYLES}`;
     // Hàm xác định loại văn bản/sheet theo phan_loai hoặc mã nhận biết (CVĐ / CV)
     const getDocumentSheetType = (item: any): string => {
       const pl = String(item.phan_loai || '').trim();
-      if (pl === 'Quyết định' || pl === 'Thông báo' || pl === 'Tờ trình' || pl === 'Công văn đến' || pl === 'Công văn đi') {
+      if (pl === 'Quyết định' || pl === 'Thông báo' || pl === 'Thông báo BĐH' || pl === 'Tờ trình' || pl === 'Công văn đến' || pl === 'Công văn đi') {
         return pl;
       }
       const soHieu = String(item.so_hieu || '').toUpperCase();
@@ -187,9 +187,9 @@ ${XML_STYLES}`;
       return pl || 'Công văn đi';
     };
 
-    // 1. Phân chia ra các sheet theo loại văn bản (Quyết định, Thông báo, Tờ trình, Công văn đến, Công văn đi...)
+    // 1. Phân chia ra các sheet theo loại văn bản (Quyết định, Thông báo, Thông báo BĐH, Tờ trình, Công văn đến, Công văn đi...)
     const foundTypes = Array.from(new Set(data.map(item => getDocumentSheetType(item)))).filter(Boolean);
-    const standardTypes = ['Quyết định', 'Thông báo', 'Tờ trình', 'Công văn đến', 'Công văn đi'];
+    const standardTypes = ['Quyết định', 'Thông báo', 'Thông báo BĐH', 'Tờ trình', 'Công văn đến', 'Công văn đi'];
     const types = foundTypes.length > 0 ? foundTypes : standardTypes;
     
     types.forEach(type => {
@@ -212,6 +212,7 @@ ${XML_STYLES}`;
       const deptData = data.filter(item => (item.bo_phan_lay_so || 'Không xác định') === deptName);
       const qdCount = deptData.filter(item => getDocumentSheetType(item) === 'Quyết định').length;
       const tbCount = deptData.filter(item => getDocumentSheetType(item) === 'Thông báo').length;
+      const tbBdhCount = deptData.filter(item => getDocumentSheetType(item) === 'Thông báo BĐH').length;
       const ttCount = deptData.filter(item => getDocumentSheetType(item) === 'Tờ trình').length;
       const cvdCount = deptData.filter(item => getDocumentSheetType(item) === 'Công văn đến').length;
       const cvDiCount = deptData.filter(item => getDocumentSheetType(item) === 'Công văn đi').length;
@@ -220,6 +221,7 @@ ${XML_STYLES}`;
         deptName,
         String(qdCount),
         String(tbCount),
+        String(tbBdhCount),
         String(ttCount),
         String(cvdCount),
         String(cvDiCount),
@@ -227,8 +229,8 @@ ${XML_STYLES}`;
       ]);
     });
 
-    const statHeaders = ['Bộ phận lấy số', 'Quyết định', 'Thông báo', 'Tờ trình', 'Công văn đến (CVĐ)', 'Công văn đi (CV)', 'Tổng cộng'];
-    const statWidths = [240, 120, 120, 120, 150, 150, 110];
+    const statHeaders = ['Bộ phận lấy số', 'Quyết định', 'Thông báo', 'Thông báo BĐH', 'Tờ trình', 'Công văn đến (CVĐ)', 'Công văn đi (CV)', 'Tổng cộng'];
+    const statWidths = [240, 120, 120, 150, 120, 150, 150, 110];
     xmlContent += renderTableXML('Thống kê Bộ phận', statHeaders, statWidths, deptRows, 'THỐNG KÊ SỐ LƯỢNG VĂN BẢN BAN HÀNH THEO BỘ PHẬN LẤY SỐ');
 
   } else if (template.id === 'system_donvi_structure') {

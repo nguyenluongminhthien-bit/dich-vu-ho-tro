@@ -132,7 +132,7 @@ export default function CustomReportBuilder({
     if (source === 'documents') {
       return [
         { key: 'id_don_vi', label: 'Chọn Đơn vị ban hành', type: 'unit' },
-        { key: 'phan_loai', label: 'Loại Văn bản', type: 'select', options: ['Thông báo', 'Quyết định', 'Tờ trình', 'Văn bản khác'] },
+        { key: 'phan_loai', label: 'Loại Văn bản', type: 'select', options: ['Thông báo', 'Thông báo BĐH', 'Quyết định', 'Tờ trình', 'Văn bản khác'] },
         { key: 'year', label: 'Năm Ban Hành', type: 'year' }
       ];
     }

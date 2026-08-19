@@ -18,7 +18,8 @@ export const ThongBaoTable: React.FC<DocumentTableProps> = ({
   openModal,
   handleDeleteClick,
   setViewData,
-  setIsViewModalOpen
+  setIsViewModalOpen,
+  phanLoai = 'Thông báo'
 }) => {
   return (
     <>
@@ -27,9 +28,9 @@ export const ThongBaoTable: React.FC<DocumentTableProps> = ({
         <table className="w-full text-left border-collapse min-w-[1100px]">
           <thead className="sticky top-0 bg-[#f8fafc] z-10 shadow-sm">
             <tr className="border-b border-gray-200 text-[11px] font-bold text-gray-600 uppercase tracking-wider">
-              <th className="py-3 px-3 w-36 bg-[#f8fafc]">Số thông báo</th>
+              <th className="py-3 px-3 w-36 bg-[#f8fafc]">Số {phanLoai}</th>
               <th className="py-3 px-3 w-[125px] bg-[#f8fafc]">Ngày Ban hành</th>
-              <th className="py-3 px-3 min-w-[250px] bg-[#f8fafc]">Tiêu đề & Nội dung Thông báo</th>
+              <th className="py-3 px-3 min-w-[250px] bg-[#f8fafc]">Tiêu đề & Nội dung {phanLoai}</th>
               <th className="py-3 px-3 w-44 bg-[#f8fafc]">Phạm vi áp dụng</th>
               <th className="py-3 px-3 w-40 bg-[#f8fafc]">Người ký</th>
               <th className="py-3 px-3 w-28 bg-[#f8fafc]">Hiệu lực</th>
@@ -48,7 +49,7 @@ export const ThongBaoTable: React.FC<DocumentTableProps> = ({
               <tr>
                 <td colSpan={7} className="p-16 text-center text-gray-500">
                   <FileText size={48} className="mx-auto text-gray-300 mb-4" />
-                  <p className="text-lg font-medium">Không tìm thấy thông báo nào phù hợp.</p>
+                  <p className="text-lg font-medium">Không tìm thấy {phanLoai.toLowerCase()} nào phù hợp.</p>
                 </td>
               </tr>
             ) : (
@@ -145,7 +146,7 @@ export const ThongBaoTable: React.FC<DocumentTableProps> = ({
         {loading ? (
           <div className="p-10 text-center"><Loader2 className="w-8 h-8 animate-spin mx-auto text-[#05469B] mb-2" /> Đang tải...</div>
         ) : filteredDocsCount === 0 ? (
-          <div className="p-10 text-center text-gray-500"><FileText size={48} className="mx-auto text-gray-300 mb-4" /> Không tìm thấy thông báo.</div>
+          <div className="p-10 text-center text-gray-500"><FileText size={48} className="mx-auto text-gray-300 mb-4" /> Không tìm thấy {phanLoai.toLowerCase()}.</div>
         ) : (
           paginatedDocs.map((item) => (
             <div 

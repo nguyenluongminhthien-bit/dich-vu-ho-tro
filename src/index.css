@@ -5,7 +5,8 @@
 /* =========================================================
    🌙 CHẾ ĐỘ BAN ĐÊM (DARK MODE) SANG TRỌNG & THÔNG MINH
    ========================================================= */
-html.dark-mode, body.dark-mode {
+html.dark-mode,
+body.dark-mode {
   background-color: #0b1329 !important;
   color: #f1f5f9 !important;
 }
@@ -151,10 +152,12 @@ html.dark-mode, body.dark-mode {
 .dark-mode::-webkit-scrollbar-track {
   background: #0f182c;
 }
+
 .dark-mode::-webkit-scrollbar-thumb {
   background: #334155;
   border-radius: 4px;
 }
+
 .dark-mode::-webkit-scrollbar-thumb:hover {
   background: #475569;
 }

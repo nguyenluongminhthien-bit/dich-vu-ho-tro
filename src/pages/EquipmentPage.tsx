@@ -19,6 +19,7 @@ import UnitFilterSidebar from '../components/ui/UnitFilterSidebar';
 import Pagination from '../components/ui/Pagination';
 import { useAllowedUnits } from '../hooks/useAllowedUnits';
 import CustomAutocomplete from '../components/ui/CustomAutocomplete';
+import SegmentTabs from '../components/ui/SegmentTabs';
 import { motion } from 'motion/react';
 // @ts-ignore
 import { QRCodeSVG } from 'qrcode.react';
@@ -139,6 +140,11 @@ export default function EquipmentPage() {
   const [nhansuData, setNhansuData] = useState<Personnel[]>([]);
   const [nccList, setNccList] = useState<NhaCungCap[]>([]);
   const [phapNhanList, setPhapNhanList] = useState<any[]>([]);
+
+  const equipmentTabs = useMemo(() => [
+    { id: 'list', label: 'Danh mục TTB/Tài sản', icon: <Package size={18} /> },
+    { id: 'report', label: 'Thống kê', icon: <BarChart3 size={18} /> }
+  ], []);
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -1602,49 +1608,15 @@ export default function EquipmentPage() {
 
           {/* HÀNG DƯỚI: TAB BAR */}
           <div className={`mb-4 transition-all duration-300 ${isListCollapsed ? 'md:pl-10' : ''}`}>
-            <nav className="flex bg-gray-100/80 dark:bg-slate-800 p-1 rounded-xl border border-gray-200/50 dark:border-slate-700/50 relative space-x-1 w-fit" aria-label="Tabs">
-              <button
-                type="button"
-                onClick={() => setActiveMainTab('list')}
-                className={`relative flex items-center gap-1.5 px-4 py-2 text-xs sm:text-sm font-bold rounded-lg transition-colors duration-200 cursor-pointer ${
-                  activeMainTab === 'list' ? 'text-white' : 'text-gray-500 hover:text-[#005698]'
-                }`}
-              >
-                <span className="relative z-10 flex items-center gap-1.5">
-                  <Package size={14} />
-                  Danh mục TTB/Tài sản
-                </span>
-                {activeMainTab === 'list' && (
-                  <motion.div
-                    layoutId="equipmentActiveBg"
-                    className="absolute inset-0 rounded-lg bg-[#005698] z-0"
-                    transition={{ type: 'spring', duration: 0.35, bounce: 0.05 }}
-                  />
-                )}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setActiveMainTab('report');
-                  setDrillDownValue(null);
-                }}
-                className={`relative flex items-center gap-1.5 px-4 py-2 text-xs sm:text-sm font-bold rounded-lg transition-colors duration-200 cursor-pointer ${
-                  activeMainTab === 'report' ? 'text-white' : 'text-gray-500 hover:text-[#005698]'
-                }`}
-              >
-                <span className="relative z-10 flex items-center gap-1.5">
-                  <BarChart3 size={14} />
-                  Thống kê
-                </span>
-                {activeMainTab === 'report' && (
-                  <motion.div
-                    layoutId="equipmentActiveBg"
-                    className="absolute inset-0 rounded-lg bg-[#005698] z-0"
-                    transition={{ type: 'spring', duration: 0.35, bounce: 0.05 }}
-                  />
-                )}
-              </button>
-            </nav>
+            <SegmentTabs
+              tabs={equipmentTabs}
+              activeTab={activeMainTab}
+              onChange={(id) => {
+                setActiveMainTab(id as any);
+                if (id === 'report') setDrillDownValue(null);
+              }}
+              layoutId="equipmentActiveBg"
+            />
           </div>
 
           {error && <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-500 text-red-700 flex items-start gap-3 rounded-r-lg shadow-sm"><AlertCircle className="w-5 h-5 shrink-0 mt-0.5" /><p>{error}</p></div>}

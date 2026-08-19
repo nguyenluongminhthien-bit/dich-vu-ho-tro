@@ -210,7 +210,7 @@ export const REPORT_TEMPLATES: ReportTemplate[] = [
     filters: [
       { key: 'year', label: 'Năm Ban Hành', type: 'year_multi' },
       { key: 'id_don_vi', label: 'Chọn Đơn vị ban hành', type: 'unit_multi' },
-      { key: 'phan_loai', label: 'Loại Văn bản', type: 'multiselect', options: ['Thông báo', 'Quyết định', 'Tờ trình', 'Công văn đến', 'Công văn đi'] },
+      { key: 'phan_loai', label: 'Loại Văn bản', type: 'multiselect', options: ['Thông báo', 'Thông báo BĐH', 'Quyết định', 'Tờ trình', 'Công văn đến', 'Công văn đi'] },
       { key: 'bo_phan_lay_so', label: 'Bộ phận lấy số (Nhiều mục)', type: 'multiselect', options: [] }
     ]
   },

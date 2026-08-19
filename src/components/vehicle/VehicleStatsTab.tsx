@@ -24,11 +24,23 @@ const calcTotalCost = (costs: any[]) =>
 const PURPOSE_COLORS: Record<string, string> = {
   "Xe công": "#3b82f6",
   "Xe lái thử": "#8b5cf6",
+  "Xe Chuyên dụng": "#10b981",
+  "Xe cho thuê": "#06b6d4",
   "Xe thay thế cho KH": "#f59e0b",
   "Xe sửa chữa lưu động": "#f97316",
 };
 const getPurposeColor = (p: string) =>
   PURPOSE_COLORS[p] || "#9ca3af";
+
+const STATUS_COLORS: Record<string, string> = {
+  "Đang hoạt động": "#10b981",
+  "Sửa chữa": "#f59e0b",
+  "Ngưng hoạt động": "#ef4444",
+  "Đã Thanh lý": "#9ca3af",
+  "Chuyển KD xe QSD": "#6366f1",
+};
+const getStatusColor = (s: string) =>
+  STATUS_COLORS[s] || "#9ca3af";
 
 const getBrandColor = (brandStr: string = '') => {
   const b = brandStr.trim().toLowerCase();
@@ -65,6 +77,7 @@ interface Props {
   chiPhiData: any[];
   donViMap: Record<string, string>;
   onViewCar: (car: TS_Xe & any) => void;
+  nhatKyData: any[];
 }
 
 // ─── LEGAL CARD COLOR ────────────────────────────────────────────────────────
@@ -75,7 +88,7 @@ const legalCardCls = (s: { expired: number; warning: number }) => {
 };
 
 // ─── MAIN ────────────────────────────────────────────────────────────────────
-export default function VehicleStatsTab({ filteredCars, chiPhiData, donViMap, onViewCar }: Props) {
+export default function VehicleStatsTab({ filteredCars, chiPhiData, donViMap, onViewCar, nhatKyData }: Props) {
   // Chi phi lien quan
   const relevantCosts = useMemo(() => {
     const ids = new Set(filteredCars.map((x) => x.id));
@@ -85,7 +98,7 @@ export default function VehicleStatsTab({ filteredCars, chiPhiData, donViMap, on
   // KPI
   const kpi = useMemo(() => {
     const total = filteredCars.length;
-    const active = filteredCars.filter((x) => x.hien_trang === "Dang hoat dong").length;
+    const active = filteredCars.filter((x) => x.hien_trang === "Đang hoạt động").length;
     const totalCost = calcTotalCost(relevantCosts);
     const today = new Date(); today.setHours(0, 0, 0, 0);
     let expiring = 0;
@@ -110,6 +123,13 @@ export default function VehicleStatsTab({ filteredCars, chiPhiData, donViMap, on
   const purposeStats = useMemo(() => {
     const map: Record<string, number> = {};
     filteredCars.forEach((x) => { const p = x.muc_dich_su_dung || "Khac"; map[p] = (map[p] || 0) + 1; });
+    return Object.entries(map).sort((a, b) => b[1] - a[1]);
+  }, [filteredCars]);
+
+  // Hien trang
+  const statusStats = useMemo(() => {
+    const map: Record<string, number> = {};
+    filteredCars.forEach((x) => { const s = x.hien_trang || "Khác"; map[s] = (map[s] || 0) + 1; });
     return Object.entries(map).sort((a, b) => b[1] - a[1]);
   }, [filteredCars]);
 
@@ -159,14 +179,15 @@ export default function VehicleStatsTab({ filteredCars, chiPhiData, donViMap, on
     return { rows, maxTotal };
   }, [relevantCosts]);
 
-  // Top 10
+  // Top 10 xe di chuyển nhiều nhất theo Km
   const top10 = useMemo(() =>
     filteredCars.map((car) => {
-      const costs = relevantCosts.filter((cp) => getCostCarId(cp) === car.id);
-      const total = calcTotalCost(costs); const months = costs.length;
-      return { car, total, months, avg: months > 0 ? total / months : 0 };
+      const logs = nhatKyData.filter((log) => log.bien_so === car.bien_so);
+      const total = logs.reduce((sum, log) => sum + (Number(log.tong_km) || 0), 0);
+      const trips = logs.length;
+      return { car, total, trips, avg: trips > 0 ? total / trips : 0 };
     }).sort((a, b) => b.total - a.total).slice(0, 10),
-    [filteredCars, relevantCosts]
+    [filteredCars, nhatKyData]
   );
 
   // Phap ly
@@ -196,6 +217,19 @@ export default function VehicleStatsTab({ filteredCars, chiPhiData, donViMap, on
     });
   }, [purposeStats, totalForDonut]);
 
+  // Status Donut slices
+  const totalForStatusDonut = statusStats.reduce((s, [, v]) => s + v, 0) || 1;
+  const statusDonutSlices = useMemo(() => {
+    let offset = 0;
+    return statusStats.map(([label, count]) => {
+      const pct = count / totalForStatusDonut;
+      const dash = pct * 251.2;
+      const slice = { label, count, pct, dash, offset };
+      offset += dash;
+      return slice;
+    });
+  }, [statusStats, totalForStatusDonut]);
+
   const maxBrand = brandStats[0]?.[1] || 1;
   const maxYear = yearStats[0]?.[1] || 1;
 
@@ -223,8 +257,8 @@ export default function VehicleStatsTab({ filteredCars, chiPhiData, donViMap, on
         ))}
       </div>
 
-      {/* HANG / MUC DICH / NAM SX */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* HANG / MUC DICH / HIEN TRANG / NAM SX */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
           <h4 className="font-bold text-gray-800 mb-4 flex items-center gap-2 text-sm"><Car size={16} className="text-[#05469B]" /> Phân loại Hãng xe</h4>
           {brandStats.length === 0 ? <p className="text-gray-400 text-sm text-center py-6">Chua co du lieu</p> : (
@@ -262,6 +296,35 @@ export default function VehicleStatsTab({ filteredCars, chiPhiData, donViMap, on
                 {donutSlices.map((s, i) => (
                   <div key={i} className="flex items-center gap-2">
                     <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: getPurposeColor(s.label) }} />
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-bold text-gray-600 truncate">{s.label}</p>
+                      <p className="text-[10px] text-gray-400">{s.count} xe - {(s.pct * 100).toFixed(0)}%</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm flex flex-col">
+          <h4 className="font-bold text-gray-800 mb-4 flex items-center gap-2 text-sm"><BarChart3 size={16} className="text-emerald-500" /> Hiện trạng xe</h4>
+          {statusStats.length === 0 ? <p className="text-gray-400 text-sm text-center py-6">Chưa có dữ liệu</p> : (
+            <div className="flex items-center gap-4 flex-1">
+              <svg viewBox="0 0 100 100" className="w-24 h-24 shrink-0 -rotate-90">
+                {statusDonutSlices.map((s, i) => (
+                  <circle key={i} cx="50" cy="50" r="40" fill="none"
+                    stroke={getStatusColor(s.label)} strokeWidth="18"
+                    strokeDasharray={`${s.dash} ${251.2 - s.dash}`}
+                    strokeDashoffset={-s.offset}
+                  />
+                ))}
+                <circle cx="50" cy="50" r="31" fill="white" />
+              </svg>
+              <div className="space-y-2 flex-1 min-w-0">
+                {statusDonutSlices.map((s, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: getStatusColor(s.label) }} />
                     <div className="min-w-0">
                       <p className="text-[10px] font-bold text-gray-600 truncate">{s.label}</p>
                       <p className="text-[10px] text-gray-400">{s.count} xe - {(s.pct * 100).toFixed(0)}%</p>
@@ -337,14 +400,14 @@ export default function VehicleStatsTab({ filteredCars, chiPhiData, donViMap, on
         )}
       </div>
 
-      {/* TOP 10 XE CHI PHI CAO */}
+      {/* TOP 10 XE DI CHUYỂN NHIỀU NHẤT */}
       <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
         <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-2">
-          <Receipt size={16} className="text-rose-500" />
-          <h4 className="font-bold text-gray-800 text-sm">TÓP 10 XE CHI PHÍ CAO NHẤT</h4>
+          <TrendingUp size={16} className="text-emerald-500" />
+          <h4 className="font-bold text-gray-800 text-sm">TOP 10 XE CÓ TỔNG SỐ KM DI CHUYỂN NHIỀU NHẤT</h4>
         </div>
         {top10.length === 0 ? (
-          <p className="text-gray-400 text-sm text-center py-8">Chưa có dữ liệu chi phí</p>
+          <p className="text-gray-400 text-sm text-center py-8">Chưa có dữ liệu hành trình</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-[12px]">
@@ -354,14 +417,14 @@ export default function VehicleStatsTab({ filteredCars, chiPhiData, donViMap, on
                   <th className="py-2.5 px-4">Bien so</th>
                   <th className="py-2.5 px-4">Hang - Loai xe</th>
                   <th className="py-2.5 px-4 hidden md:table-cell">Don vi</th>
-                  <th className="py-2.5 px-4 text-right">Tong CP</th>
-                  <th className="py-2.5 px-4 text-right hidden sm:table-cell">Thang</th>
-                  <th className="py-2.5 px-4 text-right hidden md:table-cell">TB/thang</th>
+                  <th className="py-2.5 px-4 text-right">Tong Km</th>
+                  <th className="py-2.5 px-4 text-right hidden sm:table-cell">Luot di</th>
+                  <th className="py-2.5 px-4 text-right hidden md:table-cell">TB/luot</th>
                   <th className="py-2.5 px-2 w-14"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {top10.map(({ car, total, months, avg }, i) => (
+                {top10.map(({ car, total, trips, avg }, i) => (
                   <tr key={car.id} className="hover:bg-gray-50 transition-colors">
                     <td className="py-2.5 px-4 font-bold text-gray-400">{i + 1}</td>
                     <td className="py-2.5 px-4 font-black text-[#05469B] whitespace-nowrap">{car.bien_so}</td>
@@ -370,9 +433,9 @@ export default function VehicleStatsTab({ filteredCars, chiPhiData, donViMap, on
                       <p className="text-[11px] text-gray-400">{car.loai_xe || ""}</p>
                     </td>
                     <td className="py-2.5 px-4 text-gray-600 hidden md:table-cell truncate max-w-[160px]">{donViMap[car.id_don_vi] || car.id_don_vi}</td>
-                    <td className="py-2.5 px-4 text-right font-black text-rose-600 whitespace-nowrap">{formatCurrency(total)} d</td>
-                    <td className="py-2.5 px-4 text-right text-gray-600 hidden sm:table-cell">{months}</td>
-                    <td className="py-2.5 px-4 text-right text-gray-500 hidden md:table-cell">{formatCurrency(avg)} d</td>
+                    <td className="py-2.5 px-4 text-right font-black text-emerald-600 whitespace-nowrap">{formatCurrency(total)} km</td>
+                    <td className="py-2.5 px-4 text-right text-gray-600 hidden sm:table-cell">{trips}</td>
+                    <td className="py-2.5 px-4 text-right text-gray-500 hidden md:table-cell">{avg.toFixed(1)} km</td>
                     <td className="py-2.5 px-2 text-center">
                       <button onClick={() => onViewCar(car)} className="px-2 py-1 bg-blue-50 text-blue-600 border border-blue-100 hover:bg-blue-100 rounded text-[10px] font-bold transition-colors">Xem</button>
                     </td>

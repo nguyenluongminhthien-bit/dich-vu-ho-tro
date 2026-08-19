@@ -3,12 +3,13 @@ import { createPortal } from 'react-dom';
 import {
   Search, Plus, Edit, Trash2, X, AlertCircle, Loader2, Save,
   Car, Building2, MapPin, ChevronDown, ChevronRight, ChevronLeft, PanelLeftClose, PanelLeftOpen,
-  Receipt, Calendar, Info, Eye, BarChart3, Briefcase, AlertTriangle, ShieldCheck
+  Receipt, Calendar, Info, Eye, BarChart3, Briefcase, AlertTriangle, ShieldCheck, FileSpreadsheet
 } from 'lucide-react';
 import { apiService } from '../services/api';
+import { exportVehicleSchedule } from '../utils/exportExcel';
 import { DonVi, TS_Xe, CP_HoatDongXe } from '../types';
 import { useAuth } from '../contexts/AuthContext';
-import { buildHierarchicalOptions, getUnitEmoji, sortDonViByThuTu, groupParentUnits, getDefaultUnitId } from '../utils/hierarchy';
+import { buildHierarchicalOptions, getUnitEmoji, sortDonViByThuTu, groupParentUnits, getDefaultUnitId, getAllSubordinateIds } from '../utils/hierarchy';
 import { toast } from '../utils/toast';
 import { PageWithFilterSkeleton } from '../components/SkeletonLoader';
 import { formatCurrencySpace as formatCurrency, stripAccents } from '../utils/formatters';
@@ -17,8 +18,10 @@ import UnitFilterSidebar from '../components/ui/UnitFilterSidebar';
 import Pagination from '../components/ui/Pagination';
 import { useAllowedUnits } from '../hooks/useAllowedUnits';
 import VehicleStatsTab from '../components/vehicle/VehicleStatsTab';
-import LineTabs from '../components/ui/LineTabs';
+import VehicleScheduleTab from '../components/vehicle/VehicleScheduleTab';
+import SegmentTabs from '../components/ui/SegmentTabs';
 import { motion } from 'motion/react';
+import PasteImportModal, { ColumnMapItem } from '../components/ui/PasteImportModal';
 
 // --- HÀM TỰ ĐỘNG DÒ TÌM ID TỪ SUPABASE ---
 const getCostId = (cp: any) => cp.id || cp.id_chi_phi_xe || '';
@@ -80,25 +83,59 @@ const getBrandBadgeStyle = (brandStr: string = '') => {
 // ─── DỮ LIỆU HÃNG XE & MODEL ──────────────────────────────────────────────
 // Cập nhật danh sách model tại đây khi cần
 const VEHICLE_MODELS: Record<string, string[]> = {
-  "THACO":       ["Ollin 350", "Ollin 500", "Ollin 700", "Ollin 720", "Towner 800", "Towner Van", "Frontier K200", "Frontier K250", "TL700", "Bus 29 chỗ"],
-  "KIA":         ["Morning", "Soluto", "Sonet", "Seltos", "Sportage", "Sedona", "Carnival", "Sorento", "Telluride", "K3", "K5", "EV6", "EV9", "Stonic", "Carens"],
-  "MAZDA":       ["Mazda2", "Mazda3", "Mazda6", "CX-3", "CX-30", "CX-5", "CX-8", "CX-60", "CX-90", "MX-5", "BT-50"],
-  "PEUGEOT":     ["208", "2008", "3008", "5008", "408", "508", "508 SW", "Rifter", "Partner", "Expert", "Traveller", "Boxer"],
-  "BMW":         ["118i", "218i", "320i", "330i", "520i", "530i", "730Li", "740Li", "X1", "X2", "X3", "X4", "X5", "X6", "X7", "M3", "M4", "M5", "iX", "i4"],
-  "BMW MOTORRAD":["R1250GS", "R1250R", "R1250RT", "S1000RR", "S1000R", "F900R", "F900XR", "G310R", "G310GS", "R18", "M1000RR"],
-  "JEEP":        ["Wrangler", "Wrangler Unlimited", "Gladiator", "Grand Cherokee", "Grand Cherokee L", "Compass", "Renegade", "Commander"],
-  "RAM":         ["1500", "2500", "3500", "ProMaster"],
-  "FUSO":        ["Canter 1.9T", "Canter 3.5T", "Canter 5T", "Canter 6.5T", "Canter 7T", "Fighter", "Super Great", "Rosa 16 chỗ", "Rosa 29 chỗ"],
+  "THACO": ["Ollin 350", "Ollin 500", "Ollin 700", "Ollin 720", "Towner 800", "Towner Van", "Frontier K200", "Frontier K250", "TL700", "Bus 29 chỗ"],
+  "KIA": ["Morning", "Soluto", "Sonet", "Seltos", "Sedona", "Sportage", "Carnival", "Sorento", "Telluride", "K3", "K5", "EV6", "EV9", "Stonic", "Carens"],
+  "MAZDA": ["Mazda2", "Mazda3", "Mazda6", "CX-3", "CX-30", "CX-5", "CX-8", "CX-60", "CX-90", "MX-5", "BT-50"],
+  "PEUGEOT": ["208", "2008", "3008", "5008", "408", "508", "508 SW", "Django", "Rifter", "Partner", "Expert", "Traveller", "Boxer"],
+  "BMW": ["118i", "218i", "320i", "330i", "520i", "530i", "730Li", "740Li", "X1", "X2", "X3", "X4", "X5", "X6", "X7", "M3", "M4", "M5", "iX", "i4"],
+  "BMW MOTORRAD": ["R1250GS", "R1250R", "R1250RT", "S1000RR", "S1000R", "F900R", "F900XR", "G310R", "G310GS", "R18", "M1000RR", "C400"],
+  "JEEP": ["Wrangler", "Wrangler Unlimited", "Gladiator", "Grand Cherokee", "Grand Cherokee L", "Compass", "Renegade", "Commander"],
+  "RAM": ["1500", "2500", "3500", "ProMaster"],
+  "FUSO": ["Canter 1.9T", "Canter 3.5T", "Canter 5T", "Canter 6.5T", "Canter 7T", "Fighter", "Super Great", "Rosa 16 chỗ", "Rosa 29 chỗ"],
 };
 
 // ─── MÀU SỬ NHÃN MỤC ĐÍCH Sử DỤNG ──────────────────────────────────────────────
 const getPurposeBadgeStyle = (purpose: string = '') => {
-  switch (purpose) {
-    case 'Xe công':              return 'bg-blue-50 text-blue-700 border border-blue-200';
-    case 'Xe lái thử':           return 'bg-violet-50 text-violet-700 border border-violet-200';
-    case 'Xe thay thế cho KH':   return 'bg-amber-50 text-amber-800 border border-amber-300';
-    case 'Xe sửa chữa lưu động': return 'bg-orange-50 text-orange-700 border border-orange-200';
-    default:                      return 'bg-gray-100 text-gray-600 border border-gray-200';
+  const p = purpose.toLowerCase();
+  if (p.includes('chuyên dụng') || p.includes('chuyen dung')) return 'bg-emerald-50 text-emerald-700 border border-emerald-200';
+  if (p.includes('cho thuê') || p.includes('cho thue')) return 'bg-cyan-50 text-cyan-700 border border-cyan-200';
+  if (p.includes('sửa chữa') || p.includes('sua chua')) return 'bg-orange-50 text-orange-700 border border-orange-200';
+  if (p.includes('sự kiện') || p.includes('su kien') || p.includes('roadshow')) return 'bg-rose-50 text-rose-700 border border-rose-200';
+  if (p.includes('công') || p.includes('cong')) return 'bg-blue-50 text-blue-700 border border-blue-200';
+  if (p.includes('lái thử') || p.includes('lai thu')) return 'bg-violet-50 text-violet-700 border border-violet-200';
+  if (p.includes('thay thế') || p.includes('thay the')) return 'bg-amber-50 text-amber-800 border border-amber-300';
+  return 'bg-gray-100 text-gray-600 border border-gray-200';
+};
+
+const getStatusBadgeStyle = (status: string = '') => {
+  const s = status.trim();
+  switch (s) {
+    case 'Đang hoạt động':
+      return 'bg-emerald-50 text-emerald-700 border border-emerald-200';
+    case 'Sửa chữa':
+      return 'bg-amber-50 text-amber-700 border border-amber-200';
+    case 'Ngưng hoạt động':
+    case 'Ngừng hoạt động':
+      return 'bg-red-50 text-red-700 border border-red-200';
+    case 'Đã Thanh lý':
+      return 'bg-gray-100 text-gray-600 border border-gray-200';
+    case 'Chuyển KD xe QSD':
+      return 'bg-indigo-50 text-indigo-700 border border-indigo-200';
+    default:
+      return 'bg-gray-50 text-gray-500 border border-gray-205';
+  }
+};
+
+const getStatusEmoji = (status: string = '') => {
+  const s = status.trim();
+  switch (s) {
+    case 'Đang hoạt động': return '🟢';
+    case 'Sửa chữa': return '🟡';
+    case 'Ngưng hoạt động':
+    case 'Ngừng hoạt động': return '🔴';
+    case 'Đã Thanh lý': return '⚫';
+    case 'Chuyển KD xe QSD': return '🔵';
+    default: return '⚪';
   }
 };
 
@@ -130,7 +167,7 @@ export default function VehiclePage() {
   const [isDismissed, setIsDismissed] = useState(false);
 
   // 🟢 STATE CHO TAB & BỘ LỌC NÂNG CAO
-  const [activeTab, setActiveTab] = useState<'list' | 'stats'>('list');
+  const [activeTab, setActiveTab] = useState<'list' | 'schedule' | 'stats'>('list');
   const [filterBrand, setFilterBrand] = useState('');
   const [filterModel, setFilterModel] = useState('');
   const [filterPurpose, setFilterPurpose] = useState('');
@@ -150,6 +187,22 @@ export default function VehiclePage() {
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [viewData, setViewData] = useState<TS_Xe & any | null>(null);
 
+  const [isAddDropdownOpen, setIsAddDropdownOpen] = useState(false);
+  const [isBulkImportOpen, setIsBulkImportOpen] = useState(false);
+  const [bulkImportMode, setBulkImportMode] = useState<'create' | 'update'>('create');
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsAddDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<{ id: string, type: 'xe' | 'chiphi' } | null>(null);
 
@@ -163,13 +216,15 @@ export default function VehiclePage() {
   const costFormData = costModal.formData;
   const setCostFormData = (d: any) => setCostModal(p => ({ ...p, formData: typeof d === 'function' ? d(p.formData) : d }));
 
+  const [nhatKyData, setNhatKyData] = useState<any[]>([]);
+
   const loadData = async () => {
     setLoading(true); setError(null);
     try {
-      const [dvResult, xeResult, cpResult] = await Promise.all([
-        apiService.getDonVi(), apiService.getXe(), apiService.getChiPhiXe()
+      const [dvResult, xeResult, cpResult, nkResult] = await Promise.all([
+        apiService.getDonVi(), apiService.getXe(), apiService.getChiPhiXe(), apiService.getNhatKySuDungXe()
       ]);
-      setDonViList(dvResult || []); setXeData(xeResult || []); setChiPhiData(cpResult || []);
+      setDonViList(dvResult || []); setXeData(xeResult || []); setChiPhiData(cpResult || []); setNhatKyData(nkResult || []);
     } catch (err: any) { setError(err.message || 'Lỗi tải dữ liệu.'); }
     finally { setLoading(false); }
   };
@@ -248,7 +303,7 @@ export default function VehiclePage() {
   const filteredCars = useMemo(() => {
     let result = xeData.filter(item => allowedDonViIds.includes(item.id_don_vi));
     if (selectedUnitFilter) {
-      const childUnitIds = donViList.filter(item => item.cap_quan_ly === selectedUnitFilter).map(c => c.id);
+      const childUnitIds = getAllSubordinateIds(selectedUnitFilter, donViList);
       const validIds = [selectedUnitFilter, ...childUnitIds];
       result = result.filter(item => validIds.includes(item.id_don_vi));
     }
@@ -257,19 +312,32 @@ export default function VehiclePage() {
       result = result.filter(item =>
         stripAccents(item.bien_so || '').includes(cleanSearch) ||
         stripAccents(item.hieu_xe || '').includes(cleanSearch) ||
-        stripAccents(item.loai_xe || '').includes(cleanSearch)
+        stripAccents(item.loai_xe || '').includes(cleanSearch) ||
+        stripAccents(item.so_khung || '').includes(cleanSearch) ||
+        stripAccents(item.so_may || '').includes(cleanSearch)
       );
     }
     // 🟢 Bộ lọc nâng cao
-    if (filterBrand)   result = result.filter((i: any) => i.hieu_xe === filterBrand);
-    if (filterModel)   result = result.filter((i: any) => i.loai_xe === filterModel);
+    if (filterBrand) result = result.filter((i: any) => i.hieu_xe === filterBrand);
+    if (filterModel) result = result.filter((i: any) => i.loai_xe === filterModel);
     if (filterPurpose) result = result.filter((i: any) => i.muc_dich_su_dung === filterPurpose);
-    if (filterStatus)  result = result.filter((i: any) => i.hien_trang === filterStatus);
+    if (filterStatus) result = result.filter((i: any) => i.hien_trang === filterStatus);
     return result;
   }, [xeData, carSearchTerm, selectedUnitFilter, allowedDonViIds, donViList, filterBrand, filterModel, filterPurpose, filterStatus]);
 
+  const unitCars = useMemo(() => {
+    let result = xeData.filter((x: any) => allowedDonViIds.includes(x.id_don_vi));
+    if (selectedUnitFilter) {
+      const childUnitIds = getAllSubordinateIds(selectedUnitFilter, donViList);
+      const validIds = [selectedUnitFilter, ...childUnitIds];
+      result = result.filter((item: any) => validIds.includes(item.id_don_vi));
+    }
+    return result;
+  }, [xeData, selectedUnitFilter, allowedDonViIds, donViList]);
+
   const vehicleTabs = useMemo(() => [
     { id: 'list', label: 'Danh sách xe', icon: <Car size={16} />, count: filteredCars.length },
+    { id: 'schedule', label: 'Lịch trình & Nhật ký', icon: <Calendar size={16} /> },
     { id: 'stats', label: 'Thống kê', icon: <BarChart3 size={16} /> }
   ], [filteredCars.length]);
 
@@ -358,7 +426,26 @@ export default function VehiclePage() {
     if (!carFormData.id_don_vi) return toast.warning("Vui lòng chọn Đơn vị quản lý!");
     if (!carFormData.hieu_xe) return toast.warning("Vui lòng chọn Hiệu xe!");
 
+    // 1. Kiểm tra trùng lặp Biển Số Xe (License Plate) trong danh mục
+    const newPlate = String(carFormData.bien_so || '').trim().toUpperCase().replace(/[\s\-\.]/g, '');
+    if (newPlate) {
+      const isDuplicate = xeData.some(xe => {
+        // Nếu ở chế độ cập nhật (edit/update), bỏ qua chính xe đó
+        if ((modalMode === 'edit' || modalMode === 'update') && xe.id === carFormData.id) return false;
+        const existingPlate = String(xe.bien_so || '').trim().toUpperCase().replace(/[\s\-\.]/g, '');
+        return existingPlate === newPlate;
+      });
+      if (isDuplicate) {
+        return toast.error(`Biển số xe "${carFormData.bien_so}" đã tồn tại trong hệ thống! Vui lòng kiểm tra lại.`);
+      }
+    }
+
     let finalData = { ...carFormData };
+
+    // Tự động in hoa Địa điểm sử dụng
+    if (finalData.dia_diem_su_dung) {
+      finalData.dia_diem_su_dung = String(finalData.dia_diem_su_dung).toUpperCase();
+    }
 
     // Xử lý giá trị rỗng thành null
     Object.keys(finalData).forEach(key => {
@@ -390,12 +477,404 @@ export default function VehiclePage() {
     }
   };
 
+  const pasteColumns = useMemo<ColumnMapItem[]>(() => {
+    const isUpdate = bulkImportMode === 'update';
+    return [
+      { label: 'STT', key: 'stt', type: 'number' },
+      { label: 'VP Cty/Showroom', key: 'showroom_ref', type: 'text' },
+      { label: 'Thương hiệu *', key: 'hieu_xe', type: 'text', required: !isUpdate },
+      { label: 'Loại xe *', key: 'loai_xe', type: 'text', required: !isUpdate },
+      { label: 'Năm sản xuất', key: 'nam_sx', type: 'number' },
+      { label: 'Năm đăng ký', key: 'nam_dk', type: 'number' },
+      { label: 'Biển số *', key: 'bien_so', type: 'text', required: true },
+      { label: 'Màu sơn', key: 'mau_xe', type: 'text' },
+      { label: 'Số Km hiện tại', key: 'km_hien_tai', type: 'number' },
+      { label: 'Mục đích sử dụng *', key: 'muc_dich_su_dung', type: 'text', required: !isUpdate },
+      { label: 'Chủ sở hữu', key: 'don_vi_chu_so_huu', type: 'text' },
+      { label: 'Loại phương tiện *', key: 'loai_phuong_tien', type: 'text', required: !isUpdate },
+      { label: 'Phiên bản', key: 'phien_ban', type: 'text' },
+      { label: 'Số chỗ', key: 'so_cho', type: 'number' },
+      { label: 'Dung tích', key: 'dung_tich', type: 'text' },
+      { label: 'Công thức bánh xe', key: 'cong_thuc_banh', type: 'text' },
+      { label: 'Số khung', key: 'so_khung', type: 'text' },
+      { label: 'Số máy', key: 'so_may', type: 'text' },
+      { label: 'Mã tài sản', key: 'ma_tai_san', type: 'text' },
+      { label: 'Nguyên giá', key: 'nguyen_gia', type: 'number' }
+    ];
+  }, [bulkImportMode]);
+
+  const handleValidatePasteRow = (row: any, allRows?: any[]) => {
+    const errors: Record<string, string> = {};
+    const warnings: Record<string, string> = {};
+
+    const isUpdate = bulkImportMode === 'update';
+
+    // 1. Biển số xe: loại bỏ các ký tự đặc biệt để check trùng
+    const plate = String(row.bien_so || '').trim().toUpperCase().replace(/[\s\-\.,]/g, '');
+    if (!plate) {
+      errors.bien_so = 'Biển số không được để trống.';
+    } else {
+      const isDuplicateDb = xeData.some(x => String(x.bien_so || '').trim().toUpperCase().replace(/[\s\-\.,]/g, '') === plate);
+      
+      if (isUpdate) {
+        if (!isDuplicateDb) {
+          errors.bien_so = `Biển số "${row.bien_so}" không tồn tại trong hệ thống, không thể cập nhật.`;
+        } else {
+          warnings.bien_so = `Hợp lệ (Sẽ cập nhật thông tin bổ sung).`;
+        }
+      } else {
+        if (isDuplicateDb) {
+          errors.bien_so = `Biển số "${row.bien_so}" đã tồn tại trong cơ sở dữ liệu.`;
+        }
+        if (allRows) {
+          const dupCount = allRows.filter(r => String(r.bien_so || '').trim().toUpperCase().replace(/[\s\-\.,]/g, '') === plate).length;
+          if (dupCount > 1) {
+            errors.bien_so = `Biển số "${row.bien_so}" bị trùng trong file dán.`;
+          }
+        }
+      }
+    }
+
+    // 2. Đối chiếu thương hiệu & loại xe
+    const brand = String(row.hieu_xe || '').trim().toUpperCase();
+    if (row.hieu_xe) {
+      const matchedBrandKey = Object.keys(VEHICLE_MODELS).find(b => b.toUpperCase() === brand);
+      if (!matchedBrandKey) {
+        warnings.hieu_xe = `Thương hiệu "${row.hieu_xe}" chưa có trong danh mục mẫu.`;
+      } else {
+        const model = String(row.loai_xe || '').trim().toUpperCase();
+        const validModels = (VEHICLE_MODELS[matchedBrandKey] || []).map(m => m.toUpperCase());
+        if (row.loai_xe && !validModels.includes(model)) {
+          warnings.loai_xe = `Loại xe "${row.loai_xe}" không khớp với các mẫu của hãng ${matchedBrandKey}.`;
+        }
+      }
+    }
+
+    // 3. Mục đích sử dụng
+    const validPurposes = ['Xe công', 'Xe lái thử', 'Xe Chuyên dụng', 'Xe cho thuê', 'Xe thay thế cho KH', 'Xe sửa chữa lưu động'];
+    if (row.muc_dich_su_dung) {
+      const matchedPurpose = validPurposes.find(p => p.toLowerCase() === String(row.muc_dich_su_dung).trim().toLowerCase());
+      if (!matchedPurpose) {
+        warnings.muc_dich_su_dung = `Mục đích "${row.muc_dich_su_dung}" không nằm trong danh mục chuẩn.`;
+      }
+    }
+
+    const validTypes = ['Ô tô du lịch', 'Ô tô tải', 'Xe máy', 'Xe chuyên dụng'];
+    if (row.loai_phuong_tien) {
+      const matchedType = validTypes.find(t => t.toLowerCase() === String(row.loai_phuong_tien).trim().toLowerCase());
+      if (!matchedType) {
+        warnings.loai_phuong_tien = `Loại xe "${row.loai_phuong_tien}" không khớp danh mục mẫu.`;
+      }
+    }
+
+    // 5. Kiểm tra năm sản xuất và năm đăng ký
+    const currentYear = new Date().getFullYear();
+    if (row.nam_sx) {
+      const year = parseInt(row.nam_sx);
+      if (isNaN(year) || year < 1900 || year > currentYear + 1) {
+        errors.nam_sx = `Năm sản xuất không hợp lệ.`;
+      }
+    }
+    if (row.nam_dk) {
+      const year = parseInt(row.nam_dk);
+      if (isNaN(year) || year < 1900 || year > currentYear + 1) {
+        errors.nam_dk = `Năm đăng ký không hợp lệ.`;
+      }
+    }
+
+    return { errors, warnings };
+  };
+
+  const handleBulkImportSave = async (data: any[]) => {
+    const defaultDonViId = user?.id_don_vi || (user as any)?.idDonVi;
+    const targetDonViId = (selectedUnitFilter && selectedUnitFilter !== 'ALL') 
+      ? selectedUnitFilter 
+      : (defaultDonViId && defaultDonViId !== 'ALL' ? defaultDonViId : allowedDonViIds[0]);
+
+    if (!targetDonViId) {
+      toast.error("Không xác định được Đơn vị để thêm xe. Vui lòng chọn một Showroom/Đơn vị!");
+      return;
+    }
+
+    const cleanCars: any[] = [];
+    const createCosts: any[] = [];
+    const updateCosts: any[] = [];
+    
+    const currentMonth = new Date().toISOString().slice(0, 7);
+    const isUpdateMode = bulkImportMode === 'update';
+
+    const validPurposes = ['Xe công', 'Xe lái thử', 'Xe Chuyên dụng', 'Xe cho thuê', 'Xe thay thế cho KH', 'Xe sửa chữa lưu động'];
+    const validTypes = ['Ô tô du lịch', 'Ô tô tải', 'Xe máy', 'Xe chuyên dụng'];
+
+    data.forEach((row, idx) => {
+      const cleanPlate = String(row.bien_so || '').trim().toUpperCase().replace(/[\s\-\.,]/g, '');
+      if (!cleanPlate) return;
+
+      // Chuẩn hóa Thương hiệu
+      let brand = row.hieu_xe !== undefined && row.hieu_xe !== null ? String(row.hieu_xe).trim() : null;
+      if (brand) {
+        const matchedBrandKey = Object.keys(VEHICLE_MODELS).find(b => b.toUpperCase() === brand!.toUpperCase());
+        if (matchedBrandKey) brand = matchedBrandKey;
+        else brand = brand.toUpperCase();
+      }
+
+      // Chuẩn hóa Loại xe
+      let model = row.loai_xe !== undefined && row.loai_xe !== null ? String(row.loai_xe).trim() : null;
+      if (model && brand) {
+        const matchedBrandKey = Object.keys(VEHICLE_MODELS).find(b => b.toUpperCase() === brand!.toUpperCase());
+        if (matchedBrandKey) {
+          const matchedModel = (VEHICLE_MODELS[matchedBrandKey] || []).find(m => m.toUpperCase() === model!.toUpperCase());
+          if (matchedModel) model = matchedModel;
+        }
+      }
+
+      // Chuẩn hóa Mục đích
+      let purpose = row.muc_dich_su_dung !== undefined && row.muc_dich_su_dung !== null ? String(row.muc_dich_su_dung).trim() : null;
+      if (purpose) {
+        const matchedPurpose = validPurposes.find(p => p.toLowerCase() === purpose!.toLowerCase());
+        if (matchedPurpose) purpose = matchedPurpose;
+      }
+
+      // Chuẩn hóa Loại phương tiện
+      let type = row.loai_phuong_tien !== undefined && row.loai_phuong_tien !== null ? String(row.loai_phuong_tien).trim() : null;
+      if (type) {
+        const matchedType = validTypes.find(t => t.toLowerCase() === type!.toLowerCase());
+        if (matchedType) type = matchedType;
+      }
+
+      const namSx = row.nam_sx !== undefined && row.nam_sx !== null && String(row.nam_sx).trim() !== '' ? parseInt(String(row.nam_sx)) : null;
+      const namDk = row.nam_dk !== undefined && row.nam_dk !== null && String(row.nam_dk).trim() !== '' ? parseInt(String(row.nam_dk)) : null;
+      const soCho = row.so_cho !== undefined && row.so_cho !== null && String(row.so_cho).trim() !== '' ? parseInt(String(row.so_cho)) : null;
+
+      // Số Km hiện tại
+      let km: number | null = null;
+      if (row.km_hien_tai !== undefined && row.km_hien_tai !== null && String(row.km_hien_tai).trim() !== '') {
+        let rawStr = String(row.km_hien_tai).trim();
+        if (rawStr.includes('.') && !rawStr.includes(',')) {
+          const parts = rawStr.split('.');
+          if (parts.length > 1 && parts[parts.length - 1].length === 3) {
+            rawStr = rawStr.replace(/\./g, '');
+          }
+        }
+        rawStr = rawStr.replace(/,/g, '');
+        const parsed = parseFloat(rawStr);
+        if (!isNaN(parsed) && parsed >= 0) km = parsed;
+      }
+
+      // Nguyên giá
+      let nguyenGia: number | null = null;
+      if (row.nguyen_gia !== undefined && row.nguyen_gia !== null && String(row.nguyen_gia).trim() !== '') {
+        let rawStr = String(row.nguyen_gia).trim();
+        if (rawStr.includes('.') && !rawStr.includes(',')) {
+          const parts = rawStr.split('.');
+          if (parts.length > 1 && parts[parts.length - 1].length === 3) {
+            rawStr = rawStr.replace(/\./g, '');
+          }
+        }
+        rawStr = rawStr.replace(/,/g, '');
+        const parsed = parseFloat(rawStr);
+        if (!isNaN(parsed) && parsed >= 0) nguyenGia = parsed;
+      }
+
+      if (isUpdateMode) {
+        const existingCar = xeData.find(x => String(x.bien_so || '').trim().toUpperCase().replace(/[\s\-\.,]/g, '') === cleanPlate);
+        if (!existingCar) return;
+
+        // Chỉ cập nhật các trường có giá trị dán lên (không rỗng/null)
+        const updatedCar = { ...existingCar };
+        
+        if (brand !== null) updatedCar.hieu_xe = brand;
+        if (model !== null) updatedCar.loai_xe = model;
+        if (namSx !== null) updatedCar.nam_sx = namSx;
+        if (namDk !== null) updatedCar.nam_dk = namDk;
+        if (row.mau_xe !== undefined && row.mau_xe !== null && String(row.mau_xe).trim() !== '') {
+          updatedCar.mau_xe = String(row.mau_xe).trim().toUpperCase();
+        }
+        if (purpose !== null) updatedCar.muc_dich_su_dung = purpose;
+        if (row.don_vi_chu_so_huu !== undefined && row.don_vi_chu_so_huu !== null && String(row.don_vi_chu_so_huu).trim() !== '') {
+          updatedCar.don_vi_chu_so_huu = String(row.don_vi_chu_so_huu).trim().toUpperCase();
+        }
+        if (type !== null) updatedCar.loai_phuong_tien = type;
+        if (row.phien_ban !== undefined && row.phien_ban !== null && String(row.phien_ban).trim() !== '') {
+          updatedCar.phien_ban = String(row.phien_ban).trim().toUpperCase();
+        }
+        if (soCho !== null) updatedCar.so_cho = soCho;
+        if (row.loai_nhien_lieu !== undefined && row.loai_nhien_lieu !== null && String(row.loai_nhien_lieu).trim() !== '') {
+          updatedCar.loai_nhien_lieu = String(row.loai_nhien_lieu).trim().toUpperCase();
+        }
+        if (row.dung_tich !== undefined && row.dung_tich !== null && String(row.dung_tich).trim() !== '') {
+          updatedCar.dung_tich = String(row.dung_tich).trim();
+        }
+        if (row.cong_thuc_banh !== undefined && row.cong_thuc_banh !== null && String(row.cong_thuc_banh).trim() !== '') {
+          updatedCar.cong_thuc_banh = String(row.cong_thuc_banh).trim().toUpperCase();
+        }
+        if (row.so_khung !== undefined && row.so_khung !== null && String(row.so_khung).trim() !== '') {
+          updatedCar.so_khung = String(row.so_khung).trim().toUpperCase();
+        }
+        if (row.so_may !== undefined && row.so_may !== null && String(row.so_may).trim() !== '') {
+          updatedCar.so_may = String(row.so_may).trim().toUpperCase();
+        }
+        if (row.ma_tai_san !== undefined && row.ma_tai_san !== null && String(row.ma_tai_san).trim() !== '') {
+          updatedCar.ma_tai_san = String(row.ma_tai_san).trim().toUpperCase();
+        }
+        if (nguyenGia !== null) {
+          updatedCar.nguyen_gia = nguyenGia;
+        }
+
+        cleanCars.push(updatedCar);
+
+        // Cập nhật số Km nếu có
+        if (km !== null) {
+          const existingCost = chiPhiData.find(cp => getCostCarId(cp) === existingCar.id && cp.thang_nam === currentMonth);
+          if (existingCost) {
+            updateCosts.push({
+              ...existingCost,
+              km_hien_tai: km
+            });
+          } else {
+            createCosts.push({
+              id: `CP-${Date.now()}-${idx}-${Math.floor(Math.random() * 100)}`,
+              id_don_vi: existingCar.id_don_vi || targetDonViId,
+              thang_nam: currentMonth,
+              id_ts_xe: existingCar.id,
+              km_hien_tai: km,
+              so_lit_nhien_lieu: 0,
+              cp_nhien_lieu: 0,
+              cp_cau_duong_ben_bai: 0,
+              cp_rua_xe: 0,
+              cp_bao_duong_sua_chua: 0,
+              cp_thue_khau_hao: 0,
+              cp_dang_kiem: 0,
+              cp_bh_tnds: 0,
+              cp_bh_vc: 0,
+              ghi_chu: 'Khởi tạo Số Km hiện tại khi dán bổ sung'
+            });
+          }
+        }
+
+      } else {
+        const carId = `XE-${Date.now()}-${idx}-${Math.floor(Math.random() * 100)}`;
+        const newCar: TS_Xe = {
+          id: carId,
+          id_don_vi: targetDonViId,
+          muc_dich_su_dung: purpose || 'Xe công',
+          dia_diem_su_dung: '',
+          ma_tai_san: row.ma_tai_san ? String(row.ma_tai_san).trim().toUpperCase() : '',
+          don_vi_chu_so_huu: String(row.don_vi_chu_so_huu || '').trim().toUpperCase(),
+          nguyen_gia: nguyenGia,
+          cp_thue_khau_hao: null,
+          bien_so: cleanPlate,
+          loai_phuong_tien: type || 'Ô tô du lịch',
+          hieu_xe: brand || '',
+          loai_xe: model || '',
+          phien_ban: String(row.phien_ban || '').trim().toUpperCase(),
+          mau_xe: String(row.mau_xe || '').trim().toUpperCase(),
+          nam_sx: namSx,
+          nam_dk: namDk,
+          so_khung: String(row.so_khung || '').trim().toUpperCase(),
+          so_may: String(row.so_may || '').trim().toUpperCase(),
+          so_cho: soCho,
+          loai_nhien_lieu: String(row.loai_nhien_lieu || 'Xăng').trim().toUpperCase(),
+          dung_tich: String(row.dung_tich || '').trim(),
+          cong_thuc_banh: String(row.cong_thuc_banh || '').trim().toUpperCase(),
+          hinh_thuc_so_huu: 'Sở hữu',
+          gps: 'Có',
+          hien_trang: 'Đang hoạt động',
+          ghi_chu: 'Nhập hàng loạt từ Excel',
+          han_dang_kiem: null,
+          han_bh_tnds: null,
+          han_bh_vc: null
+        };
+        cleanCars.push(newCar);
+
+        if (km !== null) {
+          createCosts.push({
+            id: `CP-${Date.now()}-${idx}-${Math.floor(Math.random() * 100)}`,
+            id_don_vi: targetDonViId,
+            thang_nam: currentMonth,
+            id_ts_xe: carId,
+            km_hien_tai: km,
+            so_lit_nhien_lieu: 0,
+            cp_nhien_lieu: 0,
+            cp_cau_duong_ben_bai: 0,
+            cp_rua_xe: 0,
+            cp_bao_duong_sua_chua: 0,
+            cp_thue_khau_hao: 0,
+            cp_dang_kiem: 0,
+            cp_bh_tnds: 0,
+            cp_bh_vc: 0,
+            ghi_chu: 'Khởi tạo Số Km hiện tại khi thêm hàng loạt'
+          });
+        }
+      }
+    });
+
+    setSubmitting(true);
+    try {
+      if (isUpdateMode) {
+        const savedCars = await apiService.save(cleanCars, 'update', 'ts_xe');
+        const responseCars = Array.isArray(savedCars) ? savedCars : cleanCars;
+        
+        setXeData(prev => prev.map(item => {
+          const matched = responseCars.find(c => c.id === item.id);
+          return matched ? matched : item;
+        }));
+
+        let totalKmCreatedUpdated = 0;
+        if (createCosts.length > 0) {
+          const savedCosts = await apiService.save(createCosts, 'create', 'cp_hoat_dong_xe');
+          const responseCosts = Array.isArray(savedCosts) ? savedCosts : createCosts;
+          setChiPhiData(prev => [...responseCosts, ...prev]);
+          totalKmCreatedUpdated += createCosts.length;
+        }
+        if (updateCosts.length > 0) {
+          const savedCosts = await apiService.save(updateCosts, 'update', 'cp_hoat_dong_xe');
+          const responseCosts = Array.isArray(savedCosts) ? savedCosts : updateCosts;
+          setChiPhiData(prev => prev.map(item => {
+            const matched = responseCosts.find(c => getCostId(c) === getCostId(item));
+            return matched ? matched : item;
+          }));
+          totalKmCreatedUpdated += updateCosts.length;
+        }
+
+        if (totalKmCreatedUpdated > 0) {
+          toast.info(`Đã cập nhật số Km hiện tại cho ${totalKmCreatedUpdated} xe.`);
+        }
+        toast.success(`Đã cập nhật thành công thông tin cho ${cleanCars.length} phương tiện!`);
+
+      } else {
+        const savedCars = await apiService.save(cleanCars, 'create', 'ts_xe');
+        const responseCars = Array.isArray(savedCars) ? savedCars : cleanCars;
+        setXeData(prev => [...responseCars, ...prev]);
+
+        if (createCosts.length > 0) {
+          const savedCosts = await apiService.save(createCosts, 'create', 'cp_hoat_dong_xe');
+          const responseCosts = Array.isArray(savedCosts) ? savedCosts : createCosts;
+          setChiPhiData(prev => [...responseCosts, ...prev]);
+          toast.info(`Đã khởi tạo số Km ban đầu cho ${createCosts.length} xe.`);
+        }
+        toast.success(`Đã nhập thành công ${cleanCars.length} phương tiện xe mới!`);
+      }
+
+      setIsBulkImportOpen(false);
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || "Lỗi lưu danh sách xe hàng loạt!");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const handleInputCarChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     if (name === 'bien_so') {
       if (/[\s\-\.]/.test(value)) { setPlateError(true); setTimeout(() => setPlateError(false), 4000); }
       const cleanPlate = value.toUpperCase().replace(/[\s\-\.]/g, '');
       setCarFormData(prev => ({ ...prev, [name]: cleanPlate })); return;
+    }
+    if (name === 'dia_diem_su_dung') {
+      setCarFormData(prev => ({ ...prev, [name]: value.toUpperCase() }));
+      return;
     }
     if (name === 'hieu_xe') {
       const models = VEHICLE_MODELS[value] || [];
@@ -597,145 +1076,148 @@ export default function VehiclePage() {
       <div className="flex-1 min-w-0 max-w-full overflow-hidden p-4 sm:p-6 relative transition-all duration-300 w-full flex flex-col">
 
         {/* FIXED HEADER & WARNINGS */}
-        <div className="shrink-0 flex flex-col z-10">
-          <div className={`flex flex-col sm:flex-row justify-between items-center mb-3 gap-4 transition-all duration-300 ${isListCollapsed ? 'md:pl-10 lg:pl-0' : ''}`}>
-            <div className="flex items-center gap-2.5 w-full sm:w-auto">
-              {isListCollapsed && (
-                <button
-                  onClick={() => setIsListCollapsed(false)}
-                  className="md:hidden bg-white p-2 rounded-lg shadow-sm border border-gray-200 text-[#05469B] hover:bg-blue-50 transition-all flex items-center justify-center shrink-0"
-                  title="Mở bộ lọc đơn vị"
-                >
-                  <PanelLeftOpen size={18} />
-                </button>
-              )}
-              <div>
-                <h2 className="text-2xl font-bold text-[#05469B] flex items-center gap-2"><Car size={28} /> Quản lý Đội xe</h2>
-                <p className="text-sm font-medium text-gray-500 mt-1">Đang xem: <span className="text-emerald-600 font-bold">{selectedUnitName}</span> ({filteredCars.length} xe)</p>
-              </div>
-            </div>
-            <div className="flex w-full sm:w-auto gap-3">
-              <div className="relative w-full sm:w-72">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-                <input type="text" placeholder="Tìm Biển số, Hiệu xe..." className="w-full pl-9 pr-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#05469B] outline-none shadow-sm text-sm" value={carSearchTerm} onChange={(e) => setCarSearchTerm(e.target.value)} />
-              </div>
-              <button onClick={() => openCarModal('create')} className="w-full sm:w-auto flex items-center justify-center gap-2 bg-[#05469B] hover:bg-[#04367a] text-white px-5 py-2.5 rounded-lg font-bold shadow-sm transition-all whitespace-nowrap"><Plus className="w-5 h-5" /> Thêm Xe Mới</button>
-            </div>
-          </div>
-
-          {/* ── TAB BAR ── */}
-          <div className={`mb-4 transition-all duration-300 ${isListCollapsed ? 'md:pl-10 lg:pl-0' : ''}`}>
-            <nav className="bg-gray-100/80 dark:bg-slate-800 rounded-xl w-fit flex space-x-1 p-1 border border-gray-200/50 dark:border-slate-700/50" aria-label="Tabs">
-              {vehicleTabs.map((tab) => {
-                const isActive = activeTab === tab.id;
-                return (
+        <div className="shrink-0 flex flex-col z-30">
+          <div className={`flex flex-col md:flex-row justify-between items-start mb-4 gap-4 transition-all duration-300 ${isListCollapsed ? 'md:pl-10 lg:pl-0' : ''}`}>
+            {/* Cột trái: Tiêu đề & Tab Bar */}
+            <div className="flex flex-col items-start gap-3 w-full md:w-auto">
+              <div className="flex items-center gap-2.5 w-full sm:w-auto">
+                {isListCollapsed && (
                   <button
-                    key={tab.id}
-                    type="button"
-                    onClick={() => setActiveTab(tab.id as 'list' | 'stats')}
-                    className={`relative flex items-center gap-2 px-4 py-2 text-xs sm:text-sm font-bold rounded-lg transition-colors duration-200 cursor-pointer ${
-                      isActive
-                        ? 'text-white'
-                        : 'text-gray-400 hover:text-[#005698]'
-                    }`}
+                    onClick={() => setIsListCollapsed(false)}
+                    className="md:hidden bg-white p-2 rounded-lg shadow-sm border border-gray-200 text-[#05469B] hover:bg-blue-50 transition-all flex items-center justify-center shrink-0"
+                    title="Mở bộ lọc đơn vị"
                   >
-                    <span className="relative z-10 flex items-center gap-2">
-                      {tab.icon}
-                      <span>{tab.label}</span>
-                      {tab.count !== undefined && (
-                        <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-black ${
-                          isActive ? 'bg-white/20 text-white' : 'bg-gray-200 text-gray-500'
-                        }`}>
-                          {tab.count}
-                        </span>
-                      )}
-                    </span>
-                    {isActive && (
-                      <motion.div
-                        layoutId="vehicleActiveBg"
-                        className="absolute inset-0 rounded-lg bg-[#005698] z-0"
-                        transition={{ type: 'spring', duration: 0.35, bounce: 0.05 }}
-                      />
-                    )}
+                    <PanelLeftOpen size={18} />
                   </button>
-                );
-              })}
-            </nav>
-          </div>
+                )}
+                <div>
+                  <h2 className="text-2xl font-bold text-[#05469B] flex items-center gap-2"><Car size={28} /> Quản lý Xe Demo/Mobile Service</h2>
+                  <p className="text-sm font-medium text-gray-500 mt-1">Đang xem: <span className="text-emerald-600 font-bold">{selectedUnitName}</span> ({filteredCars.length} xe)</p>
+                </div>
+              </div>
 
-          {/* ── FILTER TOOLBAR (chỉ hiện khi ở tab Danh sách) ── */}
-          {activeTab === 'list' && (
-            <div className={`flex flex-wrap items-center gap-2 mb-4 transition-all duration-300 ${isListCollapsed ? 'md:pl-10 lg:pl-0' : ''}`}>
-              {/* Hãng xe */}
-              <select
-                value={filterBrand}
-                onChange={e => { setFilterBrand(e.target.value); setFilterModel(''); }}
-                className={`h-8 px-2.5 text-[12px] font-semibold rounded-lg border outline-none transition-all cursor-pointer ${
-                  filterBrand ? 'border-blue-400 bg-blue-50 text-blue-700' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
-                }`}
-              >
-                <option value="">🏭 Tất cả Hãng</option>
-                {Object.keys(VEHICLE_MODELS).map(b => <option key={b} value={b}>{b}</option>)}
-              </select>
+              {/* ── TAB BAR ── */}
+              <SegmentTabs
+                tabs={vehicleTabs}
+                activeTab={activeTab}
+                onChange={(id) => setActiveTab(id as any)}
+                layoutId="vehicleActiveBg"
+              />
+            </div>
 
-              {/* Loại xe — cascade theo hãng */}
-              <select
-                value={filterModel}
-                onChange={e => setFilterModel(e.target.value)}
-                disabled={modelFilterOptions.length === 0}
-                className={`h-8 px-2.5 text-[12px] font-semibold rounded-lg border outline-none transition-all cursor-pointer ${
-                  filterModel ? 'border-blue-400 bg-blue-50 text-blue-700' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
-                } disabled:opacity-40 disabled:cursor-not-allowed`}
-              >
-                <option value="">🚗 Tất cả Loại xe</option>
-                {modelFilterOptions.map(m => <option key={m} value={m}>{m}</option>)}
-              </select>
+            {/* Cột phải: Tìm kiếm, Thêm xe mới và Bộ lọc bên dưới */}
+            <div className="flex flex-col items-stretch md:items-end gap-3 w-full md:w-auto shrink-0">
+              <div className="flex w-full md:w-auto gap-3">
+                <div className="relative w-full md:w-72">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                  <input type="text" placeholder="Tìm Biển số, Hiệu xe, Số khung, Số máy..." className="w-full pl-9 pr-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#05469B] outline-none shadow-sm text-sm" value={carSearchTerm} onChange={(e) => setCarSearchTerm(e.target.value)} />
+                </div>
+                <div className="relative z-[99]" ref={dropdownRef}>
+                  <button
+                    onClick={() => setIsAddDropdownOpen(!isAddDropdownOpen)}
+                    className="w-full md:w-auto flex items-center justify-center gap-2 bg-[#05469B] hover:bg-[#04367a] text-white px-5 py-2.5 rounded-lg font-bold shadow-sm transition-all whitespace-nowrap"
+                  >
+                    <Plus className="w-5 h-5" /> Thêm <ChevronDown className="w-4 h-4" />
+                  </button>
+                  {isAddDropdownOpen && (
+                    <div className="absolute right-0 mt-2 w-52 bg-white border border-gray-100/80 rounded-2xl shadow-[0_10px_30px_rgba(0,0,0,0.08)] z-[90] py-2 animate-in slide-in-from-top-2 duration-150">
+                      <button
+                        onClick={() => { openCarModal('create'); setIsAddDropdownOpen(false); }}
+                        className="w-full text-left px-4 py-2.5 hover:bg-gray-50 text-xs font-bold text-gray-700 flex items-center gap-2 transition-colors duration-150 rounded-t-xl"
+                      >
+                        <Car size={16} className="text-[#05469B]" /> Thêm từng xe
+                      </button>
+                      <button
+                        onClick={() => { setBulkImportMode('create'); setIsBulkImportOpen(true); setIsAddDropdownOpen(false); }}
+                        className="w-full text-left px-4 py-2.5 hover:bg-gray-50 text-xs font-bold text-gray-700 flex items-center gap-2 transition-colors duration-150"
+                      >
+                        <Plus size={16} className="text-emerald-600" /> Thêm hàng loạt (Mới)
+                      </button>
+                      <button
+                        onClick={() => { setBulkImportMode('update'); setIsBulkImportOpen(true); setIsAddDropdownOpen(false); }}
+                        className="w-full text-left px-4 py-2.5 hover:bg-gray-50 text-xs font-bold text-gray-700 flex items-center gap-2 transition-colors duration-150 rounded-b-xl"
+                      >
+                        <Edit size={16} className="text-amber-600" /> Cập nhật hàng loạt (Excel)
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
 
-              {/* Mục đích sử dụng */}
-              <select
-                value={filterPurpose}
-                onChange={e => setFilterPurpose(e.target.value)}
-                className={`h-8 px-2.5 text-[12px] font-semibold rounded-lg border outline-none transition-all cursor-pointer ${
-                  filterPurpose ? 'border-indigo-400 bg-indigo-50 text-indigo-700' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
-                }`}
-              >
-                <option value="">🎯 Tất cả Mục đích</option>
-                <option value="Xe công">Xe công</option>
-                <option value="Xe lái thử">Xe lái thử</option>
-                <option value="Xe thay thế cho KH">Xe thay thế cho KH</option>
-                <option value="Xe sửa chữa lưu động">Xe sửa chữa lưu động</option>
-              </select>
+              {/* ── FILTER TOOLBAR (nằm dưới ô tìm kiếm và thêm xe mới) ── */}
+              {activeTab === 'list' && (
+                <div className="flex flex-wrap items-center justify-start md:justify-end gap-2 w-full">
+                  {/* Hãng xe */}
+                  <select
+                    value={filterBrand}
+                    onChange={e => { setFilterBrand(e.target.value); setFilterModel(''); }}
+                    className={`h-8 px-2.5 text-[12px] font-semibold rounded-lg border outline-none transition-all cursor-pointer ${filterBrand ? 'border-blue-400 bg-blue-50 text-blue-700' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                      }`}
+                  >
+                    <option value="">🏭 Tất cả Hãng</option>
+                    {Object.keys(VEHICLE_MODELS).map(b => <option key={b} value={b}>{b}</option>)}
+                  </select>
 
-              {/* Tình trạng */}
-              <select
-                value={filterStatus}
-                onChange={e => setFilterStatus(e.target.value)}
-                className={`h-8 px-2.5 text-[12px] font-semibold rounded-lg border outline-none transition-all cursor-pointer ${
-                  filterStatus ? 'border-emerald-400 bg-emerald-50 text-emerald-700' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
-                }`}
-              >
-                <option value="">🟢 Tất cả Tình trạng</option>
-                <option value="Đang hoạt động">Đang hoạt động</option>
-                <option value="Sửa chữa">Sửa chữa</option>
-                <option value="Ngưng hoạt động">Ngưng hoạt động</option>
-                <option value="Đã Thanh lý">Đã Thanh lý</option>
-              </select>
+                  {/* Loại xe — cascade theo hãng */}
+                  <select
+                    value={filterModel}
+                    onChange={e => setFilterModel(e.target.value)}
+                    disabled={modelFilterOptions.length === 0}
+                    className={`h-8 px-2.5 text-[12px] font-semibold rounded-lg border outline-none transition-all cursor-pointer ${filterModel ? 'border-blue-400 bg-blue-50 text-blue-700' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                      } disabled:opacity-40 disabled:cursor-not-allowed`}
+                  >
+                    <option value="">🚗 Tất cả Loại xe</option>
+                    {modelFilterOptions.map(m => <option key={m} value={m}>{m}</option>)}
+                  </select>
 
-              {/* Nút xóa bộ lọc */}
-              {(filterBrand || filterModel || filterPurpose || filterStatus) && (
-                <button
-                  onClick={() => { setFilterBrand(''); setFilterModel(''); setFilterPurpose(''); setFilterStatus(''); }}
-                  className="h-8 px-3 flex items-center gap-1.5 text-[12px] font-bold text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors"
-                >
-                  <X size={12} />
-                  Xóa lọc
-                  <span className="bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px] font-black">
-                    {[filterBrand, filterModel, filterPurpose, filterStatus].filter(Boolean).length}
-                  </span>
-                </button>
+                  {/* Mục đích sử dụng */}
+                  <select
+                    value={filterPurpose}
+                    onChange={e => setFilterPurpose(e.target.value)}
+                    className={`h-8 px-2.5 text-[12px] font-semibold rounded-lg border outline-none transition-all cursor-pointer ${filterPurpose ? 'border-indigo-400 bg-indigo-50 text-indigo-700' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                      }`}
+                  >
+                    <option value="">🎯 Tất cả Mục đích</option>
+                    <option value="Xe công">Xe công</option>
+                    <option value="Xe lái thử">Xe lái thử</option>
+                    <option value="Xe Chuyên dụng">Xe Chuyên dụng</option>
+                    <option value="Xe cho thuê">Xe cho thuê</option>
+                    <option value="Xe thay thế cho KH">Xe thay thế cho KH</option>
+                    <option value="Xe sửa chữa lưu động">Xe sửa chữa lưu động</option>
+                  </select>
+
+                  {/* Tình trạng */}
+                  <select
+                    value={filterStatus}
+                    onChange={e => setFilterStatus(e.target.value)}
+                    className={`h-8 px-2.5 text-[12px] font-semibold rounded-lg border outline-none transition-all cursor-pointer ${filterStatus ? 'border-emerald-400 bg-emerald-50 text-emerald-700' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                      }`}
+                  >
+                    <option value="">🟢 Tất cả Tình trạng</option>
+                    <option value="Đang hoạt động">Đang hoạt động</option>
+                    <option value="Sửa chữa">Sửa chữa</option>
+                    <option value="Ngưng hoạt động">Ngưng hoạt động</option>
+                    <option value="Đã Thanh lý">Đã Thanh lý</option>
+                    <option value="Chuyển KD xe QSD">Chuyển KD xe QSD</option>
+                  </select>
+
+                  {/* Nút xóa bộ lọc */}
+                  {(filterBrand || filterModel || filterPurpose || filterStatus) && (
+                    <button
+                      onClick={() => { setFilterBrand(''); setFilterModel(''); setFilterPurpose(''); setFilterStatus(''); }}
+                      className="h-8 px-3 flex items-center gap-1.5 text-[12px] font-bold text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors"
+                    >
+                      <X size={12} />
+                      Xóa lọc
+                      <span className="bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px] font-black">
+                        {[filterBrand, filterModel, filterPurpose, filterStatus].filter(Boolean).length}
+                      </span>
+                    </button>
+                  )}
+                </div>
               )}
             </div>
-          )}
+          </div>
 
           {error && <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-500 text-red-700 flex items-start gap-3 rounded-r-lg shadow-sm shrink-0"><AlertCircle className="w-5 h-5 shrink-0 mt-0.5" /><p>{error}</p></div>}
 
@@ -807,274 +1289,231 @@ export default function VehiclePage() {
           {activeTab === 'list' && (
             <>
               {/* BẢNG DỮ LIỆU PC */}
-          <div className="hidden md:block bg-white rounded-xl shadow-sm border border-gray-200 w-full flex-1 min-h-0 overflow-auto custom-scrollbar">
-            <table className="w-full table-fixed text-left border-collapse min-w-[1100px] text-[12px]">
-              <thead className="sticky top-0 bg-[#f8fafc] z-10">
-                <tr className="border-b border-gray-200 text-[11px] font-bold text-gray-600 uppercase tracking-wider">
-                  <th className="py-3 px-3 w-[10%] bg-[#f8fafc]">Biển số xe</th>
-                  <th className="py-3 px-3 w-[15%] bg-[#f8fafc]">Hãng - Loại xe</th>
-                  <th className="py-3 px-3 w-[8%] bg-[#f8fafc]">Phương tiện</th>
-                  <th className="py-3 px-3 w-[10%] bg-[#f8fafc]">Mục đích SD</th>
-                  <th className="py-3 px-3 w-[15%] bg-[#f8fafc]">Đơn vị quản lý</th>
-                  <th className="py-3 px-3 w-[17%] bg-[#f8fafc]">Chi phí</th>
-                  <th className="py-3 px-3 w-[10%] bg-[#f8fafc]">Tình trạng</th>
-                  <th className="py-3 px-3 text-center w-[15%] bg-[#f8fafc]">Thao tác</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {loading ? (
-                  <tr><td colSpan={8} className="p-12 text-center text-gray-500"><Loader2 className="w-8 h-8 animate-spin mx-auto mb-3 text-[#05469B]" />Đang tải dữ liệu...</td></tr>
-                ) : filteredCars.length === 0 ? (
-                  <tr><td colSpan={8} className="p-16 text-center text-gray-500">
-                    <Car size={48} className="mx-auto text-gray-300 mb-4" />
-                    <p className="text-lg font-medium">Không có xe nào trong danh sách hiển thị.</p>
-                  </td></tr>
+              <div className="hidden md:block bg-white rounded-xl shadow-sm border border-gray-200 w-full flex-1 min-h-0 overflow-auto custom-scrollbar">
+                <table className="w-full table-fixed text-left border-collapse min-w-[1100px] text-[12px]">
+                  <thead className="sticky top-0 bg-[#f8fafc] z-10">
+                    <tr className="border-b border-gray-200 text-[11px] font-bold text-gray-600 uppercase tracking-wider">
+                      <th className="py-3 px-3 w-[10%] bg-[#f8fafc]">BIỂN SỐ XE</th>
+                      <th className="py-3 px-3 w-[15%] bg-[#f8fafc]">HÃNG - LOẠI XE</th>
+                      <th className="py-3 px-3 w-[10%] bg-[#f8fafc]">PHƯƠNG TIỆN</th>
+                      <th className="py-3 px-3 w-[10%] bg-[#f8fafc]">MỤC ĐÍCH SD</th>
+                      <th className="py-3 px-3 w-[12%] bg-[#f8fafc]">ĐỊA ĐIỂM SD</th>
+                      <th className="py-3 px-3 w-[18%] bg-[#f8fafc]">ĐƠN VỊ QUẢN LÝ</th>
+                      <th className="py-3 px-3 w-[10%] bg-[#f8fafc]">TRÌNH TRẠNG</th>
+                      <th className="py-3 px-3 text-center w-[15%] bg-[#f8fafc]">THAO TÁC</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {loading ? (
+                      <tr><td colSpan={8} className="p-12 text-center text-gray-500"><Loader2 className="w-8 h-8 animate-spin mx-auto mb-3 text-[#05469B]" />Đang tải dữ liệu...</td></tr>
+                    ) : filteredCars.length === 0 ? (
+                      <tr><td colSpan={8} className="p-16 text-center text-gray-500">
+                        <Car size={48} className="mx-auto text-gray-300 mb-4" />
+                        <p className="text-lg font-medium">Không có xe nào trong danh sách hiển thị.</p>
+                      </td></tr>
+                    ) : (
+                      paginatedCars.map((item) => (
+                        <tr key={item.id} className="hover:bg-blue-50/50 transition-colors group">
+                          <td className="py-3 px-3 font-black text-[#05469B] text-sm whitespace-nowrap align-middle">🚙 {item.bien_so}</td>
+                          <td className="py-3 px-3 align-middle">
+                            <div className="flex flex-col justify-center items-start gap-1">
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold shadow-2xs truncate max-w-full ${getBrandBadgeStyle(item.hieu_xe)}`} title={`Hãng: ${item.hieu_xe || 'Khác'}`}>
+                                {item.hieu_xe || 'Khác'}
+                              </span>
+                              <p className="text-[11px] text-slate-500 truncate w-full font-medium" title={`${item.loai_xe || ''} ${item.phien_ban ? `- ${item.phien_ban}` : ''}`}>
+                                {item.loai_xe || '---'} {item.phien_ban ? `• ${item.phien_ban}` : ''}
+                              </p>
+                            </div>
+                          </td>
+                          <td className="py-3 px-3 text-gray-700 font-medium align-middle truncate" title={item.loai_phuong_tien}>{item.loai_phuong_tien || '---'}</td>
+                          <td className="py-3 px-3 align-middle">
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold whitespace-nowrap ${getPurposeBadgeStyle(item.muc_dich_su_dung)}`}>
+                              {item.muc_dich_su_dung || '---'}
+                            </span>
+                          </td>
+                          <td className="py-3 px-3 text-gray-700 font-medium align-middle truncate" title={item.dia_diem_su_dung || ''}>{item.dia_diem_su_dung || '---'}</td>
+                          <td className="py-3 px-3 align-middle">
+                            {(() => {
+                              const unit = donViList.find(u => u.id === item.id_don_vi);
+                              if (!unit) return <span className="text-gray-400 font-medium">---</span>;
+
+                              const line1 = unit.ten_don_vi;
+                              const ancestors: string[] = [];
+                              let currParentId = unit.cap_quan_ly;
+                              let depth = 0;
+                              while (currParentId && currParentId !== 'HO' && depth < 5) {
+                                const p = donViList.find(u => u.id === currParentId);
+                                if (p) {
+                                  ancestors.push(p.ten_don_vi);
+                                  currParentId = p.cap_quan_ly;
+                                } else {
+                                  break;
+                                }
+                                depth++;
+                              }
+
+                              let line2 = '';
+                              if (ancestors.length > 0) {
+                                line2 = `Trực thuộc: ${ancestors.join(' - ')}`;
+                              } else if (item.don_vi_chu_so_huu) {
+                                line2 = `CSH: ${item.don_vi_chu_so_huu}`;
+                              } else {
+                                line2 = `Sở hữu: ${item.hinh_thuc_so_huu || 'HO'}`;
+                              }
+
+                              return (
+                                <div className="flex flex-col justify-center">
+                                  <p className="font-bold text-gray-800 text-[12px] leading-snug truncate" title={line1}>{line1}</p>
+                                  <p className="text-[10.5px] font-semibold text-slate-500 mt-0.5 truncate" title={line2}>{line2}</p>
+                                </div>
+                              );
+                            })()}
+                          </td>
+                          <td className="py-3 px-3 align-middle">
+                            <span className={`px-2 py-0.5 rounded-md text-[10.5px] font-bold whitespace-nowrap inline-block border ${getStatusBadgeStyle(item.hien_trang)}`}>
+                              {getStatusEmoji(item.hien_trang)} {item.hien_trang}
+                            </span>
+                          </td>
+                          <td className="py-2 px-2 align-middle text-center">
+                            <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity w-full max-w-[110px] mx-auto">
+                              {/* Dòng 1: Chi phí */}
+                              <button onClick={() => openCostModal(item)} className="w-full py-1 bg-white border border-indigo-200 text-indigo-600 hover:bg-indigo-50 rounded text-[10.5px] font-bold transition-colors flex items-center justify-center gap-1 shadow-2xs leading-none">
+                                <Receipt size={12} /> Chi phí
+                              </button>
+
+                              {/* Dòng 2: Xem - Sửa - Xóa */}
+                              <div className="grid grid-cols-3 gap-1">
+                                <button onClick={() => { setViewData(item); setIsViewModalOpen(true); }} className="py-1 bg-white border border-emerald-200 text-emerald-600 hover:bg-emerald-50 rounded flex items-center justify-center shadow-2xs transition-colors" title="Xem chi tiết">
+                                  <Eye size={12} />
+                                </button>
+                                <button onClick={() => openCarModal('update', item)} className="py-1 bg-white border border-blue-200 text-blue-600 hover:bg-blue-50 rounded flex items-center justify-center shadow-2xs transition-colors" title="Sửa">
+                                  <Edit size={12} />
+                                </button>
+                                <button onClick={() => { setItemToDelete({ id: item.id, type: 'xe' }); setIsConfirmOpen(true); }} className="py-1 bg-white border border-red-200 text-red-600 hover:bg-red-50 rounded flex items-center justify-center shadow-2xs transition-colors" title="Xóa">
+                                  <Trash2 size={12} />
+                                </button>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* 🟢 VIEW TRÊN MOBILE: THẺ CARD DỌC */}
+              <div className="block md:hidden flex-1 min-h-0 overflow-y-auto space-y-4 custom-scrollbar">
+                {filteredCars.length === 0 ? (
+                  <div className="bg-white p-8 rounded-2xl border border-gray-200 text-center text-gray-400 italic">Không có xe nào trong danh sách hiển thị.</div>
                 ) : (
-                  paginatedCars.map((item) => (
-                    <tr key={item.id} className="hover:bg-blue-50/50 transition-colors group">
-                      <td className="py-3 px-3 font-black text-[#05469B] text-sm whitespace-nowrap align-middle">🚙 {item.bien_so}</td>
-                      <td className="py-3 px-3 align-middle">
-                        <div className="flex flex-col justify-center items-start gap-1">
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold shadow-2xs truncate max-w-full ${getBrandBadgeStyle(item.hieu_xe)}`} title={`Hãng: ${item.hieu_xe || 'Khác'}`}>
-                            {item.hieu_xe || 'Khác'}
-                          </span>
-                          <p className="text-[11px] text-slate-500 truncate w-full font-medium" title={`${item.loai_xe || ''} ${item.phien_ban ? `- ${item.phien_ban}` : ''}`}>
-                            {item.loai_xe || '---'} {item.phien_ban ? `• ${item.phien_ban}` : ''}
-                          </p>
-                        </div>
-                      </td>
-                      <td className="py-3 px-3 text-gray-700 font-medium align-middle truncate" title={item.loai_phuong_tien}>{item.loai_phuong_tien || '---'}</td>
-                      <td className="py-3 px-3 align-middle">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold whitespace-nowrap ${getPurposeBadgeStyle(item.muc_dich_su_dung)}`}>
-                          {item.muc_dich_su_dung || '---'}
-                        </span>
-                      </td>
-                      <td className="py-3 px-3 align-middle">
-                        {(() => {
-                          const unit = donViList.find(u => u.id === item.id_don_vi);
-                          if (!unit) return <span className="text-gray-400 font-medium">---</span>;
+                  paginatedCars.map((item) => {
+                    const unit = donViList.find(u => u.id === item.id_don_vi);
+                    const line1 = unit ? unit.ten_don_vi : '---';
 
-                          const line1 = unit.ten_don_vi;
-                          const ancestors: string[] = [];
-                          let currParentId = unit.cap_quan_ly;
-                          let depth = 0;
-                          while (currParentId && currParentId !== 'HO' && depth < 5) {
-                            const p = donViList.find(u => u.id === currParentId);
-                            if (p) {
-                              ancestors.push(p.ten_don_vi);
-                              currParentId = p.cap_quan_ly;
-                            } else {
-                              break;
-                            }
-                            depth++;
-                          }
+                    const costs = chiPhiData
+                      .filter(cp => getCostCarId(cp) === item.id)
+                      .sort((a, b) => String(a.thang_nam || '').localeCompare(String(b.thang_nam || '')));
 
-                          let line2 = '';
-                          if (ancestors.length > 0) {
-                            line2 = `Trực thuộc: ${ancestors.join(' - ')}`;
-                          } else if (item.don_vi_chu_so_huu) {
-                            line2 = `CSH: ${item.don_vi_chu_so_huu}`;
-                          } else {
-                            line2 = `Sở hữu: ${item.hinh_thuc_so_huu || 'HO'}`;
-                          }
+                    const monthlyTotals = costs.map(cost => {
+                      const phikhac = (Number(cost.cp_thue_khau_hao) || 0) + (Number(cost.cp_dang_kiem) || 0) + (Number(cost.cp_bh_tnds) || 0) + (Number(cost.cp_bh_vc) || 0);
+                      const total = (Number(cost.cp_nhien_lieu) || 0) + (Number(cost.cp_cau_duong_ben_bai) || 0) + (Number(cost.cp_rua_xe) || 0) + (Number(cost.cp_bao_duong_sua_chua) || 0) + phikhac;
+                      return total;
+                    });
+                    const sumCost = monthlyTotals.reduce((a, b) => a + b, 0);
+                    const n = monthlyTotals.length;
 
-                          return (
-                            <div className="flex flex-col justify-center">
-                              <p className="font-bold text-gray-800 text-[12px] leading-snug truncate" title={line1}>{line1}</p>
-                              <p className="text-[10.5px] font-semibold text-slate-500 mt-0.5 truncate" title={line2}>{line2}</p>
-                            </div>
-                          );
-                        })()}
-                      </td>
-                      <td className="py-3 px-3 align-middle">
-                        {(() => {
-                          const costs = chiPhiData
-                            .filter(cp => getCostCarId(cp) === item.id)
-                            .sort((a, b) => String(a.thang_nam || '').localeCompare(String(b.thang_nam || '')));
-
-                          if (costs.length === 0) {
-                            return <span className="text-gray-400 text-[11px] italic">Chưa phát sinh</span>;
-                          }
-
-                          const monthlyTotals = costs.map(cost => {
-                            const phikhac = (Number(cost.cp_thue_khau_hao) || 0) + (Number(cost.cp_dang_kiem) || 0) + (Number(cost.cp_bh_tnds) || 0) + (Number(cost.cp_bh_vc) || 0);
-                            const total = (Number(cost.cp_nhien_lieu) || 0) + (Number(cost.cp_cau_duong_ben_bai) || 0) + (Number(cost.cp_rua_xe) || 0) + (Number(cost.cp_bao_duong_sua_chua) || 0) + phikhac;
-                            return total;
-                          });
-
-                          const sumCost = monthlyTotals.reduce((a, b) => a + b, 0);
-                          const maxVal = Math.max(...monthlyTotals, 1);
-                          const minVal = Math.min(...monthlyTotals, 0);
-
-                          const n = monthlyTotals.length;
-                          let points = '';
-                          if (n === 1) {
-                            points = '5,14 95,14';
-                          } else {
-                            points = monthlyTotals.map((val, idx) => {
-                              const x = 5 + (idx / (n - 1)) * 90;
-                              const y = 24 - ((val - minVal) / (maxVal - minVal || 1)) * 20;
-                              return `${x.toFixed(1)},${y.toFixed(1)}`;
-                            }).join(' ');
-                          }
-
-                          return (
-                            <div className="flex flex-col gap-1 w-full cursor-pointer" onClick={() => openCostModal(item)} title={`Chi phí ${n} tháng: Tổng ${formatCurrency(sumCost)} VNĐ (Nhấn để xem chi tiết)`}>
-                              <div className="flex items-center justify-between text-[11px]">
-                                <span className="font-bold text-gray-500">{n} tháng</span>
-                                <span className="font-black text-red-600">{formatCurrency(sumCost)}</span>
-                              </div>
-                              <div className="w-full h-[26px] bg-slate-50 rounded border border-slate-100 flex items-center justify-center px-1 overflow-hidden hover:border-indigo-200 transition-colors">
-                                <svg viewBox="0 0 100 28" className="w-full h-full overflow-visible">
-                                  <polyline
-                                    fill="none"
-                                    stroke="#05469B"
-                                    strokeWidth="2"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    points={points}
-                                  />
-                                  {n > 0 && (() => {
-                                    const lastVal = monthlyTotals[n - 1];
-                                    const lastX = n === 1 ? 95 : 5 + ((n - 1) / (n - 1)) * 90;
-                                    const lastY = 24 - ((lastVal - minVal) / (maxVal - minVal || 1)) * 20;
-                                    return <circle cx={lastX} cy={lastY} r="2.5" fill="#ef4444" />;
-                                  })()}
-                                </svg>
-                              </div>
-                            </div>
-                          );
-                        })()}
-                      </td>
-                      <td className="py-3 px-3 align-middle">
-                        <span className={`px-2 py-0.5 rounded-md text-[10.5px] font-bold whitespace-nowrap inline-block ${item.hien_trang === 'Đang hoạt động' ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' : 'bg-red-50 text-red-600 border border-red-200'}`}>
-                          {item.hien_trang === 'Đang hoạt động' ? '🟢' : '🔴'} {item.hien_trang}
-                        </span>
-                      </td>
-                      <td className="py-2 px-2 align-middle text-center">
-                        <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity w-full max-w-[110px] mx-auto">
-                          {/* Dòng 1: Chi phí */}
-                          <button onClick={() => openCostModal(item)} className="w-full py-1 bg-white border border-indigo-200 text-indigo-600 hover:bg-indigo-50 rounded text-[10.5px] font-bold transition-colors flex items-center justify-center gap-1 shadow-2xs leading-none">
-                            <Receipt size={12} /> Chi phí
-                          </button>
-
-                          {/* Dòng 2: Xem - Sửa - Xóa */}
-                          <div className="grid grid-cols-3 gap-1">
-                            <button onClick={() => { setViewData(item); setIsViewModalOpen(true); }} className="py-1 bg-white border border-emerald-200 text-emerald-600 hover:bg-emerald-50 rounded flex items-center justify-center shadow-2xs transition-colors" title="Xem chi tiết">
-                              <Eye size={12} />
-                            </button>
-                            <button onClick={() => openCarModal('update', item)} className="py-1 bg-white border border-blue-200 text-blue-600 hover:bg-blue-50 rounded flex items-center justify-center shadow-2xs transition-colors" title="Sửa">
-                              <Edit size={12} />
-                            </button>
-                            <button onClick={() => { setItemToDelete({ id: item.id, type: 'xe' }); setIsConfirmOpen(true); }} className="py-1 bg-white border border-red-200 text-red-600 hover:bg-red-50 rounded flex items-center justify-center shadow-2xs transition-colors" title="Xóa">
-                              <Trash2 size={12} />
-                            </button>
+                    return (
+                      <div
+                        key={item.id}
+                        className="p-4 bg-white rounded-2xl border border-gray-100 shadow-sm relative flex flex-col gap-3 transition-all"
+                      >
+                        {/* Header: Biển số & Hiệu xe & Hiện trạng */}
+                        <div className="pb-2.5 border-b border-gray-100">
+                          <div className="flex items-center justify-between gap-1 mb-1">
+                            <span className="font-black text-[#05469B] text-sm">🚙 {item.bien_so}</span>
+                            <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold whitespace-nowrap border ${getStatusBadgeStyle(item.hien_trang)}`}>
+                              {getStatusEmoji(item.hien_trang)} {item.hien_trang}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1.5 mt-1">
+                            <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold shadow-2xs ${getBrandBadgeStyle(item.hieu_xe)}`}>
+                              {item.hieu_xe || 'Khác'}
+                            </span>
+                            <span className="text-[10px] text-gray-500 font-medium">({item.loai_xe || '---'} {item.phien_ban ? `• ${item.phien_ban}` : ''})</span>
                           </div>
                         </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
 
-          {/* 🟢 VIEW TRÊN MOBILE: THẺ CARD DỌC */}
-          <div className="block md:hidden flex-1 min-h-0 overflow-y-auto space-y-4 custom-scrollbar">
-            {filteredCars.length === 0 ? (
-              <div className="bg-white p-8 rounded-2xl border border-gray-200 text-center text-gray-400 italic">Không có xe nào trong danh sách hiển thị.</div>
-            ) : (
-              paginatedCars.map((item) => {
-                const unit = donViList.find(u => u.id === item.id_don_vi);
-                const line1 = unit ? unit.ten_don_vi : '---';
-
-                const costs = chiPhiData
-                  .filter(cp => getCostCarId(cp) === item.id)
-                  .sort((a, b) => String(a.thang_nam || '').localeCompare(String(b.thang_nam || '')));
-
-                const monthlyTotals = costs.map(cost => {
-                  const phikhac = (Number(cost.cp_thue_khau_hao) || 0) + (Number(cost.cp_dang_kiem) || 0) + (Number(cost.cp_bh_tnds) || 0) + (Number(cost.cp_bh_vc) || 0);
-                  const total = (Number(cost.cp_nhien_lieu) || 0) + (Number(cost.cp_cau_duong_ben_bai) || 0) + (Number(cost.cp_rua_xe) || 0) + (Number(cost.cp_bao_duong_sua_chua) || 0) + phikhac;
-                  return total;
-                });
-                const sumCost = monthlyTotals.reduce((a, b) => a + b, 0);
-                const n = monthlyTotals.length;
-
-                return (
-                  <div
-                    key={item.id}
-                    className="p-4 bg-white rounded-2xl border border-gray-100 shadow-sm relative flex flex-col gap-3 transition-all"
-                  >
-                    {/* Header: Biển số & Hiệu xe & Hiện trạng */}
-                    <div className="pb-2.5 border-b border-gray-100">
-                      <div className="flex items-center justify-between gap-1 mb-1">
-                        <span className="font-black text-[#05469B] text-sm">🚙 {item.bien_so}</span>
-                        <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold whitespace-nowrap ${item.hien_trang === 'Đang hoạt động' ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' : 'bg-red-50 text-red-600 border border-red-200'}`}>
-                          {item.hien_trang === 'Đang hoạt động' ? '🟢' : '🔴'} {item.hien_trang}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1.5 mt-1">
-                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold shadow-2xs ${getBrandBadgeStyle(item.hieu_xe)}`}>
-                          {item.hieu_xe || 'Khác'}
-                        </span>
-                        <span className="text-[10px] text-gray-500 font-medium">({item.loai_xe || '---'} {item.phien_ban ? `• ${item.phien_ban}` : ''})</span>
-                      </div>
-                    </div>
-
-                    {/* Body: Details */}
-                    <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-xs">
-                      <div>
-                        <p className="text-[10px] font-bold text-gray-400 uppercase">Loại phương tiện</p>
-                        <p className="font-bold text-gray-700 mt-0.5">{item.loai_phuong_tien || '---'}</p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] font-bold text-gray-400 uppercase">Mục đích SD</p>
-                        <span className={`inline-flex items-center px-2 py-0.5 mt-0.5 rounded text-[10px] font-bold ${getPurposeBadgeStyle(item.muc_dich_su_dung)}`}>
-                          {item.muc_dich_su_dung || '---'}
-                        </span>
-                      </div>
-                      <div className="col-span-2">
-                        <p className="text-[10px] font-bold text-gray-400 uppercase">Đơn vị quản lý</p>
-                        <p className="font-bold text-gray-800 mt-0.5">{line1}</p>
-                        {item.don_vi_chu_so_huu && <p className="text-[9px] text-gray-400 font-medium mt-0.5">Sở hữu: {item.don_vi_chu_so_huu}</p>}
-                      </div>
-                      <div className="col-span-2 bg-gray-50 p-2.5 rounded-lg border border-gray-100 flex items-center justify-between">
-                        <div className="flex flex-col">
-                          <span className="text-[9px] font-bold text-gray-400 uppercase">Tổng chi phí ({n} tháng)</span>
-                          <span className="text-xs font-black text-red-600 mt-0.5">{formatCurrency(sumCost)} VNĐ</span>
+                        {/* Body: Details */}
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-xs">
+                          <div>
+                            <p className="text-[10px] font-bold text-gray-400 uppercase">Loại phương tiện</p>
+                            <p className="font-bold text-gray-700 mt-0.5">{item.loai_phuong_tien || '---'}</p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-bold text-gray-400 uppercase">Mục đích SD</p>
+                            <span className={`inline-flex items-center px-2 py-0.5 mt-0.5 rounded text-[10px] font-bold ${getPurposeBadgeStyle(item.muc_dich_su_dung)}`}>
+                              {item.muc_dich_su_dung || '---'}
+                            </span>
+                          </div>
+                          <div className="col-span-2">
+                            <p className="text-[10px] font-bold text-gray-400 uppercase">Địa điểm SD</p>
+                            <p className="font-bold text-gray-700 mt-0.5">{item.dia_diem_su_dung || '---'}</p>
+                          </div>
+                          <div className="col-span-2">
+                            <p className="text-[10px] font-bold text-gray-400 uppercase">Đơn vị quản lý</p>
+                            <p className="font-bold text-gray-800 mt-0.5">{line1}</p>
+                            {item.don_vi_chu_so_huu && <p className="text-[9px] text-gray-400 font-medium mt-0.5">Sở hữu: {item.don_vi_chu_so_huu}</p>}
+                          </div>
+                          <div className="col-span-2 bg-gray-50 p-2.5 rounded-lg border border-gray-100 flex items-center justify-between">
+                            <div className="flex flex-col">
+                              <span className="text-[9px] font-bold text-gray-400 uppercase">Tổng chi phí ({n} tháng)</span>
+                              <span className="text-xs font-black text-red-600 mt-0.5">{formatCurrency(sumCost)} VNĐ</span>
+                            </div>
+                            <button onClick={() => openCostModal(item)} className="px-2 py-1 bg-white border border-indigo-200 text-indigo-600 hover:bg-indigo-50 rounded-md text-[10px] font-bold shadow-2xs">Chi tiết</button>
+                          </div>
                         </div>
-                        <button onClick={() => openCostModal(item)} className="px-2 py-1 bg-white border border-indigo-200 text-indigo-600 hover:bg-indigo-50 rounded-md text-[10px] font-bold shadow-2xs">Chi tiết</button>
-                      </div>
-                    </div>
 
-                    {/* Footer: Actions */}
-                    <div className="flex items-center justify-between gap-1.5 pt-2.5 border-t border-gray-100 mt-1">
-                      <button onClick={() => openCostModal(item)} className="py-1.5 px-2 bg-indigo-50 text-indigo-600 border border-indigo-100 hover:bg-indigo-100 rounded-lg text-[11px] font-bold flex items-center justify-center gap-1 shadow-2xs" title="Quản lý chi phí xe"><Receipt size={13} /> QL Chi phí</button>
-                      <div className="flex items-center gap-1.5">
-                        <button onClick={() => { setViewData(item); setIsViewModalOpen(true); }} className="p-1.5 text-emerald-600 bg-emerald-50 border border-emerald-100 hover:bg-emerald-100 rounded-lg transition-colors flex items-center gap-1 text-[11px] font-bold shadow-2xs" title="Xem chi tiết"><Eye size={13} /> Xem</button>
-                        <button onClick={() => openCarModal('update', item)} className="p-1.5 text-blue-600 bg-blue-50 border border-blue-100 hover:bg-blue-100 rounded-lg transition-colors flex items-center gap-1 text-[11px] font-bold shadow-2xs" title="Sửa"><Edit size={13} /> Sửa</button>
-                        <button onClick={() => { setItemToDelete({ id: item.id, type: 'xe' }); setIsConfirmOpen(true); }} className="p-1.5 text-red-600 bg-red-50 border border-red-100 hover:bg-red-100 rounded-lg transition-colors flex items-center gap-1 text-[11px] font-bold shadow-2xs" title="Xóa"><Trash2 size={13} /> Xóa</button>
+                        {/* Footer: Actions */}
+                        <div className="flex items-center justify-between gap-1.5 pt-2.5 border-t border-gray-100 mt-1">
+                          <button onClick={() => openCostModal(item)} className="py-1.5 px-2 bg-indigo-50 text-indigo-600 border border-indigo-100 hover:bg-indigo-100 rounded-lg text-[11px] font-bold flex items-center justify-center gap-1 shadow-2xs" title="Quản lý chi phí xe"><Receipt size={13} /> QL Chi phí</button>
+                          <div className="flex items-center gap-1.5">
+                            <button onClick={() => { setViewData(item); setIsViewModalOpen(true); }} className="p-1.5 text-emerald-600 bg-emerald-50 border border-emerald-100 hover:bg-emerald-100 rounded-lg transition-colors flex items-center gap-1 text-[11px] font-bold shadow-2xs" title="Xem chi tiết"><Eye size={13} /> Xem</button>
+                            <button onClick={() => openCarModal('update', item)} className="p-1.5 text-blue-600 bg-blue-50 border border-blue-100 hover:bg-blue-100 rounded-lg transition-colors flex items-center gap-1 text-[11px] font-bold shadow-2xs" title="Sửa"><Edit size={13} /> Sửa</button>
+                            <button onClick={() => { setItemToDelete({ id: item.id, type: 'xe' }); setIsConfirmOpen(true); }} className="p-1.5 text-red-600 bg-red-50 border border-red-100 hover:bg-red-100 rounded-lg transition-colors flex items-center gap-1 text-[11px] font-bold shadow-2xs" title="Xóa"><Trash2 size={13} /> Xóa</button>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
+                    );
+                  })
+                )}
+              </div>
 
-          {/* 🟢 GIAO DIỆN PHÂN TRANG (PAGINATION BAR) */}
-          <div className="shrink-0 pt-2">
-            <Pagination
-              currentPage={currentPage}
-              totalPages={totalPages}
-              rowsPerPage={rowsPerPage}
-              totalRows={filteredCars.length}
-              onPageChange={setCurrentPage}
-              onRowsPerPageChange={(rows) => { setRowsPerPage(rows); setCurrentPage(1); }}
-              itemName="xe"
-            />
-          </div>
+              {/* 🟢 GIAO DIỆN PHÂN TRANG (PAGINATION BAR) */}
+              <div className="shrink-0 pt-2">
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  rowsPerPage={rowsPerPage}
+                  totalRows={filteredCars.length}
+                  onPageChange={setCurrentPage}
+                  onRowsPerPageChange={(rows) => { setRowsPerPage(rows); setCurrentPage(1); }}
+                  itemName="xe"
+                />
+              </div>
             </>
+          )}
+
+          {/* ── TAB LỊCH TRÌNH & NHẬT KÝ ── */}
+          {activeTab === 'schedule' && (
+            <VehicleScheduleTab
+              xeData={xeData}
+              allowedDonViIds={allowedDonViIds}
+              selectedUnitFilter={selectedUnitFilter}
+              donViList={donViList}
+              nhatKyData={nhatKyData}
+              setNhatKyData={setNhatKyData}
+            />
           )}
 
           {/* ── TAB THỐNG KÊ ── */}
@@ -1084,6 +1523,7 @@ export default function VehiclePage() {
               chiPhiData={chiPhiData}
               donViMap={donViMap}
               onViewCar={(car) => { setViewData(car); setIsViewModalOpen(true); }}
+              nhatKyData={nhatKyData}
             />
           )}
 
@@ -1116,6 +1556,8 @@ export default function VehiclePage() {
                       <select name="muc_dich_su_dung" value={carFormData.muc_dich_su_dung || 'Xe công'} onChange={handleInputCarChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] font-bold text-indigo-700 outline-none focus:ring-2 focus:ring-[#05469B]">
                         <option value="Xe công">Xe công</option>
                         <option value="Xe lái thử">Xe lái thử</option>
+                        <option value="Xe Chuyên dụng">Xe Chuyên dụng</option>
+                        <option value="Xe cho thuê">Xe cho thuê</option>
                         <option value="Xe thay thế cho KH">Xe thay thế cho KH</option>
                         <option value="Xe sửa chữa lưu động">Xe sửa chữa lưu động</option>
                       </select>
@@ -1236,7 +1678,7 @@ export default function VehiclePage() {
                 <div className="bg-orange-50/40 p-5 rounded-xl border border-orange-100">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                     <div><label className="block text-xs font-bold text-gray-700 mb-1">Định vị GPS</label><select name="gps" value={carFormData.gps || 'Có'} onChange={handleInputCarChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]"><option value="Có">Có</option><option value="Không">Không</option></select></div>
-                    <div><label className="block text-xs font-bold text-gray-700 mb-1">Hiện trạng</label><select name="hien_trang" value={carFormData.hien_trang || 'Đang hoạt động'} onChange={handleInputCarChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] font-bold text-[#05469B] outline-none focus:ring-2 focus:ring-[#05469B]"><option value="Đang hoạt động">Đang hoạt động</option><option value="Sửa chữa">Sửa chữa</option><option value="Ngừng hoạt động">Ngừng hoạt động</option><option value="Đã Thanh lý">Đã Thanh lý</option></select></div>
+                    <div><label className="block text-xs font-bold text-gray-700 mb-1">Hiện trạng</label><select name="hien_trang" value={carFormData.hien_trang || 'Đang hoạt động'} onChange={handleInputCarChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] font-bold text-[#05469B] outline-none focus:ring-2 focus:ring-[#05469B]"><option value="Đang hoạt động">Đang hoạt động</option><option value="Sửa chữa">Sửa chữa</option><option value="Ngưng hoạt động">Ngưng hoạt động</option><option value="Đã Thanh lý">Đã Thanh lý</option><option value="Chuyển KD xe QSD">Chuyển KD xe QSD</option></select></div>
                     <div className="md:col-span-2"><label className="block text-xs font-bold text-gray-700 mb-1">Ghi chú khác</label><textarea name="ghi_chu" value={carFormData.ghi_chu || ''} onChange={handleInputCarChange} rows={2} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] resize-none"></textarea></div>
                   </div>
                 </div>
@@ -1278,8 +1720,8 @@ export default function VehiclePage() {
                     <div className="flex flex-wrap justify-center sm:justify-start gap-2 mt-3">
                       <span className="px-2.5 py-1 bg-gray-100 text-gray-700 rounded text-xs font-bold uppercase">{viewData.loai_phuong_tien}</span>
                       <span className="px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded text-xs font-bold">{viewData.muc_dich_su_dung}</span>
-                      <span className={`px-2.5 py-1 rounded text-xs font-bold ${viewData.hien_trang === 'Đang hoạt động' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
-                        {viewData.hien_trang}
+                      <span className={`px-2.5 py-1 rounded text-xs font-bold border ${getStatusBadgeStyle(viewData.hien_trang)}`}>
+                        {getStatusEmoji(viewData.hien_trang)} {viewData.hien_trang}
                       </span>
                     </div>
                   </div>
@@ -1591,6 +2033,8 @@ export default function VehiclePage() {
         document.body
       )}
 
+
+
       {/* --- XÁC NHẬN XÓA --- */}
       {isConfirmOpen && createPortal(
         <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
@@ -1605,6 +2049,17 @@ export default function VehiclePage() {
           </div>
         </div>,
         document.body
+      )}
+
+      {isBulkImportOpen && (
+        <PasteImportModal
+          isOpen={isBulkImportOpen}
+          onClose={() => setIsBulkImportOpen(false)}
+          onSave={handleBulkImportSave}
+          title={bulkImportMode === 'update' ? "Dán Excel - Cập nhật thông tin xe hàng loạt" : "Dán Excel - Thêm mới xe hàng loạt"}
+          columnMapping={pasteColumns}
+          onValidateRow={handleValidatePasteRow}
+        />
       )}
     </div>
   );

@@ -47,6 +47,7 @@ export const getNoiGuiNhanLabel = (phanLoai: string): string => {
     case 'Quyết định': return 'Đơn vị / Cá nhân nhận Quyết định';
     case 'Tờ trình': return 'Kính gửi (Nơi nhận Tờ trình)';
     case 'Thông báo': return 'Nơi nhận Thông báo';
+    case 'Thông báo BĐH': return 'Nơi nhận Thông báo BĐH';
     default: return 'Nơi nhận / Gửi';
   }
 };

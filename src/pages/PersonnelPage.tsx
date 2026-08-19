@@ -18,7 +18,7 @@ import { formatPhoneNumber, getDirectImageLink, formatCurrencySpace as formatCur
 import UnitFilterSidebar from '../components/ui/UnitFilterSidebar';
 import Pagination from '../components/ui/Pagination';
 import { useAllowedUnits } from '../hooks/useAllowedUnits';
-import LineTabs from '../components/ui/LineTabs';
+import SegmentTabs from '../components/ui/SegmentTabs';
 import PersonnelModal from '../components/personnel/PersonnelModal';
 import { motion } from 'motion/react';
 
@@ -2115,34 +2115,12 @@ export default function PersonnelPage() {
           )}
 
           <div className={`mb-4 transition-all duration-300 ${isListCollapsed ? 'md:ml-10 lg:ml-0' : ''} shrink-0`}>
-            <nav className="bg-gray-100/80 dark:bg-slate-800 rounded-xl w-fit flex space-x-1 p-1 border border-gray-200/50 dark:border-slate-700/50" aria-label="Tabs">
-              {personnelTabs.map((tab) => {
-                const isActive = activeTab === tab.id;
-                return (
-                  <button
-                    key={tab.id}
-                    type="button"
-                    onClick={() => setActiveTab(tab.id as 'info' | 'stats' | 'cuoc')}
-                    className={`relative flex items-center gap-2 px-4 py-2 text-xs sm:text-sm font-bold rounded-lg transition-colors duration-200 cursor-pointer ${isActive
-                        ? 'text-white'
-                        : 'text-gray-400 hover:text-[#005698]'
-                      }`}
-                  >
-                    <span className="relative z-10 flex items-center gap-2">
-                      {tab.icon}
-                      <span>{tab.label}</span>
-                    </span>
-                    {isActive && (
-                      <motion.div
-                        layoutId="personnelActiveBg"
-                        className="absolute inset-0 rounded-lg bg-[#005698] z-0"
-                        transition={{ type: 'spring', duration: 0.35, bounce: 0.05 }}
-                      />
-                    )}
-                  </button>
-                );
-              })}
-            </nav>
+            <SegmentTabs
+              tabs={personnelTabs}
+              activeTab={activeTab}
+              onChange={(id) => setActiveTab(id as any)}
+              layoutId="personnelActiveBg"
+            />
           </div>
         </div>
 

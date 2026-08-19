@@ -162,7 +162,7 @@ export const INITIAL_MOCK_DATA: Record<string, any[]> = {
       so_khung: 'RLAA1234567890',
       so_may: '2AR-FE123456',
       so_cho: 5,
-      nhien_lieu: 'Xăng',
+      loai_nhien_lieu: 'Xăng',
       dung_tich: '2.5L',
       cong_thuc_banh: '4x2',
       hinh_thuc_so_huu: 'Mua mới',
@@ -447,6 +447,25 @@ export const INITIAL_MOCK_DATA: Record<string, any[]> = {
       ghi_chu: 'Cấp vỏ bình đặt cọc 50.000đ/vỏ',
       dau_moi_json: [],
       gia_han_tu_dong: 12
+    }
+  ],
+
+  nk_su_dung_xe: [
+    {
+      id: 'NKSD1',
+      id_don_vi: 'SR1',
+      bien_so: '61A-12345',
+      nguoi_de_xuat: 'Nguyễn Lương Minh Thiện',
+      lai_xe: 'Trần Văn Tài',
+      muc_dich_su_dung: 'Sửa chữa lưu động',
+      thoi_gian_su_dung: '08:30 - 17:30, Ngày 15/08/2026',
+      noi_di: 'Showroom Bình Dương',
+      noi_den: 'Khách hàng Thuận An',
+      so_km_di: 18500,
+      so_km_ve: 18545,
+      tong_km: 45,
+      file_name: 'Phieu_De_Xuat_61A12345.pdf',
+      created_at: '2026-08-15T08:30:00Z'
     }
   ]
 };

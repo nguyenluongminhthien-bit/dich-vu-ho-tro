@@ -108,7 +108,7 @@ export default function ReportPage() {
   // Hàm phân loại văn bản chuẩn
   const getDocumentSheetType = (item: any): string => {
     const pl = String(item.phan_loai || '').trim();
-    if (pl === 'Quyết định' || pl === 'Thông báo' || pl === 'Tờ trình' || pl === 'Công văn đến' || pl === 'Công văn đi') {
+    if (pl === 'Quyết định' || pl === 'Thông báo' || pl === 'Thông báo BĐH' || pl === 'Tờ trình' || pl === 'Công văn đến' || pl === 'Công văn đi') {
       return pl;
     }
     const soHieu = String(item.so_hieu || '').toUpperCase();

@@ -38,18 +38,19 @@ export const getPCCC = () => getWithFallback<any>('hs_pccc');
 export const getTsPCCC = () => getWithFallback<any>('ts_pccc');
 export const getUsers = () => getWithFallback<User>('config_users');
 export const getLogs = () => getWithFallback<SysLog>('sys_logs');
-export const getThueBao   = () => getWithFallback<ThueBao>('dm_thue_bao');
+export const getThueBao = () => getWithFallback<ThueBao>('dm_thue_bao');
 export const getCuocThang = () => getWithFallback<CuocThang>('cp_cuoc_thang');
 export const getKhoaHuanLuyen = () => getWithFallback<any>('hs_khoa_huan_luyen');
 export const getHocVienKhoaHuanLuyen = () => getWithFallback<any>('hs_hoc_vien_khoa_huan_luyen');
 export const getChuKyATVSLD = (forceRefresh = false) => getWithFallback<any>('dm_chu_ky_atvsld', forceRefresh);
 export const getThietBiNghiemNgat = () => getWithFallback<any>('ts_thiet_bi_nghiem_ngat');
 export const getKiemDinhTBNN = () => getWithFallback<any>('nk_kiem_dinh_tbnn');
+export const getNhatKySuDungXe = () => getWithFallback<any>('nk_su_dung_xe');
 
 // Helper làm sạch payload trước khi gửi lên Supabase (loại bỏ trường UI-only, rỗng "" -> null)
 function sanitizePayload(item: Record<string, any>, isUpdate: boolean = false): Record<string, any> {
   const cleaned: Record<string, any> = {};
-  const uiOnlyKeys = new Set(['STT', 'stt', 'isEditing', 'isSelected', 'action', '__rowNum__']);
+  const uiOnlyKeys = new Set(['STT', 'stt', 'isEditing', 'isSelected', 'action', '__rowNum__', 'showroom_ref']);
 
   Object.keys(item || {}).forEach(key => {
     // Loại bỏ các trường nội bộ bắt đầu bằng _ hoặc trường UI-only
@@ -79,7 +80,7 @@ function extractRecordSummary(data: any, tableName: string): string {
   }
 
   const table = tableName.toLowerCase();
-  
+
   if (table.includes('ns_dich_vu')) {
     if (data.ho_ten) parts.push(`Họ tên: ${data.ho_ten}`);
     if (data.ma_so_nhan_vien) parts.push(`MSNV: ${data.ma_so_nhan_vien}`);
@@ -127,7 +128,7 @@ async function checkUnitPermission(item: any, tableName: string) {
 
   const strTargetId = String(targetIdDonVi).trim();
   const userIdDonVi = String(currentUser.id_don_vi || (currentUser as any).idDonVi || '').trim();
-  
+
   if (!userIdDonVi || userIdDonVi === 'ALL' || userIdDonVi === 'HO' || userIdDonVi === 'DV_HO') return;
 
   const allUnits = await getDonVi();
@@ -161,7 +162,7 @@ export async function save(data: any, action: 'create' | 'update', tableName: st
       const cleanArray = data.map(item => sanitizePayload(item, false));
 
       const response = await fetch(`${SUPABASE_URL}/rest/v1/${realTableName}`, {
-        method: 'POST', 
+        method: 'POST',
         headers: HEADERS,
         body: JSON.stringify(cleanArray)
       });
@@ -191,32 +192,32 @@ export async function save(data: any, action: 'create' | 'update', tableName: st
     }
 
     let url = `${SUPABASE_URL}/rest/v1/${realTableName}`;
-    let method = 'POST'; 
+    let method = 'POST';
 
     if (action === 'update') {
-      const recordId = data.id || data.ID || data.ID_Xe || data.ID_User; 
-      url = `${url}?id=eq.${recordId}`; 
-      method = 'PATCH'; 
+      const recordId = data.id || data.ID || data.ID_Xe || data.ID_User;
+      url = `${url}?id=eq.${recordId}`;
+      method = 'PATCH';
     }
 
     const response = await fetch(url, {
-      method: method, 
+      method: method,
       headers: HEADERS,
       body: JSON.stringify(cleanedData)
     });
-    
+
     if (!response.ok) {
       const errorText = await response.text();
       let errorMsg = errorText;
       try {
         const errJson = JSON.parse(errorText);
         errorMsg = errJson.message || errJson.details || errorText;
-      } catch (e) {}
-      
+      } catch (e) { }
+
       console.error(`🔴 LỖI TỪ SUPABASE (Bảng ${realTableName}):`, errorMsg);
-      throw new Error(errorMsg); 
+      throw new Error(errorMsg);
     }
-    
+
     invalidateCache(realTableName);
     const tenHanhDong = action === 'create' ? 'THÊM MỚI' : 'CẬP NHẬT';
     const detailSummary = extractRecordSummary(data, realTableName);
@@ -239,15 +240,15 @@ export async function deleteRecord(id: string, tableName: string): Promise<boole
     const realTableName = resolveTable(tableName);
 
     const response = await fetch(`${SUPABASE_URL}/rest/v1/${realTableName}?id=eq.${id}`, {
-      method: 'DELETE', 
+      method: 'DELETE',
       headers: HEADERS
     });
-    
+
     if (!response.ok) {
       const errorText = await response.text();
       throw new Error(`Lỗi xóa ${realTableName}: ${errorText}`);
     }
-    
+
     invalidateCache(realTableName);
     void writeLog('XÓA', `Bảng: ${realTableName} | ID Đối tượng: ${id}`);
     return true;

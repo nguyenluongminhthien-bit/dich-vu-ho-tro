@@ -29,6 +29,8 @@ import { buildHierarchicalOptions, getUnitEmoji, sortDonViByThuTu, groupParentUn
 import { toast } from '../utils/toast';
 import { PageWithFilterSkeleton } from '../components/SkeletonLoader';
 import { exportSecurityReport } from '../utils/exportExcel';
+import DepartmentMapModal from '../components/department/DepartmentMapModal';
+
 
 // 🟢 [HÀM TIỆN ÍCH CHUNG]
 
@@ -185,6 +187,13 @@ export default function DepartmentPage() {
   const [isListCollapsed, setIsListCollapsed] = useState(false);
   const [selectedUnitId, setSelectedUnitId] = useState<string | null>(null);
   const [expandedParents, setExpandedParents] = useState<string[]>([]);
+
+  // 🟢 State quản lý Modal Bản đồ Showroom & Tối ưu lộ trình
+  const [isMapModalOpen, setIsMapModalOpen] = useState(false);
+  const [mapInitialUnitId, setMapInitialUnitId] = useState<string | null>(null);
+
+  // State lưu trữ tạm thời mã nhúng/link Google Maps để phân tích tọa độ
+  const [mapEmbedCode, setMapEmbedCode] = useState('');
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<'create' | 'update' | 'view'>('create');
@@ -586,8 +595,46 @@ export default function DepartmentPage() {
   const openModal = (mode: 'create' | 'update', item?: DonVi) => {
     setModalMode(mode);
     setCustomKD('');
+    setMapEmbedCode(''); // Reset ô dán mã nhúng khi mở form
     setFormData(item ? { ...item } : { ...initialFormState, id: `DV${Date.now()}` });
     setIsModalOpen(true); setError(null);
+  };
+
+  // 🟢 Hàm phân tích vĩ độ & kinh độ từ link thanh địa chỉ trình duyệt hoặc mã nhúng Google Maps
+  const handleMapEmbedChange = (val: string) => {
+    setMapEmbedCode(val);
+    if (!val.trim()) return;
+
+    // 1. ƯU TIÊN SỐ 1: Trích xuất tọa độ chính xác của Marker địa điểm (!3d[vi_do]!4d[kinh_do]) từ link đầy đủ trên thanh địa chỉ
+    const markerLatMatch = val.match(/!3d(-?\d+\.\d+)/);
+    const markerLngMatch = val.match(/!4d(-?\d+\.\d+)/);
+
+    // Lưu ý: Nếu có cả !3d và !4d thì đây là tọa độ chính xác của Marker địa điểm được ghim
+    if (markerLatMatch && markerLngMatch) {
+      const lat = parseFloat(markerLatMatch[1]);
+      const lng = parseFloat(markerLngMatch[1]);
+      setFormData(prev => ({ ...prev, vi_do: lat, kinh_do: lng }));
+      return;
+    }
+
+    // 2. FALLBACK 1: Trích xuất tọa độ tâm camera dạng @latitude,longitude từ link trình duyệt
+    const cameraMatch = val.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+    if (cameraMatch) {
+      const lat = parseFloat(cameraMatch[1]);
+      const lng = parseFloat(cameraMatch[2]);
+      setFormData(prev => ({ ...prev, vi_do: lat, kinh_do: lng }));
+      return;
+    }
+
+    // 3. FALLBACK 2: Trích xuất từ mã nhúng iframe (pb=!1m...!2d[kinh_do]!3d[vi_do])
+    const embedMatchLng = val.match(/!2d(-?\d+\.\d+)/);
+    const embedMatchLat = val.match(/!3d(-?\d+\.\d+)/);
+    if (embedMatchLng && embedMatchLat) {
+      const lng = parseFloat(embedMatchLng[1]);
+      const lat = parseFloat(embedMatchLat[1]);
+      setFormData(prev => ({ ...prev, vi_do: lat, kinh_do: lng }));
+      return;
+    }
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -933,10 +980,13 @@ export default function DepartmentPage() {
                 <div>
                   <h1 className="text-3xl font-black text-[#05469B] mb-3">{selectedUnit.ten_don_vi}</h1>
                   <div className="flex flex-wrap items-center gap-3 text-sm text-gray-500 font-medium">
-                    <span className="flex items-center gap-1.5 group">
-                      <MapPin size={16} className="text-red-500 shrink-0" />
+                    <span className="flex items-center gap-1.5 group cursor-pointer" onClick={() => {
+                      setMapInitialUnitId(selectedUnit.id);
+                      setIsMapModalOpen(true);
+                    }}>
+                      <MapPin size={16} className="text-red-500 shrink-0 group-hover:scale-110 transition-transform" />
                       {selectedUnit.dia_chi ? (
-                        <a href={`http://maps.google.com/?q=$?q=${encodeURIComponent(selectedUnit.dia_chi)}`} target="_blank" rel="noreferrer" className="group-hover:text-blue-600 group-hover:underline transition-colors break-words" title="Xem trên Google Maps">{selectedUnit.dia_chi}</a>
+                        <button className="group-hover:text-blue-600 group-hover:underline text-left break-words cursor-pointer bg-transparent border-none p-0 outline-none text-slate-500 font-medium" title="Xem trên Bản đồ Showroom">{selectedUnit.dia_chi}</button>
                       ) : 'Chưa cập nhật địa chỉ'}
                     </span>
                     <span className="px-2.5 py-1 bg-gray-100 rounded-md text-xs border border-gray-200">ID: {selectedUnit.id}</span>
@@ -2049,7 +2099,7 @@ export default function DepartmentPage() {
                   <div className={`grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch`}>
                     {/* 1. THỐNG KÊ PHƯƠNG TIỆN */}
                     <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex flex-col h-full">
-                      <h4 className="font-bold text-[#05469B] mb-4 flex items-center gap-2 border-b border-gray-100 pb-2"><Car size={18} className="text-[#05469B]" /> 1. Phương tiện (Xe công & Lái thử)</h4>
+                      <h4 className="font-bold text-[#05469B] mb-4 flex items-center gap-2 border-b border-gray-100 pb-2"><Car size={18} className="text-[#05469B]" /> 1. Phương tiện (Thống kê theo Mục đích)</h4>
                       <div className="grid grid-cols-3 gap-4 mb-5">
                         <div className="bg-gray-50 p-3 rounded-xl border border-gray-100 text-center flex flex-col items-center justify-between"><p className="text-[10px] font-bold text-gray-500 uppercase mb-1 whitespace-nowrap w-full truncate" title="Tổng số xe">Tổng số xe</p><p className="text-xl font-black text-[#05469B] mt-auto flex-1 flex items-end">{xeStats.total}</p></div>
                         <div className="bg-emerald-50 p-3 rounded-xl border border-emerald-100 text-center flex flex-col items-center justify-between"><p className="text-[10px] font-bold text-emerald-600 uppercase mb-1 whitespace-nowrap w-full truncate" title="Đang hoạt động">Đang hoạt động</p><p className="text-xl font-black text-emerald-700 mt-auto flex-1 flex items-end">{xeStats.active}</p></div>
@@ -2147,9 +2197,31 @@ export default function DepartmentPage() {
                 <div className="md:col-span-2"><label className="block text-xs font-bold mb-1 text-gray-600">Tên Đơn Vị *</label><input type="text" required name="ten_don_vi" value={formData.ten_don_vi || ''} onChange={(e) => setFormData({ ...formData, ten_don_vi: e.target.value })} className="w-full p-2.5 border rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-blue-500" /></div>
                 <div><label className="block text-xs font-bold mb-1 text-gray-600">Cấp Quản Lý (Mẹ) *</label><select required name="cap_quan_ly" value={formData.cap_quan_ly || ''} onChange={(e) => setFormData({ ...formData, cap_quan_ly: e.target.value })} className="w-full p-2.5 border rounded-lg bg-[#FFFFF0] font-bold text-[#05469B] outline-none focus:ring-2 focus:ring-blue-500"><option value="">-- Chọn Cấp QL --</option><option value="HO" className="text-red-600">🏢 Tổng Công Ty (HO)</option>{buildHierarchicalOptions(data.filter(d => d.id !== formData.id)).map(({ unit, prefix }) => (<option key={unit.id} value={unit.id}>{prefix}{getUnitEmoji(unit.loai_hinh)} {unit.ten_don_vi}</option>))}</select></div>
                 <div><label className="block text-xs font-bold mb-1 text-gray-600">Khu vực (Phía)</label><select name="phia" value={formData.phia || 'VPĐH'} onChange={(e) => setFormData({ ...formData, phia: e.target.value })} className="w-full p-2.5 border rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-blue-500"><option value="VPĐH">VPĐH</option><option value="CTTT Phía Nam">CTTT Phía Nam</option><option value="CTTT Phía Bắc">CTTT Phía Bắc</option></select></div>
-                <div><label className="block text-xs font-bold mb-1 text-gray-600">Loại hình</label><select name="loai_hinh" value={formData.loai_hinh || 'Showroom Quản trị'} onChange={(e) => setFormData({ ...formData, loai_hinh: e.target.value })} className="w-full p-2.5 border rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-blue-500"><option value="Tổng Công ty">Tổng Công ty</option><option value="Công ty Tỉnh/TP">Công ty Tỉnh/TP</option><option value="Showroom Quản trị">Showroom Quản trị</option><option value="Showroom">Showroom</option><option value="Xưởng Dịch vụ">Xưởng Dịch vụ</option><option value="Điểm Kinh doanh">Điểm Kinh doanh</option><option value="Kho xe">Kho xe</option></select></div>
+                <div><label className="block text-xs font-bold mb-1 text-gray-600">Loại hình</label><select name="loai_hinh" value={formData.loai_hinh || 'Showroom Quản trị'} onChange={(e) => setFormData({ ...formData, loai_hinh: e.target.value })} className="w-full p-2.5 border rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-blue-500"><option value="Tổng Công ty">Tổng Công ty</option><option value="Công ty Tỉnh thành">Công ty Tỉnh thành</option><option value="Showroom Quản trị">Showroom Quản trị</option><option value="Showroom">Showroom</option><option value="Xưởng Dịch vụ">Xưởng Dịch vụ</option><option value="Điểm Kinh doanh">Điểm Kinh doanh</option><option value="Kho xe">Kho xe</option></select></div>
                 <div><label className="block text-xs font-bold mb-1 text-gray-600">Trạng thái</label><select name="trang_thai" value={formData.trang_thai || 'Hoạt động'} onChange={(e) => setFormData({ ...formData, trang_thai: e.target.value })} className="w-full p-2.5 border rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-blue-500 font-bold text-gray-700"><option value="Hoạt động">Hoạt động</option><option value="Đại lý">Đại lý</option><option value="Đầu tư mới">Đầu tư mới</option><option value="Ngừng hoạt động">Ngừng hoạt động</option></select></div>
                 <div className="md:col-span-2"><label className="block text-xs font-bold mb-1 text-gray-600">Địa chỉ</label><input type="text" name="dia_chi" value={formData.dia_chi || ''} onChange={(e) => setFormData({ ...formData, dia_chi: e.target.value })} className="w-full p-2.5 border rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-blue-500" /></div>
+                <div className="md:col-span-3">
+                  <label className="block text-xs font-bold mb-1 text-gray-600">Nhúng bản đồ (Dán Link Google Maps từ thanh địa chỉ trình duyệt hoặc mã nhúng iframe)</label>
+                  <input
+                    type="text"
+                    value={mapEmbedCode}
+                    onChange={(e) => handleMapEmbedChange(e.target.value)}
+                    placeholder="Dán toàn bộ link Google Maps copy từ thanh địa chỉ trình duyệt để lấy tọa độ chính xác nhất..."
+                    className="w-full p-2.5 border rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-blue-500 text-xs text-gray-700 placeholder-gray-400"
+                  />
+                  <p className="text-[9px] text-gray-400 font-bold mt-1.5 leading-relaxed">
+                    💡 Mẹo: Hãy mở Google Maps trên trình duyệt máy tính, tìm kiếm địa điểm showroom, copy toàn bộ đường dẫn URL trên thanh địa chỉ dán vào đây để lấy vĩ độ/kinh độ chính xác 100% (không dùng link rút gọn dạng maps.app.goo.gl).
+                  </p>
+                  {formData.vi_do && formData.kinh_do ? (
+                    <p className="text-[10px] text-emerald-600 font-bold mt-1.5 flex items-center gap-1.5 animate-in fade-in">
+                      ✓ Đã phân tích tọa độ thành công: Vĩ độ (vi_do): {formData.vi_do} | Kinh độ (kinh_do): {formData.kinh_do}
+                    </p>
+                  ) : (
+                    <p className="text-[10px] text-amber-600 font-bold mt-1.5 flex items-center gap-1.5">
+                      ℹ️ Chưa có dữ liệu tọa độ (Vui lòng dán link Google Maps hoặc mã nhúng để phân tích)
+                    </p>
+                  )}
+                </div>
               </div>
               {formData.loai_hinh === 'Showroom Quản trị' && (<div className="bg-[#00559B]/5 p-4 rounded-xl border border-[#00559B]/20 mt-2 animate-in fade-in"><label className="block text-xs font-bold text-[#00559B] mb-3 uppercase tracking-wider">Thương hiệu Kinh Doanh</label><div className="flex flex-wrap gap-3 mb-4">{KINH_DOANH_OPTIONS.map(opt => { const isChecked = (formData.kinh_doanh || '').split(',').map((s: string) => s.trim()).includes(opt); return (<label key={opt} className="flex items-center gap-1.5 cursor-pointer bg-white px-3 py-1.5 rounded-lg border border-[#00559B]/20 shadow-sm hover:border-[#00559B] transition-colors"><input type="checkbox" checked={isChecked} onChange={(e) => handleKinhDoanhChange(opt, e.target.checked)} className="w-4 h-4 text-[#00559B] rounded border-gray-300 focus:ring-[#00559B] cursor-pointer" /><span className="text-xs font-bold text-gray-700">{opt}</span></label>) })}{(formData.kinh_doanh || '').split(',').map((s: string) => s.trim()).filter(Boolean).filter((opt: string) => !KINH_DOANH_OPTIONS.includes(opt)).map((opt: string) => (<label key={opt} className="flex items-center gap-1.5 cursor-pointer bg-white px-3 py-1.5 rounded-lg border border-[#00559B]/20 shadow-sm hover:border-[#00559B] transition-colors"><input type="checkbox" checked={true} onChange={(e) => handleKinhDoanhChange(opt, e.target.checked)} className="w-4 h-4 text-[#00559B] rounded border-gray-300 focus:ring-[#00559B] cursor-pointer" /><span className="text-xs font-bold text-gray-700">{opt}</span></label>))}</div><div className="flex gap-2 items-center max-w-sm"><input type="text" value={customKD} onChange={e => setCustomKD(e.target.value)} placeholder="Nhập thương hiệu khác..." className="w-full p-2 border border-gray-200 rounded-lg bg-white text-sm outline-none focus:ring-2 focus:ring-[#00559B]" onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addCustomKD(); } }} /><button type="button" onClick={addCustomKD} className="px-4 py-2 bg-[#00559B] hover:bg-[#04367a] text-white font-bold rounded-lg text-sm transition-colors shadow-sm">Thêm</button></div></div>)}
               <hr className="border-gray-100" />
@@ -2501,6 +2573,18 @@ export default function DepartmentPage() {
           </div>
         </div>
       )}
+
+      {/* 11. MODAL BẢN ĐỒ SHOWROOM & TỐI ƯU LỘ TRÌNH */}
+      <DepartmentMapModal
+        isOpen={isMapModalOpen}
+        onClose={() => {
+          setIsMapModalOpen(false);
+          setMapInitialUnitId(null);
+        }}
+        initialUnitId={mapInitialUnitId}
+        units={data}
+        personnel={personnelData}
+      />
 
     </div>
   );
