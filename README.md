@@ -1,6 +1,6 @@
 # 🏢 HỆ THỐNG QUẢN TRỊ VĂN PHÒNG & AN SINH ĐỜI SỐNG (QTVP-ASDS)
 
-Tài liệu này cung cấp bức tranh toàn cảnh 100% về kiến trúc, tất cả 12 phân hệ nghiệp vụ, cơ chế phân quyền, nguyên tắc tối ưu hiệu năng và giải thích cấu trúc file dự án **QTVP-ASDS**.
+Tài liệu này cung cấp bức tranh toàn cảnh 100% về kiến trúc, tất cả 13 phân hệ nghiệp vụ, cơ chế phân quyền, nguyên tắc tối ưu hiệu năng và giải thích cấu trúc file dự án **QTVP-ASDS**.
 
 ---
 
@@ -46,7 +46,7 @@ QTVP-ASDS App
 ### 🟢 CHI TIẾT TÍNH NĂNG TỪNG PHÂN HỆ
 
 #### 📊 01. Phân hệ Tổng quan (DashboardPage.tsx)
-- **Hệ thống Thẻ KPI**: Hiển thị tổng số nhân sự, đơn vị, xe, thiết bị, tình hình PCCC và ATVSLĐ thuộc phạm vi quản lý.
+- **Hệ thống Thẻ KPI**: Hiển thị tổng số nhân sự, đơn vị, xe, thiết bị, tình hình PCCC và ATVSLĐ thuộc phạm vi quản lý. Số liệu nghiệp vụ nhân sự được phân loại đồng bộ với trang Nhân sự: nhóm Bảo vệ (phòng ban hoặc phân loại chứa "BV, ĐTKH"), nhóm PVHC (phòng ban chứa "PVHC") và nhóm QTVP & ASĐS (phòng ban chứa "QTVP" hoặc phân loại chứa "PT QTVP").
 - **Biểu đồ Nhân sự (PersonnelDoughnutChart.tsx)**: Phân tích cơ cấu nhân sự theo phân loại, thâm niên, độ tuổi và giới tính.
 - **Bảng Cảnh báo Hạn (ExpiryAlertPanel.tsx)**: Tự động gom nhóm các đối tượng Sắp hết hạn / Quá hạn (Biên bản kiểm định thiết bị nghiêm ngặt, Chứng chỉ ATVSLĐ, Bảo hiểm chay nổ PCCC, Bơm sạc bình PCCC, Kiểm định xe...).
 - **Tùy chỉnh Dashboard (DashboardCustomizerModal.tsx)**: Cho phép bật/tắt và sắp xếp các widget theo sở thích cá nhân.
@@ -67,6 +67,9 @@ QTVP-ASDS App
 - **Xuất danh bạ (Excel)**: Chuyển đổi vai trò hiển thị và lọc từ "PT DVHT KD" thành "PT QTVP", chỉ trích xuất các nhân sự có chức vụ chính xác là "PT QTVP" hoặc "Trưởng phòng QTVP" (hỗ trợ so khớp NFC không phân biệt chữ hoa/thường). Tên file tải về định dạng: `Danh_Ba_Lanh_Dao_QTVP_YYYY-MM-DD.xls`.
 - **Nhập Dán Excel Hàng Loạt (Paste Import)**: Cho phép copy-paste toàn bộ bảng Excel vào phần mềm.
   - *Quy tắc bảo toàn dữ liệu*: Bắt buộc MSNV và Họ tên. Đối với nhân sự đã tồn tại, các cột để trống trong file Excel sẽ **GIỮ NGUYÊN 100% dữ liệu cũ trong CSDL**, không bị ghi đè hay nhảy chức danh.
+- **Bảo mật nâng cao & Quyền chi tiết (Granular Rules)**:
+  - `NS_HIDE_SENSITIVE`: Tự động ẩn thông tin nhạy cảm (SĐT cá nhân, Số CCCD, Ngạch lương, Thu nhập, Mô tả ngoại hình) thành dạng `***` trên toàn giao diện xem danh sách, thẻ nhân sự và chi tiết hồ sơ.
+  - `NS_NO_DETAIL`: Cấm tài khoản mở xem trang Chi tiết Hồ sơ 360° của nhân viên.
 
 #### 🧯 04. Phân hệ Quản lý PCCC & CNCH (FireSafetyPage.tsx)
 - **Hồ sơ Đội PCCC cơ sở**: Số lượng đội viên, khả năng huy động ban ngày/ban đêm, phương án PCCC, hotline khẩn cấp (PCCC, UBND, Công an, Điện lực, Cấp nước, Y tế).
@@ -93,6 +96,8 @@ QTVP-ASDS App
 - **Chuẩn hóa Màu sắc & Giao diện Nhập liệu**: Đồng nhất màu nền `#FFFFF0` nhẹ dịu, chữ màu đen rõ ràng và font size đồng nhất giữa tất cả các trường dữ liệu trên bảng Thêm mới / Cập nhật tài sản.
 - **Tự động Làm sạch Chuỗi Kỹ thuật (`cleanTechnicalString`)**: Tự động loại bỏ khoảng trắng thừa quanh dấu gạch ngang (VD: `i7 - 1185G7` thành `i7-1185G7`, `Core i5 - 1135G7` thành `Core i5-1135G7`). Áp dụng tự động cho CPU, VGA, Mã tài sản, Số seri.
 - **Tự động Định dạng Đơn vị GB (`formatMemorySize`)**: Nhập số thuần (VD: `512`, `16`, `256`) hay chữ dính liền (`512gb`, `16GB`) $\rightarrow$ tự động gắn đơn vị chuẩn **`512 GB`**, **`16 GB`**, **`256 GB`**. Áp dụng đồng bộ cả khi Dán Excel hàng loạt lẫn Nhập/Sửa từng thiết bị đơn lẻ.
+- **Ẩn giá trị tài sản qua Quyền chi tiết**:
+  - `TB_HIDE_PRICE`: Ẩn thông tin Nguyên giá/Giá mua (`gia_mua`) của thiết bị thành `***` và khóa không cho chỉnh sửa trường này đối với tài khoản bị hạn chế.
 - **Nhật ký Thiết bị (NhatKyThietBi)**: Ghi nhận lịch sử bàn giao người sử dụng, phòng ban quản lý, lịch sử sửa chữa, nâng cấp, báo hỏng, chi phí.
 - **Deep Link & Quét mã QR**: Tạo mã QR tài sản (`qrcode.react`), hỗ trợ quét mã QR qua camera (`html5-qrcode`) hoặc truy cập thẳng qua URL `/?tab=equipment&qr=MÃ_TÀI_SẢN` để mở ngay chi tiết thiết bị.
 
@@ -104,30 +109,44 @@ QTVP-ASDS App
 
 #### 📄 09. Phân hệ Quản lý Văn bản & Thông báo (DocumentPage.tsx)
 - **Phân loại Văn bản**: Quản lý văn bản đến/đi, thông báo, quyết định, quy định.
-- **Phân quyền thao tác**:
-  - Chỉ đơn vị ban hành hoặc HO Admin mới có quyền Sửa/Xóa văn bản đó.
-  - Các đơn vị khác chỉ có quyền Xem (Read-only).
+- **Phân quyền thao tác & Ma trận quyền nâng cao**:
+  - Chỉ đơn vị ban hành hoặc HO Admin mới có quyền Sửa/Xóa văn bản đó. Các đơn vị khác chỉ có quyền Xem (Read-only).
+  - `VB_HIDE_BTN`: Ẩn hoàn toàn nút Ban hành mới trên thanh công cụ.
+  - `VB_VIEW_QD`, `VB_VIEW_TB`, `VB_VIEW_TB_BDH`, `VB_VIEW_TT`, `VB_VIEW_CV_DI`, `VB_VIEW_CV_DEN`: Hạn chế chỉ hiển thị loại văn bản tương ứng với quyền được tích chọn trong ma trận quyền.
+- **Tự động tìm kiếm file đính kèm trên Google Drive**: Tích hợp nút **"Tự động tìm file trên Drive"** cạnh trường nhập đường dẫn file. Hệ thống tự động phân tích Năm ban hành, Phân loại văn bản và Số hiệu để truy vấn Google Drive API v3. Sử dụng thuật toán so khớp RegExp thông minh ở Client-side hỗ trợ đa tiền tố viết tắt (QĐ/QD, CVĐ/CVD, TTr/TT) giúp tìm chính xác file PDF bất kể sự không đồng nhất về khoảng trắng, dấu chấm phân cách hay hậu tố chữ cái (ví dụ khớp chuẩn: QĐ09, QD34, QĐ.04, QĐ 40, QĐ12B).
 - **Auto-fill Người lấy số**: Nhập mã nhân viên tự động điền Họ tên và Bộ phận lấy số.
 - **Hỗ trợ Đa nghiệp vụ**: Cho phép nhập nhiều phân loại nghiệp vụ ngăn cách bởi dấu `;`. Giao diện bảng danh sách tài liệu (`AllDocTable.tsx`, `ThongBaoTable.tsx`, `QuyetDinhTable.tsx`, `CongVanDiTable.tsx`, `ToTrinhTable.tsx`) tự động tách chuỗi theo dấu `;` để hiển thị thành các tag nghiệp vụ độc lập, gọn gàng.
 - **Autocomplete Nhiều giá trị**: Ô nhập liệu Nghiệp vụ tự động gợi ý thông minh dựa trên phần văn bản sau dấu `;` cuối cùng và điền tiếp nối một cách chuẩn xác mà không đè lên giá trị đã nhập trước đó.
 
 #### 📜 10. Phân hệ Quản lý Quy định & Quy trình (PolicyPage.tsx)
 - Lưu trữ, phân loại và tra cứu các quy định hành chính, quy trình làm việc chuẩn áp dụng trong toàn hệ thống.
+- **Bộ lọc Quyền nâng cao**:
+  - `QD_TYPES:type1|type2|...`: Giới hạn các loại tài liệu quy định (Ví dụ: chỉ cho phép xem Quy định và Quy trình).
+  - `QD_YEARS:year1|year2|...`: Giới hạn các tài liệu quy định chỉ được ban hành trong các năm chỉ định.
 - **Xử lý Đa nghiệp vụ Đồng bộ**: Tự động đồng bộ và tách các chuỗi nghiệp vụ ghép từ phân hệ Văn bản. Danh sách nhóm nghiệp vụ bên trái chỉ chứa các nghiệp vụ đơn lẻ, sạch sẽ. Bộ lọc và số lượng đếm tài liệu cho mỗi nghiệp vụ được xử lý chính xác tuyệt đối.
 
 #### 📊 11. Phân hệ Báo cáo Tổng hợp & Custom Builder (ReportPage.tsx)
 - **Mẫu báo cáo Cấu trúc Đơn vị (`ReportList.tsx`)**: Tổng hợp sơ đồ và thông tin liên hệ đơn vị.
 - **Mẫu báo cáo Pháp nhân Hóa đơn**: Tổng hợp mã số thuế và tên công ty xuất hóa đơn.
 - **Mẫu báo cáo Khảo sát An ninh Bảo vệ 13 mục**: Cho phép xuất file Excel đa Worksheet (mỗi đơn vị/showroom 1 Sheet) theo đúng chuẩn khảo sát AN-BV.
+- **Danh sách Quy định - Quy trình hiện hành**: Báo cáo tích hợp nâng cao của tính năng xuất Excel từ mục Quy định. Hệ thống tự động gộp dữ liệu từ bảng quy định (`qd_qt`) và bảng văn bản liên kết (`vb_tb` có gán nghiệp vụ) để đảm bảo đầy đủ 100% dữ liệu (116 văn bản). Hỗ trợ các bộ lọc nâng cao gồm Năm ban hành, Loại tài liệu (quét động toàn bộ các loại tài liệu thực tế đang có như Quy định, Quy trình, Tờ trình, Thông báo...), Nghiệp vụ áp dụng (quét từ chuỗi nghiệp vụ ghép) và Bộ phận ban hành, tự động xuất Excel theo đúng mẫu thiết kế gốc gồm 8 cột (STT, Số hiệu, Tiêu đề, Trích yếu, Nghiệp vụ, Bộ phận ban hành, Ngày ban hành, Đính kèm) có chèn Hyperlink.
 - **Trình dựng Báo cáo Tùy chỉnh (`CustomReportBuilder.tsx`)**: Cho phép chọn bảng dữ liệu, chọn cột hiển thị, thiết lập bộ lọc và xuất file Excel theo ý muốn.
 - **Tải Form Nhập Hàng Loạt Chuẩn DB theo 3 Tiêu chí**: Tích hợp khu vực tải tập trung 4 biểu mẫu dán Excel chuẩn hóa. Đặc biệt đối với **Trang thiết bị văn phòng** và **Nhân sự**, file Excel mẫu `.xls` được tạo tự động bằng cách quét 100% dữ liệu thực tế đang có trong DB và áp dụng thuật toán trích xuất 01 bản ghi mẫu theo đúng 3 tiêu chí: *1. Điền đầy đủ thông tin nhất*, *2. Thời gian thêm mới gần nhất với hiện tại*, *3. Mô tả chi tiết nhất*. Dữ liệu dòng mẫu 100% là dữ liệu thật thực tế từ hệ thống của người dùng.
 
 #### 👤 12. Phân hệ Quản lý Tài khoản (AccountPage.tsx)
 - **Quản lý Người dùng**: Tạo mới, cập nhật thông tin tài khoản, cấp lại mật khẩu.
-- **Phân quyền chi tiết (Granular Permissions)**: Phân quyền theo Cây đơn vị (`id_don_vi`) và Phân quyền Module thanh menu (`quyen_truy_cap`).
+- **Phân quyền chi tiết & Ma trận quyền nâng cao (Granular & Advanced Permissions)**: 
+  - Phân quyền theo Cây đơn vị (`id_don_vi`) quyết định phạm vi dữ liệu đơn vị trực thuộc được phép xem.
+  - Phân quyền Module thanh menu (`quyen_truy_cap`) để cấp quyền hiển thị các phân hệ chính trên Sidebar.
+  - Ma trận Quyền chi tiết (`quyen_chi_tiet`) cho phép bật/tắt các chính sách cụ thể (như ẩn lương nhân viên, ẩn giá mua thiết bị, cấm xem chi tiết, ẩn nút ban hành, giới hạn loại văn bản, giới hạn năm/phân loại quy trình) để kiểm soát truy cập dữ liệu nhạy cảm.
+- **Cơ chế bảo mật phiên đăng nhập kết hợp**:
+  - **Kiểm tra phiên bản ứng dụng (App Versioning - `APP_VERSION: '1.1.0'`)**: Tự động dọn dẹp các cache dữ liệu cũ của trình duyệt và buộc đăng nhập lại khi có cập nhật lớn trên hệ thống.
+  - **Giới hạn thời hạn phiên**: Phiên đăng nhập ghi nhớ (`localStorage`) tự động hết hạn và xóa sau **2 ngày** (48 giờ) kể từ thời điểm đăng nhập thành công.
+  - **Đồng bộ ngầm quyền hạn và mật khẩu (Database Sync & Password Change)**: Mỗi khi tải ứng dụng, hệ thống tự động gọi ngầm API để đối chiếu mật khẩu và đồng bộ phân quyền mới nhất từ cơ sở dữ liệu Supabase, hoặc buộc đăng xuất ngay lập tức nếu tài khoản bị khóa/xóa hoặc đổi mật khẩu.
+
 
 #### 📜 13. Phân hệ Nhật ký Hệ thống (LogPage.tsx)
-- **Ghi vết Tự động (SysLog)**: Tự động lưu vết lịch sử Đăng nhập, Đăng xuất, Thêm mới, Cập nhật, Xóa bản ghi của tất cả người dùng kèm thời gian và IP/thông tin thao tác.
+- **Ghi vết Tự động (SysLog)**: Tự động lưu vết lịch sử Đăng nhập, Đăng xuất, Thêm mới, Cập nhật, Xóa bản ghi (cho tất cả các phân hệ dữ liệu hệ thống), đồng thời tự động ghi log khi người dùng Xem chi tiết đối tượng (Đơn vị, Nhân sự, Xe, Thiết bị, Nhà cung cấp, Văn bản, Quy định) hoặc thực hiện các thao tác Xuất Excel. Tích hợp cơ chế tự động dọn dẹp hệ thống log cũ quá hạn 5 ngày chạy ngầm khi khởi chạy ứng dụng.
 
 ---
 
@@ -151,7 +170,7 @@ Trong `src/pages/PersonnelPage.tsx`:
 ### 3.4. Cổng ghi dữ liệu duy nhất (đã xác minh trực tiếp trong `services/api/modules.ts`)
 - Toàn bộ thao tác **Đọc** đi qua các hàm `getX()` (VD `getPersonnel()`, `getThietBi()`...), có cơ chế fallback tự động sang dữ liệu offline (`getLocalRecords`) nếu Supabase lỗi.
 - Toàn bộ thao tác **Ghi/Sửa** bắt buộc qua `apiService.save(data, action, tableName)` — hàm tự làm sạch payload, tự sinh `id`, và tự gọi `invalidateCache()` + `writeLog()` (ghi Audit log). Không được gọi thẳng Supabase REST trong component.
-- Toàn bộ thao tác **Xóa** qua `apiService.deleteRecord(id, tableName)`.
+- Toàn bộ thao tác **Xóa** qua `apiService.deleteRecord(id, tableName).`
 
 ---
 
@@ -161,23 +180,23 @@ Dưới đây là giải thích chi tiết lý do vì sao phiên bản gốc (H�
 
 ```text
 📁 Cấu trúc Thư mục Root
-├── 📂 dist/                      # [Có ở cả 2 hình] Chứa sản phẩm đã build (HTML, JS, CSS)
-├── 📂 node_modules/              # [Mới ở Hình 2] Thư mục chứa thư viện npm (phát sinh khi chạy npm install)
-├── 📂 public/                    # [Có ở cả 2 hình] Chứa tài nguyên tĩnh (favicon, logo)
-├── 📂 src/                       # [Có ở cả 2 hình] Thư mục chứa 100% mã nguồn React TypeScript
-├── 📄 .gitignore                 # [Mới ở Hình 2] File cấu hình Git loại trừ các thư mục rác (dist, node_modules)
-├── 📄 ARCHITECTURE.md            # [Mới ở Hình 2] Tài liệu mô tả kiến trúc mã nguồn dành cho AI/Developer
-├── 📄 deptTabStats_restored.ts   # [Mới ở Hình 2] File nháp tạm khôi phục code (đã loại trừ khỏi build)
-├── 📄 find_stats.cjs             # [Mới ở Hình 2] Script công cụ hỗ trợ tìm kiếm code nội bộ
-├── 📄 find_stats.js              # [Mới ở Hình 2] Script công cụ hỗ trợ tìm kiếm code nội bộ
-├── 📄 search_results.txt         # [Mới ở Hình 2] File văn bản lưu kết quả xuất ra từ script tìm kiếm
-├── 📄 index.html                 # [Có ở cả 2 hình] File HTML gốc của ứng dụng React SPA
-├── 📄 metadata.json              # [Có ở cả 2 hình] File thông tin cấu hình dự án
-├── 📄 package.json               # [Có ở cả 2 hình] File khai báo danh sách thư viện phụ thuộc
-├── 📄 package-lock.json          # [Có ở cả 2 hình] File khóa phiên bản chính xác của các gói npm
-├── 📄 README.md                  # [Có ở cả 2 hình] Tài liệu hướng dẫn sử dụng và tổng quan nghiệp vụ này
-├── 📄 tsconfig.json              # [Có ở cả 2 hình] File cấu hình trình biên dịch TypeScript (đã chỉnh include src)
-└── 📄 vite.config.ts             # [Có ở cả 2 hình] File cấu hình đóng gói Vite (đã chỉnh emptyOutDir: false)
+├── 📂 dist/                      # Chứa sản phẩm đã build (HTML, JS, CSS)
+├── 📂 node_modules/              # Thư mục chứa thư viện npm (phát sinh khi chạy npm install)
+├── 📂 public/                    # Chứa tài nguyên tĩnh (favicon, logo)
+├── 📂 src/                       # Thư mục chứa 100% mã nguồn React TypeScript
+├── 📄 .gitignore                 # File cấu hình Git loại trừ các thư mục rác (dist, node_modules)
+├── 📄 ARCHITECTURE.md            # Tài liệu mô tả kiến trúc mã nguồn dành cho AI/Developer
+├── 📄 deptTabStats_restored.ts   # File nháp tạm khôi phục code (đã loại trừ khỏi build)
+├── 📄 find_stats.cjs             # Script công cụ hỗ trợ tìm kiếm code nội bộ
+├── 📄 find_stats.js              # Script công cụ hỗ trợ tìm kiếm code nội bộ
+├── 📄 search_results.txt         # File văn bản lưu kết quả xuất ra từ script tìm kiếm
+├── 📄 index.html                 # File HTML gốc của ứng dụng React SPA
+├── 📄 metadata.json              # File thông tin cấu hình dự án
+├── 📄 package.json               # File khai báo danh sách thư viện phụ thuộc
+├── 📄 package-lock.json          # File khóa phiên bản chính xác của các gói npm
+├── 📄 README.md                  # Tài liệu hướng dẫn sử dụng và tổng quan nghiệp vụ này
+├── 📄 tsconfig.json              # File cấu hình trình biên dịch TypeScript (đã chỉnh include src)
+└── 📄 vite.config.ts             # File cấu hình đóng gói Vite (đã chỉnh emptyOutDir: false)
 ```
 
 ### 💡 Bảng so sánh & Giải thích nguyên nhân phát sinh:
@@ -237,14 +256,14 @@ Dưới đây là giải thích chi tiết lý do vì sao phiên bản gốc (H�
 
 - **Cơ chế xác định Đơn vị mặc định khi truy cập hệ thống**: Tự động chọn đơn vị mặc định khi truy cập bất kỳ phân hệ nào qua hàm `getDefaultUnitId(user, donViList)` trong `src/utils/hierarchy.ts`. Tài khoản Admin/Toàn quyền sẽ hiển thị mặc định đơn vị **THACO AUTO**, tài khoản thường (Showroom, điểm bán lẻ) sẽ hiển thị **Đơn vị mẹ quản lý** (Công ty tỉnh thành) của tài khoản đó.
 - **Tab "Khám sức khỏe & Bệnh nghề nghiệp"** (mục 2, phân hệ 05) mới là khung giao diện placeholder, chưa có dữ liệu — xem mục 2 phía trên.
-- **`utils/logger.ts` và `utils/logger.tsx` bị trùng lặp**: cả 2 file cùng export hàm `generateDiffLog()`. Cần xác định file nào thực sự đang được import ở nơi khác trong dự án và xóa file thừa để tránh nhầm lẫn khi bảo trì.
+- **utils/logger.tsx trùng lặp đã được xóa**: Đã xóa tệp `utils/logger.tsx` dư thừa, giữ lại `utils/logger.ts` làm nguồn duy nhất chứa logic export hàm `generateDiffLog()`, tránh cảnh báo khi biên dịch.
 - **Bảng `dm_chu_ky_atvsld`**: có hàm đọc `getChuKyATVSLD()` khai báo sẵn trong `services/api/modules.ts`, nhưng không tìm thấy nơi nào trong `pages/` hoặc `components/` gọi hàm này — cần kiểm tra lại thủ công (có thể là bảng chưa nối vào UI, hoặc đã đổi tên biến ở nơi khác).
 - **`services/api/client.ts`** chứa `SUPABASE_ANON_KEY` hardcode trực tiếp trong source. Đây là anon key public (được bảo vệ bởi Row Level Security phía Supabase) nên không phải lỗi bảo mật nghiêm trọng, nhưng nên cân nhắc chuyển sang biến môi trường (`.env` + `import.meta.env` của Vite) để thuận tiện đổi giữa môi trường dev/production.
 - **2 file lớn nhất hệ thống** (ứng viên hàng đầu nếu cần tách nhỏ để dễ bảo trì): `components/personnel/CuocDiDongTab.tsx` (3.366 dòng) và `pages/PersonnelPage.tsx` (2.851 dòng).
 - **Lỗi trùng khớp kết quả OSH (ATVSLĐ) "Chưa đạt"**: Các hàm kiểm tra kết quả học viên đạt trong `KhoaHocTab.tsx`, `HoSoTab.tsx` và `AtvsldPage.tsx` ban đầu sử dụng phương thức `.includes('đạt')` / `.includes('dat')`, gây ra lỗi logic nhận nhầm trạng thái "Chưa đạt" thành "Đạt" (do có chứa từ khóa "đạt"). Đã được khắc phục hoàn toàn bằng cách so khớp chính xác (`=== 'đạt' || === 'dat'`) sau khi chuyển chữ thường, loại bỏ khoảng trắng và chuẩn hóa Unicode bằng `.normalize('NFC')` để chống lệch dấu tiếng Việt.
 
-#### 📄 08. Phân hệ Quản lý Văn bản & Thông báo (DocumentPage.tsx)
-- **Line Tab chuyển đổi mượt mà (LineTabs.tsx)**: Phân hệ chuyển đổi giữa các loại văn bản sử dụng component dùng chung `LineTabs.tsx` với hiệu ứng trượt gạch chân mượt mà bằng Framer Motion, đồng bộ thiết kế không đóng khung thống nhất.
+#### 📄 09. Phân hệ Quản lý Văn bản & Thông báo (DocumentPage.tsx)
+- **Giao diện Tab dạng Segmented Control (SegmentTabs.tsx)**: Cơ chế chuyển đổi tab trên tất cả các trang chính (Nhân sự, Xe, Thiết bị, Văn bản, ATVSLĐ) đã được nâng cấp đồng bộ từ LineTabs cũ sang SegmentTabs. Sử dụng giao diện bo tròn dạng viên thuốc hiện đại, tích hợp hiệu ứng chuyển động trượt mượt mà bằng Framer Motion (`motion/react`), đồng thời hỗ trợ hiển thị số lượng badge và các biểu tượng đi kèm trực quan.
 - **Cấp số hiệu tự động (Auto-numbering)**: Tích hợp checkbox "Số tự động" cạnh ô Số hiệu giúp tự động tính toán số hiệu tiếp theo dạng `[số]/[năm]/[loại]-[đơn vị]` dựa trên phân loại, đơn vị ban hành, năm hiện hành và viết tắt chức danh người ký.
 - **Cấu trúc Component hóa (Modular architecture)**: Tách mã nguồn hiển thị bảng dữ liệu của từng loại văn bản thành các file `.tsx` riêng biệt (`AllDocTable`, `ThongBaoTable`, `QuyetDinhTable`, `CongVanDenTable`, `CongVanDiTable`, `ToTrinhTable`) giúp dễ bảo trì và tối ưu cột hiển thị riêng cho mỗi loại.
 - **Copy nhanh Thông tin phản hồi**: Hỗ trợ nút sao chép thông tin phản hồi định dạng chuẩn bên cạnh mục Ban hành trong bảng Chi tiết Văn bản để phản hồi ngay cho người xin cấp số (bao gồm Số hiệu, Nội dung, Ngày ban hành, Người phê duyệt, Nhân sự & Bộ phận trình).
