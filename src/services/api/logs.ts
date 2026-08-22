@@ -1,6 +1,6 @@
 import { SUPABASE_URL, HEADERS, API_MODE } from './client';
 import { currentUser } from './auth';
-import { saveLocalRecord } from './localStore';
+import { saveLocalRecord, getLocalRecords } from './localStore';
 
 export async function writeLog(hanhDong: string, chiTiet: string): Promise<void> {
   try {
@@ -57,5 +57,42 @@ export async function writeLog(hanhDong: string, chiTiet: string): Promise<void>
       };
       saveLocalRecord(logData, 'create', 'sys_logs');
     } catch (e) {}
+  }
+}
+
+export async function cleanOldLogs(days = 5): Promise<void> {
+  const cutoffDate = new Date();
+  cutoffDate.setDate(cutoffDate.getDate() - days);
+  const cutoffIso = cutoffDate.toISOString();
+
+  // 1. MOCK mode: xóa trong LocalStorage
+  if (API_MODE === 'MOCK') {
+    try {
+      const allLogs = getLocalRecords('sys_logs') || [];
+      const newLogs = allLogs.filter((log: any) => {
+        if (!log.thoi_gian) return false;
+        return new Date(log.thoi_gian).getTime() >= cutoffDate.getTime();
+      });
+      localStorage.setItem('db_sys_logs', JSON.stringify(newLogs));
+    } catch (e) {
+      console.error("Lỗi xóa Log Mock:", e);
+    }
+    return;
+  }
+
+  // 2. Supabase mode: gọi DELETE API qua REST
+  try {
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/sys_logs?thoi_gian=lt.${encodeURIComponent(cutoffIso)}`, {
+      method: 'DELETE',
+      headers: {
+        ...HEADERS
+      }
+    });
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Lỗi xóa Log Supabase:", errorText);
+    }
+  } catch (error) {
+    console.error("Lỗi hệ thống khi xóa Log:", error);
   }
 }

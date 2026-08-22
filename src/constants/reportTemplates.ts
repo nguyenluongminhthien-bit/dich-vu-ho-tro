@@ -22,7 +22,7 @@ export interface ReportTemplate {
   title: string;
   icon: string;
   description: string;
-  dataSource: 'getDonVi' | 'getPersonnel' | 'getVanBan' | 'getCuocThang';
+  dataSource: 'getDonVi' | 'getPersonnel' | 'getVanBan' | 'getCuocThang' | 'getQuyDinh';
   columns: ReportColumn[];
   filters: ReportFilter[];
   customizable: boolean;
@@ -242,6 +242,30 @@ export const REPORT_TEMPLATES: ReportTemplate[] = [
       { key: 'thang_nam',    label: 'Tháng',     type: 'daterange' },
       { key: 'loai_thue_bao', label: 'Loại TB',  type: 'select',
         options: ['Cá nhân', 'Bộ phận dùng chung', 'Hotline'] },
+    ]
+  },
+  {
+    id: 'policy_list_report',
+    module: 'VĂN BẢN',
+    title: 'Danh sách Quy định - Quy trình hiện hành',
+    icon: 'FileText',
+    description: 'Báo cáo tổng hợp các văn bản quy trình, quy định nghiệp vụ hiện hành đang áp dụng trong toàn hệ thống.',
+    dataSource: 'getQuyDinh',
+    customizable: true,
+    columns: [
+      { key: 'so_hieu', label: 'Số Hiệu', width: 150, defaultVisible: true },
+      { key: 'ngay_ban_hanh', label: 'Ngày Ban Hành', width: 110, format: 'date', defaultVisible: true },
+      { key: 'tieu_de', label: 'Tiêu Đề Quy Định / Quy Trình', width: 280, defaultVisible: true },
+      { key: 'nghiep_vu', label: 'Phân loại Nghiệp vụ', width: 150, defaultVisible: true },
+      { key: 'phan_loai', label: 'Phân Loại', width: 120, defaultVisible: true },
+      { key: 'hieu_luc', label: 'Tình Trạng Hiệu Lực', width: 120, defaultVisible: true },
+      { key: 'bo_phan_lay_so', label: 'Bộ Phận Ban Hành', width: 180, defaultVisible: true }
+    ],
+    filters: [
+      { key: 'year', label: 'Năm Ban Hành', type: 'year_multi' },
+      { key: 'phan_loai', label: 'Loại tài liệu', type: 'multiselect', options: [] },
+      { key: 'nghiep_vu_multi', label: 'Nghiệp vụ áp dụng', type: 'multiselect', options: [] },
+      { key: 'bo_phan_lay_so', label: 'Bộ phận ban hành', type: 'multiselect', options: [] }
     ]
   }
 ];

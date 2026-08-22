@@ -106,6 +106,15 @@ export default function PolicyPage() {
   useEffect(() => { loadData(); }, []);
 
   useEffect(() => {
+    if (viewData) {
+      apiService.writeLog(
+        'XEM QUY ĐỊNH',
+        `Loại: ${viewData.phan_loai || 'Không xác định'} | Số hiệu: ${viewData.so_hieu || 'Chưa có'} | Tiêu đề: ${viewData.tieu_de || ''}`
+      );
+    }
+  }, [viewData]);
+
+  useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (boPhanDropdownRef.current && !boPhanDropdownRef.current.contains(event.target as Node)) {
         setIsBoPhanDropdownOpen(false);
@@ -117,9 +126,39 @@ export default function PolicyPage() {
     };
   }, []);
 
+  const permittedQdData = useMemo(() => {
+    let result = qdData;
+    const quyenChiTiet = String(user?.quyen_chi_tiet || '');
+    const rulesList = quyenChiTiet.split(',').map(r => r.trim());
+
+    // 1. Lọc theo Phân loại tài liệu
+    const qdTypesRule = rulesList.find(r => r.startsWith('QD_TYPES:'));
+    if (qdTypesRule) {
+      const allowedTypes = qdTypesRule.substring('QD_TYPES:'.length).split('|').filter(Boolean);
+      if (allowedTypes.length > 0) {
+        result = result.filter(item => item.phan_loai && allowedTypes.includes(item.phan_loai));
+      }
+    }
+
+    // 2. Lọc theo Năm ban hành
+    const qdYearsRule = rulesList.find(r => r.startsWith('QD_YEARS:'));
+    if (qdYearsRule) {
+      const allowedYears = qdYearsRule.substring('QD_YEARS:'.length).split('|').filter(Boolean);
+      if (allowedYears.length > 0) {
+        result = result.filter(item => {
+          if (!item.ngay_ban_hanh) return false;
+          const year = item.ngay_ban_hanh.substring(0, 4);
+          return allowedYears.includes(year);
+        });
+      }
+    }
+
+    return result;
+  }, [qdData, user]);
+
   const uniqueNghiepvu = useMemo(() => {
     const list: string[] = [];
-    qdData.forEach(item => {
+    permittedQdData.forEach(item => {
       if (item.nghiep_vu) {
         item.nghiep_vu.split(';').forEach(p => {
           const trimmed = p.trim();
@@ -128,20 +167,20 @@ export default function PolicyPage() {
       }
     });
     return Array.from(new Set(list)).sort();
-  }, [qdData]);
+  }, [permittedQdData]);
 
   const uniquePhanloai = useMemo(() => {
-    const list = qdData.map(item => item.phan_loai).filter(Boolean);
+    const list = permittedQdData.map(item => item.phan_loai).filter(Boolean);
     return Array.from(new Set(list)).sort();
-  }, [qdData]);
+  }, [permittedQdData]);
 
   const uniqueBoPhan = useMemo(() => {
-    const list = qdData.map(item => item.bo_phan_lay_so).filter(Boolean);
+    const list = permittedQdData.map(item => item.bo_phan_lay_so).filter(Boolean);
     return Array.from(new Set(list)).sort() as string[];
-  }, [qdData]);
+  }, [permittedQdData]);
 
   const filteredDocs = useMemo(() => {
-    let result = qdData;
+    let result = permittedQdData;
 
     if (selectedNghiepvu) {
       result = result.filter(item => {
@@ -174,7 +213,7 @@ export default function PolicyPage() {
       const dateB = b.ngay_ban_hanh ? new Date(b.ngay_ban_hanh).getTime() : 0;
       return dateB - dateA;
     });
-  }, [qdData, searchTerm, selectedNghiepvu, selectedBoPhans]);
+  }, [permittedQdData, searchTerm, selectedNghiepvu, selectedBoPhans]);
 
   const openModal = (mode: 'create' | 'update', item?: PolicyItem) => {
     setModalMode(mode);
@@ -252,6 +291,9 @@ export default function PolicyPage() {
   };
 
   const exportToExcel = () => {
+    // Ghi nhận nhật ký xuất Excel
+    void apiService.writeLog('XUẤT EXCEL', 'Tải danh sách Quy định - Quy trình từ trang quản lý');
+
     // Sắp xếp theo Nghiệp vụ (A-Z) và Ngày ban hành (mới đến cũ)
     const sortedExportDocs = [...filteredDocs].sort((a, b) => {
       const nvA = a.nghiep_vu || '';
@@ -265,9 +307,7 @@ export default function PolicyPage() {
     });
 
     const rowsHTML = sortedExportDocs.map((item, idx) => {
-      const linkHTML = item.link_vb 
-        ? `<a href="${item.link_vb}">Link</a>` 
-        : '';
+      const linkHTML = item.link_vb ? 'Link' : '';
       
       const formattedDate = item.ngay_ban_hanh 
         ? new Date(item.ngay_ban_hanh).toLocaleDateString('vi-VN') 
@@ -370,7 +410,7 @@ export default function PolicyPage() {
                     <span className="truncate">{nv}</span>
                   </div>
                   <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${selectedNghiepvu === nv ? 'bg-[#05469B] text-white' : 'bg-gray-100 text-gray-500'}`}>
-                    {qdData.filter(d => d.nghiep_vu && d.nghiep_vu.split(';').map(p => p.trim()).includes(nv)).length}
+                    {permittedQdData.filter(d => d.nghiep_vu && d.nghiep_vu.split(';').map(p => p.trim()).includes(nv)).length}
                   </span>
                 </button>
               ))}

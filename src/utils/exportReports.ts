@@ -110,6 +110,35 @@ const XML_STYLES = `
    <Alignment ss:Horizontal="Left" ss:Vertical="Center"/>
    <Font ss:FontName="Times New Roman" x:CharSet="163" x:Family="Roman" ss:Color="#1F2937"/>
   </Style>
+  <Style ss:ID="sDataCenter">
+   <Alignment ss:Horizontal="Center" ss:Vertical="Center" ss:WrapText="1"/>
+   <Borders>
+    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#D1D5DB"/>
+    <Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#D1D5DB"/>
+    <Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#D1D5DB"/>
+    <Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#D1D5DB"/>
+   </Borders>
+  </Style>
+  <Style ss:ID="sDataBold">
+   <Alignment ss:Vertical="Center" ss:WrapText="1"/>
+   <Font ss:FontName="Times New Roman" x:CharSet="163" x:Family="Roman" ss:Bold="1"/>
+   <Borders>
+    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#D1D5DB"/>
+    <Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#D1D5DB"/>
+    <Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#D1D5DB"/>
+    <Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#D1D5DB"/>
+   </Borders>
+  </Style>
+  <Style ss:ID="sDataLink">
+   <Alignment ss:Horizontal="Center" ss:Vertical="Center" ss:WrapText="1"/>
+   <Font ss:FontName="Times New Roman" x:CharSet="163" x:Family="Roman" ss:Color="#05469B" ss:Underline="Single"/>
+   <Borders>
+    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#D1D5DB"/>
+    <Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#D1D5DB"/>
+    <Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#D1D5DB"/>
+    <Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#D1D5DB"/>
+   </Borders>
+  </Style>
  </Styles>
 `;
 
@@ -170,7 +199,7 @@ ${XML_STYLES}`;
   const colsWidth = cols.map(c => c.width || 120);
 
   // XỬ LÝ ĐẶC BIỆT THEO LOẠI BÁO CÁO (Mỗi loại văn bản là 1 sheet Excel)
-  if (template.id === 'document_list_report' || template.id === 'custom_report_documents' || template.module === 'VĂN BẢN') {
+  if (template.id === 'document_list_report' || template.id === 'custom_report_documents') {
     // Hàm xác định loại văn bản/sheet theo phan_loai hoặc mã nhận biết (CVĐ / CV)
     const getDocumentSheetType = (item: any): string => {
       const pl = String(item.phan_loai || '').trim();
@@ -232,6 +261,59 @@ ${XML_STYLES}`;
     const statHeaders = ['Bộ phận lấy số', 'Quyết định', 'Thông báo', 'Thông báo BĐH', 'Tờ trình', 'Công văn đến (CVĐ)', 'Công văn đi (CV)', 'Tổng cộng'];
     const statWidths = [240, 120, 120, 150, 120, 150, 150, 110];
     xmlContent += renderTableXML('Thống kê Bộ phận', statHeaders, statWidths, deptRows, 'THỐNG KÊ SỐ LƯỢNG VĂN BẢN BAN HÀNH THEO BỘ PHẬN LẤY SỐ');
+
+  } else if (template.id === 'policy_list_report') {
+    // Sắp xếp theo Nghiệp vụ (A-Z) và Ngày ban hành (mới đến cũ) tương tự PolicyPage.tsx
+    const sortedData = [...data].sort((a, b) => {
+      const nvA = a.nghiep_vu || '';
+      const nvB = b.nghiep_vu || '';
+      const compNv = nvA.localeCompare(nvB, 'vi', { sensitivity: 'base' });
+      if (compNv !== 0) return compNv;
+
+      const dateA = a.ngay_ban_hanh ? new Date(a.ngay_ban_hanh).getTime() : 0;
+      const dateB = b.ngay_ban_hanh ? new Date(b.ngay_ban_hanh).getTime() : 0;
+      return dateB - dateA;
+    });
+
+    const rows = sortedData.map((item, idx) => {
+      const formattedDate = item.ngay_ban_hanh 
+        ? new Date(item.ngay_ban_hanh).toLocaleDateString('vi-VN') 
+        : '';
+
+      return `
+   <Row ss:Height="22" ss:AutoFitHeight="1">
+    <Cell ss:StyleID="sDataCenter"><Data ss:Type="Number">${idx + 1}</Data></Cell>
+    <Cell ss:StyleID="sDataBold"><Data ss:Type="String">${escapeXML(item.so_hieu || '')}</Data></Cell>
+    <Cell ss:StyleID="sData"><Data ss:Type="String">${escapeXML(item.tieu_de || '')}</Data></Cell>
+    <Cell ss:StyleID="sData"><Data ss:Type="String">${escapeXML(item.noi_dung || '')}</Data></Cell>
+    <Cell ss:StyleID="sData"><Data ss:Type="String">${escapeXML(item.nghiep_vu || '')}</Data></Cell>
+    <Cell ss:StyleID="sData"><Data ss:Type="String">${escapeXML(item.bo_phan_lay_so || '')}</Data></Cell>
+    <Cell ss:StyleID="sDataCenter"><Data ss:Type="String">${escapeXML(formattedDate)}</Data></Cell>
+    <Cell ss:StyleID="sDataLink"${item.link_vb ? ` ss:HRef="${escapeXML(item.link_vb)}"` : ''}><Data ss:Type="String">${item.link_vb ? 'Link' : ''}</Data></Cell>
+   </Row>\n`;
+    }).join('');
+
+    let sheetXml = ` <Worksheet ss:Name="Danh sách">\n  <Table x:FullColumns="1" x:FullRows="1">\n`;
+    const widths = [50, 150, 250, 350, 150, 180, 120, 100];
+    widths.forEach(w => {
+      sheetXml += `   <Column ss:Width="${w}"/>\n`;
+    });
+
+    // Dòng Tiêu đề báo cáo gộp ô
+    sheetXml += `   <Row ss:Height="40">\n    <Cell ss:MergeAcross="7" ss:StyleID="sTitle"><Data ss:Type="String">DANH SÁCH QUY ĐỊNH &amp; QUY TRÌNH</Data></Cell>\n   </Row>\n`;
+    sheetXml += `   <Row ss:Height="15"><Cell ss:MergeAcross="7"></Cell></Row>\n`;
+
+    // Headers
+    sheetXml += `   <Row ss:Height="26">\n`;
+    const headersList = ['STT', 'Số hiệu', 'Nội dung (tiêu đề)', 'Trích yếu', 'Nghiệp vụ', 'Bộ phận ban hành', 'Ngày ban hành', 'Đính kèm'];
+    headersList.forEach(h => {
+      sheetXml += `    <Cell ss:StyleID="sHeader"><Data ss:Type="String">${escapeXML(h)}</Data></Cell>\n`;
+    });
+    sheetXml += `   </Row>\n`;
+
+    sheetXml += rows;
+    sheetXml += `  </Table>\n </Worksheet>\n`;
+    xmlContent += sheetXml;
 
   } else if (template.id === 'system_donvi_structure') {
     // Layout xuất Excel có tiêu đề 2 dòng gộp ô chuyên nghiệp

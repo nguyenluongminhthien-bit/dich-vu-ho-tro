@@ -231,6 +231,15 @@ export default function VehiclePage() {
 
   useEffect(() => { loadData(); }, []);
 
+  useEffect(() => {
+    if (viewData) {
+      apiService.writeLog(
+        'XEM XE',
+        `Biển số: ${viewData.bien_so || ''} | Hiệu xe: ${viewData.hieu_xe || ''} | Loại xe: ${viewData.loai_xe || ''}`
+      );
+    }
+  }, [viewData]);
+
   const donViMap = useMemo(() => {
     const map: Record<string, string> = {};
     donViList.forEach(dv => { map[dv.id] = dv.ten_don_vi; });

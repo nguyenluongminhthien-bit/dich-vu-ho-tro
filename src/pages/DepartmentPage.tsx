@@ -375,6 +375,24 @@ export default function DepartmentPage() {
     return [selectedUnitId, ...subIds];
   }, [selectedUnitId, data]);
 
+  useEffect(() => {
+    if (selectedUnit) {
+      apiService.writeLog(
+        'XEM ĐƠN VỊ',
+        `Tên đơn vị: ${selectedUnit.ten_don_vi || ''} | Mã viết tắt: ${selectedUnit.abbr || ''}`
+      );
+    }
+  }, [selectedUnit]);
+
+  useEffect(() => {
+    if (isPcccModalOpen && pcccMode === 'view' && pcccFormData) {
+      apiService.writeLog(
+        'XEM HỒ SƠ PCCC',
+        `Đơn vị: ${pcccFormData.ten_don_vi || ''} | Đội trưởng PCCC: ${pcccFormData.ho_ten_doi_truong || ''}`
+      );
+    }
+  }, [isPcccModalOpen, pcccMode, pcccFormData]);
+
   const currentAnNinh = useMemo(() => anNinhData.find(item => getUnitIdSafe(item) === selectedUnitId) || null, [anNinhData, selectedUnitId]);
   const currentPvhc = useMemo(() => pvhcData.find(item => getUnitIdSafe(item) === selectedUnitId) || null, [pvhcData, selectedUnitId]);
   const currentPccc = useMemo(() => pcccData.find(item => getUnitIdSafe(item) === selectedUnitId) || null, [pcccData, selectedUnitId]);

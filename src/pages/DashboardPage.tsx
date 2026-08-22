@@ -527,10 +527,25 @@ export default function DashboardPage() {
     nsData.forEach(ns => {
       if (currentSubordinateIds.includes(ns.id_don_vi) && ns.trang_thai !== 'Đã nghỉ việc') {
         totalStaff++;
-        const role = String(ns.phan_loai || '').toUpperCase();
-        if (role.includes('PT QTVP & ASĐS') || role.includes('PT QTVP') || role.includes('QTVP & ASĐS') || role.includes('PT QTVT') || role.includes('PT DVHT KD')) dvht++;
-        if (role.includes('BV, ĐTKH') || role.includes('BẢO VỆ')) bv++;
-        if (role.includes('PVHC')) pvhc++;
+        const bp = String(ns.phong_ban || '');
+        const pl = String(ns.phan_loai || '');
+
+        // 1. Nhóm Bảo vệ (phong_ban chứa "BV, ĐTKH" hoặc phan_loai chứa "BV, ĐTKH")
+        const isBV = bp.toUpperCase().includes('BV, ĐTKH') || pl.toUpperCase().includes('BV, ĐTKH');
+
+        // 2. Nhóm Phục vụ Hành chính (phong_ban chứa "PVHC")
+        const isPVHC = bp.toUpperCase().includes('PVHC');
+
+        // 3. Nhóm QTVP & ASĐS (phong_ban chứa "QTVP" hoặc phan_loai chứa "PT QTVP")
+        const isQTVP = bp.toUpperCase().includes('QTVP') || pl.toUpperCase().includes('PT QTVP');
+
+        if (isQTVP) {
+          dvht++;
+        } else if (isBV) {
+          bv++;
+        } else if (isPVHC) {
+          pvhc++;
+        }
       }
     });
 

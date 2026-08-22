@@ -274,6 +274,15 @@ export default function SupplierPage() {
     loadData();
   }, []);
 
+  useEffect(() => {
+    if (viewData) {
+      apiService.writeLog(
+        'XEM NHÀ CUNG CẤP',
+        `Tên công ty: ${viewData.ten_cong_ty || ''} | Tên gọi tắt: ${viewData.ten_goi_tat || ''}`
+      );
+    }
+  }, [viewData]);
+
   // Initialize default unit filter
   useEffect(() => {
     if (donViList.length > 0 && !hasInitializedRef.current) {

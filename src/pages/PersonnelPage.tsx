@@ -232,7 +232,7 @@ export default function PersonnelPage() {
   const hasRule = (ruleId: string) => {
     if (!user) return false;
     if (String(user.quyen).toUpperCase() === 'ADMIN') return false;
-    return String(user.quyen_chi_tiet || '').includes(ruleId);
+    return String(user.quyen_chi_tiet || '').split(',').map(r => r.trim()).includes(ruleId);
   };
   const [data, setData] = useState<any[]>([]);
   const [donViList, setDonViList] = useState<DonVi[]>([]);
@@ -353,6 +353,15 @@ export default function PersonnelPage() {
   };
 
   useEffect(() => { loadData(); }, []);
+
+  useEffect(() => {
+    if (viewData) {
+      apiService.writeLog(
+        'XEM NHÂN SỰ',
+        `Họ tên: ${viewData.ho_ten || ''} | Mã NV: ${viewData.ma_nv || ''} | Bộ phận: ${viewData.bo_phan || ''}`
+      );
+    }
+  }, [viewData]);
 
   const donViLookupMap = useMemo(() => {
     const map = new Map<string, DonVi>();

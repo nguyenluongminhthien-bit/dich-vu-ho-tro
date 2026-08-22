@@ -1,5 +1,5 @@
-import { setCurrentUser, login } from './auth';
-import { writeLog } from './logs';
+import { setCurrentUser, login, validateAndRefreshUser } from './auth';
+import { writeLog, cleanOldLogs } from './logs';
 import {
   getPersonnel,
   getDonVi,
@@ -35,7 +35,9 @@ import {
 export const apiService = {
   setCurrentUser,
   writeLog,
+  cleanOldLogs,
   login,
+  validateAndRefreshUser,
   getPersonnel,
   getDonVi,
   getNhaCungCap,
@@ -66,3 +68,4 @@ export const apiService = {
   getKiemDinhTBNN,
   getNhatKySuDungXe
 };
+

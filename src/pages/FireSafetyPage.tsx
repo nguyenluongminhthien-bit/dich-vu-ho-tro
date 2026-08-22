@@ -123,6 +123,15 @@ export default function FireSafetyPage() {
     return map;
   }, [donViList]);
 
+  useEffect(() => {
+    if (isEmergencyContactOpen && selectedPcccForContact) {
+      apiService.writeLog(
+        'XEM DANH BẠ KHẨN CẤP PCCC',
+        `Đơn vị: ${donViMap[selectedPcccForContact.id_don_vi] || selectedPcccForContact.id_don_vi || ''}`
+      );
+    }
+  }, [isEmergencyContactOpen, selectedPcccForContact, donViMap]);
+
   const allowedDonViIds = useAllowedUnits(donViList);
 
   const hasInitializedRef = useRef(false);

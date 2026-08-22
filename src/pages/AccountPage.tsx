@@ -25,10 +25,15 @@ const MODULE_LIST = [
 // 🟢 2. KHO MA TRẬN QUYỀN CHI TIẾT (quyen_chi_tiet)
 const ADVANCED_PERMISSIONS = {
   VanBan: [
-    { id: 'VB_ONLY_TB', label: 'Chỉ xem Thông báo' },
-    { id: 'VB_ONLY_QD', label: 'Chỉ xem Quyết định' },
+    { id: 'VB_VIEW_QD', label: 'Quyền xem Quyết định' },
+    { id: 'VB_VIEW_TB', label: 'Quyền xem Thông báo' },
+    { id: 'VB_VIEW_TB_BDH', label: 'Quyền xem Thông báo BĐH' },
+    { id: 'VB_VIEW_TT', label: 'Quyền xem Tờ trình' },
+    { id: 'VB_VIEW_CV_DI', label: 'Quyền xem Công văn đi' },
+    { id: 'VB_VIEW_CV_DEN', label: 'Quyền xem Công văn đến' },
     { id: 'VB_HIDE_BTN', label: 'Ẩn nút Ban hành' },
   ],
+  QuyDinh: [],
   NhanSu: [
     { id: 'NS_HIDE_SENSITIVE', label: 'Ẩn SĐT, Lương, Ngạch' },
     { id: 'NS_NO_DETAIL', label: 'Cấm xem Chi tiết Hồ sơ' },
@@ -46,6 +51,12 @@ export default function AccountPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+
+  const yearOptions = useMemo(() => {
+    const startYear = 2010;
+    const endYear = new Date().getFullYear() + 3; // e.g. 2029
+    return Array.from({ length: endYear - startYear + 1 }, (_, i) => String(endYear - i));
+  }, []);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<'create' | 'update'>('create');
@@ -204,6 +215,72 @@ export default function AccountPage() {
     });
   };
 
+  const getYearsFromRule = (ruleString: string | undefined, prefix: string): string[] => {
+    if (!ruleString) return [];
+    const rules = ruleString.split(',').map(r => r.trim());
+    const rule = rules.find(r => r.startsWith(prefix));
+    if (!rule) return [];
+    return rule.substring(prefix.length).split('|').filter(Boolean);
+  };
+
+  const handleToggleYearRule = (prefix: string, year: string) => {
+    setFormData(prev => {
+      let currentRules = prev.quyen_chi_tiet ? prev.quyen_chi_tiet.split(',').map(r => r.trim()).filter(Boolean) : [];
+      const ruleIndex = currentRules.findIndex(r => r.startsWith(prefix));
+      
+      let activeYears: string[] = [];
+      if (ruleIndex !== -1) {
+        activeYears = currentRules[ruleIndex].substring(prefix.length).split('|').filter(Boolean);
+        currentRules.splice(ruleIndex, 1);
+      }
+      
+      if (activeYears.includes(year)) {
+        activeYears = activeYears.filter(y => y !== year);
+      } else {
+        activeYears.push(year);
+      }
+      
+      if (activeYears.length > 0) {
+        currentRules.push(`${prefix}${activeYears.join('|')}`);
+      }
+      
+      return { ...prev, quyen_chi_tiet: currentRules.join(',') };
+    });
+  };
+
+  const getTypesFromRule = (ruleString: string | undefined, prefix: string): string[] => {
+    if (!ruleString) return [];
+    const rules = ruleString.split(',').map(r => r.trim());
+    const rule = rules.find(r => r.startsWith(prefix));
+    if (!rule) return [];
+    return rule.substring(prefix.length).split('|').filter(Boolean);
+  };
+
+  const handleToggleTypeRule = (prefix: string, type: string) => {
+    setFormData(prev => {
+      let currentRules = prev.quyen_chi_tiet ? prev.quyen_chi_tiet.split(',').map(r => r.trim()).filter(Boolean) : [];
+      const ruleIndex = currentRules.findIndex(r => r.startsWith(prefix));
+      
+      let activeTypes: string[] = [];
+      if (ruleIndex !== -1) {
+        activeTypes = currentRules[ruleIndex].substring(prefix.length).split('|').filter(Boolean);
+        currentRules.splice(ruleIndex, 1);
+      }
+      
+      if (activeTypes.includes(type)) {
+        activeTypes = activeTypes.filter(t => t !== type);
+      } else {
+        activeTypes.push(type);
+      }
+      
+      if (activeTypes.length > 0) {
+        currentRules.push(`${prefix}${activeTypes.join('|')}`);
+      }
+      
+      return { ...prev, quyen_chi_tiet: currentRules.join(',') };
+    });
+  };
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault(); setSubmitting(true); setError(null);
     try {
@@ -308,7 +385,7 @@ export default function AccountPage() {
                       ${String(user.quyen).toUpperCase() === 'ADMIN' ? 'bg-red-50 text-red-600 border-red-200' : 
                         String(user.quyen).toLowerCase() === 'viewer_hanche' ? 'bg-orange-50 text-orange-600 border-orange-200' : 
                         'bg-emerald-50 text-emerald-600 border-emerald-200'}`}>
-                      {String(user.quyen).toLowerCase() === 'viewer_hanche' ? 'VIEWER HẠN CHẾ' : user.quyen}
+                      {String(user.quyen).toLowerCase() === 'viewer_hanche' ? 'VIEWER' : user.quyen}
                     </span>
                   </td>
                   <td className="p-4">
@@ -409,7 +486,7 @@ export default function AccountPage() {
                           className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] disabled:bg-gray-100 outline-none focus:ring-2 focus:ring-[#05469B] font-bold"
                         >
                           <option value="USER">USER (Được quyền Thêm/Sửa/Xóa của mình)</option>
-                          <option value="viewer_hanche">VIEWER HẠN CHẾ (Chỉ xem, cấm click chi tiết)</option>
+                          <option value="viewer_hanche">VIEWER (Chỉ xem, cấm click chi tiết)</option>
                           {isAdmin && <option value="ADMIN">ADMIN (Quản trị toàn quyền)</option>}
                         </select>
                       </div>
@@ -460,27 +537,76 @@ export default function AccountPage() {
                     <div className="bg-orange-50/30 p-5 rounded-xl border border-orange-100">
                       <h4 className="font-bold text-orange-800 mb-4 flex items-center gap-2"><ListChecks size={18}/> 3. Cấu hình Đặc quyền Chi tiết (Ma trận Quyền)</h4>
                       
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-stretch">
                         {Object.entries(ADVANCED_PERMISSIONS).map(([moduleName, options]) => (
-                          <div key={moduleName} className="bg-white p-4 rounded-lg border border-orange-100 shadow-sm">
+                          <div key={moduleName} className="bg-white p-4 rounded-lg border border-orange-100 shadow-sm h-full flex flex-col">
                             <h5 className="font-bold text-gray-700 mb-3 uppercase text-xs border-b pb-2">
-                              {moduleName === 'VanBan' ? '📑 Module Văn bản' : moduleName === 'NhanSu' ? '👥 Module Nhân sự' : '💻 Module Thiết bị'}
+                              {moduleName === 'VanBan' ? '📑 Module Văn bản' : moduleName === 'QuyDinh' ? '📖 Module Quy định - Quy trình' : moduleName === 'NhanSu' ? '👥 Module Nhân sự' : '💻 Module Thiết bị'}
                             </h5>
-                            <div className="flex flex-col gap-2">
-                              {options.map(opt => {
-                                const isChecked = formData.quyen_chi_tiet?.includes(opt.id);
-                                return (
-                                  <label key={opt.id} className={`flex items-center gap-2 p-1.5 rounded cursor-pointer transition-colors ${isChecked ? 'bg-orange-50 text-[#c2410c] font-bold' : 'hover:bg-gray-50 text-gray-600'}`}>
-                                    <input 
-                                      type="checkbox" 
-                                      checked={isChecked}
-                                      onChange={() => handleToggleAdvancedRule(opt.id)}
-                                      className="w-4 h-4 text-orange-600 rounded focus:ring-orange-500"
-                                    />
-                                    <span className="text-xs">{opt.label}</span>
-                                  </label>
-                                );
-                              })}
+                            <div className="flex flex-col flex-grow justify-between gap-4">
+                              <div className="flex flex-col gap-2">
+                                {moduleName !== 'QuyDinh' && options.map(opt => {
+                                  const isChecked = formData.quyen_chi_tiet ? formData.quyen_chi_tiet.split(',').map(r => r.trim()).includes(opt.id) : false;
+                                  return (
+                                    <label key={opt.id} className={`flex items-center gap-2 p-1.5 rounded cursor-pointer transition-colors ${isChecked ? 'bg-orange-50 text-[#c2410c] font-bold' : 'hover:bg-gray-50 text-gray-600'}`}>
+                                      <input 
+                                        type="checkbox" 
+                                        checked={isChecked}
+                                        onChange={() => handleToggleAdvancedRule(opt.id)}
+                                        className="w-4 h-4 text-orange-600 rounded focus:ring-orange-500"
+                                      />
+                                      <span className="text-xs">{opt.label}</span>
+                                    </label>
+                                  );
+                                })}
+
+                                {moduleName === 'QuyDinh' && (
+                                  <div>
+                                    <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1.5 font-black">Cho phép xem Phân loại</label>
+                                    <div className="h-48 overflow-y-auto p-1.5 border border-gray-200 dark:border-slate-700 rounded-lg bg-gray-50/50 dark:bg-slate-900/50 custom-scrollbar flex flex-col gap-1">
+                                      {['Quy định', 'Quy trình', 'Hướng dẫn', 'Quy chế', 'Quyết định', 'Thông báo', 'Thông báo BĐH', 'Tờ trình', 'Công văn đi', 'Công văn đến'].map(type => {
+                                        const activeTypes = getTypesFromRule(formData.quyen_chi_tiet, 'QD_TYPES:');
+                                        const isTypeChecked = activeTypes.includes(type);
+                                        return (
+                                          <label key={type} className={`flex items-center gap-2 px-2 py-1 rounded cursor-pointer text-xs transition-colors ${isTypeChecked ? 'bg-orange-50 dark:bg-orange-950/30 text-orange-700 dark:text-orange-400 font-bold' : 'hover:bg-gray-100 dark:hover:bg-slate-800 text-gray-600 dark:text-gray-400'}`}>
+                                            <input
+                                              type="checkbox"
+                                              checked={isTypeChecked}
+                                              onChange={() => handleToggleTypeRule('QD_TYPES:', type)}
+                                              className="w-3.5 h-3.5 text-orange-600 rounded focus:ring-orange-500 border-gray-300"
+                                            />
+                                            <span>{type}</span>
+                                          </label>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+
+                              {(moduleName === 'VanBan' || moduleName === 'QuyDinh') && (
+                                <div className="pt-3 border-t border-gray-100">
+                                  <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1.5 font-black">Cho phép xem theo Năm</label>
+                                  <div className="h-36 overflow-y-auto p-1.5 border border-gray-200 dark:border-slate-700 rounded-lg bg-gray-50/50 dark:bg-slate-900/50 custom-scrollbar flex flex-col gap-1">
+                                    {yearOptions.map(year => {
+                                      const prefix = moduleName === 'VanBan' ? 'VB_YEARS:' : 'QD_YEARS:';
+                                      const activeYears = getYearsFromRule(formData.quyen_chi_tiet, prefix);
+                                      const isYearChecked = activeYears.includes(year);
+                                      return (
+                                        <label key={year} className={`flex items-center gap-2 px-2 py-1 rounded cursor-pointer text-xs transition-colors ${isYearChecked ? 'bg-orange-50 dark:bg-orange-950/30 text-orange-700 dark:text-orange-400 font-bold' : 'hover:bg-gray-100 dark:hover:bg-slate-800 text-gray-600 dark:text-gray-400'}`}>
+                                          <input
+                                            type="checkbox"
+                                            checked={isYearChecked}
+                                            onChange={() => handleToggleYearRule(prefix, year)}
+                                            className="w-3.5 h-3.5 text-orange-600 rounded focus:ring-orange-500 border-gray-300"
+                                          />
+                                          <span>Năm {year}</span>
+                                        </label>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           </div>
                         ))}

@@ -132,7 +132,7 @@ export default function EquipmentPage() {
   const hasRule = (ruleId: string) => {
     if (!user) return false;
     if (String(user.quyen).toUpperCase() === 'ADMIN') return false;
-    return String(user.quyen_chi_tiet || '').includes(ruleId);
+    return String(user.quyen_chi_tiet || '').split(',').map(r => r.trim()).includes(ruleId);
   };
   const [donViList, setDonViList] = useState<DonVi[]>([]);
   const [tbData, setTbData] = useState<any[]>([]);
@@ -498,6 +498,15 @@ export default function EquipmentPage() {
   };
 
   useEffect(() => { loadData(); }, []);
+
+  useEffect(() => {
+    if (viewData) {
+      apiService.writeLog(
+        'XEM THIẾT BỊ',
+        `Tên thiết bị: ${viewData.ten_thiet_bi || ''} | Nhóm: ${viewData.nhom_thiet_bi || ''} | Mã định danh: ${viewData.ma_dinh_danh || ''}`
+      );
+    }
+  }, [viewData]);
 
   // Lắng nghe click ra ngoài để tự động đóng Dropdown
   useEffect(() => {

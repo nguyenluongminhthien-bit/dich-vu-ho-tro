@@ -41,6 +41,7 @@ export default function ReportPage() {
   const [personnelList, setPersonnelList] = useState<Personnel[]>([]);
   const [vanBanList, setVanBanList] = useState<any[]>([]);
   const [anNinhList, setAnNinhList] = useState<any[]>([]);
+  const [policyList, setPolicyList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Mẫu đang chọn và các bộ lọc cho mẫu đó
@@ -56,16 +57,42 @@ export default function ReportPage() {
   const loadBaseData = async () => {
     setLoading(true);
     try {
-      const [units, staff, docs, anNinh] = await Promise.all([
+      const [units, staff, docs, anNinh, policies] = await Promise.all([
         apiService.getDonVi(),
         apiService.getPersonnel(),
         apiService.getVanBan(),
-        apiService.getAnNinh()
+        apiService.getAnNinh(),
+        apiService.getQuyDinh()
       ]);
       setDonViList(units);
       setPersonnelList(staff);
       setVanBanList(docs);
       setAnNinhList(anNinh || []);
+
+      // Ghép dữ liệu từ qd_qt và vb_tb (có nghiệp vụ khác rỗng) giống hệt trang Quy định gốc
+      const mappedQd = (policies || []).map((item: any) => ({
+        ...item,
+        isFromVB: false
+      }));
+      const mappedVb = (docs || [])
+        .filter((item: any) => item.nghiep_vu && item.nghiep_vu.trim() !== '')
+        .map((item: any) => ({
+          id: item.id,
+          phan_loai: item.phan_loai,
+          so_hieu: item.so_hieu,
+          ngay_ban_hanh: item.ngay_ban_hanh,
+          tieu_de: item.tieu_de,
+          noi_dung: item.noi_dung,
+          nghiep_vu: item.nghiep_vu,
+          link_vb: item.link_vb,
+          hieu_luc: item.hieu_luc || 'Còn hiệu lực',
+          nguoi_ky: item.nguoi_ky,
+          chuc_vu: item.chuc_vu,
+          nguoi_lay_so: item.nguoi_lay_so,
+          bo_phan_lay_so: item.bo_phan_lay_so,
+          isFromVB: true
+        }));
+      setPolicyList([...mappedQd, ...mappedVb]);
     } catch (e) {
       console.error(e);
     } finally {
@@ -181,11 +208,44 @@ export default function ReportPage() {
     return list.sort();
   }, [allowedDonViList]);
 
-  const dynamicOptions = useMemo(() => ({
-    bo_phan_lay_so: boPhanOptions,
-    year: yearOptions,
-    loai_hinh: loaiHinhOptions
-  }), [boPhanOptions, yearOptions, loaiHinhOptions]);
+  // Lấy danh sách Bộ phận ban hành từ danh mục Quy định
+  const policyBoPhanOptions = useMemo(() => {
+    const depts = Array.from(new Set(policyList.map(item => item.bo_phan_lay_so).filter(Boolean)));
+    return depts.sort();
+  }, [policyList]);
+
+  // Lấy danh sách Nghiệp vụ áp dụng từ danh mục Quy định (tách chuỗi dấu ";")
+  const policyNghiepVuOptions = useMemo(() => {
+    const list: string[] = [];
+    policyList.forEach(item => {
+      if (item.nghiep_vu) {
+        item.nghiep_vu.split(';').forEach((p: string) => {
+          const trimmed = p.trim();
+          if (trimmed) list.push(trimmed);
+        });
+      }
+    });
+    return Array.from(new Set(list)).sort();
+  }, [policyList]);
+
+  // Lấy danh sách Loại tài liệu thực tế từ danh mục Quy định
+  const policyPhanLoaiOptions = useMemo(() => {
+    const list = policyList.map(item => item.phan_loai).filter(Boolean);
+    return Array.from(new Set(list)).sort();
+  }, [policyList]);
+
+  const dynamicOptions = useMemo(() => {
+    const opts: Record<string, any> = {
+      bo_phan_lay_so: selectedTemplate?.id === 'policy_list_report' ? policyBoPhanOptions : boPhanOptions,
+      year: yearOptions,
+      loai_hinh: loaiHinhOptions,
+      nghiep_vu_multi: policyNghiepVuOptions
+    };
+    if (selectedTemplate?.id === 'policy_list_report') {
+      opts.phan_loai = policyPhanLoaiOptions;
+    }
+    return opts;
+  }, [selectedTemplate, boPhanOptions, policyBoPhanOptions, yearOptions, loaiHinhOptions, policyNghiepVuOptions, policyPhanLoaiOptions]);
 
   const templateWithDynamicColumns = selectedTemplate;
 
@@ -371,6 +431,10 @@ export default function ReportPage() {
           ...doc,
           msnv_nguoi_lay_so: doc.msnv_nguoi_lay_so || doc.msnv_lay_so || ''
         }));
+      } else if (selectedTemplate.dataSource === 'getQuyDinh') {
+        rawData = [...policyList];
+      } else if (selectedTemplate.dataSource === 'getCuocThang') {
+        rawData = await apiService.getCuocThang();
       }
 
       // XỬ LÝ LỌC TRÊN CLIENT SIDE
@@ -442,10 +506,22 @@ export default function ReportPage() {
             if (!dateStr) return false;
             return new Date(dateStr) <= new Date(val as string);
           });
+        } else if (key === 'nghiep_vu_multi') {
+          if (Array.isArray(val) && val.length > 0) {
+            filtered = filtered.filter(item => {
+              if (!item.nghiep_vu) return false;
+              const itemNvs = item.nghiep_vu.split(';').map((s: string) => s.trim().toLowerCase());
+              return val.some(v => itemNvs.includes(String(v).toLowerCase()));
+            });
+          }
         } else if (key === 'phan_loai') {
           const selectedTypes = (Array.isArray(val) ? val : [val]).map(s => String(s).trim().toLowerCase());
           if (selectedTypes.length > 0 && !selectedTypes.includes('tất cả')) {
-            filtered = filtered.filter(item => selectedTypes.includes(getDocumentSheetType(item).toLowerCase()));
+            if (selectedTemplate.id === 'policy_list_report') {
+              filtered = filtered.filter(item => selectedTypes.includes(String(item.phan_loai || '').trim().toLowerCase()));
+            } else {
+              filtered = filtered.filter(item => selectedTypes.includes(getDocumentSheetType(item).toLowerCase()));
+            }
           }
         } else {
           filtered = filtered.filter(item => String(item[key] || '').toLowerCase() === String(val).toLowerCase());
@@ -529,6 +605,9 @@ export default function ReportPage() {
   const handleExport = async () => {
     if (!templateWithDynamicColumns) return;
     
+    // Ghi nhận nhật ký xuất báo cáo
+    void apiService.writeLog('XUẤT BÁO CÁO', `Tải Excel báo cáo: ${selectedTemplate?.title || ''}`);
+    
     // Tải và chuẩn bị dữ liệu mới nhất
     const latestFilteredData = await handlePreview() || previewData;
 
@@ -572,6 +651,36 @@ export default function ReportPage() {
       rawData = [...personnelList];
     } else if (selectedTemplate.dataSource === 'getVanBan') {
       rawData = await apiService.getVanBan();
+    } else if (selectedTemplate.dataSource === 'getQuyDinh') {
+      const [policies, docs] = await Promise.all([
+        apiService.getQuyDinh(),
+        apiService.getVanBan()
+      ]);
+      const mappedQd = (policies || []).map((item: any) => ({
+        ...item,
+        isFromVB: false
+      }));
+      const mappedVb = (docs || [])
+        .filter((item: any) => item.nghiep_vu && item.nghiep_vu.trim() !== '')
+        .map((item: any) => ({
+          id: item.id,
+          phan_loai: item.phan_loai,
+          so_hieu: item.so_hieu,
+          ngay_ban_hanh: item.ngay_ban_hanh,
+          tieu_de: item.tieu_de,
+          noi_dung: item.noi_dung,
+          nghiep_vu: item.nghiep_vu,
+          link_vb: item.link_vb,
+          hieu_luc: item.hieu_luc || 'Còn hiệu lực',
+          nguoi_ky: item.nguoi_ky,
+          chuc_vu: item.chuc_vu,
+          nguoi_lay_so: item.nguoi_lay_so,
+          bo_phan_lay_so: item.bo_phan_lay_so,
+          isFromVB: true
+        }));
+      rawData = [...mappedQd, ...mappedVb];
+    } else if (selectedTemplate.dataSource === 'getCuocThang') {
+      rawData = await apiService.getCuocThang();
     }
     return rawData;
   };

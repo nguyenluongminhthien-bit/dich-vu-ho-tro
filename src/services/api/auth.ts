@@ -32,9 +32,32 @@ export async function login(username: string, password: string): Promise<User> {
   }
 }
 
+export async function validateAndRefreshUser(id: string): Promise<User | null> {
+  // 1. Chế độ MOCK hoàn toàn
+  if (API_MODE === 'MOCK') {
+    const users = getLocalRecords('config_users');
+    return (users.find(u => String(u.id) === String(id)) as User) || null;
+  }
+
+  // 2. Chế độ SUPABASE
+  try {
+    const url = `${SUPABASE_URL}/rest/v1/config_users?id=eq.${id}&select=*`;
+    const response = await fetch(url, { method: 'GET', headers: HEADERS });
+    if (!response.ok) return null;
+    
+    const users = await response.json();
+    if (users.length === 0) return null;
+    return users[0] as User;
+  } catch (err) {
+    console.warn("⚠️ Không thể kết nối Supabase để đồng bộ tài khoản. Sử dụng dữ liệu cache.");
+    return null;
+  }
+}
+
 function loginMock(username: string, password: string): User {
   const users = getLocalRecords('config_users');
   const user = users.find(u => u.user_name === username && String(u.password) === String(password));
   if (!user) throw new Error("Sai tên đăng nhập hoặc mật khẩu (Chế độ offline)");
   return user as User;
 }
+

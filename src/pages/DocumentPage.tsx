@@ -16,6 +16,7 @@ import { PageWithFilterSkeleton } from '../components/SkeletonLoader';
 import UnitFilterSidebar from '../components/ui/UnitFilterSidebar';
 import Pagination from '../components/ui/Pagination';
 import { useAllowedUnits } from '../hooks/useAllowedUnits';
+import { searchGoogleDriveFile } from '../services/googleDrive';
 import SegmentTabs from '../components/ui/SegmentTabs';
 
 import {
@@ -289,11 +290,52 @@ export default function DocumentPage() {
 
   const advancedRules = String((user as any)?.quyen_chi_tiet || '');
 
+  const canViewType = useCallback((type: string) => {
+    const rulesList = advancedRules.split(',').map(r => r.trim());
+    const activeViewRules = rulesList.filter(r => [
+      'VB_VIEW_QD', 'VB_VIEW_TB', 'VB_VIEW_TB_BDH', 'VB_VIEW_TT', 'VB_VIEW_CV_DI', 'VB_VIEW_CV_DEN'
+    ].includes(r));
+    
+    // 1. Nếu có cấu hình các quyền xem chi tiết mới
+    if (activeViewRules.length > 0) {
+      switch (type) {
+        case 'Quyết định': return activeViewRules.includes('VB_VIEW_QD');
+        case 'Thông báo': return activeViewRules.includes('VB_VIEW_TB');
+        case 'Thông báo BĐH': return activeViewRules.includes('VB_VIEW_TB_BDH');
+        case 'Tờ trình': return activeViewRules.includes('VB_VIEW_TT');
+        case 'Công văn đi': return activeViewRules.includes('VB_VIEW_CV_DI');
+        case 'Công văn đến': return activeViewRules.includes('VB_VIEW_CV_DEN');
+        default: return true;
+      }
+    }
+    
+    // 2. Tương thích ngược với các rule cũ (VB_ONLY_TB, VB_ONLY_QD)
+    const hasOnlyTb = rulesList.includes('VB_ONLY_TB');
+    const hasOnlyQd = rulesList.includes('VB_ONLY_QD');
+    if (hasOnlyTb && !hasOnlyQd) {
+      return type === 'Thông báo' || type === 'Thông báo BĐH';
+    }
+    if (hasOnlyQd && !hasOnlyTb) {
+      return type === 'Quyết định';
+    }
+    if (hasOnlyTb && hasOnlyQd) {
+      return type === 'Thông báo' || type === 'Thông báo BĐH' || type === 'Quyết định';
+    }
+
+    // 3. Quyền Viewer Hạn Chế mặc định
+    if (isViewerHanChe) {
+      return type === 'Quyết định' || type === 'Thông báo' || type === 'Thông báo BĐH';
+    }
+    
+    return true;
+  }, [advancedRules, isViewerHanChe]);
+
   const [donViList, setDonViList] = useState<DonVi[]>([]);
   const [vbData, setVbData] = useState<any[]>([]);
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [scanningDrive, setScanningDrive] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -353,6 +395,15 @@ export default function DocumentPage() {
   };
 
   useEffect(() => { loadData(); }, []);
+
+  useEffect(() => {
+    if (viewData) {
+      apiService.writeLog(
+        'XEM VĂN BẢN',
+        `Loại: ${viewData.phan_loai || 'Không xác định'} | Số hiệu: ${viewData.so_hieu || 'Chưa có'} | Tiêu đề: ${viewData.tieu_de || ''}`
+      );
+    }
+  }, [viewData]);
 
   useEffect(() => {
     const handleResize = () => {
@@ -609,23 +660,24 @@ export default function DocumentPage() {
   const filteredDocsWithoutPhanLoai = useMemo(() => {
     let result = [...visibleDocuments];
 
-    if (isViewerHanChe) {
-      result = result.filter(item =>
-        item.phan_loai === 'Thông báo' || item.phan_loai === 'Thông báo BĐH' || item.phan_loai === 'Quyết định'
-      );
-    }
+    result = result.filter(item => canViewType(item.phan_loai));
 
-    if (advancedRules.includes('VB_ONLY_TB') && !advancedRules.includes('VB_ONLY_QD')) {
-      result = result.filter(item => item.phan_loai === 'Thông báo' || item.phan_loai === 'Thông báo BĐH');
-    } else if (advancedRules.includes('VB_ONLY_QD') && !advancedRules.includes('VB_ONLY_TB')) {
-      result = result.filter(item => item.phan_loai === 'Quyết định');
-    } else if (advancedRules.includes('VB_ONLY_TB') && advancedRules.includes('VB_ONLY_QD')) {
-      result = result.filter(item => item.phan_loai === 'Thông báo' || item.phan_loai === 'Thông báo BĐH' || item.phan_loai === 'Quyết định');
+    // Giới hạn theo Năm nếu được cấu hình trong Ma trận Quyền
+    const vbYearsRule = advancedRules.split(',').map(r => r.trim()).find(r => r.startsWith('VB_YEARS:'));
+    if (vbYearsRule) {
+      const allowedYears = vbYearsRule.substring('VB_YEARS:'.length).split('|').filter(Boolean);
+      if (allowedYears.length > 0) {
+        result = result.filter(item => {
+          if (!item.ngay_ban_hanh) return false;
+          const year = item.ngay_ban_hanh.substring(0, 4);
+          return allowedYears.includes(year);
+        });
+      }
     }
 
     if (selectedUnitFilter) result = result.filter(item => String(item.id_don_vi) === String(selectedUnitFilter) || String(item.pham_vi_ap_dung) === String(selectedUnitFilter));
     if (selectedYear !== 'all') {
-      result = result.filter(item => item.ngay_ban_hanh && new Date(item.ngay_ban_hanh).getFullYear().toString() === selectedYear);
+      result = result.filter(item => item.ngay_ban_hanh && item.ngay_ban_hanh.substring(0, 4) === selectedYear);
     }
     if (selectedSigner !== 'all') {
       result = result.filter(item => item.nguoi_ky && normalizeSignerName(item.nguoi_ky) === selectedSigner);
@@ -698,20 +750,29 @@ export default function DocumentPage() {
   const docTabs = useMemo(() => {
     const list: { id: string; label: string; count: number; icon: React.ReactNode }[] = [];
 
-    list.push({ id: 'Quyết định', label: 'Quyết định', count: tabCounts.quyetDinh, icon: <FileText size={16} /> });
-    list.push({ id: 'Thông báo', label: 'Thông báo', count: tabCounts.thongBao, icon: <Megaphone size={16} /> });
-    list.push({ id: 'Thông báo BĐH', label: 'Ban điều hành TB', count: tabCounts.thongBaoBdh, icon: <Briefcase size={16} /> });
-
-    if (!isViewerHanChe) {
+    if (canViewType('Quyết định')) {
+      list.push({ id: 'Quyết định', label: 'Quyết định', count: tabCounts.quyetDinh, icon: <FileText size={16} /> });
+    }
+    if (canViewType('Thông báo')) {
+      list.push({ id: 'Thông báo', label: 'Thông báo', count: tabCounts.thongBao, icon: <Megaphone size={16} /> });
+    }
+    if (canViewType('Thông báo BĐH')) {
+      list.push({ id: 'Thông báo BĐH', label: 'Ban điều hành TB', count: tabCounts.thongBaoBdh, icon: <Briefcase size={16} /> });
+    }
+    if (canViewType('Tờ trình')) {
       list.push({ id: 'Tờ trình', label: 'Tờ trình', count: tabCounts.toTrinh, icon: <Bookmark size={16} /> });
+    }
+    if (canViewType('Công văn đi')) {
       list.push({ id: 'Công văn đi', label: 'Công văn đi', count: tabCounts.cvDi, icon: <Send size={16} /> });
+    }
+    if (canViewType('Công văn đến')) {
       list.push({ id: 'Công văn đến', label: 'Công văn đến', count: tabCounts.cvDen, icon: <Inbox size={16} /> });
     }
 
     list.push({ id: 'all', label: 'Tất cả', count: tabCounts.all, icon: <Layers size={16} /> });
 
     return list;
-  }, [tabCounts, isViewerHanChe]);
+  }, [tabCounts, canViewType]);
 
   const selectedUnitName = useMemo(() => {
     if (!selectedUnitFilter) return 'Toàn hệ thống';
@@ -919,6 +980,38 @@ Anh/chị vui lòng gửi file scan đầy đủ chữ ký và mộc để phụ
       toast.error(err.message || "Đã xảy ra lỗi khi lưu văn bản!");
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleAutoScanDrive = async () => {
+    const { phan_loai, ngay_ban_hanh, so_hieu } = formData;
+    if (!phan_loai) {
+      toast.error("Vui lòng chọn Loại văn bản trước!");
+      return;
+    }
+    if (!ngay_ban_hanh) {
+      toast.error("Vui lòng chọn Ngày ban hành trước!");
+      return;
+    }
+    if (!so_hieu) {
+      toast.error("Vui lòng nhập Số hiệu trước!");
+      return;
+    }
+
+    const year = ngay_ban_hanh.substring(0, 4);
+    setScanningDrive(true);
+    try {
+      const link = await searchGoogleDriveFile(year, phan_loai, so_hieu);
+      if (link) {
+        setFormData((prev: any) => ({ ...prev, link_vb: link }));
+        toast.success("Đã tìm thấy và điền link file từ Drive thành công!");
+      } else {
+        toast.error("Không tìm thấy tệp tin phù hợp trên Drive. Vui lòng dán liên kết thủ công!");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Lỗi khi quét liên kết Google Drive!");
+    } finally {
+      setScanningDrive(false);
     }
   };
 
@@ -1498,12 +1591,12 @@ Anh/chị vui lòng gửi file scan đầy đủ chữ ký và mộc để phụ
                     <div className="md:col-span-1 min-w-0">
                       <label className="block text-[11px] font-bold text-[#05469B] mb-1">Phân loại *</label>
                       <select required name="phan_loai" value={formData.phan_loai || 'Thông báo'} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] font-bold text-gray-800">
-                        <option value="Thông báo">Thông báo</option>
-                        <option value="Thông báo BĐH">Thông báo BĐH</option>
-                        <option value="Quyết định">Quyết định</option>
-                        <option value="Tờ trình">Tờ trình</option>
-                        <option value="Công văn đến">Công văn đến</option>
-                        <option value="Công văn đi">Công văn đi</option>
+                        {canViewType('Thông báo') && <option value="Thông báo">Thông báo</option>}
+                        {canViewType('Thông báo BĐH') && <option value="Thông báo BĐH">Thông báo BĐH</option>}
+                        {canViewType('Quyết định') && <option value="Quyết định">Quyết định</option>}
+                        {canViewType('Tờ trình') && <option value="Tờ trình">Tờ trình</option>}
+                        {canViewType('Công văn đến') && <option value="Công văn đến">Công văn đến</option>}
+                        {canViewType('Công văn đi') && <option value="Công văn đi">Công văn đi</option>}
                       </select>
                     </div>
                     <div className="md:col-span-1 min-w-0">
@@ -1592,7 +1685,27 @@ Anh/chị vui lòng gửi file scan đầy đủ chữ ký và mộc để phụ
                       <textarea name="noi_dung" value={formData.noi_dung || ''} onChange={handleInputChange} rows={3} className="w-full p-3 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] resize-none break-words" placeholder="Tóm tắt ngắn gọn nội dung..."></textarea>
                     </div>
                     <div className="min-w-0">
-                      <label className="block text-[11px] font-bold text-gray-700 mb-1">Link File đính kèm (PDF / Drive)</label>
+                      <div className="flex justify-between items-center mb-1">
+                        <label className="block text-[11px] font-bold text-gray-700">Link File đính kèm (PDF / Drive)</label>
+                        <button
+                          type="button"
+                          onClick={handleAutoScanDrive}
+                          disabled={scanningDrive}
+                          className="text-[10px] text-[#05469B] hover:text-blue-700 font-bold flex items-center gap-1 bg-blue-50 px-2.5 py-1 rounded border border-blue-100 hover:bg-blue-100 disabled:opacity-50 transition-all cursor-pointer shadow-sm shrink-0"
+                        >
+                          {scanningDrive ? (
+                            <>
+                              <Loader2 className="animate-spin" size={11} />
+                              Đang quét Drive...
+                            </>
+                          ) : (
+                            <>
+                              <Search size={11} />
+                              Tự động tìm file trên Drive
+                            </>
+                          )}
+                        </button>
+                      </div>
                       <div className="relative">
                         <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
                         <input type="url" name="link_vb" value={formData.link_vb || ''} onChange={handleInputChange} className="w-full pl-9 pr-4 py-3 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B] text-blue-600 font-medium break-all" placeholder="Dán link Google Drive hoặc file PDF vào đây..." />

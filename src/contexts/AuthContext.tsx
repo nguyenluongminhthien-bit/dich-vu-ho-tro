@@ -10,6 +10,7 @@ interface AppUser {
   quyen: string; 
   quyen_truy_cap?: string; 
   quyen_chi_tiet?: string;
+  password?: string; // Mật khẩu dùng để đối chiếu đổi mật khẩu ngầm
 }
 
 interface AuthContextType {
@@ -21,24 +22,114 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
+// Hằng số phiên bản ứng dụng và thời hạn phiên
+const APP_VERSION = '1.1.0';
+const SESSION_EXPIRY_MS = 2 * 24 * 60 * 60 * 1000; // 2 ngày (48 giờ)
+
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<AppUser | null>(null);
 
   useEffect(() => {
+    // 🟢 TỰ ĐỘNG DỌN DẸP NHẬT KÝ HỆ THỐNG CŨ (> 5 ngày) CHẠY NGẦM
+    apiService.cleanOldLogs?.(5).catch(err => {
+      console.warn("Lỗi tự động dọn dẹp log:", err);
+    });
+
+    // 🟢 1. KIỂM TRA PHIÊN BẢN ỨNG DỤNG (APP VERSIONING)
+    const currentVersion = localStorage.getItem('appVersion');
+    if (currentVersion !== APP_VERSION) {
+      // Xóa thông tin đăng nhập và cache cũ khi có cập nhật lớn để tránh xung đột
+      localStorage.removeItem('authUser');
+      localStorage.removeItem('sessionExpiry');
+      sessionStorage.removeItem('authUser');
+      
+      // Xóa các dữ liệu API đệm (cache) lưu trong localStorage
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const key = localStorage.key(i);
+        if (key && (key.startsWith('api_cache_') || key.startsWith('offline_records_'))) {
+          localStorage.removeItem(key);
+        }
+      }
+      localStorage.setItem('appVersion', APP_VERSION);
+    }
+
     const storedUser = localStorage.getItem('authUser') || sessionStorage.getItem('authUser');
     if (storedUser) {
       const parsedUser = JSON.parse(storedUser);
-      setUser(parsedUser);
       
-      // Đồng bộ thông tin user xuống apiService
-      apiService.setCurrentUser({
-        id: parsedUser.id,
-        user_name: parsedUser.user_name,
-        ho_ten: parsedUser.ho_ten,
-        id_don_vi: parsedUser.id_don_vi,
-        quyen: parsedUser.quyen,
-        quyen_truy_cap: parsedUser.quyen_truy_cap
-      } as User);
+      // 🟢 2. KIỂM TRA THỜI HẠN PHIÊN (SESSION EXPIRATION - 2 NGÀY)
+      if (localStorage.getItem('authUser')) {
+        const expiry = localStorage.getItem('sessionExpiry');
+        if (expiry && Date.now() > Number(expiry)) {
+          // Phiên đăng nhập đã quá hạn 2 ngày -> tự động logout
+          localStorage.removeItem('authUser');
+          localStorage.removeItem('sessionExpiry');
+          window.location.reload();
+          return;
+        }
+      }
+
+      // Đăng nhập nhanh bằng dữ liệu cache (tránh giật lag giao diện)
+      setUser(parsedUser);
+      apiService.setCurrentUser(parsedUser as unknown as User);
+
+      // 🟢 3. ĐỒNG BỘ NGẦM QUYỀN HẠN & MẬT KHẨU TỪ DATABASE (DATABASE SYNC)
+      apiService.validateAndRefreshUser(parsedUser.id).then((freshUser) => {
+        if (freshUser) {
+          // A. Kiểm tra xem mật khẩu có bị đổi không
+          if (parsedUser.password && freshUser.password !== parsedUser.password) {
+            logout();
+            alert("Tài khoản của bạn đã bị đổi mật khẩu hoặc khóa bởi quản trị viên. Vui lòng đăng nhập lại!");
+            return;
+          }
+
+          // B. Tính toán đơn vị mặc định
+          let finalIdDonVi = '';
+          if (String(freshUser.quyen || '').toUpperCase() === 'ADMIN') {
+            finalIdDonVi = 'ALL';
+          } else {
+            finalIdDonVi = freshUser.id_don_vi ? String(freshUser.id_don_vi).trim() : 'HO';
+          }
+
+          // C. So sánh dữ liệu mới và cũ
+          const hasChanges = 
+            freshUser.ho_ten !== parsedUser.ho_ten ||
+            finalIdDonVi !== parsedUser.id_don_vi ||
+            freshUser.quyen !== parsedUser.quyen ||
+            (freshUser.quyen_truy_cap || '') !== (parsedUser.quyen_truy_cap || '') ||
+            (freshUser.quyen_chi_tiet || '') !== (parsedUser.quyen_chi_tiet || '');
+
+          if (hasChanges) {
+            const updatedUser: AppUser = {
+              id: parsedUser.id,
+              user_name: parsedUser.user_name,
+              ho_ten: String(freshUser.ho_ten || 'Người dùng'),
+              id_don_vi: finalIdDonVi,
+              quyen: String(freshUser.quyen || 'USER'),
+              quyen_truy_cap: String(freshUser.quyen_truy_cap || ''),
+              quyen_chi_tiet: String(freshUser.quyen_chi_tiet || ''),
+              password: String(freshUser.password || '')
+            };
+
+            setUser(updatedUser);
+            if (localStorage.getItem('authUser')) {
+              localStorage.setItem('authUser', JSON.stringify(updatedUser));
+              // Gia hạn thời điểm hết hạn từ lúc đồng bộ thành công
+              localStorage.setItem('sessionExpiry', String(Date.now() + SESSION_EXPIRY_MS));
+            } else {
+              sessionStorage.setItem('authUser', JSON.stringify(updatedUser));
+            }
+            apiService.setCurrentUser(updatedUser as unknown as User);
+            console.log("Đã đồng bộ ngầm thông tin phân quyền mới thành công.");
+          }
+        } else {
+          // Tài khoản không tồn tại trong DB (bị xóa) -> tự động logout
+          logout();
+          alert("Tài khoản của bạn không còn tồn tại trên hệ thống!");
+        }
+      }).catch((err) => {
+        console.warn("⚠️ Không thể đồng bộ ngầm thông tin phân quyền (Đang chạy offline):", err);
+      });
     }
   }, []);
 
@@ -73,23 +164,26 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
       // 🟢 3. CHUẨN HÓA THÔNG TIN NGƯỜI DÙNG (Bao gồm cả Cột Truy Cập)
       const mappedUser: AppUser = {
-        id: String(userData.id || userData.ID_User || 'Unknown'),
+        id: String(userData.id || userData.ID || userData.ID_User || 'Unknown'),
         user_name: String(userData.user_name || userData.Username || userData.username || username),
         ho_ten: String(userData.ho_ten || userData.HoTen || userData.hoTen || 'Người dùng'),
         id_don_vi: finalIdDonVi,
         quyen: rawRole, // Lấy chuẩn chữ viewer_hanche
         quyen_truy_cap: String(userData.quyen_truy_cap || ''),
-        quyen_chi_tiet: String(userData.quyen_chi_tiet || '')
+        quyen_chi_tiet: String(userData.quyen_chi_tiet || ''),
+        password: String(userData.password || '') // Lưu password để đối chiếu đổi mật khẩu ngầm
       };
 
       // Lưu User vào state và LocalStorage/SessionStorage tùy chọn
       setUser(mappedUser);
       if (remember) {
         localStorage.setItem('authUser', JSON.stringify(mappedUser));
+        localStorage.setItem('sessionExpiry', String(Date.now() + SESSION_EXPIRY_MS)); // Lưu mốc hết hạn 2 ngày
         sessionStorage.removeItem('authUser');
       } else {
         sessionStorage.setItem('authUser', JSON.stringify(mappedUser));
         localStorage.removeItem('authUser');
+        localStorage.removeItem('sessionExpiry');
       }
       
       apiService.setCurrentUser(mappedUser as unknown as User);
@@ -111,6 +205,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setTimeout(() => {
       setUser(null);
       localStorage.removeItem('authUser');
+      localStorage.removeItem('sessionExpiry'); // Xóa thời hạn hết hạn
       sessionStorage.removeItem('authUser');
       apiService.setCurrentUser(null);
       window.location.reload();
