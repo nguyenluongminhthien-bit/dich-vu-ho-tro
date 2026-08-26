@@ -56,9 +56,22 @@ QTVP-ASDS App
 - **Quản lý Pháp nhân (PnModal.tsx)**: Lưu giữ thông tin Mã số thuế, tên công ty, địa chỉ xuất hóa đơn, giấy phép kinh doanh.
 - **Quản lý Phòng họp (PhModal.tsx)**: Quản lý vị trí, sức chứa, thiết bị trình chiếu, thiết bị họp online, layout bàn ghế.
 - **Tích hợp các Sub-modal nghiệp vụ**: Nhật ký An ninh bảo vệ (SecurityModal), Phục vụ hành chính (PvhcModal), PCCC (PcccModal), ATVSLĐ (AtvsldModal), PCTT (PcttModal).
+- **Sơ đồ Mạng lưới & Lộ trình Showroom (`DepartmentMapModal.tsx`)**:
+  - *Bản đồ Phủ bán kính & Tính khoảng cách OSRM*: Lọc loại hình đơn vị, tính chuỗi khoảng cách đường bộ / chim bay, đề xuất lộ trình ghé thăm tối ưu.
+  - *Popup Tooltip Đơn vị Sang trọng Bọc vừa khít*: Thẻ Popup bản đồ dạng Mini-card bọc khung vừa khít (`custom-showroom-popup`, `minWidth: 380px`, `maxWidth: 480px`), trình bày thẳng hàng 4 dòng thông tin chuẩn:
+    * **Dòng 1**: Lãnh đạo & SĐT liên hệ.
+    * **Dòng 2**: Diện tích mặt bằng (`m²`) & Số cổng ra vào.
+    * **Dòng 3**: Quy mô (tầng, hầm).
+    * **Dòng 4**: Lượt khách BQ & Tổng CB-NV (lấy chuẩn từ `tong_nhan_su` trong bảng `dm_don_vi`).
+    * **Khối AN-BV & Phương án**: AN-BV Định biên / Hiện hữu, phân bổ ca ngày / ca đêm, chữ viết đầy đủ không viết tắt (*Nội bộ*, *Dịch vụ*, *Cố định*, *Tuần tra*).
+    * **Tiếp giáp địa bàn**: Tách biệt 4 hướng **• Trước**, **• Sau**, **• Trái**, **• Phải** dạng block lưới 2 cột ngắt dòng tự nhiên (`break-words`), **nguyên văn 100% không bị ba chấm `...`**.
+    * **Camera & Giám sát**: Tổng số mắt camera (Hoạt động tốt / Hư hỏng) và đánh giá an ninh địa bàn.
+  - *Chọn Điểm Dừng Chân 1-Click Trên Bản Đồ*: Chọn/thêm điểm dừng chân (Tab Khoảng cách) hoặc điểm ghé thăm (Tab Tuyến tối ưu) trực tiếp bằng cách click vào marker bản đồ hoặc bấm nút thao tác nhanh trong Popup HTML.
 
 #### 👥 03. Phân hệ Quản lý Nhân sự & Cước Di động (PersonnelPage.tsx)
 - **Hồ sơ Nhân sự 360°**: Quản lý đầy đủ mã nhân viên, họ tên, chức danh, bộ phận, khối, ngạch lương, thâm niên, ngày nhận việc, CCCD, thông tin xe cá nhân, bằng cấp chứng chỉ (ANBV, PCCC, CNCH, Sơ cấp cứu, Võ thuật, GPLX, Tin học, Ngoại ngữ...).
+- **Giao diện Tab Liền Khối Màu Xanh Thương Hiệu**: Đặt màu xanh thương hiệu `#00539c` (RGB `0, 82, 156`) làm chuẩn đồng bộ cho các khối tab lồng liền mạch cấp 1 & cấp 2.
+- **Tối ưu Bảng Danh sách & Modal Xem Chi Tiết**: Cột "Họ và tên" `whitespace-nowrap` hiển thị thẳng hàng không bị xuống dòng / ba chấm. Khối **Lịch Sử Khám Sức Khỏe & BNN Cá Nhân** được di chuyển sang Modal Xem Chi Tiết Hồ Sơ Nhân Sự, đặt nằm phía trên khối "Ghi chú khác".
 - **Quản lý Thuê bao & Cước di động (`CuocDiDongTab.tsx`)**:
   - Quản lý danh mục số thuê bao công ty cấp cho nhân sự/bộ phận.
   - Theo dõi lịch sử người sử dụng thuê bao (`lich_su_nsd`).
@@ -82,7 +95,7 @@ QTVP-ASDS App
 - **Tab 3: Khóa học Huấn luyện (`KhoaHocTab.tsx`)**: Quản lý các đợt đào tạo qua 2 chế độ:
   - **Danh sách khóa huấn luyện:** Tạo khóa học mới, nhập danh sách học viên qua dán Excel, đồng bộ chứng chỉ ngầm theo batch.
   - **Lịch sử đào tạo cá nhân:** Hiển thị dưới dạng **Bảng ma trận (Matrix View)** gom nhóm lịch sử đạt các năm (cột năm động) kèm timeline chi tiết và **Bảng chi tiết (List View)** lọc theo đơn vị lúc học thực tế để tính toán chi phí. Tích hợp nút **"Xuất Excel Đợt Học Tiếp Theo"** tự động đề xuất nhân sự chưa học/hết hạn chứng chỉ chuẩn 14 cột.
-  - *Đồng bộ thông minh:* Khi lưu học viên và đồng bộ chứng chỉ sang hồ sơ chính, hệ thống tự động nhận diện và cập nhật theo MSNV trên toàn hệ thống nếu nhân viên đã điều chuyển sang đơn vị mới.
+  - *Đồng bộ thông minh nhân sự kiêm nhiệm:* Khi lưu học viên và đồng bộ chứng chỉ sang hồ sơ chính, hệ thống tự động quét MSNV trên toàn hệ thống và cập nhật đồng bộ cho tất cả hồ sơ công tác chính và kiêm nhiệm ở các đơn vị khác nhau.
 - **Tab 4: Thiết bị yêu cầu Nghiêm ngặt về ATLĐ (`StrictEquipmentTab.tsx`)**:
   - Quản lý danh mục thiết bị có yêu cầu nghiêm ngặt (xe nâng, nồi hơi, thang máy, bình chịu áp lực...).
   - Quản lý nhật ký/lịch sử kiểm định (`nk_kiem_dinh_tbnn`), đơn vị kiểm định, chi phí, link biên bản PDF.
@@ -91,6 +104,7 @@ QTVP-ASDS App
   - Quản lý chiến dịch khám sức khỏe định kỳ của toàn đơn vị.
   - Hỗ trợ dán Excel danh sách KSK cá nhân (tự viết hoa chữ cái đầu họ tên, tự gán đúng đơn vị khám năm cũ), tự động tính toán & tổng hợp đợt KSK cấp đơn vị.
   - Cơ chế lọc phân tách: Bảng ma trận lọc theo đơn vị hiện tại (xem tiến trình điều chuyển đơn vị), Bảng chi tiết lọc theo đơn vị lúc khám thực tế (báo cáo thống kê).
+  - *Custom Confirm Modal Xóa:* Thay thế dialog confirm native của trình duyệt bằng Custom Confirm Modal giao diện mờ backdrop blur sang trọng.
 
 #### 🚗 06. Phân hệ Quản lý Xe & Chi phí Vận hành (VehiclePage.tsx)
 - **Master Tài sản Xe (TS_Xe)**: Quản lý biển số, loại phương tiện, hiệu xe, số khung, số máy, năm sản xuất, hình thức sở hữu, GPS, hiện trạng.
