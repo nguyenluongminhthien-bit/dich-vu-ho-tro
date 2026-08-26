@@ -14,6 +14,7 @@ import HoSoTab from '../components/atvsld/HoSoTab';
 import KeHoachTab from '../components/atvsld/KeHoachTab';
 import KhoaHocTab from '../components/atvsld/KhoaHocTab';
 import StrictEquipmentTab from '../components/atvsld/StrictEquipmentTab';
+import SucKhoeTab from '../components/atvsld/SucKhoeTab';
 import { getExpiryStatus } from '../utils/expiryStatus';
 import { useAuth } from '../contexts/AuthContext';
 import { DonVi } from '../types';
@@ -24,7 +25,7 @@ import Pagination from '../components/ui/Pagination';
 import { useAllowedUnits } from '../hooks/useAllowedUnits';
 import SegmentTabs from '../components/ui/SegmentTabs';
 import { toUnaccented, stripAccents } from '../utils/formatters';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 
 // Hàm dò tìm Tên Vùng Miền (Dành cho chức năng Xuất Excel)
 const getRegionName = (unitId: string, allUnits: DonVi[]): string => {
@@ -64,7 +65,11 @@ export default function AtvsldPage() {
 
   // 🟢 STATE CHUYỂN TAB CẤP 1 VÀ CẤP 2
   const [activeTab, setActiveTab] = useState<'hoso' | 'daotao' | 'thietbi' | 'khamsuckhoe'>('hoso');
-  const [activeSubTab, setActiveSubTab] = useState<'kehoach' | 'khoahoc'>('kehoach');
+  const [activeSubTab, setActiveSubTab] = useState<'khoahoc' | 'kehoach'>('khoahoc');
+  const [activeSubTab3, setActiveSubTab3] = useState<'khoahoc' | 'canhan'>('khoahoc');
+  const [level3Counts, setLevel3Counts] = useState({ khoaHocCount: 0, caNhanCount: 0 });
+  const [activeSubTabSuckhoe, setActiveSubTabSuckhoe] = useState<'tonghop' | 'canhan'>('tonghop');
+  const [suckhoeCounts, setSuckhoeCounts] = useState({ campaignCount: 0, caNhanCount: 0 });
 
   // Tab Hồ sơ (Cũ)
   const [searchTerm, setSearchTerm] = useState('');
@@ -82,14 +87,14 @@ export default function AtvsldPage() {
   const [currentSafetyPage, setCurrentSafetyPage] = useState(1);
   const [rowsPerSafetyPage, setRowsPerSafetyPage] = useState(50);
 
-  // 🟢 KÉO CÙNG LÚC 8 BẢNG DỮ LIỆU
+  // 🟢 KÉO CÙNG LÚC 8 BẢNG DỮ LIỆU (Đã bọc bẫy lỗi an toàn cho từng API)
   const loadData = async () => {
     setLoading(true);
     try {
       const [dvResult, atResult, nsResult, khResult, hvResult, ckResult, tbResult, kdResult] = await Promise.all([
-        apiService.getDonVi(),
+        apiService.getDonVi ? apiService.getDonVi().catch(() => []) : Promise.resolve([]),
         apiService.getATVSLD ? apiService.getATVSLD().catch(() => []) : Promise.resolve([]),
-        apiService.getPersonnel(),
+        apiService.getPersonnel ? apiService.getPersonnel().catch(() => []) : Promise.resolve([]),
         apiService.getKhoaHuanLuyen ? apiService.getKhoaHuanLuyen().catch(() => []) : Promise.resolve([]),
         apiService.getHocVienKhoaHuanLuyen ? apiService.getHocVienKhoaHuanLuyen().catch(() => []) : Promise.resolve([]),
         apiService.getChuKyATVSLD ? apiService.getChuKyATVSLD().catch(() => []) : Promise.resolve([]),
@@ -105,6 +110,7 @@ export default function AtvsldPage() {
       setThietBiData(tbResult || []);
       setKiemDinhData(kdResult || []);
     } catch (err) {
+      console.error("Lỗi tải dữ liệu ATVSLĐ:", err);
       toast.error('Lỗi tải dữ liệu ATVSLĐ.');
     } finally {
       setLoading(false);
@@ -363,12 +369,12 @@ export default function AtvsldPage() {
           <td style="text-align: center;">${idx + 1}</td>
           <td style="mso-number-format:'\\@'; font-weight: bold;">${p.ma_so_nhan_vien || ''}</td>
           <td>${p.ho_ten || ''}</td>
-          <td>${p.phan_loai || ''}</td>
+          <td>${p.chuc_danh || ''}</td>
+          <td>${p.chuc_vu || ''}</td>
           <td>${p.phong_ban || ''}</td>
           <td>${p.donViText || ''}</td>
           <td>${p.showroomText || ''}</td>
           <td>${p.phiaText || ''}</td>
-          <td>${p.chuc_vu || ''}</td>
           <td style="mso-number-format:'\\@'; text-align: center;">${p.sdt_cong_ty || ''}</td>
           <td style="text-align: center;">${p.gioi_tinh || ''}</td>
           <td style="text-align: center;">${p.nam_sinh ? new Date(p.nam_sinh).toLocaleDateString('vi-VN') : ''}</td>
@@ -401,25 +407,25 @@ export default function AtvsldPage() {
           <thead>
             <tr>
               <th>Stt</th>
-              <th>Mã NV</th>
+              <th>Mã</th>
               <th>Họ tên</th>
+              <th>Chức danh</th>
               <th>Chức vụ</th>
-              <th>Bộ phận</th>
-              <th>Đơn vị</th>
+              <th>Bộ phận làm việc</th>
+              <th>Đơn vị công tác</th>
               <th>Showroom</th>
               <th>Phía</th>
-              <th>Chức danh</th>
               <th>SDT Cty</th>
               <th>Giới tính</th>
               <th>Năm sinh</th>
               <th>Ngày nhận việc</th>
-              <th>SDT CNhan</th>
+              <th>SDT CN</th>
               <th>Email</th>
               <th>Ngạch</th>
               <th>Nhóm</th>
               <th>Từ</th>
               <th>Đến</th>
-              <th>Giá trị đến</th>
+              <th>Giá trị</th>
             </tr>
           </thead>
           <tbody>
@@ -445,6 +451,11 @@ export default function AtvsldPage() {
 
   if (loading) return <div className="flex items-center justify-center h-full"><Loader2 className="w-8 h-8 animate-spin text-emerald-600" /></div>;
 
+  const isDaotaoOpen = activeTab === 'daotao';
+  const isKhamsuckhoeOpen = activeTab === 'khamsuckhoe';
+  const isLevel2Open = isDaotaoOpen || isKhamsuckhoeOpen;
+  const isLevel3Open = isDaotaoOpen && activeSubTab === 'khoahoc';
+
   return (
     <div className="flex w-full max-w-full h-full bg-[#f4f7f9] overflow-hidden relative">
 
@@ -469,7 +480,7 @@ export default function AtvsldPage() {
       <div className="flex-1 min-w-0 max-w-full overflow-y-auto px-4 sm:px-6 pb-4 sm:pb-6 relative transition-all duration-300 custom-scrollbar flex flex-col">
 
         {/* 🟢 KHU VỰC TIÊU ĐỀ, TABS & THẺ THỐNG KÊ CỐ ĐỊNH KHI CUỘN (STICKY HEADER) */}
-        <div className={`sticky top-0 z-20 bg-gray-50 dark:bg-gray-900 pt-4 sm:pt-6 pb-4 border-b border-gray-200/80 dark:border-gray-800 transition-all duration-300 ${isListCollapsed ? 'md:pl-10 lg:pl-0' : ''} shrink-0 mb-6 shadow-2xs`}>
+        <div className={`sticky top-0 z-20 bg-gray-50 dark:bg-gray-900 pt-4 sm:pt-6 ${activeTab === 'daotao' ? 'pb-3 mb-[15px]' : 'pb-4 mb-6'} border-b border-gray-200/80 dark:border-gray-800 transition-all duration-300 ${isListCollapsed ? 'md:pl-10 lg:pl-0' : ''} shrink-0 shadow-2xs`}>
 
           {/* 1. Header tiêu đề + Tìm kiếm + Nút Thêm */}
           <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center mb-5 gap-4">
@@ -485,7 +496,19 @@ export default function AtvsldPage() {
               )}
               <div>
                 <h2 className="text-2xl font-black text-emerald-700 flex items-center gap-2"><HardHat size={28} /> Quản lý Hồ sơ ATVSLĐ</h2>
-                <p className="text-sm font-medium text-gray-500 mt-1">Đang xem: <span className="text-emerald-600 font-bold">{selectedUnitName}</span></p>
+                <div className="flex items-center gap-2 mt-1 text-xs text-gray-500 font-semibold flex-wrap">
+                  <span>Đang xem: <span className="text-emerald-600 font-bold">{selectedUnitName}</span></span>
+                  <span className="text-gray-300">•</span>
+                  <div className="flex items-center gap-1 text-emerald-700 font-bold bg-emerald-50/80 px-2.5 py-0.5 rounded-full border border-emerald-200 text-[11px] shadow-2xs">
+                    <span>{atvsldTabs.find(t => t.id === activeTab)?.label}</span>
+                    {activeTab === 'daotao' && (
+                      <>
+                        <ChevronRight size={12} className="text-emerald-400" />
+                        <span className="text-emerald-800">{activeSubTab === 'khoahoc' ? 'Khóa Đào tạo/Huấn luyện' : 'Kế hoạch Đào tạo/Huấn luyện'}</span>
+                      </>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -516,44 +539,161 @@ export default function AtvsldPage() {
             </div>
           </div>
 
-          {/* 2. Khu vực Chuyển Tab Cấp 1 */}
-          <div className="mb-5">
-            <SegmentTabs
-              tabs={atvsldTabs}
-              activeTab={activeTab}
-              onChange={(id) => setActiveTab(id as any)}
-              layoutId="atvsldActiveBg"
-              activeBgColor="#047857"
-            />
+          {/* 🟢 KHU VỰC TABS PHÂN CẤP LIỀN KHỐI (LEVEL 1, 2, 3) */}
+          <div className="w-full flex flex-col mt-4 select-none shrink-0 overflow-hidden rounded-2xl border border-gray-200 dark:border-slate-800 shadow-xs bg-white dark:bg-slate-900 transition-all duration-300">
+            {/* --- CẤP 1 --- */}
+            <div className={`w-full bg-gray-100 dark:bg-slate-800 flex flex-wrap gap-1 pt-1 px-1 items-center transition-all duration-300 ${isLevel2Open ? 'pb-0 border-b-0' : 'pb-1'}`}>
+              {atvsldTabs.map((tab) => {
+                const isActive = tab.id === activeTab;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setActiveTab(tab.id as any)}
+                    className={`relative flex items-center gap-2 px-4 py-2 text-xs sm:text-sm font-bold transition-all duration-250 cursor-pointer whitespace-nowrap outline-none border-none ${
+                      isActive
+                        ? `bg-emerald-600 dark:bg-emerald-700 text-white font-black z-10 ${isLevel2Open ? 'rounded-t-xl rounded-b-none pb-2.5 sm:pb-3' : 'rounded-xl'}`
+                        : 'text-gray-500 hover:text-emerald-700 dark:hover:text-emerald-300 hover:bg-white/50 dark:hover:bg-slate-700/50 rounded-xl'
+                    }`}
+                  >
+                    {tab.icon && <span className="shrink-0 flex items-center">{tab.icon}</span>}
+                    <span>{tab.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* --- CẤP 2 (Chỉ mở khi chọn Đào tạo/Huấn luyện hoặc Khám BNN/Sức khỏe định kỳ) --- */}
+            <AnimatePresence initial={false}>
+              {isLevel2Open && (
+                <motion.div
+                  key={isDaotaoOpen ? "level2-daotao" : "level2-suckhoe"}
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.3, ease: 'easeInOut' }}
+                  className="overflow-hidden bg-emerald-600 dark:bg-emerald-700"
+                >
+                  {isDaotaoOpen ? (
+                    <div className={`w-full flex flex-wrap gap-4 px-4 pt-1.5 items-center transition-all duration-300 ${isLevel3Open ? 'pb-0' : 'pb-1.5'}`}>
+                      <button
+                        type="button"
+                        onClick={() => setActiveSubTab('khoahoc')}
+                        className={`py-1.5 px-4 text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                          activeSubTab === 'khoahoc'
+                            ? `bg-emerald-800 text-white shadow-sm ring-1 ring-emerald-500/30 ${isLevel3Open ? 'rounded-t-lg rounded-b-none pb-2.5' : 'rounded-lg'}`
+                            : 'text-white/80 hover:text-white hover:bg-white/10 rounded-lg'
+                        }`}
+                      >
+                        <GraduationCap className="w-4 h-4" />
+                        <span>Khóa Đào tạo/Huấn luyện</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setActiveSubTab('kehoach')}
+                        className={`py-1.5 px-4 text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                          activeSubTab === 'kehoach'
+                            ? 'bg-emerald-800 text-white shadow-sm ring-1 ring-emerald-500/30 rounded-lg'
+                            : 'text-white/80 hover:text-white hover:bg-white/10 rounded-lg'
+                        }`}
+                      >
+                        <FileSpreadsheet className="w-4 h-4" />
+                        <span>Kế hoạch Đào tạo/Huấn luyện</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="w-full flex flex-wrap gap-4 px-4 py-1.5 items-center transition-all duration-300">
+                      <button
+                        type="button"
+                        onClick={() => setActiveSubTabSuckhoe('tonghop')}
+                        className={`py-1.5 px-4 text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                          activeSubTabSuckhoe === 'tonghop'
+                            ? 'bg-emerald-800 text-white shadow-sm ring-1 ring-emerald-500/30 rounded-lg'
+                            : 'text-white/80 hover:text-white hover:bg-white/10 rounded-lg'
+                        }`}
+                      >
+                        <Building2 className="w-4 h-4" />
+                        <span>Đợt KSK Tổng hợp cấp đơn vị</span>
+                        <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${activeSubTabSuckhoe === 'tonghop' ? 'bg-white/20 text-white' : 'bg-white/10 text-white/80'}`}>
+                          {suckhoeCounts.campaignCount}
+                        </span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setActiveSubTabSuckhoe('canhan')}
+                        className={`py-1.5 px-4 text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                          activeSubTabSuckhoe === 'canhan'
+                            ? 'bg-emerald-800 text-white shadow-sm ring-1 ring-emerald-500/30 rounded-lg'
+                            : 'text-white/80 hover:text-white hover:bg-white/10 rounded-lg'
+                        }`}
+                      >
+                        <Users className="w-4 h-4" />
+                        <span>Lịch sử KSK chi tiết nhân sự</span>
+                        <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${activeSubTabSuckhoe === 'canhan' ? 'bg-white/20 text-white' : 'bg-white/10 text-white/80'}`}>
+                          {suckhoeCounts.caNhanCount}
+                        </span>
+                      </button>
+                    </div>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* --- CẤP 3 (Chỉ mở khi chọn Đào tạo/Huấn luyện -> Khóa Đào tạo/Huấn luyện) --- */}
+            <AnimatePresence initial={false}>
+              {isLevel3Open && (
+                <motion.div
+                  key="level3"
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.3, ease: 'easeInOut' }}
+                  className="overflow-hidden bg-emerald-800 dark:bg-emerald-900"
+                >
+                  <div className="w-full flex flex-wrap gap-4 px-6 py-2 items-center">
+                    <button
+                      type="button"
+                      onClick={() => setActiveSubTab3('khoahoc')}
+                      className={`py-1.5 px-3.5 text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer rounded-lg ${
+                        activeSubTab3 === 'khoahoc'
+                          ? 'bg-lime-600 text-white shadow-sm ring-1 ring-lime-400 font-black'
+                          : 'text-white/80 hover:text-white hover:bg-white/10'
+                      }`}
+                    >
+                      <Building2 className="w-3.5 h-3.5" />
+                      <span>Khóa Đào tạo/Huấn luyện</span>
+                      <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${activeSubTab3 === 'khoahoc' ? 'bg-white/20 text-white' : 'bg-white/10 text-white/80'}`}>
+                        {level3Counts.khoaHocCount}
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setActiveSubTab3('canhan')}
+                      className={`py-1.5 px-3.5 text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer rounded-lg ${
+                        activeSubTab3 === 'canhan'
+                          ? 'bg-lime-600 text-white shadow-sm ring-1 ring-lime-400 font-black'
+                          : 'text-white/80 hover:text-white hover:bg-white/10'
+                      }`}
+                    >
+                      <Users className="w-3.5 h-3.5" />
+                      <span>Lịch Sử Đào Tạo Cá Nhân</span>
+                      <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${activeSubTab3 === 'canhan' ? 'bg-white/20 text-white' : 'bg-white/10 text-white/80'}`}>
+                        {level3Counts.caNhanCount} nhân sự
+                      </span>
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
 
-          {/* Sub-navigation Cấp 2 (Chỉ xuất hiện khi chọn Tab Đào tạo ATVSLĐ) */}
-          {activeTab === 'daotao' && (
-            <div className="flex gap-4 mb-5 border-b border-gray-150/50 pb-2 px-1">
-              <button
-                onClick={() => setActiveSubTab('kehoach')}
-                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeSubTab === 'kehoach'
-                    ? 'bg-lime-600 text-white shadow-sm border border-lime-600'
-                    : 'bg-white text-gray-500 border border-gray-250 hover:bg-gray-50 hover:text-gray-700'
-                  }`}
-              >
-                Kế hoạch đào tạo đợt tới
-              </button>
-              <button
-                onClick={() => setActiveSubTab('khoahoc')}
-                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeSubTab === 'khoahoc'
-                    ? 'bg-lime-600 text-white shadow-sm border border-lime-600'
-                    : 'bg-white text-gray-500 border border-gray-250 hover:bg-gray-50 hover:text-gray-700'
-                  }`}
-              >
-                Khóa học huấn luyện
-              </button>
-            </div>
-          )}
 
           {/* 3. Thẻ Thống kê Tổng quan (khi ở Tab 1 - Hồ sơ) */}
           {activeTab === 'hoso' && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 w-full">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 w-full mt-4">
               <div className="bg-white p-3.5 rounded-xl border border-emerald-200 shadow-xs flex items-center gap-3.5 transition-all hover:shadow-md hover:border-emerald-500">
                 <div className="w-11 h-11 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 border border-emerald-100"><Building2 size={20} /></div>
                 <div><p className="text-[10px] font-bold text-gray-500 uppercase">Cơ sở khai báo</p><p className="text-xl font-black text-emerald-700">{filteredData.length}</p></div>
@@ -592,37 +732,44 @@ export default function AtvsldPage() {
           />
         )}
 
-        {/* 🟢 TAB CẤP 1 - PHÂN HỆ 2: ĐÀO TẠO ATVSLĐ (Gồm 2 Sub-tabs) */}
-        {activeTab === 'daotao' && activeSubTab === 'kehoach' && (
-          <KeHoachTab
-            statusFilter={statusFilter}
-            setStatusFilter={setStatusFilter}
-            safetySearchTerm={safetySearchTerm}
-            setSafetySearchTerm={setSafetySearchTerm}
-            nhomFilter={nhomFilter}
-            setNhomFilter={setNhomFilter}
-            safetySummaryCounts={safetySummaryCounts}
-            paginatedSafetyList={paginatedSafetyList}
-            selectedSafetyIds={selectedSafetyIds}
-            totalSafetyPages={totalSafetyPages}
-            currentSafetyPage={currentSafetyPage}
-            setCurrentSafetyPage={setCurrentSafetyPage}
-            rowsPerSafetyPage={rowsPerSafetyPage}
-            setRowsPerSafetyPage={setRowsPerSafetyPage}
-            filteredSafetyList={filteredSafetyList}
-            exportSafetyPlanToExcel={exportSafetyPlanToExcel}
-            handleSelectAllSafety={handleSelectAllSafety}
-            handleSelectSafetyRow={handleSelectSafetyRow}
-            isListCollapsed={isListCollapsed}
-          />
-        )}
-
-        {activeTab === 'daotao' && activeSubTab === 'khoahoc' && (
-          <KhoaHocTab
-            onReloadData={loadData}
-            selectedUnitFilter={selectedUnitFilter}
-            allowedDonViIds={allowedDonViIds}
-          />
+        {/* 🟢 TAB CẤP 1 - PHÂN HỆ 2: ĐÀO TẠO / HUẤN LUYỆN */}
+        {activeTab === 'daotao' && (
+          <div className="flex-1 flex flex-col gap-[15px] w-full">
+            {activeSubTab === 'khoahoc' ? (
+              <KhoaHocTab
+                onReloadData={loadData}
+                selectedUnitFilter={selectedUnitFilter}
+                allowedDonViIds={allowedDonViIds}
+                activeSubTab3={activeSubTab3}
+                setActiveSubTab3={setActiveSubTab3}
+                onTabCountsChange={(khCount, cnCount) => {
+                  setLevel3Counts({ khoaHocCount: khCount, caNhanCount: cnCount });
+                }}
+              />
+            ) : (
+              <KeHoachTab
+                statusFilter={statusFilter}
+                setStatusFilter={setStatusFilter}
+                safetySearchTerm={safetySearchTerm}
+                setSafetySearchTerm={setSafetySearchTerm}
+                nhomFilter={nhomFilter}
+                setNhomFilter={setNhomFilter}
+                safetySummaryCounts={safetySummaryCounts}
+                paginatedSafetyList={paginatedSafetyList}
+                selectedSafetyIds={selectedSafetyIds}
+                totalSafetyPages={totalSafetyPages}
+                currentSafetyPage={currentSafetyPage}
+                setCurrentSafetyPage={setCurrentSafetyPage}
+                rowsPerSafetyPage={rowsPerSafetyPage}
+                setRowsPerSafetyPage={setRowsPerSafetyPage}
+                filteredSafetyList={filteredSafetyList}
+                exportSafetyPlanToExcel={exportSafetyPlanToExcel}
+                handleSelectAllSafety={handleSelectAllSafety}
+                handleSelectSafetyRow={handleSelectSafetyRow}
+                isListCollapsed={isListCollapsed}
+              />
+            )}
+          </div>
         )}
 
         {/* 🟢 TAB CẤP 1 - PHÂN HỆ 3: THIẾT BỊ YÊU CẦU NGHIÊM NGẶT */}
@@ -637,15 +784,19 @@ export default function AtvsldPage() {
           />
         )}
 
-        {/* 🟢 TAB CẤP 1 - PHÂN HỆ 4: KHÁM SỨC KHỎE (SẮP CẬP NHẬT) */}
+        {/* 🟢 TAB CẤP 1 - PHÂN HỆ 4: KHÁM SỨC KHỎE & BỆNH NGHỀ NGHIỆP */}
         {activeTab === 'khamsuckhoe' && (
-          <div className="bg-white border border-lime-100 p-16 rounded-2xl shadow-sm text-center">
-            <div className="w-16 h-16 rounded-full bg-lime-50 text-lime-600 flex items-center justify-center mx-auto mb-4 border-4 border-lime-100">
-              <Heart className="w-8 h-8" />
-            </div>
-            <h3 className="text-xl font-bold text-lime-800 mb-2">Phân hệ Khám sức khỏe & Bệnh nghề nghiệp</h3>
-            <p className="text-gray-500 text-sm max-w-md mx-auto">Phân hệ này hiện đang được lên kế hoạch phát triển ở các giai đoạn tiếp theo. Dữ liệu khám sức khỏe định kỳ và quản lý bệnh nghề nghiệp của nhân sự sẽ được tập trung tại đây.</p>
-          </div>
+          <SucKhoeTab
+            selectedUnitFilter={selectedUnitFilter || ''}
+            allowedDonViIds={allowedDonViIds}
+            donViList={donViData}
+            onReloadData={loadData}
+            activeSubTabSuckhoe={activeSubTabSuckhoe}
+            setActiveSubTabSuckhoe={setActiveSubTabSuckhoe}
+            onTabCountsChange={(campCount, caNhanCount) => {
+              setSuckhoeCounts({ campaignCount: campCount, caNhanCount });
+            }}
+          />
         )}
 
       </div>

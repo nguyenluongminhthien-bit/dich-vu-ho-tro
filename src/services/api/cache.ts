@@ -10,7 +10,9 @@ export const TABLE_MAP: Record<string, string> = {
   'TS_PCCC': 'ts_pccc',
   'HS_ATVSLD': 'hs_an_toan_lao_dong',
   'HS_PCTT': 'hs_pctt',
-  'NhaCungCap': 'dm_ncc'
+  'NhaCungCap': 'dm_ncc',
+  'HS_KhamSucKhoe': 'hs_kham_suc_khoe',
+  'NK_KhamSucKhoeCaNhan': 'nk_kham_suc_khoe_canhan'
 };
 
 export const resolveTable = (name: string) => TABLE_MAP[name] || name.toLowerCase();
@@ -100,7 +102,7 @@ export function invalidateCache(tableName: string): void {
   });
 }
 
-// Smart Two-Layer Fetch
+// Smart Two-Layer Fetch với thuật toán Tải song song phân trang (Parallel Batch Fetching)
 export async function fetchWithCache(tableName: string, forceRefresh = false) {
   const resolved = resolveTable(tableName);
 
@@ -118,30 +120,78 @@ export async function fetchWithCache(tableName: string, forceRefresh = false) {
     }
   }
 
-  // 3. Gọi Supabase REST API (Tải cuốn chiếu tự động phân trang 1000 dòng để lấy hết 100% dữ liệu)
+  // 3. Gọi Supabase REST API với Tải song song phân trang (Parallel Batch Fetching)
   try {
-    let allData: any[] = [];
-    let from = 0;
     const batchSize = 1000;
-    let hasMore = true;
 
-    while (hasMore) {
-      const response = await fetch(`${SUPABASE_URL}/rest/v1/${resolved}?select=*`, {
-        method: 'GET',
-        headers: {
-          ...HEADERS,
-          'Range': `${from}-${from + batchSize - 1}`
+    // Lần tải đầu tiên (0 - 999) + Đọc header Content-Range để lấy tổng số dòng
+    const firstRes = await fetch(`${SUPABASE_URL}/rest/v1/${resolved}?select=*`, {
+      method: 'GET',
+      headers: {
+        ...HEADERS,
+        'Prefer': 'count=exact',
+        'Range': `0-${batchSize - 1}`
+      }
+    });
+
+    if (!firstRes.ok) throw new Error(`Lỗi tải dữ liệu bảng ${resolved}`);
+    const firstBatch: any[] = await firstRes.json();
+    let allData: any[] = [...firstBatch];
+
+    // Đọc tổng số bản ghi từ header Content-Range (ví dụ: "0-999/3450" -> 3450)
+    const contentRange = firstRes.headers.get('content-range');
+    let totalCount = 0;
+    if (contentRange && contentRange.includes('/')) {
+      const parts = contentRange.split('/');
+      totalCount = parseInt(parts[1], 10) || 0;
+    }
+
+    // Nếu tổng số dòng > 1000, bắn ĐỒNG THỜI (Parallel) toàn bộ các trang còn lại
+    if (totalCount > batchSize) {
+      const remainingPromises: Promise<any[]>[] = [];
+      for (let from = batchSize; from < totalCount; from += batchSize) {
+        const to = Math.min(from + batchSize - 1, totalCount - 1);
+        remainingPromises.push(
+          fetch(`${SUPABASE_URL}/rest/v1/${resolved}?select=*`, {
+            method: 'GET',
+            headers: {
+              ...HEADERS,
+              'Range': `${from}-${to}`
+            }
+          }).then(res => {
+            if (!res.ok) return [];
+            return res.json();
+          }).catch(() => [])
+        );
+      }
+
+      const remainingResults = await Promise.all(remainingPromises);
+      remainingResults.forEach(batch => {
+        if (Array.isArray(batch)) {
+          allData = allData.concat(batch);
         }
       });
-
-      if (!response.ok) throw new Error(`Lỗi tải dữ liệu bảng ${resolved}`);
-      const data = await response.json();
-      allData = allData.concat(data);
-
-      if (data.length < batchSize) {
-        hasMore = false;
-      } else {
-        from += batchSize;
+    } else if (firstBatch.length === batchSize && totalCount === 0) {
+      // Dự phòng nếu máy chủ không trả Content-Range header
+      let from = batchSize;
+      let hasMore = true;
+      while (hasMore) {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/${resolved}?select=*`, {
+          method: 'GET',
+          headers: {
+            ...HEADERS,
+            'Range': `${from}-${from + batchSize - 1}`
+          }
+        });
+        if (!res.ok) break;
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          allData = allData.concat(data);
+          if (data.length < batchSize) hasMore = false;
+          else from += batchSize;
+        } else {
+          hasMore = false;
+        }
       }
     }
 
@@ -151,7 +201,7 @@ export async function fetchWithCache(tableName: string, forceRefresh = false) {
 
     return allData;
   } catch (error) {
-    // 4. Nếu mất mạng hoặc Supabase lỗi -> Thử trả về dữ liệu cũ (Stale Cache) nếu có
+    // 4. Nếu mất mạng hoặc Supabase lỗi -> Thử trả về dữ liệu cũ nếu có
     if (apiCache[resolved]?.data) {
       console.warn(`⚠️ Dùng cache tạm thời cho bảng ${resolved} do lỗi kết nối.`);
       return apiCache[resolved].data;

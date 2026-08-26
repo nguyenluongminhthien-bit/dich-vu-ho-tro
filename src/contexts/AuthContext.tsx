@@ -7,8 +7,8 @@ interface AppUser {
   user_name: string;
   ho_ten: string;
   id_don_vi: string;
-  quyen: string; 
-  quyen_truy_cap?: string; 
+  quyen: string;
+  quyen_truy_cap?: string;
   quyen_chi_tiet?: string;
   password?: string; // Mật khẩu dùng để đối chiếu đổi mật khẩu ngầm
 }
@@ -42,7 +42,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       localStorage.removeItem('authUser');
       localStorage.removeItem('sessionExpiry');
       sessionStorage.removeItem('authUser');
-      
+
       // Xóa các dữ liệu API đệm (cache) lưu trong localStorage
       for (let i = localStorage.length - 1; i >= 0; i--) {
         const key = localStorage.key(i);
@@ -56,7 +56,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const storedUser = localStorage.getItem('authUser') || sessionStorage.getItem('authUser');
     if (storedUser) {
       const parsedUser = JSON.parse(storedUser);
-      
+
       // 🟢 2. KIỂM TRA THỜI HẠN PHIÊN (SESSION EXPIRATION - 2 NGÀY)
       if (localStorage.getItem('authUser')) {
         const expiry = localStorage.getItem('sessionExpiry');
@@ -92,7 +92,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           }
 
           // C. So sánh dữ liệu mới và cũ
-          const hasChanges = 
+          const hasChanges =
             freshUser.ho_ten !== parsedUser.ho_ten ||
             finalIdDonVi !== parsedUser.id_don_vi ||
             freshUser.quyen !== parsedUser.quyen ||
@@ -136,16 +136,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const login = async (username: string, pass: string, remember: boolean = false) => {
     try {
       const responseData = await apiService.login(username, pass);
-      
+
       if (!responseData) throw new Error("Không nhận được dữ liệu từ máy chủ.");
-      
+
       let userData: any = null;
       if (responseData.data) {
-        userData = responseData.data; 
+        userData = responseData.data;
       } else if (Array.isArray(responseData)) {
-        userData = responseData[0];   
+        userData = responseData[0];
       } else {
-        userData = responseData;      
+        userData = responseData;
       }
 
       if (!userData) throw new Error("Dữ liệu tài khoản bị trống.");
@@ -185,18 +185,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         localStorage.removeItem('authUser');
         localStorage.removeItem('sessionExpiry');
       }
-      
+
       apiService.setCurrentUser(mappedUser as unknown as User);
       apiService.writeLog('ĐĂNG NHẬP', 'Truy cập hệ thống');
 
       // Chỉ preload danh mục đơn vị cơ bản ngầm (nhẹ) nếu cần, tránh tải ồ ạt toàn bộ bảng nhân sự, an ninh, pháp nhân
       setTimeout(() => {
-        apiService.getDonVi().catch(() => {});
+        apiService.getDonVi().catch(() => { });
       }, 300);
 
     } catch (error) {
       console.error("Login Error:", error);
-      throw error; 
+      throw error;
     }
   };
 

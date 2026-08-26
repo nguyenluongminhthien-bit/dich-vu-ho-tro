@@ -1013,8 +1013,8 @@ export default function FireSafetyPage() {
       {isEmergencyContactOpen && selectedPcccForContact && (() => {
         // TỰ ĐỘNG TÌM LÃNH ĐẠO VÀ PT DVHT CỦA ĐƠN VỊ TƯƠNG ỨNG
         const activeUnitPersonnel = personnelData.filter(ns => ns.id_don_vi === safeGet(selectedPcccForContact, 'id_don_vi') && ns.trang_thai !== 'Đã nghỉ việc');
-        const pcccLeader = activeUnitPersonnel.find(ns => String(ns.phan_loai).toLowerCase().includes('lãnh đạo') || String(ns.chuc_vu).toLowerCase().includes('giám đốc'));
-        const pcccDvht = activeUnitPersonnel.find(ns => String(ns.phan_loai).toLowerCase().includes('pt dvht'));
+        const pcccLeader = activeUnitPersonnel.find(ns => String(ns.chuc_danh).toLowerCase().includes('lãnh đạo') || String(ns.chuc_vu).toLowerCase().includes('giám đốc'));
+        const pcccDvht = activeUnitPersonnel.find(ns => String(ns.chuc_danh).toLowerCase().includes('pt dvht'));
 
         return (
           <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm transition-all duration-300">

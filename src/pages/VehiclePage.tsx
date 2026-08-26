@@ -248,6 +248,41 @@ export default function VehiclePage() {
 
   const allowedDonViIds = useAllowedUnits(donViList);
 
+  const limitPlates = useMemo(() => {
+    if (!user?.quyen_chi_tiet) return null;
+    const rules = user.quyen_chi_tiet.split(',').map(r => r.trim());
+    const rule = rules.find(r => r.startsWith('XE_LIMIT:'));
+    if (!rule) return null;
+    return rule.substring('XE_LIMIT:'.length).split('|').filter(Boolean).map(p => p.toUpperCase().replace(/[\s\-\.]/g, ''));
+  }, [user]);
+
+  const permittedCars = useMemo(() => {
+    if (!limitPlates) return xeData;
+    return xeData.filter(item => {
+      const cleanPlate = String(item.bien_so || '').toUpperCase().replace(/[\s\-\.]/g, '');
+      return limitPlates.includes(cleanPlate);
+    });
+  }, [xeData, limitPlates]);
+
+  const permittedChiPhi = useMemo(() => {
+    if (!limitPlates) return chiPhiData;
+    return chiPhiData.filter(cp => {
+      const carId = getCostCarId(cp);
+      const car = xeData.find(x => x.id === carId);
+      if (!car) return false;
+      const cleanPlate = String(car.bien_so || '').toUpperCase().replace(/[\s\-\.]/g, '');
+      return limitPlates.includes(cleanPlate);
+    });
+  }, [chiPhiData, xeData, limitPlates]);
+
+  const permittedNhatKy = useMemo(() => {
+    if (!limitPlates) return nhatKyData;
+    return nhatKyData.filter(nk => {
+      const cleanPlate = String(nk.bien_so || '').toUpperCase().replace(/[\s\-\.]/g, '');
+      return limitPlates.includes(cleanPlate);
+    });
+  }, [nhatKyData, limitPlates]);
+
   const hasInitializedRef = useRef(false);
 
   useEffect(() => {
@@ -310,7 +345,7 @@ export default function VehiclePage() {
   }, [filterBrand, xeData]);
 
   const filteredCars = useMemo(() => {
-    let result = xeData.filter(item => allowedDonViIds.includes(item.id_don_vi));
+    let result = permittedCars.filter(item => allowedDonViIds.includes(item.id_don_vi));
     if (selectedUnitFilter) {
       const childUnitIds = getAllSubordinateIds(selectedUnitFilter, donViList);
       const validIds = [selectedUnitFilter, ...childUnitIds];
@@ -332,17 +367,17 @@ export default function VehiclePage() {
     if (filterPurpose) result = result.filter((i: any) => i.muc_dich_su_dung === filterPurpose);
     if (filterStatus) result = result.filter((i: any) => i.hien_trang === filterStatus);
     return result;
-  }, [xeData, carSearchTerm, selectedUnitFilter, allowedDonViIds, donViList, filterBrand, filterModel, filterPurpose, filterStatus]);
+  }, [permittedCars, carSearchTerm, selectedUnitFilter, allowedDonViIds, donViList, filterBrand, filterModel, filterPurpose, filterStatus]);
 
   const unitCars = useMemo(() => {
-    let result = xeData.filter((x: any) => allowedDonViIds.includes(x.id_don_vi));
+    let result = permittedCars.filter((x: any) => allowedDonViIds.includes(x.id_don_vi));
     if (selectedUnitFilter) {
       const childUnitIds = getAllSubordinateIds(selectedUnitFilter, donViList);
       const validIds = [selectedUnitFilter, ...childUnitIds];
       result = result.filter((item: any) => validIds.includes(item.id_don_vi));
     }
     return result;
-  }, [xeData, selectedUnitFilter, allowedDonViIds, donViList]);
+  }, [permittedCars, selectedUnitFilter, allowedDonViIds, donViList]);
 
   const vehicleTabs = useMemo(() => [
     { id: 'list', label: 'Danh sách xe', icon: <Car size={16} />, count: filteredCars.length },
@@ -1516,11 +1551,11 @@ export default function VehiclePage() {
           {/* ── TAB LỊCH TRÌNH & NHẬT KÝ ── */}
           {activeTab === 'schedule' && (
             <VehicleScheduleTab
-              xeData={xeData}
+              xeData={permittedCars}
               allowedDonViIds={allowedDonViIds}
               selectedUnitFilter={selectedUnitFilter}
               donViList={donViList}
-              nhatKyData={nhatKyData}
+              nhatKyData={permittedNhatKy}
               setNhatKyData={setNhatKyData}
             />
           )}
@@ -1529,10 +1564,10 @@ export default function VehiclePage() {
           {activeTab === 'stats' && (
             <VehicleStatsTab
               filteredCars={filteredCars}
-              chiPhiData={chiPhiData}
+              chiPhiData={permittedChiPhi}
               donViMap={donViMap}
               onViewCar={(car) => { setViewData(car); setIsViewModalOpen(true); }}
-              nhatKyData={nhatKyData}
+              nhatKyData={permittedNhatKy}
             />
           )}
 

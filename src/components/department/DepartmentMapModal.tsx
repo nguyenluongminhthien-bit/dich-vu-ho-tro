@@ -2,9 +2,11 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 // @ts-ignore
 import * as L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { X, Navigation, MapPin, Loader2, RotateCcw, AlertTriangle, HelpCircle, Layers, Compass } from 'lucide-react';
+import { X, Navigation, MapPin, Loader2, RotateCcw, AlertTriangle, HelpCircle, Layers, Compass, Shield, Camera } from 'lucide-react';
 import { DonVi, Personnel } from '../../types';
 import { buildHierarchicalOptions, getUnitEmoji } from '../../utils/hierarchy';
+import { getAnNinh } from '../../services/api/modules';
+import { toast } from '../../utils/toast';
 
 // 🟢 Danh sách 7 loại hình đơn vị thật khớp chính xác 100% với cấu hình trong dự án
 const ALL_UNIT_TYPES = [
@@ -144,6 +146,30 @@ export default function DepartmentMapModal({
   const [calculatedBirdDistance, setCalculatedBirdDistance] = useState<number | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  // ---- Dữ liệu An ninh & Hệ thống Camera ----
+  const [anNinhList, setAnNinhList] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (isOpen) {
+      getAnNinh()
+        .then(res => setAnNinhList(Array.isArray(res) ? res : []))
+        .catch(err => {
+          console.error("Lỗi khi tải dữ liệu an ninh:", err);
+          setAnNinhList([]);
+        });
+    }
+  }, [isOpen]);
+
+  const anNinhMap = useMemo(() => {
+    const map = new Map<string, any>();
+    anNinhList.forEach(item => {
+      if (item.id_don_vi) {
+        map.set(String(item.id_don_vi), item);
+      }
+    });
+    return map;
+  }, [anNinhList]);
+
   // ---- Refs điều khiển Leaflet ----
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -233,6 +259,66 @@ export default function DepartmentMapModal({
     }
   }, [isOpen, initialUnitId, validUnits]);
 
+  // 4.5. Đăng ký sự kiện popupopen để lắng nghe click nút bấm thao tác nhanh bên trong Popup HTML
+  useEffect(() => {
+    if (!mapRef.current) return;
+
+    const handlePopupOpen = (e: any) => {
+      const popupNode = e.popup?.getElement();
+      if (!popupNode) return;
+
+      const btnAddDistance = popupNode.querySelector('.btn-add-distance');
+      if (btnAddDistance) {
+        btnAddDistance.onclick = (event: Event) => {
+          event.stopPropagation();
+          const uId = btnAddDistance.getAttribute('data-unit-id');
+          if (uId) {
+            setDistancePoints(prev => {
+              if (!prev.includes(uId)) {
+                const matched = validUnits.find(u => u.id === uId);
+                toast.success(`Đã thêm "${matched?.ten_don_vi || ''}" vào chuỗi khoảng cách!`);
+                return [...prev, uId];
+              } else {
+                const matched = validUnits.find(u => u.id === uId);
+                toast.info(`"${matched?.ten_don_vi || ''}" đã có trong chuỗi khoảng cách.`);
+                return prev;
+              }
+            });
+            setCalculatedRoadDistance(null);
+            setErrorMessage(null);
+          }
+        };
+      }
+
+      const btnAddRoute = popupNode.querySelector('.btn-add-route');
+      if (btnAddRoute) {
+        btnAddRoute.onclick = (event: Event) => {
+          event.stopPropagation();
+          const uId = btnAddRoute.getAttribute('data-unit-id');
+          if (uId) {
+            setWaypointSelections(prev => {
+              const matched = validUnits.find(u => u.id === uId);
+              if (!prev[uId]) {
+                toast.success(`Đã chọn "${matched?.ten_don_vi || ''}" làm điểm ghé thăm!`);
+                return { ...prev, [uId]: true };
+              } else {
+                toast.info(`"${matched?.ten_don_vi || ''}" đã được chọn làm điểm ghé thăm.`);
+                return prev;
+              }
+            });
+            setCalculatedRoadDistance(null);
+            setCalculatedBirdDistance(null);
+          }
+        };
+      }
+    };
+
+    mapRef.current.on('popupopen', handlePopupOpen);
+    return () => {
+      mapRef.current?.off('popupopen', handlePopupOpen);
+    };
+  }, [validUnits]);
+
   // 5. Vẽ Markers lên bản đồ (lọc động theo checkbox loại hình ở Tab Độ phủ)
   useEffect(() => {
     if (!mapRef.current || !isOpen) return;
@@ -247,34 +333,182 @@ export default function DepartmentMapModal({
       return isUnitTypeSelected(u.loai_hinh, selectedTypes) || u.id === centerUnitId || u.id === selectedUnitId;
     });
 
-    unitsToDraw.forEach(u => {
-      const lat = parseFloat(u.vi_do);
-      const lng = parseFloat(u.kinh_do);
-      const leaderName = personnel.find(p => p.id === u.id_giam_doc)?.ho_ten || 'Chưa cập nhật';
-      const isSelected = u.id === selectedUnitId;
+      unitsToDraw.forEach(u => {
+        const lat = parseFloat(u.vi_do);
+        const lng = parseFloat(u.kinh_do);
+        const isSelected = u.id === selectedUnitId;
+
+        // Lấy thông tin Lãnh đạo & SĐT
+        const leaderObj = personnel.find(p => p.id === u.id_giam_doc || (u.id_giam_doc && String(p.ma_so_nhan_vien || '').toLowerCase() === String(u.id_giam_doc).toLowerCase()));
+        const leaderName = leaderObj?.ho_ten || u.ten_giam_doc || 'Chưa cập nhật';
+        const leaderPhone = leaderObj?.sdt_ca_nhan || leaderObj?.sdt_cong_ty || u.sdt_giam_doc || u.sdt || '---';
+
+        // Lấy Tổng CB-NV theo thông tin tong_nhan_su tại đơn vị trong bảng dm_don_vi
+        const totalStaff = u.tong_nhan_su || u.tong_cb_nv || (personnel.filter(p => p.id_don_vi === u.id && p.trang_thai !== 'Đã nghỉ việc').length || '---');
+
+        const quyMoText = u.quy_mo || (u.so_tang ? `${u.so_tang} tầng${u.so_ham ? `, ${u.so_ham} hầm` : ''}` : '---');
+        const luotKhachText = u.luot_khach_bq ? `${Number(u.luot_khach_bq).toLocaleString('vi-VN')} lượt/tháng` : (u.luot_khach ? `${u.luot_khach}` : '---');
+        const dienTichFormatted = u.dien_tich ? `${Number(u.dien_tich).toLocaleString('vi-VN')} m²` : '---';
+
+        const anData = anNinhMap.get(u.id);
+        const actualGuards = anData ? (anData.tong_bv || (Number(anData.bv_noi_bo || 0) + Number(anData.bv_dich_vu || 0))) : 0;
+
+        const popupHtml = `
+          <div class="p-2 font-sans text-slate-800 w-[350px] sm:w-[390px] space-y-2">
+            <!-- Header -->
+            <div class="flex items-center justify-between border-b border-slate-200/80 pb-1.5">
+              <div class="font-black text-sm text-[#005698] leading-tight pr-1">${u.ten_don_vi}</div>
+              <span class="text-[10px] font-black px-2 py-0.5 rounded bg-blue-50 text-[#005698] border border-blue-200/80 shrink-0 select-none">
+                ${u.loai_hinh}
+              </span>
+            </div>
+
+            <!-- KHỐI 1: THÔNG TIN ĐƠN VỊ (Mini-card Slate) -->
+            <div class="bg-slate-50/90 p-2.5 rounded-xl border border-slate-200/80 space-y-1.5 text-[11px]">
+              <div class="font-bold text-[#005698] text-[11.5px] border-b border-slate-200/60 pb-1 flex items-center justify-between">
+                <span>🏢 Thông tin đơn vị</span>
+                <span class="text-[10px] font-normal text-slate-500 leading-tight text-right max-w-[180px]" title="${u.dia_chi || ''}">📍 ${u.dia_chi || 'Chưa cập nhật'}</span>
+              </div>
+
+              <!-- Dòng 1: Lãnh đạo - SĐT -->
+              <div class="flex items-center justify-between text-[11px]">
+                <span class="text-slate-500 font-medium shrink-0">👤 Lãnh đạo:</span>
+                <span class="font-bold text-slate-800 text-right leading-tight">${leaderName} ${leaderPhone !== '---' ? `<span class="text-[#005698] font-semibold text-[10.5px]">(${leaderPhone})</span>` : ''}</span>
+              </div>
+
+              <!-- Dòng 2: Diện tích - số cổng -->
+              <div class="grid grid-cols-2 gap-2 border-t border-slate-200/40 pt-1 text-[11px]">
+                <div class="flex justify-between items-center"><span class="text-slate-500 font-medium">📐 Diện tích:</span> <strong class="text-emerald-700 font-black">${dienTichFormatted}</strong></div>
+                <div class="flex justify-between items-center"><span class="text-slate-500 font-medium">🚪 Số cổng:</span> <strong class="text-slate-800 font-bold">${u.so_cong || '---'}</strong></div>
+              </div>
+
+              <!-- Dòng 3: Quy mô tầng hầm -->
+              <div class="flex items-center justify-between border-t border-slate-200/40 pt-1 text-[11px]">
+                <span class="text-slate-500 font-medium shrink-0">🏗️ Quy mô:</span>
+                <span class="font-bold text-slate-800 text-right leading-tight">${quyMoText}</span>
+              </div>
+
+              <!-- Dòng 4: Lượt khách BQ - Tổng CB-NV -->
+              <div class="grid grid-cols-2 gap-2 border-t border-slate-200/40 pt-1 text-[11px]">
+                <div class="flex justify-between items-center"><span class="text-slate-500 font-medium">🚗 Khách BQ:</span> <strong class="text-slate-800 font-bold">${luotKhachText}</strong></div>
+                <div class="flex justify-between items-center"><span class="text-slate-500 font-medium">👥 CB-NV:</span> <strong class="text-blue-900 font-black">${totalStaff} NS</strong></div>
+              </div>
+            </div>
+
+            <!-- KHỐI 2: AN-BV & PHƯƠNG ÁN (Mini-card Blue) -->
+            <div class="bg-blue-50/60 p-2.5 rounded-xl border border-blue-100/90 text-[11px] space-y-1.5">
+              <div class="font-bold text-[#005698] text-[11.5px] border-b border-blue-100 pb-1">
+                <span>🛡️ AN-BV & Phương Án Giám Sát</span>
+              </div>
+
+              ${anData ? `
+                <!-- Dòng 1: AN-BV : 4 Định biên / 4 Hiện hữu - 3 Nội bộ + 1 Dịch vụ & Ca ngày - Ca đêm -->
+                <div class="space-y-1 text-[10.5px]">
+                  <div class="font-bold text-slate-800 flex items-center justify-between flex-wrap gap-1">
+                    <span>AN-BV: <strong class="text-blue-900">${anData.dinh_bien_bv || 0} Định biên / ${actualGuards} Hiện hữu</strong></span>
+                    <span class="text-[#005698] bg-white px-2 py-0.5 rounded border border-blue-200 text-[10px] font-bold">${anData.bv_noi_bo || 0} Nội bộ + ${anData.bv_dich_vu || 0} Dịch vụ ${anData.ncc_dich_vu ? `(${anData.ncc_dich_vu})` : ''}</span>
+                  </div>
+                  <div class="flex items-center justify-between text-[10px] text-slate-700 bg-white/80 px-2 py-1 rounded border border-blue-100/80">
+                    <span>☀️ Ca ngày: <strong class="text-slate-900 font-bold">${anData.ngay_co_dinh || 0} Cố định / ${anData.ngay_tuan_tra || 0} Tuần tra</strong></span>
+                    <span class="text-slate-300">|</span>
+                    <span>🌙 Ca đêm: <strong class="text-slate-900 font-bold">${anData.dem_co_dinh || 0} Cố định / ${anData.dem_tuan_tra || 0} Tuần tra</strong></span>
+                  </div>
+                </div>
+
+                <!-- Dòng 2: Tiếp giáp địa bàn thể hiện đầy đủ 100% không bị ba chấm -->
+                <div class="border-t border-blue-100/80 pt-1 text-[10.5px] space-y-1">
+                  <div class="font-bold text-slate-700 flex items-center justify-between">
+                    <span>🧭 Tiếp giáp địa bàn:</span>
+                  </div>
+                  <div class="grid grid-cols-2 gap-x-3 gap-y-1.5 text-[10px] bg-white/80 p-2 rounded-lg border border-blue-100/80 leading-snug">
+                    <div class="space-y-0.5"><span class="text-slate-500 font-medium block">• Trước:</span> <strong class="text-slate-800 font-semibold break-words">${anData.tiep_giap_truoc || '---'}</strong></div>
+                    <div class="space-y-0.5"><span class="text-slate-500 font-medium block">• Sau:</span> <strong class="text-slate-800 font-semibold break-words">${anData.tiep_giap_sau || '---'}</strong></div>
+                    <div class="space-y-0.5"><span class="text-slate-500 font-medium block">• Trái:</span> <strong class="text-slate-800 font-semibold break-words">${anData.tiep_giap_trai || '---'}</strong></div>
+                    <div class="space-y-0.5"><span class="text-slate-500 font-medium block">• Phải:</span> <strong class="text-slate-800 font-semibold break-words">${anData.tiep_giap_phai || '---'}</strong></div>
+                  </div>
+                </div>
+
+                <!-- Dòng 3: Camera: hoạt động/hư hỏng -->
+                <div class="border-t border-blue-100/80 pt-1 text-[10.5px] flex items-center justify-between">
+                  <span class="text-slate-500 font-medium">📹 Camera (${anData.sl_camera || 0} mắt):</span>
+                  <span class="font-bold px-2 py-0.5 rounded text-[10px] ${Number(anData.camera_hu || 0) > 0 ? 'text-amber-800 bg-amber-100 border border-amber-200' : 'text-emerald-800 bg-emerald-100 border border-emerald-200'}">
+                    Hoạt động tốt: ${anData.camera_hoat_dong || anData.sl_camera || 0} | Hư hỏng: ${anData.camera_hu || 0}
+                  </span>
+                </div>
+
+                <!-- Dòng 4: Tình hình an ninh khu vực hiển thị đầy đủ -->
+                <div class="border-t border-blue-100/80 pt-1 text-[10.5px] space-y-1">
+                  <div class="text-slate-500 font-medium">🔰 Tình hình an ninh địa bàn:</div>
+                  <div class="font-bold text-emerald-800 bg-white/90 border border-emerald-200/80 p-1.5 rounded-lg text-[10px] leading-snug break-words">
+                    ${anData.tinh_hinh_khu_vuc || 'An ninh tốt'}
+                  </div>
+                </div>
+              ` : `
+                <div class="text-[10px] text-slate-400 italic text-center py-1">Chưa cập nhật phương án an ninh & camera</div>
+              `}
+            </div>
+
+            <!-- Nút Thao tác Nhanh phụ thuộc Tab đang chọn -->
+            <div class="pt-1 border-t border-slate-200/80 flex gap-2">
+              ${activeTab === 'distance' ? `
+                <button data-unit-id="${u.id}" class="btn-add-distance w-full py-1.5 bg-[#005698] hover:bg-blue-800 text-white rounded-lg font-bold text-[10.5px] flex items-center justify-center gap-1 transition-colors shadow-xs cursor-pointer">
+                  + THÊM VÀO CHUỖI KHOẢNG CÁCH
+                </button>
+              ` : activeTab === 'route' ? `
+                <button data-unit-id="${u.id}" class="btn-add-route w-full py-1.5 bg-[#005698] hover:bg-blue-800 text-white rounded-lg font-bold text-[10px] flex items-center justify-center gap-1 transition-colors shadow-xs cursor-pointer">
+                  + CHỌN LÀM ĐIỂM GHÉ THĂM
+                </button>
+              ` : `
+                <div class="text-[10px] text-slate-400 font-medium text-center w-full">💡 Bấm marker để chọn tuyến đi / điểm dừng chân</div>
+              `}
+            </div>
+          </div>
+        `;
 
       const marker = L.marker([lat, lng], {
         icon: createMarkerIcon(isSelected, u.ten_don_vi, u.loai_hinh)
       })
         .addTo(mapRef.current!)
-        .bindPopup(`
-          <div class="p-1 space-y-1 min-w-[200px] text-slate-800 font-sans">
-            <div class="font-black text-xs text-[#05469B] border-b border-slate-100 pb-1">${u.ten_don_vi}</div>
-            <div class="text-[10px] leading-relaxed"><span class="font-bold text-slate-500">Địa chỉ:</span> ${u.dia_chi || 'Chưa cập nhật'}</div>
-            <div class="text-[10px]"><span class="font-bold text-slate-500">Diện tích:</span> ${u.dien_tich || '---'} m²</div>
-            <div class="text-[10px]"><span class="font-bold text-slate-500">Lãnh đạo:</span> ${leaderName}</div>
-            <div class="text-[10px]"><span class="font-bold text-slate-500">Kinh doanh:</span> ${u.kinh_doanh || 'Chưa cập nhật'}</div>
-          </div>
-        `);
+        .bindPopup(popupHtml, {
+          maxWidth: 480,
+          minWidth: 380,
+          className: 'custom-showroom-popup'
+        });
 
-      // Lắng nghe sự kiện click marker
+      // Lắng nghe sự kiện click marker trực tiếp trên bản đồ
       marker.on('click', () => {
         setSelectedUnitId(u.id);
+
+        if (activeTab === 'distance') {
+          setDistancePoints(prev => {
+            if (!prev.includes(u.id)) {
+              toast.success(`Đã thêm "${u.ten_don_vi}" vào chuỗi khoảng cách!`);
+              return [...prev, u.id];
+            } else {
+              toast.info(`"${u.ten_don_vi}" đã có trong chuỗi khoảng cách.`);
+              return prev;
+            }
+          });
+          setCalculatedRoadDistance(null);
+          setErrorMessage(null);
+        } else if (activeTab === 'route') {
+          setWaypointSelections(prev => {
+            if (!prev[u.id]) {
+              toast.success(`Đã chọn "${u.ten_don_vi}" làm điểm ghé thăm!`);
+              return { ...prev, [u.id]: true };
+            } else {
+              toast.info(`"${u.ten_don_vi}" đã được chọn làm điểm ghé thăm.`);
+              return prev;
+            }
+          });
+          setCalculatedRoadDistance(null);
+          setCalculatedBirdDistance(null);
+        }
       });
 
       markersRef.current[u.id] = marker;
     });
-  }, [validUnits, personnel, isOpen, selectedUnitId, activeTab, selectedTypes, centerUnitId]);
+  }, [validUnits, personnel, isOpen, selectedUnitId, activeTab, selectedTypes, centerUnitId, anNinhMap]);
 
   // 6. Camera bay mượt (flyTo) đến showroom được chọn và mở popup
   useEffect(() => {
@@ -686,6 +920,31 @@ export default function DepartmentMapModal({
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 md:p-6 animate-in fade-in duration-200">
+      {/* CSS tùy chỉnh Popup Leaflet bọc vừa khít với bảng nội dung */}
+      <style>{`
+        .custom-showroom-popup .leaflet-popup-content-wrapper {
+          padding: 4px !important;
+          border-radius: 18px !important;
+          box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.25), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
+          background: #ffffff !important;
+          border: 1px solid rgba(226, 232, 240, 0.9) !important;
+        }
+        .custom-showroom-popup .leaflet-popup-content {
+          margin: 6px 8px !important;
+          width: auto !important;
+          max-width: 400px !important;
+        }
+        .custom-showroom-popup a.leaflet-popup-close-button {
+          top: 10px !important;
+          right: 10px !important;
+          padding: 4px !important;
+          color: #64748b !important;
+          font-size: 16px !important;
+        }
+        .custom-showroom-popup .leaflet-popup-tip-container {
+          margin-top: -1px !important;
+        }
+      `}</style>
       <div className="bg-white rounded-2xl shadow-2xl border border-slate-100 w-full h-full max-w-7xl flex flex-col overflow-hidden relative">
 
         {/* Nút đóng modal */}

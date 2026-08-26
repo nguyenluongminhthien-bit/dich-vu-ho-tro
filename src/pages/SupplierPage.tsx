@@ -41,7 +41,7 @@ const NHOM_DICH_VU_NCC = [
   "An ninh - Bảo vệ", "Xăng dầu", "Văn phòng phẩm & Ấn vật phẩm", "Tạp phẩm",
   "Trang trí VP, quầy lễ tân", "Tiếp khách (Phòng chờ KH)", "Công cụ dụng cụ",
   "Sửa chữa, bảo trì", "Thiết bị CNTT & Văn phòng", "Viễn thông",
-  "Đào tạo, Chứng nhận & Kiểm định", "Bảo hiểm", "Khác"
+  "Đào tạo, Chứng nhận & Kiểm định", "Bảo hiểm", "Sức khỏe", "Khác"
 ];
 
 const TRANG_THAI_LIST = ["Đang hợp tác", "Ngừng hợp tác"];
@@ -71,7 +71,7 @@ const SupplierMobileCard = React.memo(({ item, props }: { item: NhaCungCap; prop
   const effectiveExpiry = getEffectiveExpiryDate(item.ngay_het_han_hd, item.gia_han_tu_dong);
   const expStatus = effectiveExpiry ? getExpiryStatus(effectiveExpiry) : null;
   return (
-    <div className="bg-white p-4 rounded-xl border border-gray-150 shadow-sm space-y-3 relative">
+    <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm space-y-3 relative">
       {/* Expiry and status badges */}
       <div className="flex justify-between items-start gap-2">
         <span className={`px-2 py-0.5 rounded text-[10px] font-black border uppercase ${props.getNhomDichVuColor(item.nhom_dich_vu)}`}>

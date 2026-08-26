@@ -159,7 +159,13 @@ export async function save(data: any, action: 'create' | 'update', tableName: st
 
     // Xử lý lưu nhiều dòng (Mảng)
     if (Array.isArray(data)) {
-      const cleanArray = data.map(item => sanitizePayload(item, false));
+      const cleanArray = data.map(item => {
+        const cleaned = sanitizePayload(item, false);
+        if (realTableName === 'ns_dich_vu') {
+          delete cleaned.phan_loai;
+        }
+        return cleaned;
+      });
 
       const response = await fetch(`${SUPABASE_URL}/rest/v1/${realTableName}`, {
         method: 'POST',
@@ -185,6 +191,9 @@ export async function save(data: any, action: 'create' | 'update', tableName: st
 
     // Làm sạch dữ liệu Object (biến "" thành null, loại bỏ trường UI-only)
     const cleanedData = sanitizePayload(data, action === 'update');
+    if (realTableName === 'ns_dich_vu') {
+      delete cleanedData.phan_loai;
+    }
 
     if (action === 'create' && !cleanedData.id) {
       const prefix = realTableName.substring(0, 2).toUpperCase();
@@ -257,3 +266,34 @@ export async function deleteRecord(id: string, tableName: string): Promise<boole
     throw err;
   }
 }
+
+// 🟢 HELPER KHÁM SỨC KHỎE ĐỊNH KỲ & BỆNH NGHỀ NGHIỆP
+export async function getKhamSucKhoeCampaigns(): Promise<any[]> {
+  return getWithFallback('hs_kham_suc_khoe');
+}
+
+export async function saveKhamSucKhoeCampaign(data: any, action: 'create' | 'update'): Promise<any> {
+  return save(data, action, 'hs_kham_suc_khoe');
+}
+
+export async function deleteKhamSucKhoeCampaign(id: string): Promise<boolean> {
+  return deleteRecord(id, 'hs_kham_suc_khoe');
+}
+
+export async function getKhamSucKhoeCaNhan(): Promise<any[]> {
+  return getWithFallback('nk_kham_suc_khoe_canhan');
+}
+
+export async function saveKhamSucKhoeCaNhanBatch(records: any[]): Promise<any[]> {
+  const results = [];
+  for (const record of records) {
+    const res = await save(record, record.id ? 'update' : 'create', 'nk_kham_suc_khoe_canhan');
+    results.push(res);
+  }
+  return results;
+}
+
+export async function deleteKhamSucKhoeCaNhan(id: string): Promise<boolean> {
+  return deleteRecord(id, 'nk_kham_suc_khoe_canhan');
+}
+

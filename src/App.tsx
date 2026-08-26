@@ -1,16 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Sidebar from './components/Sidebar';
-import Login from './pages/LoginPage'; 
+import Login from './pages/LoginPage';
 
 // Lazy load các Module chính của hệ thống để giảm dung lượng bundle ban đầu (Code Splitting)
 const DashboardPage = React.lazy(() => import('./pages/DashboardPage'));
 const PersonnelPage = React.lazy(() => import('./pages/PersonnelPage'));
 const DepartmentPage = React.lazy(() => import('./pages/DepartmentPage'));
 const VehiclePage = React.lazy(() => import('./pages/VehiclePage'));
-const DocumentPage = React.lazy(() => import('./pages/DocumentPage')); 
-const PolicyPage = React.lazy(() => import('./pages/PolicyPage')); 
-const EquipmentPage = React.lazy(() => import('./pages/EquipmentPage')); 
+const DocumentPage = React.lazy(() => import('./pages/DocumentPage'));
+const PolicyPage = React.lazy(() => import('./pages/PolicyPage'));
+const EquipmentPage = React.lazy(() => import('./pages/EquipmentPage'));
 const SupplierPage = React.lazy(() => import('./pages/SupplierPage'));
 const FireSafetyPage = React.lazy(() => import('./pages/FireSafetyPage'));
 const AtvsldPage = React.lazy(() => import('./pages/AtvsldPage'));
@@ -54,7 +54,7 @@ const TabContainer = React.memo(function TabContainer({ active, children }: TabC
 
 function AppContent() {
   const { user, checkPermission } = useAuth();
-  
+
   // Tùy chỉnh: Đặt 'dashboard' làm trang mặc định hiển thị đầu tiên
   const [activeTab, setActiveTab] = useState('dashboard');
 
@@ -111,7 +111,7 @@ function AppContent() {
     const params = new URLSearchParams(window.location.search);
     const qrParam = params.get('qr');
     const tabParam = params.get('tab');
-    
+
     if (qrParam || tabParam === 'equipment') {
       setActiveTab('equipments');
       return;
@@ -137,20 +137,20 @@ function AppContent() {
 
   return (
     <div className="flex h-screen w-full bg-gray-100 overflow-hidden font-sans">
-      
+
       {/* Thanh Menu bên trái */}
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
-      
+
       {/* Khu vực nội dung bên phải */}
       <main className="flex-1 min-w-0 max-w-full h-full overflow-hidden bg-[#f4f7f9] relative">
-        
+
         {/* TUYỆT CHIÊU GIỮ CACHE */}
         {checkPermission('TongQuan') && (
           <TabContainer active={activeTab === 'dashboard'}>
             <DashboardPage />
           </TabContainer>
         )}
-        
+
         {checkPermission('NhanSu') && (
           <TabContainer active={activeTab === 'personnel'}>
             <PersonnelPage />
@@ -168,37 +168,37 @@ function AppContent() {
             <AtvsldPage />
           </TabContainer>
         )}
-        
+
         {checkPermission('Xe') && (
           <TabContainer active={activeTab === 'vehicles'}>
             <VehiclePage />
           </TabContainer>
         )}
-        
+
         {checkPermission('ThietBi') && (
           <TabContainer active={activeTab === 'equipments'}>
             <EquipmentPage />
           </TabContainer>
         )}
-        
+
         {checkPermission('NhaCungCap') && (
           <TabContainer active={activeTab === 'suppliers'}>
             <SupplierPage />
           </TabContainer>
         )}
-        
+
         {checkPermission('VanBan') && (
           <TabContainer active={activeTab === 'documents'}>
             <DocumentPage />
           </TabContainer>
         )}
-        
+
         {checkPermission('QuyDinh') && (
           <TabContainer active={activeTab === 'policies'}>
             <PolicyPage />
           </TabContainer>
         )}
-        
+
         {checkPermission('CongTy') && (
           <TabContainer active={activeTab === 'departments'}>
             <DepartmentPage />
@@ -214,13 +214,13 @@ function AppContent() {
         <TabContainer active={activeTab === 'accounts'}>
           <AccountPage />
         </TabContainer>
-        
+
         {String(user?.quyen).toUpperCase() === 'ADMIN' && (
           <TabContainer active={activeTab === 'logs'}>
             <LogPage />
           </TabContainer>
         )}
-        
+
       </main>
     </div>
   );

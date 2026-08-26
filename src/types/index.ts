@@ -90,7 +90,7 @@ export interface Personnel {
   nam_sinh: string;
   ngay_nhan_vien: string;
   id_don_vi: string;
-  phan_loai: string;
+  chuc_danh: string;
   trinh_do_hoc_van: string;
   tuoi?: string | number;
   tham_nien?: string;
@@ -556,5 +556,80 @@ export interface NK_SuDungXe {
   tong_km?: number;
   file_name?: string;
   created_at?: string;
+  [key: string]: any;
+}
+
+// 🟢 PHÂN HỆ KHÁM SỨC KHỎE ĐỊNH KỲ & BỆNH NGHỀ NGHIỆP (KSK/BNN)
+export interface DynamicGoiKhamItem {
+  code: string;
+  label: string;
+  mo_ta?: string;
+}
+
+export interface KetQuaKSKBreakdown {
+  loai_1?: number;
+  loai_2?: number;
+  loai_3?: number;
+  loai_4?: number;
+  loai_5?: number;
+  khong_phan_loai?: number;
+}
+
+export interface KetQuaBNNBreakdown {
+  sl_kham?: number;
+  sl_mac_bnn?: number;
+  sl_nguy_co?: number;
+}
+
+export interface KhamSucKhoeRecord {
+  id: string;
+  id_don_vi: string;
+  nam_kham: number;
+  ten_dot_kham?: string;
+  id_ncc?: string;
+  ten_ncc?: string;
+  id_ncc_bnn?: string;
+  ten_ncc_bnn?: string;
+  hinh_thuc_kham: 'NOI_VIEN' | 'NGOAI_VIEN';
+  dia_diem_kham?: string;
+  ngay_lay_mau?: string;          // Ngày lấy máu / xét nghiệm
+  ngay_kham_lam_sang?: string;    // Ngày khám lâm sàng
+  sl_dang_ky: number;
+  sl_thuc_te: number;
+  sl_khong_kham?: number;
+  ly_do_khong_kham?: string;
+  tong_chi_phi: number;
+  goi_kham_schema?: DynamicGoiKhamItem[];  // Danh mục gói khám động năm đó
+  goi_kham_values?: Record<string, number>; // Số lượng thực tế theo mã gói
+  ket_qua_ksk_json?: KetQuaKSKBreakdown;
+  bnn_lan_1_json?: KetQuaBNNBreakdown;
+  bnn_lan_2_json?: KetQuaBNNBreakdown;
+  ngay_kham_bnn_lan_1?: string;   // Ngày khám BNN Lần 1
+  ngay_kham_bnn_lan_2?: string;   // Ngày khám BNN Lần 2
+  danh_gia_ncc?: 'DAT' | 'KHONG_DAT';
+  ly_do_ncc_khong_dat?: string;
+  link_bao_cao?: string;
+  ghi_chu?: string;
+  created_at?: string;
+  updated_at?: string;
+  [key: string]: any;
+}
+
+export interface KhamSucKhoeCaNhanRecord {
+  id: string;
+  ma_so_nhan_vien: string;
+  ho_ten: string;
+  id_don_vi: string;
+  nam_kham: number;
+  id_dot_ksk?: string;
+  ma_goi_kham?: string;       // Ví dụ: GK 1, GK 2, GK 3A, GK 4B...
+  ten_goi_kham?: string;
+  loai_suc_khoe?: string;     // 'Loại I' | 'Loại II' | 'Loại III' | 'Loại IV' | 'Loại V' | 'Không phân loại'
+  ket_luan_bnn?: string;      // 'Bình thường' | 'Nguy cơ BNN' | 'Mắc bệnh BNN'
+  ten_benh_nghe_nghiep?: string;
+  ngay_kham?: string;
+  ghi_chu_suc_khoe?: string;
+  created_at?: string;
+  updated_at?: string;
   [key: string]: any;
 }

@@ -40,17 +40,20 @@ const ADVANCED_PERMISSIONS = {
   ],
   ThietBi: [
     { id: 'TB_HIDE_PRICE', label: 'Ẩn cột Nguyên giá' },
-  ]
+  ],
+  Xe: []
 };
 
 export default function AccountPage() {
   const { user: currentUser } = useAuth();
   const [data, setData] = useState<User[]>([]);
   const [donViList, setDonViList] = useState<DonVi[]>([]);
+  const [xeList, setXeList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [carFilterTerm, setCarFilterTerm] = useState('');
 
   const yearOptions = useMemo(() => {
     const startYear = 2010;
@@ -72,9 +75,14 @@ export default function AccountPage() {
     const loadData = async () => {
       setLoading(true); setError(null);
       try {
-        const [users, donvis] = await Promise.all([apiService.getUsers(), apiService.getDonVi()]);
+        const [users, donvis, xes] = await Promise.all([
+          apiService.getUsers(), 
+          apiService.getDonVi(),
+          apiService.getXe()
+        ]);
         setData(users || []); 
         setDonViList(donvis || []);
+        setXeList(xes || []);
       } catch (err: any) { 
         setError(err.message || 'Lỗi tải dữ liệu tài khoản.'); 
       } finally { 
@@ -89,6 +97,16 @@ export default function AccountPage() {
     (donViList || []).forEach(dv => { map[String(dv.id || '')] = dv.ten_don_vi; });
     return map;
   }, [donViList]);
+
+  const carsOfSelectedUnit = useMemo(() => {
+    const targetDonViId = formData.id_don_vi || '';
+    if (!targetDonViId || targetDonViId === 'ALL' || targetDonViId === 'HO') {
+      return xeList;
+    }
+    const childUnitIds = getAllSubordinateIds(targetDonViId, donViList);
+    const allowedUnitIds = [targetDonViId, ...childUnitIds];
+    return xeList.filter(car => allowedUnitIds.includes(car.id_don_vi));
+  }, [formData.id_don_vi, xeList, donViList]);
 
   const isHOAdmin = useMemo(() => {
     if (!currentUser) return false;
@@ -275,6 +293,39 @@ export default function AccountPage() {
       
       if (activeTypes.length > 0) {
         currentRules.push(`${prefix}${activeTypes.join('|')}`);
+      }
+      
+      return { ...prev, quyen_chi_tiet: currentRules.join(',') };
+    });
+  };
+
+  const getPlatesFromRule = (ruleString: string | undefined, prefix: string): string[] => {
+    if (!ruleString) return [];
+    const rules = ruleString.split(',').map(r => r.trim());
+    const rule = rules.find(r => r.startsWith(prefix));
+    if (!rule) return [];
+    return rule.substring(prefix.length).split('|').filter(Boolean);
+  };
+
+  const handleTogglePlateRule = (prefix: string, plate: string) => {
+    setFormData(prev => {
+      let currentRules = prev.quyen_chi_tiet ? prev.quyen_chi_tiet.split(',').map(r => r.trim()).filter(Boolean) : [];
+      const ruleIndex = currentRules.findIndex(r => r.startsWith(prefix));
+      
+      let activePlates: string[] = [];
+      if (ruleIndex !== -1) {
+        activePlates = currentRules[ruleIndex].substring(prefix.length).split('|').filter(Boolean);
+        currentRules.splice(ruleIndex, 1);
+      }
+      
+      if (activePlates.includes(plate)) {
+        activePlates = activePlates.filter(p => p !== plate);
+      } else {
+        activePlates.push(plate);
+      }
+      
+      if (activePlates.length > 0) {
+        currentRules.push(`${prefix}${activePlates.join('|')}`);
       }
       
       return { ...prev, quyen_chi_tiet: currentRules.join(',') };
@@ -541,11 +592,15 @@ export default function AccountPage() {
                         {Object.entries(ADVANCED_PERMISSIONS).map(([moduleName, options]) => (
                           <div key={moduleName} className="bg-white p-4 rounded-lg border border-orange-100 shadow-sm h-full flex flex-col">
                             <h5 className="font-bold text-gray-700 mb-3 uppercase text-xs border-b pb-2">
-                              {moduleName === 'VanBan' ? '📑 Module Văn bản' : moduleName === 'QuyDinh' ? '📖 Module Quy định - Quy trình' : moduleName === 'NhanSu' ? '👥 Module Nhân sự' : '💻 Module Thiết bị'}
+                              {moduleName === 'VanBan' ? '📑 Module Văn bản' 
+                               : moduleName === 'QuyDinh' ? '📖 Module Quy định - Quy trình' 
+                               : moduleName === 'NhanSu' ? '👥 Module Nhân sự' 
+                               : moduleName === 'ThietBi' ? '💻 Module Thiết bị'
+                               : '🚗 Module Xe'}
                             </h5>
                             <div className="flex flex-col flex-grow justify-between gap-4">
                               <div className="flex flex-col gap-2">
-                                {moduleName !== 'QuyDinh' && options.map(opt => {
+                                {moduleName !== 'QuyDinh' && moduleName !== 'Xe' && options.map(opt => {
                                   const isChecked = formData.quyen_chi_tiet ? formData.quyen_chi_tiet.split(',').map(r => r.trim()).includes(opt.id) : false;
                                   return (
                                     <label key={opt.id} className={`flex items-center gap-2 p-1.5 rounded cursor-pointer transition-colors ${isChecked ? 'bg-orange-50 text-[#c2410c] font-bold' : 'hover:bg-gray-50 text-gray-600'}`}>
@@ -579,6 +634,49 @@ export default function AccountPage() {
                                           </label>
                                         );
                                       })}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {moduleName === 'Xe' && (
+                                  <div>
+                                    <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1.5 font-black">Giới hạn xe xem được (Bỏ trống = Xem hết)</label>
+                                    <input 
+                                      type="text" 
+                                      placeholder="Tìm biển số..." 
+                                      value={carFilterTerm}
+                                      onChange={e => setCarFilterTerm(e.target.value)}
+                                      className="w-full p-2 text-xs border border-gray-200 rounded-lg mb-2 focus:ring-1 focus:ring-orange-500 outline-none"
+                                    />
+                                    <div className="h-64 overflow-y-auto p-1.5 border border-gray-200 dark:border-slate-700 rounded-lg bg-gray-50/50 dark:bg-slate-900/50 custom-scrollbar flex flex-col gap-1">
+                                      {carsOfSelectedUnit.filter(car => 
+                                        !carFilterTerm || 
+                                        String(car.bien_so || '').toLowerCase().includes(carFilterTerm.toLowerCase()) ||
+                                        String(car.hieu_xe || '').toLowerCase().includes(carFilterTerm.toLowerCase()) ||
+                                        String(car.loai_xe || '').toLowerCase().includes(carFilterTerm.toLowerCase())
+                                      ).map(car => {
+                                        const activePlates = getPlatesFromRule(formData.quyen_chi_tiet, 'XE_LIMIT:');
+                                        const isPlateChecked = activePlates.includes(car.bien_so);
+                                        return (
+                                          <label key={car.id} className={`flex items-center justify-between px-2 py-1.5 rounded cursor-pointer text-xs transition-colors ${isPlateChecked ? 'bg-orange-50 dark:bg-orange-950/30 text-orange-700 dark:text-orange-400 font-bold' : 'hover:bg-gray-100 dark:hover:bg-slate-800 text-gray-600 dark:text-gray-400'}`}>
+                                            <div className="flex items-center gap-2">
+                                              <input
+                                                type="checkbox"
+                                                checked={isPlateChecked}
+                                                onChange={() => handleTogglePlateRule('XE_LIMIT:', car.bien_so)}
+                                                className="w-3.5 h-3.5 text-orange-600 rounded focus:ring-orange-500 border-gray-300"
+                                              />
+                                              <span className="font-bold">{car.bien_so}</span>
+                                            </div>
+                                            <span className="text-[10px] text-gray-400 font-normal">
+                                              {car.hieu_xe} {car.loai_xe}
+                                            </span>
+                                          </label>
+                                        );
+                                      })}
+                                      {carsOfSelectedUnit.length === 0 && (
+                                        <div className="text-center py-4 text-xs text-gray-400">Không có xe thuộc Đơn vị quản lý</div>
+                                      )}
                                     </div>
                                   </div>
                                 )}

@@ -555,7 +555,7 @@ export default function StrictEquipmentTab({
         
         {/* CỘT 1 + 2: DANH SÁCH THIẾT BỊ (Bên trái) */}
         <div className="xl:col-span-2 bg-white border border-lime-100 rounded-2xl shadow-sm overflow-hidden flex flex-col min-h-[500px]">
-          <div className="p-4 border-b border-gray-150 bg-gray-50/50 flex justify-between items-center shrink-0">
+          <div className="p-4 border-b border-gray-200 bg-gray-50/50 flex justify-between items-center shrink-0">
             <h3 className="text-sm font-black text-lime-800 uppercase flex items-center gap-2">
               <Wrench size={18} /> Danh sách thiết bị ({processedThietBiList.length})
             </h3>
@@ -633,7 +633,7 @@ export default function StrictEquipmentTab({
 
         {/* CỘT 3: CHI TIẾT & LỊCH SỬ KIỂM ĐỊNH (Bên phải) */}
         <div className="bg-white border border-lime-100 rounded-2xl shadow-sm overflow-hidden min-h-[500px] flex flex-col">
-          <div className="p-4 border-b border-gray-150 bg-gray-50/50 flex justify-between items-center shrink-0">
+          <div className="p-4 border-b border-gray-200 bg-gray-50/50 flex justify-between items-center shrink-0">
             <h3 className="text-sm font-black text-lime-800 uppercase flex items-center gap-2">
               <Calendar size={18} /> Nhật ký kiểm định
             </h3>
@@ -685,7 +685,7 @@ export default function StrictEquipmentTab({
                 </div>
 
                 {/* Inspections Header */}
-                <div className="flex justify-between items-center border-b border-gray-150 pb-2 shrink-0">
+                <div className="flex justify-between items-center border-b border-gray-200 pb-2 shrink-0">
                   <span className="text-[11px] font-black text-gray-500 uppercase">Lượt kiểm định ({selectedHistory.length})</span>
                   {(user?.quyen === 'ADMIN' || user?.quyen === 'USER') && (
                     <button 
@@ -711,7 +711,7 @@ export default function StrictEquipmentTab({
                             idx === 0 ? 'border-lime-500 scale-125 ring-2 ring-lime-100' : 'border-gray-300'
                           }`} />
                           
-                          <div className="bg-gray-50 hover:bg-lime-50/20 p-3.5 rounded-xl border border-gray-150 relative transition-colors shadow-2xs">
+                          <div className="bg-gray-50 hover:bg-lime-50/20 p-3.5 rounded-xl border border-gray-200 relative transition-colors shadow-2xs">
                             {(user?.quyen === 'ADMIN' || user?.quyen === 'USER') && (
                               <div className="absolute top-2.5 right-2.5 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                 <button 
@@ -754,7 +754,7 @@ export default function StrictEquipmentTab({
                               {kd.ghi_chu && <p className="pt-1 text-[9px] text-gray-400 italic whitespace-pre-wrap">{kd.ghi_chu}</p>}
                               
                               {kd.bien_ban_kiem_dinh && (
-                                <div className="pt-2 border-t border-dashed border-gray-250 mt-1.5 flex justify-end">
+                                <div className="pt-2 border-t border-dashed border-gray-200 mt-1.5 flex justify-end">
                                   <a 
                                     href={kd.bien_ban_kiem_dinh} 
                                     target="_blank" 

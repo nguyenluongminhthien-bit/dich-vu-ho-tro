@@ -123,7 +123,7 @@ export const REPORT_TEMPLATES: ReportTemplate[] = [
       { key: 'gioi_tinh', label: 'Giới Tính', width: 80, defaultVisible: true },
       { key: 'nam_sinh', label: 'Năm Sinh', width: 100, format: 'date', defaultVisible: false },
       { key: 'ngay_nhan_vien', label: 'Ngày Nhận Việc', width: 110, format: 'date', defaultVisible: true },
-      { key: 'phan_loai', label: 'Phân Loại Nhân Sự', width: 130, defaultVisible: true },
+      { key: 'chuc_danh', label: 'Chức Danh Nhân Sự', width: 130, defaultVisible: true },
       { key: 'trinh_do_hoc_van', label: 'Trình Độ Học Vấn', width: 120, defaultVisible: false },
       { key: 'ngach_luong', label: 'Ngạch Lương', width: 120, defaultVisible: false },
       { key: 'thu_nhap', label: 'Mức Thu Nhập (Lương đóng BH)', width: 160, format: 'currency', defaultVisible: false },
@@ -132,7 +132,7 @@ export const REPORT_TEMPLATES: ReportTemplate[] = [
     ],
     filters: [
       { key: 'id_don_vi', label: 'Chọn Đơn vị', type: 'unit' },
-      { key: 'phan_loai', label: 'Phân loại Nhân sự', type: 'select', options: ['Chính thức', 'Thử việc', 'Cộng tác viên', 'Kiêm nhiệm', 'Học việc'] },
+      { key: 'chuc_danh', label: 'Chức danh Nhân sự', type: 'select', options: ['Chính thức', 'Thử việc', 'Cộng tác viên', 'Kiêm nhiệm', 'Học việc'] },
       { key: 'trang_thai', label: 'Trạng thái Làm việc', type: 'select', options: ['Đang làm việc', 'Đã nghỉ việc'] }
     ]
   },

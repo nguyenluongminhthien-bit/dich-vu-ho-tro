@@ -13,17 +13,16 @@ export const EXCEL_TEMPLATES: Record<string, ExcelTemplateConfig> = {
   personnel: {
     filename: 'Mau_Form_Them_Nhan_Su_Hang_Loat.xls',
     headers: [
-      "Số TT", "Mã NV *", "Họ tên *", "Chức danh *", "Bộ phận",
-      "Đơn vị (để trống)", "Showroom (để trống)", "Phía (để trống)",
-      "Phân loại", "SĐT Cty", "Giới tính", "Năm sinh", "Ngày làm",
-      "SĐT CNhân", "Email", "Ngạch", "Nhóm ATVSLĐ", "HL Từ",
-      "HL Đến", "Giá trị đến", "Khối", "Địa điểm LV", "CCCD",
-      "Thẻ thang", "Thẻ xe", "Hãng Loại xe", "Biển kiểm soát"
+      "Số TT", "Mã", "Họ tên", "Chức danh", "Chức vụ", "Bộ phận làm việc",
+      "Đơn vị công tác", "Showroom", "Phía", "SDT Cty", "Giới tính", "Năm sinh", "Ngày nhận việc",
+      "SDT CN", "Email", "Ngạch", "Nhóm", "Từ", "Đến", "Giá trị", "Khối",
+      "Địa điểm làm việc", "CCCD", "Thẻ thang (True/False)", "Thẻ xe (True/False)", "Hãng-Loại xe", "BKS"
     ],
     dummyRow: [
-      "1", "2112277", "Nguyễn Văn A", "Chuyên viên Quản trị Văn phòng", "QTVP",
-      "", "", "", "Chuyên viên", "0901234567", "Nam", "1990", "01/01/2020",
-      "0987654321", "nguyenvana@thaco.com.vn", "G2", "4", "", "", "", "", "VP Sadora (HCM)", "079090123456", "TRUE", "1236", "Yamaha Exciter", "66F118251"
+      "1", "2112277", "Nguyễn Văn A", "Chuyên viên", "Trưởng bộ phận", "QTVP",
+      "THACO AUTO An Giang", "Showroom Kia An Giang", "Nam", "0901234567", "Nam", "1990", "01/01/2020",
+      "0987654321", "nguyenvana@thaco.com.vn", "G2", "4", "", "", "", "Khối Văn phòng",
+      "VP Sadora (HCM)", "079090123456", "TRUE", "TRUE", "Yamaha Exciter", "66F118251"
     ]
   },
   osh_training: {
@@ -72,6 +71,17 @@ export const EXCEL_TEMPLATES: Record<string, ExcelTemplateConfig> = {
       "512 GB", "1 TB", "GTX 1650", "Dell 24 inch", "Core i7 12700, RAM 16 GB, SSD 512 GB", "Tốt",
       "Kim loại/Nhựa", "PCDELL12345", "Chuột, phím, tai nghe", "Core i7, RAM 16GB, SSD 512GB",
       "", ""
+    ]
+  },
+  ksk_canhan: {
+    filename: 'Mau_Form_Kham_Suc_Khoe_Nhan_Su_Hang_Loat.xls',
+    headers: [
+      "STT", "MSNV *", "Họ và tên *", "Năm KSK *", "Mã Gói khám",
+      "Phân loại SK (Loại I - V)", "Kết luận BNN", "Tên bệnh nghề nghiệp", "Ghi chú sức khỏe"
+    ],
+    dummyRow: [
+      "1", "22091296", "Nguyễn Thị Hoàng Yến", "2025", "GK 3A",
+      "Loại II", "Nguy cơ BNN", "Giảm thính lực nhẹ", "Cần kiểm tra lại thị lực"
     ]
   }
 };
@@ -223,30 +233,30 @@ export const getMostCompletePersonnelDummyRow = (items: any[], donViMap?: Record
     "1",
     bestItem.ma_so_nhan_vien || bestItem.msnv || '',
     bestItem.ho_ten || '',
-    bestItem.chuc_vu || bestItem.chuc_danh || '',
-    bestItem.bo_phan || bestItem.phong_ban || '',
+    bestItem.chuc_danh || bestItem.phan_loai || '',
+    bestItem.chuc_vu || '',
+    bestItem.phong_ban || bestItem.bo_phan || '',
     dvName || '',
     bestItem.showroom || '',
     bestItem.phia || '',
-    bestItem.phan_loai || '',
     bestItem.sdt_cong_ty || '',
     bestItem.gioi_tinh || '',
     bestItem.nam_sinh ? String(bestItem.nam_sinh) : '',
-    bestItem.ngay_nhan_viec || bestItem.ngay_lam || '',
+    bestItem.ngay_nhan_vien || bestItem.ngay_nhan_viec || bestItem.ngay_lam || '',
     bestItem.sdt_ca_nhan || '',
     bestItem.email || '',
-    bestItem.ngach || '',
-    bestItem.nhom_atvsld ? String(bestItem.nhom_atvsld) : '',
-    bestItem.hl_tu || '',
-    bestItem.hl_den || '',
+    bestItem.ngach_luong || bestItem.ngach || '',
+    bestItem.nhom_doi_tuong || bestItem.nhom_atvsld || '',
+    bestItem.huan_luyen_tu || bestItem.hl_tu || '',
+    bestItem.huan_luyen_den || bestItem.hl_den || '',
     bestItem.gia_tri_den || '',
     bestItem.khoi || '',
-    bestItem.dia_diem_lv || '',
-    bestItem.so_cccd || bestItem.cccd || '',
+    bestItem.dia_diem_lam_viec || bestItem.dia_diem_lv || '',
+    bestItem.cccd || bestItem.so_cccd || '',
     bestItem.the_thang !== undefined && bestItem.the_thang !== null ? String(bestItem.the_thang) : '',
     bestItem.the_xe || '',
     bestItem.hang_loai_xe || '',
-    bestItem.bien_kiem_soat || ''
+    bestItem.bks || bestItem.bien_kiem_soat || ''
   ];
 };
 

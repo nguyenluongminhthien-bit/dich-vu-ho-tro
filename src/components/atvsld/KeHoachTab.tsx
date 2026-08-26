@@ -231,7 +231,7 @@ export default function KeHoachTab({
                       <td className="p-3">
                         <p className="font-medium text-gray-700">{p.phong_ban || '---'}</p>
                         <p className="text-[10px] text-gray-500 text-slate-500">
-                          {p.chuc_vu} ({p.phan_loai})
+                          {p.chuc_vu} ({p.chuc_danh})
                         </p>
                       </td>
                       <td className="p-3 text-center font-bold text-[#05469B] text-sm">{p.nhom_doi_tuong || '---'}</td>

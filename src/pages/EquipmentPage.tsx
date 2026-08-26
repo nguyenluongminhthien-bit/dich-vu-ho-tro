@@ -1587,7 +1587,7 @@ export default function EquipmentPage() {
                   </button>
 
                   {isAddDropdownOpen && (
-                    <div className="absolute right-0 mt-2 w-56 bg-white border border-gray-150 rounded-xl shadow-xl py-2 z-[60] animate-in fade-in slide-in-from-top-2 duration-150">
+                    <div className="absolute right-0 mt-2 w-56 bg-white border border-gray-200 rounded-xl shadow-xl py-2 z-[60] animate-in fade-in slide-in-from-top-2 duration-150">
                       <button
                         onClick={() => {
                           setIsAddDropdownOpen(false);

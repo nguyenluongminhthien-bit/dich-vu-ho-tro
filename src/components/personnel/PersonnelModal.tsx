@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo } from 'react';
-import { X, Loader2, Save, Image as ImageIcon, ShieldCheck, Info } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { X, Loader2, Save, Image as ImageIcon, ShieldCheck, Info, Heart, Activity } from 'lucide-react';
 import { DonVi } from '../../types';
 import { formatPhoneNumber } from '../../utils/formatters';
 import { buildHierarchicalOptions, getUnitEmoji } from '../../utils/hierarchy';
@@ -61,7 +61,7 @@ interface PersonnelModalProps {
   formData: any;
   submitting: boolean;
   donViList: DonVi[];
-  phanLoaiSuggestions?: string[];
+  chucDanhSuggestions?: string[];
   onClose: () => void;
   onSave: (e: React.FormEvent) => void;
   setFormData: (updater: (prev: any) => any) => void;
@@ -74,7 +74,7 @@ export default function PersonnelModal({
   formData,
   submitting,
   donViList,
-  phanLoaiSuggestions = [],
+  chucDanhSuggestions = [],
   onClose,
   onSave,
   setFormData,
@@ -174,14 +174,14 @@ export default function PersonnelModal({
     return base;
   }, [formData.khoi]);
 
-  const phanLoaiOptions = useMemo(() => {
+  const chucDanhOptions = useMemo(() => {
     const base = ['Lãnh đạo', 'PT KD Xe', 'PT KD DVPT', 'PT DVHT 1', 'PT DVHT 2', 'Hành chính NS', 'Nhân sự hỗ trợ'];
-    const current = String(formData.phan_loai || '').trim();
+    const current = String(formData.chuc_danh || '').trim();
     if (current && !base.includes(current)) {
       base.push(current);
     }
     return base;
-  }, [formData.phan_loai]);
+  }, [formData.chuc_danh]);
 
   const nhomOptions = useMemo(() => {
     const base = ['1', '2', '3', '4', '6'];
@@ -317,25 +317,25 @@ export default function PersonnelModal({
                   </div>
                   <div><label className="block text-xs font-bold text-gray-700 mb-1">Bộ phận làm việc</label><input type="text" name="phong_ban" value={formData.phong_ban || ''} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" placeholder="Hành chính, Kỹ thuật..." /></div>
 
-                  {/* Dòng 2: Phân loại nhân sự - Chức danh nghiệp vụ - Nhóm đối tượng ATVSLĐ - Địa điểm làm việc (25% mỗi mục) */}
+                  {/* Dòng 2: Chức danh - Chức vụ - Nhóm đối tượng ATVSLĐ - Địa điểm làm việc (25% mỗi mục) */}
                   <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-1">Phân loại nhân sự</label>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">Chức danh</label>
                     <input
-                      type="text"
-                      name="phan_loai"
-                      list="phan-loai-suggestions"
-                      value={formData.phan_loai || ''}
-                      onChange={handleInputChange}
-                      className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]"
-                      placeholder="Nhập hoặc chọn phân loại..."
+                       type="text"
+                       name="chuc_danh"
+                       list="chuc-danh-suggestions"
+                       value={formData.chuc_danh || ''}
+                       onChange={handleInputChange}
+                       className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]"
+                       placeholder="Nhập hoặc chọn chức danh..."
                     />
-                    <datalist id="phan-loai-suggestions">
-                      {phanLoaiSuggestions.map(opt => (
+                    <datalist id="chuc-danh-suggestions">
+                       {chucDanhSuggestions.map(opt => (
                         <option key={opt} value={opt} />
-                      ))}
+                       ))}
                     </datalist>
                   </div>
-                  <div><label className="block text-xs font-bold text-gray-700 mb-1">Chức danh nghiệp vụ *</label><input type="text" required name="chuc_vu" value={formData.chuc_vu || ''} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" placeholder="Nhân viên, Kỹ thuật viên..." /></div>
+                  <div><label className="block text-xs font-bold text-gray-700 mb-1">Chức vụ *</label><input type="text" required name="chuc_vu" value={formData.chuc_vu || ''} onChange={handleInputChange} className="w-full p-2.5 border border-gray-200 rounded-lg bg-[#FFFFF0] outline-none focus:ring-2 focus:ring-[#05469B]" placeholder="Nhân viên, Kỹ thuật viên..." /></div>
                   <div className="relative" onMouseLeave={() => setShowNhomTooltip(false)}>
                     <div className="flex items-center justify-between mb-1">
                       <label className="block text-xs font-bold text-gray-700">Nhóm đối tượng ATVSLĐ *</label>

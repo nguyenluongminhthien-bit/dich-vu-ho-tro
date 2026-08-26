@@ -387,6 +387,14 @@ export default function DashboardPage() {
         console.error("Lỗi tải dữ liệu Dashboard:", error);
       } finally {
         setLoading(false);
+        // 🟢 TỰ ĐỘNG LÀM ẤM BỘ ĐỆM NGẦM (BACKGROUND PRE-FETCHING)
+        // Tải trước dữ liệu ATVSLĐ chuyên sâu 1.2s sau khi Dashboard đã tải xong
+        setTimeout(() => {
+          apiService.getKhoaHuanLuyen?.().catch(() => {});
+          apiService.getHocVienKhoaHuanLuyen?.().catch(() => {});
+          apiService.getThietBiNghiemNgat?.().catch(() => {});
+          apiService.getKiemDinhTBNN?.().catch(() => {});
+        }, 1200);
       }
     };
     loadData();
@@ -528,7 +536,7 @@ export default function DashboardPage() {
       if (currentSubordinateIds.includes(ns.id_don_vi) && ns.trang_thai !== 'Đã nghỉ việc') {
         totalStaff++;
         const bp = String(ns.phong_ban || '');
-        const pl = String(ns.phan_loai || '');
+        const pl = String(ns.chuc_danh || '');
 
         // 1. Nhóm Bảo vệ (phong_ban chứa "BV, ĐTKH" hoặc phan_loai chứa "BV, ĐTKH")
         const isBV = bp.toUpperCase().includes('BV, ĐTKH') || pl.toUpperCase().includes('BV, ĐTKH');
@@ -717,7 +725,7 @@ export default function DashboardPage() {
     const roleCounts: Record<string, number> = {};
     nsData.forEach(ns => {
       if (currentSubordinateIds.includes(ns.id_don_vi) && ns.trang_thai !== 'Đã nghỉ việc') {
-        const roleName = ns.phan_loai || 'Chưa phân loại';
+        const roleName = ns.chuc_danh || 'Chưa phân loại';
         roleCounts[roleName] = (roleCounts[roleName] || 0) + 1;
       }
     });
