@@ -30,6 +30,7 @@ export default defineConfig(({ mode }) => {
       watch: {
         usePolling: true,
         interval: 1000,
+        followSymlinks: false,
       },
     },
   };

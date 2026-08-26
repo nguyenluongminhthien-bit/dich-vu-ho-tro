@@ -79,12 +79,18 @@ QTVP-ASDS App
 #### 🛡️ 05. Phân hệ Quản lý ATVSLĐ & Thiết bị Nghiêm ngặt (AtvsldPage.tsx)
 - **Tab 1: Hồ sơ Báo cáo Cơ sở (`HoSoTab.tsx`)**: Tự động tổng hợp số liệu huấn luyện các Nhóm 1-6 và thiết bị nghiêm ngặt từ database mà không cần nhập tay.
 - **Tab 2: Kế hoạch Đào tạo đợt tới (`KeHoachTab.tsx`)**: Quét và phân loại tự động nhân sự thành 4 diện: *Chưa học*, *Quá hạn*, *Sắp hết hạn (<60 ngày)*, *An toàn*. Hỗ trợ xuất danh sách Excel theo mẫu.
-- **Tab 3: Khóa học Huấn luyện (`KhoaHocTab.tsx`)**: Quản lý các đợt đào tạo, nhập danh sách học viên qua dán Excel. Hỗ trợ **Đồng bộ chứng chỉ ngầm (Background Batch Sync)** cập nhật ngược về hồ sơ nhân sự theo lô (batch size 15).
+- **Tab 3: Khóa học Huấn luyện (`KhoaHocTab.tsx`)**: Quản lý các đợt đào tạo qua 2 chế độ:
+  - **Danh sách khóa huấn luyện:** Tạo khóa học mới, nhập danh sách học viên qua dán Excel, đồng bộ chứng chỉ ngầm theo batch.
+  - **Lịch sử đào tạo cá nhân:** Hiển thị dưới dạng **Bảng ma trận (Matrix View)** gom nhóm lịch sử đạt các năm (cột năm động) kèm timeline chi tiết và **Bảng chi tiết (List View)** lọc theo đơn vị lúc học thực tế để tính toán chi phí. Tích hợp nút **"Xuất Excel Đợt Học Tiếp Theo"** tự động đề xuất nhân sự chưa học/hết hạn chứng chỉ chuẩn 14 cột.
+  - *Đồng bộ thông minh:* Khi lưu học viên và đồng bộ chứng chỉ sang hồ sơ chính, hệ thống tự động nhận diện và cập nhật theo MSNV trên toàn hệ thống nếu nhân viên đã điều chuyển sang đơn vị mới.
 - **Tab 4: Thiết bị yêu cầu Nghiêm ngặt về ATLĐ (`StrictEquipmentTab.tsx`)**:
   - Quản lý danh mục thiết bị có yêu cầu nghiêm ngặt (xe nâng, nồi hơi, thang máy, bình chịu áp lực...).
   - Quản lý nhật ký/lịch sử kiểm định (`nk_kiem_dinh_tbnn`), đơn vị kiểm định, chi phí, link biên bản PDF.
   - Cảnh báo thời hạn kiểm định qua huy hiệu màu chuẩn: *Đỏ (Quá hạn)*, *Cam (Dưới 30 ngày)*, *Vàng (Dưới 60 ngày)*, *Xanh (An toàn)*.
-- **⚠️ Tab 5: Khám sức khỏe & Bệnh nghề nghiệp — MỚI XÁC MINH (chưa có trong tài liệu gốc):** Đã có khung giao diện (`activeTab === 'khamsuckhoe'`) hiển thị thông báo "đang được lên kế hoạch phát triển", nhưng **CHƯA có bảng dữ liệu Supabase, chưa có component riêng, chưa nhập liệu được**. Đây là phân hệ thứ 5 thực tế trong module ATVSLĐ, cần bổ sung khi triển khai.
+- **Tab 5: Khám sức khỏe & Bệnh nghề nghiệp (`SucKhoeTab.tsx`)**:
+  - Quản lý chiến dịch khám sức khỏe định kỳ của toàn đơn vị.
+  - Hỗ trợ dán Excel danh sách KSK cá nhân (tự viết hoa chữ cái đầu họ tên, tự gán đúng đơn vị khám năm cũ), tự động tính toán & tổng hợp đợt KSK cấp đơn vị.
+  - Cơ chế lọc phân tách: Bảng ma trận lọc theo đơn vị hiện tại (xem tiến trình điều chuyển đơn vị), Bảng chi tiết lọc theo đơn vị lúc khám thực tế (báo cáo thống kê).
 
 #### 🚗 06. Phân hệ Quản lý Xe & Chi phí Vận hành (VehiclePage.tsx)
 - **Master Tài sản Xe (TS_Xe)**: Quản lý biển số, loại phương tiện, hiệu xe, số khung, số máy, năm sản xuất, hình thức sở hữu, GPS, hiện trạng.
@@ -255,7 +261,8 @@ Dưới đây là giải thích chi tiết lý do vì sao phiên bản gốc (H�
 > Mục này được thêm sau khi quét toàn bộ 81 file `.ts/.tsx` thật trong `src/` (không suy đoán). Xem chi tiết bảng ánh xạ Tính năng ↔ File ↔ Bảng Supabase đầy đủ tại `ARCHITECTURE.md`.
 
 - **Cơ chế xác định Đơn vị mặc định khi truy cập hệ thống**: Tự động chọn đơn vị mặc định khi truy cập bất kỳ phân hệ nào qua hàm `getDefaultUnitId(user, donViList)` trong `src/utils/hierarchy.ts`. Tài khoản Admin/Toàn quyền sẽ hiển thị mặc định đơn vị **THACO AUTO**, tài khoản thường (Showroom, điểm bán lẻ) sẽ hiển thị **Đơn vị mẹ quản lý** (Công ty tỉnh thành) của tài khoản đó.
-- **Tab "Khám sức khỏe & Bệnh nghề nghiệp"** (mục 2, phân hệ 05) mới là khung giao diện placeholder, chưa có dữ liệu — xem mục 2 phía trên.
+- **Xây dựng phân hệ Khám sức khỏe & Bệnh nghề nghiệp (`SucKhoeTab.tsx`)**: Đã chuyển đổi từ khung placeholder thành giao diện tính năng hoàn chỉnh, hỗ trợ dán Excel cá nhân (tự viết hoa chữ cái đầu họ tên, tự gán đúng đơn vị khám cũ), tự động tính toán tổng hợp đợt KSK cấp đơn vị, phân tách bộ lọc: Ma trận lọc theo đơn vị hiện tại (xem tiến trình điều chuyển), Danh sách lọc theo đơn vị lúc khám.
+- **Nâng cấp Đào tạo/Huấn luyện sang cơ chế Matrix & List View (`KhoaHocTab.tsx`)**: Tích hợp SubTab chia xem danh sách khóa học và lịch sử cá nhân. Bảng ma trận hiển thị lịch sử các năm (cột năm động) kèm timeline chi tiết, bảng danh sách lọc theo đơn vị lúc học để báo cáo chi phí. Tích hợp nút xuất Excel đề xuất học đợt tiếp theo chuẩn 14 cột. Hỗ trợ validate và đồng bộ ngược thông minh toàn hệ thống theo MSNV khi nhân sự đã điều chuyển đơn vị.
 - **utils/logger.tsx trùng lặp đã được xóa**: Đã xóa tệp `utils/logger.tsx` dư thừa, giữ lại `utils/logger.ts` làm nguồn duy nhất chứa logic export hàm `generateDiffLog()`, tránh cảnh báo khi biên dịch.
 - **Bảng `dm_chu_ky_atvsld`**: có hàm đọc `getChuKyATVSLD()` khai báo sẵn trong `services/api/modules.ts`, nhưng không tìm thấy nơi nào trong `pages/` hoặc `components/` gọi hàm này — cần kiểm tra lại thủ công (có thể là bảng chưa nối vào UI, hoặc đã đổi tên biến ở nơi khác).
 - **`services/api/client.ts`** chứa `SUPABASE_ANON_KEY` hardcode trực tiếp trong source. Đây là anon key public (được bảo vệ bởi Row Level Security phía Supabase) nên không phải lỗi bảo mật nghiêm trọng, nhưng nên cân nhắc chuyển sang biến môi trường (`.env` + `import.meta.env` của Vite) để thuận tiện đổi giữa môi trường dev/production.
