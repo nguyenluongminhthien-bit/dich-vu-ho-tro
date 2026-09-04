@@ -123,9 +123,18 @@ export default function PersonnelCard({
                 <Phone size={14} className="text-gray-400 shrink-0 group-hover/phone:text-[#05469B]"/>
                 {sdt ? <a href={`tel:${sdt.replace(/\s/g, '')}`} className="text-sm font-semibold text-gray-700 group-hover/phone:text-[#05469B] w-full" title="Bấm để gọi">{formatPhoneNumber(sdt)}</a> : <span className="text-sm font-semibold text-gray-400">---</span>}
               </div>
-              <div className="flex items-center gap-3 px-3 py-2 bg-white rounded-md border border-gray-200 shadow-sm transition-colors hover:border-blue-300 hover:bg-blue-50/50 group/mail">
+              <div 
+                onClick={() => {
+                  if (email) {
+                    navigator.clipboard.writeText(email);
+                    toast.success(`Đã sao chép email: ${email}`);
+                  }
+                }}
+                className={`flex items-center gap-3 px-3 py-2 bg-white rounded-md border border-gray-200 shadow-sm transition-colors ${email ? 'hover:border-blue-300 hover:bg-blue-50/50 cursor-pointer' : ''} group/mail`}
+                title={email ? "Bấm để sao chép địa chỉ email" : undefined}
+              >
                 <MailIcon size={14} className="text-gray-400 shrink-0 group-hover/mail:text-[#05469B]"/>
-                {email ? <a href={`mailto:${email}`} className="text-sm font-semibold text-gray-700 truncate group-hover/mail:text-[#05469B] w-full" title="Bấm để gửi mail">{email}</a> : <span className="text-sm font-semibold text-gray-400 truncate">---</span>}
+                {email ? <span className="text-sm font-semibold text-gray-700 truncate group-hover/mail:text-[#05469B] w-full">{email}</span> : <span className="text-sm font-semibold text-gray-400 truncate">---</span>}
               </div>
             </div>
           </>

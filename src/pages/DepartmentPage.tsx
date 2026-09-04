@@ -10,7 +10,7 @@ import {
   SquarePen, PenTool, Wand2, Compass, Clock, Sun, Moon,
   MonitorSmartphone, Tag, Car, Pocket, Store, Warehouse,
   Flame, ShieldAlert, Droplets, BellRing, BatteryWarning, Settings,
-  PhoneCall, PlusCircle, ShieldCheck, CheckCircle2, Siren, AlertTriangle, Eye
+  PhoneCall, PlusCircle, ShieldCheck, CheckCircle2, Siren, AlertTriangle, Eye, ClipboardPaste
 } from 'lucide-react';
 import { apiService } from '../services/api';
 import { DonVi, Personnel, AnNinh, PhapNhan, PhongHop, TS_Xe, ThietBi, NhaCungCap } from '../types';
@@ -23,6 +23,7 @@ import AtvsldModal from '../components/department/AtvsldModal';
 import PcttModal from '../components/department/PcttModal';
 import SecurityModal from '../components/department/SecurityModal';
 import PcccModal from '../components/department/PcccModal';
+import PcccContactPasteModal from '../components/department/PcccContactPasteModal';
 import { useAllowedUnits } from '../hooks/useAllowedUnits';
 import PersonnelCard from '../components/department/PersonnelCard';
 import { buildHierarchicalOptions, getUnitEmoji, sortDonViByThuTu, groupParentUnits, getAllSubordinateIds, getDefaultUnitId } from '../utils/hierarchy';
@@ -99,15 +100,25 @@ const PCCC_SYSTEMS = [
   { key: 'dung_cu_pccc', label: 'Dụng cụ CC & CNCH', Icon: Flame, color: 'text-red-500' },
 ];
 
-const EMERGENCY_CONTACTS = [
-  { key: 'sdt_pccc', label: 'Báo cháy / CNCH', def: '114', color: 'text-red-600', bg: 'bg-red-50' },
-  { key: 'sdt_ca_pccc_catt', label: 'CS PCCC Quản lý', def: '', color: 'text-gray-800', bg: 'bg-white' },
-  { key: 'sdt_ub', label: 'UBND Xã/Phường', def: '', color: 'text-gray-800', bg: 'bg-white' },
-  { key: 'sdt_cax', label: 'Công an Xã/Phường', def: '', color: 'text-gray-800', bg: 'bg-white' },
-  { key: 'sdt_dien_luc', label: 'Đơn vị Điện lực', def: '', color: 'text-gray-800', bg: 'bg-white' },
-  { key: 'sdt_cap_thoat_nuoc', label: 'Đơn vị Cấp nước', def: '', color: 'text-gray-800', bg: 'bg-white' },
-  { key: 'sdt_yte', label: 'Cơ quan Y tế', def: '', color: 'text-gray-800', bg: 'bg-white' },
+const CONTACTS_BAN_NGANH = [
+  { key: 'sdt_ca_pccc', nameKey: 'ten_ca_pccc', label: 'Cảnh sát PCCC', def: '', color: 'text-red-600', bg: 'bg-red-50' },
+  { key: 'sdt_yte', nameKey: 'ten_yte', label: 'Cấp cứu y tế', def: '', color: 'text-gray-800', bg: 'bg-white' },
+  { key: 'sdt_bv_lien_ket', nameKey: 'ten_bv_lien_ket', label: 'Cơ sở y tế gần nhất (ký HĐ y tế)', def: '', color: 'text-gray-800', bg: 'bg-white' },
+  { key: 'sdt_bv_dan_quan', nameKey: 'ten_bv_dan_quan', label: 'Bảo vệ dân phố / Dân quân tự vệ', def: '', color: 'text-gray-800', bg: 'bg-white' },
+  { key: 'sdt_ca_khu_vuc', nameKey: 'ten_ca_khu_vuc', label: 'Công an khu vực', def: '', color: 'text-gray-800', bg: 'bg-white' },
+  { key: 'sdt_ca_xa_phuong', nameKey: 'ten_ca_xa_phuong', label: 'Công an Xã/Phường', def: '', color: 'text-gray-800', bg: 'bg-white' },
+  { key: 'sdt_pccc_xa_phuong', nameKey: 'ten_pccc_xa_phuong', label: 'PCCC Xã/Phường', def: '', color: 'text-gray-800', bg: 'bg-white' },
+  { key: 'sdt_dien_luc', nameKey: 'ten_dien_luc', label: 'Điện lực khu vực', def: '', color: 'text-gray-800', bg: 'bg-white' },
+  { key: 'sdt_ub', nameKey: 'ten_ub', label: 'Cơ quan ban ngành', def: '', color: 'text-gray-800', bg: 'bg-white' }
 ];
+
+const CONTACTS_DON_VI = [
+  { key: 'sdt_kho_xe', nameKey: 'ten_kho_xe', label: 'Phụ trách Kho xe & Lái xe', def: '', color: 'text-gray-800', bg: 'bg-white' },
+  { key: 'sdt_tt_bao_ve', nameKey: 'ten_tt_bao_ve', label: 'Tổ trưởng bảo vệ, đón tiếp khách hàng', def: '', color: 'text-gray-800', bg: 'bg-white' },
+  { key: 'sdt_hc_ns', nameKey: 'ten_hc_ns', label: 'Phụ trách QTVP', def: '', color: 'text-gray-800', bg: 'bg-white' }
+];
+
+const EMERGENCY_CONTACTS = [...CONTACTS_BAN_NGANH, ...CONTACTS_DON_VI];
 
 const getStatusColor = (dateString: string, type: 'BH' | 'DT' | 'TB') => {
   if (!dateString) return { color: 'bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-gray-400 border-gray-200 dark:border-slate-700', text: 'Chưa có', isDanger: false };
@@ -170,6 +181,7 @@ export default function DepartmentPage() {
   const [pcccFormData, setPcccFormData] = useState<any>({});
   const [equipmentList, setEquipmentList] = useState<any[]>([]);
   const [deletedEqIds, setDeletedEqIds] = useState<string[]>([]);
+  const [isPcccPasteModalOpen, setIsPcccPasteModalOpen] = useState(false);
 
   const [atvsldData, setAtvsldData] = useState<any[]>([]);
   const [isAtvsldModalOpen, setIsAtvsldModalOpen] = useState(false);
@@ -721,6 +733,74 @@ export default function DepartmentPage() {
 
   const openPcccModal = (mode: 'create' | 'update' | 'view') => {
     setPcccMode(mode);
+    if (mode === 'create') {
+      setPcccFormData({
+        id: '',
+        id_don_vi: selectedUnitId || '',
+        giay_phep_pccc: 'Nghiệm thu',
+        bao_hiem_chay_no: 'Có',
+        ngay_het_han_bh: '',
+        ho_ten_doi_truong: '',
+        sdt_doi_truong: '',
+        chuc_vu: '',
+        tong_sl_thanh_vien: '',
+        sl_huy_dong_ban_ngay: '',
+        sl_huy_dong_ban_dem: '',
+        ngay_dien_tap: '',
+        link_phuong_an_pccc: '',
+        sdt_ca_pccc: '',
+        ten_ca_pccc: '',
+        sdt_yte: '',
+        ten_yte: '',
+        sdt_bv_dan_quan: '',
+        ten_bv_dan_quan: '',
+        sdt_ca_khu_vuc: '',
+        ten_ca_khu_vuc: '',
+        sdt_ca_xa_phuong: '',
+        ten_ca_xa_phuong: '',
+        sdt_pccc_xa_phuong: '',
+        ten_pccc_xa_phuong: '',
+        sdt_dien_luc: '',
+        ten_dien_luc: '',
+        sdt_cap_thoat_nuoc: '',
+        ten_cap_thoat_nuoc: '',
+        sdt_kho_xe: '',
+        ten_kho_xe: '',
+        sdt_tt_bao_ve: '',
+        ten_tt_bao_ve: '',
+        sdt_hc_ns: '',
+        ten_hc_ns: '',
+        sdt_bv_lien_ket: '',
+        ten_bv_lien_ket: '',
+        ten_giam_doc: leader?.ho_ten || '',
+        sdt_giam_doc: leader ? formatPhoneNumber(leader.sdt_ca_nhan || leader.sdt_cong_ty) : '',
+        ten_ptkd_dvpt: kdDvpt?.ho_ten || '',
+        sdt_ptkd_dvpt: kdDvpt ? formatPhoneNumber(kdDvpt.sdt_ca_nhan || kdDvpt.sdt_cong_ty) : '',
+        ten_ptkd_xe: kdXe?.ho_ten || '',
+        sdt_ptkd_xe: kdXe ? formatPhoneNumber(kdXe.sdt_ca_nhan || kdXe.sdt_cong_ty) : '',
+        sdt_ub: '',
+        ten_ub: '',
+        he_thong_bao_chay_tu_dong: 'Có',
+        he_thong_chua_chay_tu_dong_nuoc: 'Không',
+        he_thong_chua_chay_nuoc: 'Có',
+        dung_cu_pccc: 'Có',
+        khu_vuc_rui_ro_cao: '',
+        loi_ton_tai_chua_khac_phuc: ''
+      });
+      setEquipmentList([]);
+    } else {
+      setPcccFormData(currentPccc ? {
+        ...currentPccc,
+        ten_giam_doc: currentPccc.ten_giam_doc !== undefined ? currentPccc.ten_giam_doc : (leader?.ho_ten || ''),
+        sdt_giam_doc: currentPccc.sdt_giam_doc !== undefined ? currentPccc.sdt_giam_doc : (leader ? formatPhoneNumber(leader.sdt_ca_nhan || leader.sdt_cong_ty) : ''),
+        ten_ptkd_dvpt: currentPccc.ten_ptkd_dvpt !== undefined ? currentPccc.ten_ptkd_dvpt : (kdDvpt?.ho_ten || ''),
+        sdt_ptkd_dvpt: currentPccc.sdt_ptkd_dvpt !== undefined ? currentPccc.sdt_ptkd_dvpt : (kdDvpt ? formatPhoneNumber(kdDvpt.sdt_ca_nhan || kdDvpt.sdt_cong_ty) : ''),
+        ten_ptkd_xe: currentPccc.ten_ptkd_xe !== undefined ? currentPccc.ten_ptkd_xe : (kdXe?.ho_ten || ''),
+        sdt_ptkd_xe: currentPccc.sdt_ptkd_xe !== undefined ? currentPccc.sdt_ptkd_xe : (kdXe ? formatPhoneNumber(kdXe.sdt_ca_nhan || kdXe.sdt_cong_ty) : ''),
+      } : {});
+      setEquipmentList(tsPcccData.filter(eq => getUnitIdSafe(eq) === selectedUnitId).map(e => ({ ...e })));
+    }
+    setDeletedEqIds([]);
     setIsPcccModalOpen(true);
   };
 
@@ -2426,21 +2506,215 @@ export default function DepartmentPage() {
                   </div>
 
                   <div className="bg-purple-50/40 p-5 rounded-xl border border-purple-100 shadow-sm mt-6">
-                    <h4 className="font-bold text-purple-800 mb-4 flex items-center gap-2 border-b border-purple-200 pb-2"><PhoneCall size={18} /> 4. Danh bạ Khẩn cấp & Ghi chú Tồn tại (Mẫu PC01)</h4>
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-5 pb-5 border-b border-purple-100/50">
-                      {EMERGENCY_CONTACTS.map(contact => (
-                        <div key={contact.key}>
-                          <label className={`block text-[10px] font-bold uppercase mb-1 ${contact.color}`}>📞 {contact.label}</label>
-                          <input type="text" name={contact.key} value={pcccFormData[contact.key] || contact.def} onChange={(e) => handleInputChange(e, 'pccc')} className={`w-full p-2 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-purple-500 text-sm ${contact.bg} ${contact.key === 'sdt_pccc' ? 'border-red-300 font-bold' : ''}`} placeholder="xxxx xxx xxx" />
-                        </div>
-                      ))}
+                    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-purple-200 pb-2 mb-4">
+                      <h4 className="font-bold text-purple-800 flex items-center gap-2"><PhoneCall size={18} /> 4. Danh bạ Khẩn cấp & Ghi chú Tồn tại (Mẫu PC01)</h4>
+                      {pcccMode !== 'view' && (
+                        <button
+                          type="button"
+                          onClick={() => setIsPcccPasteModalOpen(true)}
+                          className="flex items-center gap-1.5 px-3.5 py-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer"
+                          title="Dán bảng danh bạ từ PowerPoint hoặc Excel"
+                        >
+                          <ClipboardPaste size={14} /> Dán Bảng Danh bạ (PowerPoint / Excel)
+                        </button>
+                      )}
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <div className="space-y-6">
+                      {/* Nhóm 1: Cơ quan chức năng & Ban ngành */}
+                      <div className="bg-[#fcf8ff]/60 p-5 rounded-xl border border-purple-100 shadow-sm space-y-4">
+                        <h5 className="text-xs font-bold text-purple-800 flex items-center gap-1.5 uppercase tracking-wider border-b border-purple-100 pb-2">
+                          <Building2 size={15} className="text-purple-600" /> 4.1. Cơ quan chức năng & Ban ngành
+                        </h5>
+
+                        {/* Dòng 1: Cảnh sát PCCC - PCCC Xã/phường */}
+                        <div className="space-y-1.5">
+                          <span className="text-[10px] font-bold text-purple-600 uppercase tracking-wider block">Dòng 1: Cảnh sát PCCC & Xã Phường</span>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {[
+                              CONTACTS_BAN_NGANH.find(c => c.key === 'sdt_ca_pccc'),
+                              CONTACTS_BAN_NGANH.find(c => c.key === 'sdt_pccc_xa_phuong')
+                            ].map(contact => {
+                              if (!contact) return null;
+                              return (
+                                <div key={contact.key} className="p-3 bg-white rounded-lg border border-gray-200 space-y-2 shadow-sm">
+                                  <label className={`block text-[10px] font-bold uppercase ${contact.color}`}>📞 {contact.label}</label>
+                                  <input
+                                    type="text"
+                                    name={contact.nameKey}
+                                    value={pcccFormData[contact.nameKey] || ''}
+                                    onChange={(e) => handleInputChange(e, 'pccc')}
+                                    className="w-full p-2 text-xs border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-purple-500 bg-white font-medium transition-colors"
+                                    placeholder="Tên đơn vị / cá nhân..."
+                                  />
+                                  <input
+                                    type="text"
+                                    name={contact.key}
+                                    value={pcccFormData[contact.key] || contact.def}
+                                    onChange={(e) => handleInputChange(e, 'pccc')}
+                                    className={`w-full p-2 text-xs border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-purple-500 font-semibold transition-colors ${contact.bg} ${contact.key === 'sdt_ca_pccc' ? 'border-red-300 font-bold text-red-600' : ''}`}
+                                    placeholder="Số điện thoại..."
+                                  />
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        {/* Dòng 2: Công an Khu vực - Công an Xã /Phương - Bảo vệ dân phố */}
+                        <div className="space-y-1.5 pt-2 border-t border-dashed border-purple-100">
+                          <span className="text-[10px] font-bold text-purple-600 uppercase tracking-wider block">Dòng 2: Công an khu vực & An ninh địa bàn</span>
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            {[
+                              CONTACTS_BAN_NGANH.find(c => c.key === 'sdt_ca_khu_vuc'),
+                              CONTACTS_BAN_NGANH.find(c => c.key === 'sdt_ca_xa_phuong'),
+                              CONTACTS_BAN_NGANH.find(c => c.key === 'sdt_bv_dan_quan')
+                            ].map(contact => {
+                              if (!contact) return null;
+                              return (
+                                <div key={contact.key} className="p-3 bg-white rounded-lg border border-gray-200 space-y-2 shadow-sm">
+                                  <label className={`block text-[10px] font-bold uppercase ${contact.color}`}>📞 {contact.label}</label>
+                                  <input
+                                    type="text"
+                                    name={contact.nameKey}
+                                    value={pcccFormData[contact.nameKey] || ''}
+                                    onChange={(e) => handleInputChange(e, 'pccc')}
+                                    className="w-full p-2 text-xs border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-purple-500 bg-white font-medium transition-colors"
+                                    placeholder="Tên đơn vị / cá nhân..."
+                                  />
+                                  <input
+                                    type="text"
+                                    name={contact.key}
+                                    value={pcccFormData[contact.key] || contact.def}
+                                    onChange={(e) => handleInputChange(e, 'pccc')}
+                                    className={`w-full p-2 text-xs border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-purple-500 font-semibold transition-colors ${contact.bg}`}
+                                    placeholder="Số điện thoại..."
+                                  />
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        {/* Dòng 3: Cơ quan ban ngành - Điện lực - Cơ sở y tế - Cấp cứu y tế */}
+                        <div className="space-y-1.5 pt-2 border-t border-dashed border-purple-100">
+                          <span className="text-[10px] font-bold text-purple-600 uppercase tracking-wider block">Dòng 3: Ban ngành, Điện nước & Y tế</span>
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                            {[
+                              CONTACTS_BAN_NGANH.find(c => c.key === 'sdt_ub'),
+                              CONTACTS_BAN_NGANH.find(c => c.key === 'sdt_dien_luc'),
+                              CONTACTS_BAN_NGANH.find(c => c.key === 'sdt_bv_lien_ket'),
+                              CONTACTS_BAN_NGANH.find(c => c.key === 'sdt_yte')
+                            ].map(contact => {
+                              if (!contact) return null;
+                              return (
+                                <div key={contact.key} className="p-3 bg-white rounded-lg border border-gray-200 space-y-2 shadow-sm">
+                                  <label className={`block text-[10px] font-bold uppercase ${contact.color}`}>📞 {contact.label}</label>
+                                  <input
+                                    type="text"
+                                    name={contact.nameKey}
+                                    value={pcccFormData[contact.nameKey] || ''}
+                                    onChange={(e) => handleInputChange(e, 'pccc')}
+                                    className="w-full p-2 text-xs border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-purple-500 bg-white font-medium transition-colors"
+                                    placeholder="Tên đơn vị / cá nhân..."
+                                  />
+                                  <input
+                                    type="text"
+                                    name={contact.key}
+                                    value={pcccFormData[contact.key] || contact.def}
+                                    onChange={(e) => handleInputChange(e, 'pccc')}
+                                    className={`w-full p-2 text-xs border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-purple-500 font-semibold transition-colors ${contact.bg}`}
+                                    placeholder="Số điện thoại..."
+                                  />
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="bg-[#f0f9ff]/50 p-5 rounded-xl border border-sky-100 shadow-sm space-y-4">
+                        <h5 className="text-xs font-bold text-sky-800 flex items-center gap-1.5 uppercase tracking-wider border-b border-sky-100 pb-2">
+                          <Users size={15} className="text-sky-600" /> 4.2. Nhân sự phụ trách tại Đơn vị
+                        </h5>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                          {/* 1. Lãnh đạo đơn vị (Giám đốc Showroom) */}
+                          <div className="p-3 bg-white rounded-lg border border-gray-200 space-y-2 shadow-sm">
+                            <label className="block text-[10px] font-bold uppercase text-[#05469B]">📞 Lãnh đạo đơn vị (Giám đốc)</label>
+                            <input
+                              type="text"
+                              name="ten_giam_doc"
+                              value={pcccFormData.ten_giam_doc !== undefined ? pcccFormData.ten_giam_doc : (leader?.ho_ten || '')}
+                              onChange={(e) => handleInputChange(e, 'pccc')}
+                              className="w-full p-2 text-xs border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-purple-500 bg-white font-medium transition-colors"
+                              placeholder={leader?.ho_ten ? `Mục A: ${leader.ho_ten}` : "Tên Giám đốc đơn vị..."}
+                            />
+                            <input
+                              type="text"
+                              name="sdt_giam_doc"
+                              value={pcccFormData.sdt_giam_doc !== undefined ? pcccFormData.sdt_giam_doc : (leader ? formatPhoneNumber(leader.sdt_ca_nhan || leader.sdt_cong_ty) : '')}
+                              onChange={(e) => handleInputChange(e, 'pccc')}
+                              className="w-full p-2 text-xs border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-purple-500 font-semibold transition-colors bg-white text-[#05469B]"
+                              placeholder={leader ? `Mục A: ${formatPhoneNumber(leader.sdt_ca_nhan || leader.sdt_cong_ty)}` : "Số điện thoại..."}
+                            />
+                          </div>
+
+                          {/* 2. PT KD DVPT */}
+                          <div className="p-3 bg-white rounded-lg border border-gray-200 space-y-2 shadow-sm">
+                            <label className="block text-[10px] font-bold uppercase text-cyan-700">📞 Giám đốc / PT KD DVPT</label>
+                            <input
+                              type="text"
+                              name="ten_ptkd_dvpt"
+                              value={pcccFormData.ten_ptkd_dvpt !== undefined ? pcccFormData.ten_ptkd_dvpt : (kdDvpt?.ho_ten || '')}
+                              onChange={(e) => handleInputChange(e, 'pccc')}
+                              className="w-full p-2 text-xs border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-purple-500 bg-white font-medium transition-colors"
+                              placeholder={kdDvpt?.ho_ten ? `Mục A: ${kdDvpt.ho_ten}` : "Tên PT KD DVPT..."}
+                            />
+                            <input
+                              type="text"
+                              name="sdt_ptkd_dvpt"
+                              value={pcccFormData.sdt_ptkd_dvpt !== undefined ? pcccFormData.sdt_ptkd_dvpt : (kdDvpt ? formatPhoneNumber(kdDvpt.sdt_ca_nhan || kdDvpt.sdt_cong_ty) : '')}
+                              onChange={(e) => handleInputChange(e, 'pccc')}
+                              className="w-full p-2 text-xs border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-purple-500 font-semibold transition-colors bg-white text-cyan-700"
+                              placeholder={kdDvpt ? `Mục A: ${formatPhoneNumber(kdDvpt.sdt_ca_nhan || kdDvpt.sdt_cong_ty)}` : "Số điện thoại..."}
+                            />
+                          </div>
+
+                          {/* 3. PT KD Xe */}
+                          <div className="p-3 bg-white rounded-lg border border-gray-200 space-y-2 shadow-sm">
+                            <label className="block text-[10px] font-bold uppercase text-indigo-700">📞 Giám đốc / PT KD Xe</label>
+                            <input
+                              type="text"
+                              name="ten_ptkd_xe"
+                              value={pcccFormData.ten_ptkd_xe !== undefined ? pcccFormData.ten_ptkd_xe : (kdXe?.ho_ten || '')}
+                              onChange={(e) => handleInputChange(e, 'pccc')}
+                              className="w-full p-2 text-xs border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-purple-500 bg-white font-medium transition-colors"
+                              placeholder={kdXe?.ho_ten ? `Mục A: ${kdXe.ho_ten}` : "Tên PT KD Xe..."}
+                            />
+                            <input
+                              type="text"
+                              name="sdt_ptkd_xe"
+                              value={pcccFormData.sdt_ptkd_xe !== undefined ? pcccFormData.sdt_ptkd_xe : (kdXe ? formatPhoneNumber(kdXe.sdt_ca_nhan || kdXe.sdt_cong_ty) : '')}
+                              onChange={(e) => handleInputChange(e, 'pccc')}
+                              className="w-full p-2 text-xs border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-purple-500 font-semibold transition-colors bg-white text-indigo-700"
+                              placeholder={kdXe ? `Mục A: ${formatPhoneNumber(kdXe.sdt_ca_nhan || kdXe.sdt_cong_ty)}` : "Số điện thoại..."}
+                            />
+                          </div>
+
+                          {/* 4, 5, 6: Các nhân sự khác */}
+                          {CONTACTS_DON_VI.map(contact => (
+                            <div key={contact.key} className="p-3 bg-white rounded-lg border border-gray-200 space-y-2 shadow-sm">
+                              <label className={`block text-[10px] font-bold uppercase ${contact.color}`}>📞 {contact.label}</label>
+                              <input type="text" name={contact.nameKey} value={pcccFormData[contact.nameKey] || ''} onChange={(e) => handleInputChange(e, 'pccc')} className="w-full p-2 text-xs border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-purple-500 bg-white font-medium transition-colors" placeholder="Tên đơn vị / cá nhân..." />
+                              <input type="text" name={contact.key} value={pcccFormData[contact.key] || contact.def} onChange={(e) => handleInputChange(e, 'pccc')} className={`w-full p-2 text-xs border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-purple-500 font-semibold transition-colors ${contact.bg}`} placeholder="Số điện thoại..." />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mt-6">
                       <div><label className="block text-[10px] font-bold text-orange-600 mb-1 uppercase">Khu vực rủi ro cháy nổ cao</label><textarea name="khu_vuc_rui_ro_cao" value={pcccFormData.khu_vuc_rui_ro_cao || ''} onChange={(e) => handleInputChange(e, 'pccc')} rows={2} className="w-full p-2 border border-orange-200 rounded-lg bg-white outline-none focus:ring-2 focus:ring-orange-500 text-sm resize-none" placeholder="VD: Kho sơn tĩnh điện, Kho xăng dầu..."></textarea></div>
                       <div><label className="block text-[10px] font-bold text-red-600 mb-1 uppercase">Lỗi / Tồn tại chưa khắc phục (CA Yêu cầu)</label><textarea name="loi_ton_tai_chua_khac_phuc" value={pcccFormData.loi_ton_tai_chua_khac_phuc || ''} onChange={(e) => handleInputChange(e, 'pccc')} rows={2} className="w-full p-2 border border-red-300 rounded-lg bg-red-50 text-red-800 font-medium outline-none focus:ring-2 focus:ring-red-500 text-sm resize-none" placeholder="Ghi nhận các lỗi hệ thống..."></textarea></div>
                     </div>
                   </div>
-
                 </fieldset>
               </div>
 
@@ -2457,7 +2731,6 @@ export default function DepartmentPage() {
         </div>
       )}
 
-      {/* 7. MODAL ATVSLĐ */}
       <AtvsldModal
         isOpen={isAtvsldModalOpen}
         currentData={atvsldCurrentData}
@@ -2469,7 +2742,6 @@ export default function DepartmentPage() {
         onClose={() => setIsAtvsldModalOpen(false)}
       />
 
-      {/* 8. MODAL PCTT */}
       <PcttModal
         isOpen={isPcttModalOpen}
         currentData={pcttCurrentData}
@@ -2481,7 +2753,17 @@ export default function DepartmentPage() {
         onClose={() => setIsPcttModalOpen(false)}
       />
 
-      {/* 9. MODAL CONFIRM XÓA */}
+      <PcccContactPasteModal
+        isOpen={isPcccPasteModalOpen}
+        onClose={() => setIsPcccPasteModalOpen(false)}
+        onApply={(patch) => {
+          setPcccFormData((prev: any) => ({
+            ...prev,
+            ...patch
+          }));
+        }}
+      />
+
       {isConfirmOpen && (
         <div className={`fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm transition-all duration-300 ${!isListCollapsed ? 'lg:pl-80' : ''}`}>
           <div className="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-sm text-center animate-in zoom-in duration-200">
@@ -2496,7 +2778,6 @@ export default function DepartmentPage() {
         </div>
       )}
 
-      {/* 10. MODAL DANH BẠ KHẨN CẤP (GỌI NHANH) */}
       {isEmergencyContactOpen && (
         <div className={`fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm transition-all duration-300 ${!isListCollapsed ? 'lg:pl-80' : ''}`}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col animate-in zoom-in duration-200 overflow-hidden">
@@ -2507,30 +2788,120 @@ export default function DepartmentPage() {
 
             <div className="p-0 max-h-[75vh] overflow-y-auto custom-scrollbar divide-y divide-gray-100">
 
-              {/* PHẦN 1: BAN CHỈ HUY ĐƠN VỊ */}
-              <div className="bg-blue-50/30">
-                <h4 className="px-4 py-2 text-[10px] font-black text-blue-800 uppercase tracking-wider bg-blue-100/50">Ban Chỉ Huy Đơn Vị</h4>
-
-                {/* Gọi Lãnh đạo */}
-                {leader && (leader.sdt_ca_nhan || leader.sdt_cong_ty) && (
-                  <div className="flex items-center justify-between p-4 hover:bg-white transition-colors">
-                    <div className="flex items-start gap-3">
-                      <div className="mt-1 w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shrink-0"><UserCheck size={16} /></div>
-                      <div>
-                        <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-0.5">Lãnh đạo Đơn vị</p>
-                        <p className="font-bold text-gray-800 text-sm leading-tight">{leader.ho_ten}</p>
-                        <p className="text-[#05469B] font-black text-sm mt-0.5">{formatPhoneNumber(leader.sdt_ca_nhan || leader.sdt_cong_ty)}</p>
+              {/* PHẦN 1: CƠ QUAN CHỨC NĂNG & BAN NGÀNH */}
+              {currentPccc && (
+                <div className="bg-red-50/20">
+                  <h4 className="px-4 py-2 text-[10px] font-black text-red-800 uppercase tracking-wider bg-red-100/50 flex items-center gap-1"><Siren size={12}/> Cơ quan chức năng & Ban ngành</h4>
+                  {CONTACTS_BAN_NGANH.map(contact => {
+                    const phone = currentPccc[contact.key];
+                    const nameVal = currentPccc[contact.nameKey];
+                    if (!phone) return null;
+                    return (
+                      <div key={contact.key} className="flex items-center justify-between p-4 hover:bg-white transition-colors border-b border-red-50/30 last:border-b-0">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-red-100 text-red-600 flex items-center justify-center shrink-0"><AlertTriangle size={16} /></div>
+                          <div>
+                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">{contact.label}</p>
+                            <p className="font-bold text-gray-800 text-sm leading-tight">{nameVal || 'Chưa cập nhật tên'}</p>
+                            <p className="text-red-600 font-black text-sm mt-0.5">{formatPhoneNumber(phone)}</p>
+                          </div>
+                        </div>
+                        <a href={`tel:${String(phone).replace(/[^\d+]/g, '')}`} className="w-10 h-10 shrink-0 rounded-full bg-red-100 text-red-600 flex items-center justify-center hover:bg-red-600 hover:text-white transition-all shadow-md"><PhoneCall size={18} /></a>
                       </div>
-                    </div>
-                    <a href={`tel:${String(leader.sdt_ca_nhan || leader.sdt_cong_ty).replace(/[^\d+]/g, '')}`} className="w-10 h-10 shrink-0 rounded-full bg-green-100 text-green-600 flex items-center justify-center hover:bg-green-600 hover:text-white transition-all shadow-md"><PhoneCall size={18} /></a>
-                  </div>
-                )}
+                    );
+                  })}
+                </div>
+              )}
 
-                {/* Gọi PT DVHT */}
+              {/* PHẦN 2: NHÂN SỰ PHỤ TRÁCH TẠI ĐƠN VỊ */}
+              <div className="bg-blue-50/20">
+                <h4 className="px-4 py-2 text-[10px] font-black text-blue-800 uppercase tracking-wider bg-blue-100/50 flex items-center gap-1"><Users size={12}/> Nhân sự phụ trách tại Đơn vị</h4>
+
+                {/* Giám đốc Showroom */}
+                {(() => {
+                  const phone = leader?.sdt_ca_nhan || leader?.sdt_cong_ty || currentPccc?.sdt_giam_doc;
+                  const name = leader?.ho_ten || currentPccc?.ten_giam_doc;
+                  if (!phone && !name) return null;
+                  return (
+                    <div className="flex items-center justify-between p-4 hover:bg-white transition-colors border-b border-blue-50/30">
+                      <div className="flex items-start gap-3">
+                        <div className="mt-1 w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shrink-0"><UserCheck size={16} /></div>
+                        <div>
+                          <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-0.5">Giám đốc Showroom</p>
+                          <p className="font-bold text-gray-800 text-sm leading-tight">{name || 'Chưa cập nhật'}</p>
+                          {phone && <p className="text-[#05469B] font-black text-sm mt-0.5">{formatPhoneNumber(phone)}</p>}
+                        </div>
+                      </div>
+                      {phone && <a href={`tel:${String(phone).replace(/[^\d+]/g, '')}`} className="w-10 h-10 shrink-0 rounded-full bg-green-100 text-green-600 flex items-center justify-center hover:bg-green-600 hover:text-white transition-all shadow-md"><PhoneCall size={18} /></a>}
+                    </div>
+                  );
+                })()}
+
+                {/* Giám đốc / PT KD DVPT */}
+                {(() => {
+                  const phone = kdDvpt?.sdt_ca_nhan || kdDvpt?.sdt_cong_ty || currentPccc?.sdt_ptkd_dvpt;
+                  const name = kdDvpt?.ho_ten || currentPccc?.ten_ptkd_dvpt;
+                  if (!phone && !name) return null;
+                  return (
+                    <div className="flex items-center justify-between p-4 hover:bg-white transition-colors border-b border-blue-50/30">
+                      <div className="flex items-start gap-3">
+                        <div className="mt-1 w-8 h-8 rounded-full bg-cyan-100 text-cyan-600 flex items-center justify-center shrink-0"><UserCheck size={16} /></div>
+                        <div>
+                          <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-0.5">Giám đốc / PT KD DVPT</p>
+                          <p className="font-bold text-gray-800 text-sm leading-tight">{name || 'Chưa cập nhật'}</p>
+                          {phone && <p className="text-[#05469B] font-black text-sm mt-0.5">{formatPhoneNumber(phone)}</p>}
+                        </div>
+                      </div>
+                      {phone && <a href={`tel:${String(phone).replace(/[^\d+]/g, '')}`} className="w-10 h-10 shrink-0 rounded-full bg-green-100 text-green-600 flex items-center justify-center hover:bg-green-600 hover:text-white transition-all shadow-md"><PhoneCall size={18} /></a>}
+                    </div>
+                  );
+                })()}
+
+                {/* Giám đốc / PT KD Xe */}
+                {(() => {
+                  const phone = kdXe?.sdt_ca_nhan || kdXe?.sdt_cong_ty || currentPccc?.sdt_ptkd_xe;
+                  const name = kdXe?.ho_ten || currentPccc?.ten_ptkd_xe;
+                  if (!phone && !name) return null;
+                  return (
+                    <div className="flex items-center justify-between p-4 hover:bg-white transition-colors border-b border-blue-50/30">
+                      <div className="flex items-start gap-3">
+                        <div className="mt-1 w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center shrink-0"><UserCheck size={16} /></div>
+                        <div>
+                          <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-0.5">Giám đốc / PT KD Xe</p>
+                          <p className="font-bold text-gray-800 text-sm leading-tight">{name || 'Chưa cập nhật'}</p>
+                          {phone && <p className="text-[#05469B] font-black text-sm mt-0.5">{formatPhoneNumber(phone)}</p>}
+                        </div>
+                      </div>
+                      {phone && <a href={`tel:${String(phone).replace(/[^\d+]/g, '')}`} className="w-10 h-10 shrink-0 rounded-full bg-green-100 text-green-600 flex items-center justify-center hover:bg-green-600 hover:text-white transition-all shadow-md"><PhoneCall size={18} /></a>}
+                    </div>
+                  );
+                })()}
+
+                {/* Phụ trách QTVP, PT BV, PT Kho xe */}
+                {currentPccc && CONTACTS_DON_VI.map(contact => {
+                  const phone = currentPccc[contact.key];
+                  const nameVal = currentPccc[contact.nameKey];
+                  if (!phone) return null;
+                  return (
+                    <div key={contact.key} className="flex items-center justify-between p-4 hover:bg-white transition-colors border-b border-blue-50/30">
+                      <div className="flex items-start gap-3">
+                        <div className="mt-1 w-8 h-8 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center shrink-0"><Users size={16} /></div>
+                        <div>
+                          <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-0.5">{contact.label}</p>
+                          <p className="font-bold text-gray-800 text-sm leading-tight">{nameVal || 'Chưa cập nhật tên'}</p>
+                          <p className="text-[#05469B] font-black text-sm mt-0.5">{formatPhoneNumber(phone)}</p>
+                        </div>
+                      </div>
+                      <a href={`tel:${String(phone).replace(/[^\d+]/g, '')}`} className="w-10 h-10 shrink-0 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center hover:bg-sky-600 hover:text-white transition-all shadow-md"><PhoneCall size={18} /></a>
+                    </div>
+                  );
+                })}
+
+                {/* Phụ trách DV Hỗ trợ KD */}
                 {dvht1 && (dvht1.sdt_ca_nhan || dvht1.sdt_cong_ty) && (
-                  <div className="flex items-center justify-between p-4 hover:bg-white transition-colors border-t border-blue-50">
+                  <div className="flex items-center justify-between p-4 hover:bg-white transition-colors border-b border-blue-50/30">
                     <div className="flex items-start gap-3">
-                      <div className="mt-1 w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center shrink-0"><Briefcase size={16} /></div>
+                      <div className="mt-1 w-8 h-8 rounded-full bg-gray-100 text-gray-600 flex items-center justify-center shrink-0"><Briefcase size={16} /></div>
                       <div>
                         <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-0.5">Phụ trách DV Hỗ trợ KD</p>
                         <p className="font-bold text-gray-800 text-sm leading-tight">{dvht1.ho_ten}</p>
@@ -2543,7 +2914,7 @@ export default function DepartmentPage() {
 
                 {/* Gọi Đội trưởng PCCC */}
                 {currentPccc && currentPccc.sdt_doi_truong && (
-                  <div className="flex items-center justify-between p-4 hover:bg-white transition-colors border-t border-blue-50">
+                  <div className="flex items-center justify-between p-4 hover:bg-white transition-colors border-b border-blue-50/30 last:border-b-0">
                     <div className="flex items-start gap-3">
                       <div className="mt-1 w-8 h-8 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center shrink-0"><HardHat size={16} /></div>
                       <div>
@@ -2557,28 +2928,7 @@ export default function DepartmentPage() {
                 )}
               </div>
 
-              {/* PHẦN 2: CƠ QUAN CHỨC NĂNG */}
-              {currentPccc && (
-                <div className="bg-red-50/30">
-                  <h4 className="px-4 py-2 text-[10px] font-black text-red-800 uppercase tracking-wider bg-red-100/50">Cơ quan Chức năng</h4>
-                  {EMERGENCY_CONTACTS.map(contact => {
-                    const phone = currentPccc[contact.key];
-                    if (!phone) return null;
-                    return (
-                      <div key={contact.key} className="flex items-center justify-between p-4 hover:bg-white transition-colors border-b border-red-50 last:border-b-0">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-red-100 text-red-600 flex items-center justify-center shrink-0"><AlertTriangle size={16} /></div>
-                          <div>
-                            <p className="font-bold text-gray-800 text-sm leading-tight">{contact.label}</p>
-                            <p className="text-red-600 font-black text-sm mt-0.5">{formatPhoneNumber(phone)}</p>
-                          </div>
-                        </div>
-                        <a href={`tel:${String(phone).replace(/[^\d+]/g, '')}`} className="w-10 h-10 shrink-0 rounded-full bg-red-100 text-red-600 flex items-center justify-center hover:bg-red-600 hover:text-white transition-all shadow-md"><PhoneCall size={18} /></a>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
+
 
               {/* PHẦN 3: NẾU TRỐNG TOÀN BỘ */}
               {(!currentPccc || (!currentPccc.sdt_doi_truong && !currentPccc.sdt_pccc)) && !leader && !dvht1 && (

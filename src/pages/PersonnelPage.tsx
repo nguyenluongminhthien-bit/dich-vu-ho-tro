@@ -60,27 +60,27 @@ const PersonnelDesktopRow = React.memo(({ item, props }: any) => {
           </div>
           <div className="min-w-0 flex-1">
             <p className="font-bold text-[#00539c] leading-snug text-[13px] whitespace-nowrap">{item.ho_ten}</p>
-            <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
-              {item.email ? (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    navigator.clipboard.writeText(item.email);
-                    toast.success(`Đã sao chép email: ${item.email}`);
-                  }}
-                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-50 hover:bg-blue-100 text-[#00539c] border border-blue-200/70 transition-all cursor-pointer shadow-2xs max-w-full truncate"
-                  title="Bấm để sao chép địa chỉ email"
-                >
-                  <Mail size={10} className="shrink-0 text-blue-500" />
-                  <span className="truncate">{item.email}</span>
-                </button>
-              ) : (
-                <span className="text-[10px] text-gray-400 italic">Chưa có email</span>
-              )}
-              {item.trang_thai === 'Đã nghỉ việc' && <span className="text-[9px] font-bold text-red-600 bg-red-100 px-1.5 py-0.5 rounded uppercase">Đã nghỉ việc</span>}
-              {item.trang_thai === 'Đã điều chuyển' && <span className="text-[9px] font-bold text-indigo-600 bg-indigo-100 px-1.5 py-0.5 rounded uppercase">Đã điều chuyển</span>}
-            </div>
+            {(item.email || item.trang_thai === 'Đã nghỉ việc' || item.trang_thai === 'Đã điều chuyển') && (
+              <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                {item.email && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigator.clipboard.writeText(item.email);
+                      toast.success(`Đã sao chép email: ${item.email}`);
+                    }}
+                    className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-50 hover:bg-blue-100 text-[#00539c] border border-blue-200/70 transition-all cursor-pointer shadow-2xs max-w-full truncate"
+                    title="Bấm để sao chép địa chỉ email"
+                  >
+                    <Mail size={10} className="shrink-0 text-blue-500" />
+                    <span className="truncate">{item.email}</span>
+                  </button>
+                )}
+                {item.trang_thai === 'Đã nghỉ việc' && <span className="text-[9px] font-bold text-red-600 bg-red-100 px-1.5 py-0.5 rounded uppercase">Đã nghỉ việc</span>}
+                {item.trang_thai === 'Đã điều chuyển' && <span className="text-[9px] font-bold text-indigo-600 bg-indigo-100 px-1.5 py-0.5 rounded uppercase">Đã điều chuyển</span>}
+              </div>
+            )}
           </div>
         </div>
       </td>
@@ -176,7 +176,7 @@ const PersonnelMobileCard = React.memo(({ item, props }: any) => {
             )}
           </div>
           <h4 className="font-extrabold text-[#00539c] text-sm leading-snug truncate mt-0.5">{item.ho_ten}</h4>
-          {item.email ? (
+          {item.email && (
             <button
               type="button"
               onClick={(e) => {
@@ -190,8 +190,6 @@ const PersonnelMobileCard = React.memo(({ item, props }: any) => {
               <Mail size={10} className="shrink-0 text-blue-500" />
               <span className="truncate">{item.email}</span>
             </button>
-          ) : (
-            <span className="text-[10px] text-gray-400 italic mt-0.5 inline-block">Chưa có email</span>
           )}
         </div>
       </div>
