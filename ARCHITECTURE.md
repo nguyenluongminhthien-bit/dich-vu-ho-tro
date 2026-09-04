@@ -43,6 +43,7 @@ src/
 │   ├── formatters.ts              # formatCurrency, formatPhoneNumber, getDirectImageLink...
 │   ├── expiryStatus.ts            # Tính trạng thái hạn (CẢNH BÁO/QUÁ HẠN...)
 │   ├── atvsld.ts                  # getChungNhanByNhom(), calcGiaTriDen() — công thức hạn ATVSLĐ
+│   ├── pcccContactParser.ts       # Parser phân tích bảng danh bạ PCCC mẫu PC01 từ PowerPoint/Excel (HTML/Text)
 │   ├── exportExcel.ts / exportReports.ts
 │   ├── excelTemplates.ts          # Định nghĩa cấu trúc cột và dữ liệu mẫu Excel dán hàng loạt (Nhân sự, OSH, TBNN, TTB VP) + hàm download
 │   ├── mathEvaluator.ts           # safeEvalMath() — tính công thức nhập tay
@@ -53,7 +54,7 @@ src/
     ├── ui/                        # Badge, Button, Modal, Pagination, CustomAutocomplete, PasteImportModal, UnitFilterSidebar, SegmentTabs
     ├── common/                    # EmptyState, TablePaginationFooter
     ├── dashboard/                 # KpiSection, ExpiryAlertPanel, PersonnelDoughnutChart, DashboardCustomizerModal
-    ├── department/                # 7 Modal theo từng phân hệ hồ sơ đơn vị (mục 3)
+    ├── department/                # 8 Modal theo từng phân hệ hồ sơ đơn vị: SecurityModal, PcccModal, PcccContactPasteModal, AtvsldModal, PcttModal, PvhcModal, PnModal, PhModal
     ├── personnel/                 # Cụm Cước ĐTDĐ + PersonnelModal (mục 3)
     ├── atvsld/                    # 4 Tab con của AtvsldPage (mục 3)
     └── report/                    # CustomReportBuilder + 4 component phụ trợ báo cáo
@@ -66,9 +67,9 @@ src/
 | Menu Sidebar (tab id) | Page chính | Component/Modal con | Bảng Supabase thật | Trạng thái |
 |---|---|---|---|---|
 | Tổng quan (`dashboard`) | `DashboardPage.tsx` (1486 dòng) | `KpiSection`, `ExpiryAlertPanel`, `PersonnelDoughnutChart`, `DashboardCustomizerModal` | đọc `dm_don_vi`, `ns_dich_vu`, `ts_thiet_bi` (tổng hợp, không ghi) | ✅ |
-| Thông tin Công ty (`departments`) | `DepartmentPage.tsx` (2437 dòng — **file lớn nhất theo page**) | `SecurityModal`, `PcccModal`, `AtvsldModal`, `PcttModal`, `PvhcModal`, `PnModal`, `PhModal`, `PersonnelCard`, `DepartmentMapModal` (Sơ đồ showroom bản đồ & OSRM) | `dm_don_vi`, `hs_an_ninh`, `hs_pccc`+`ts_pccc`, `hs_an_toan_lao_dong`, `hs_pctt`, `hs_pvhc`, `dm_phap_nhan`, `dm_phong_hop` | ✅ |
+| Thông tin Công ty (`departments`) | `DepartmentPage.tsx` (2944 dòng — **file lớn nhất theo page**) | `SecurityModal`, `PcccModal`, `PcccContactPasteModal`, `AtvsldModal`, `PcttModal`, `PvhcModal`, `PnModal`, `PhModal`, `PersonnelCard`, `DepartmentMapModal` (Sơ đồ showroom bản đồ & OSRM) | `dm_don_vi`, `hs_an_ninh`, `hs_pccc` (gồm 6 cột lãnh đạo mới) + `ts_pccc`, `hs_an_toan_lao_dong`, `hs_pctt`, `hs_pvhc`, `dm_phap_nhan`, `dm_phong_hop` | ✅ |
 | Nhân sự (`personnel`) | `PersonnelPage.tsx` (2868 dòng) | `PersonnelModal`, component `SegmentTabs.tsx`; module con **Cước ĐTDĐ**: `CuocDiDongTab.tsx` (3366 dòng — **file lớn nhất toàn repo**), `ThueBaoCuocHistorySection`, `BatchCostEntryModal`, `PersonnelDetailCuocChart`, `ThueBaoDetailCuocChart` | `ns_dich_vu` (hồ sơ NS); Cước ĐTDĐ dùng `dm_thue_bao` + `cp_cuoc_thang` | ✅ |
-| An toàn PCCC (`firesafety`) | `FireSafetyPage.tsx` (1117 dòng) | dùng chung `PcccModal` (ở `components/department/`) | `hs_pccc`, `ts_pccc` | ✅ |
+| An toàn PCCC (`firesafety`) | `FireSafetyPage.tsx` (1465 dòng) | `PcccContactPasteModal`, `pcccContactParser.ts`, dùng chung `PcccModal` (ở `components/department/`) | `hs_pccc` (bổ sung `ten_giam_doc`, `sdt_giam_doc`, `ten_ptkd_dvpt`, `sdt_ptkd_dvpt`, `ten_ptkd_xe`, `sdt_ptkd_xe`), `ts_pccc` | ✅ |
 | ATVSLĐ (`atvsld`) | `AtvsldPage.tsx` (676 dòng) — có 5 tab cấp 1: `hoso`, `daotao` (2 tab con `kehoach`/`khoahoc`), `thietbi`, `khamsuckhoe` | `HoSoTab.tsx`, `KeHoachTab.tsx`, `KhoaHocTab.tsx` (1742 dòng), `StrictEquipmentTab.tsx` (996 dòng), `SucKhoeTab.tsx` (705 dòng), modal `AtvsldModal`, component `SegmentTabs.tsx` | `hs_an_toan_lao_dong` (hồ sơ), `hs_khoa_huan_luyen`+`hs_hoc_vien_khoa_huan_luyen` (khóa học), `ts_thiet_bi_nghiem_ngat`+`nk_kiem_dinh_tbnn` (thiết bị nghiêm ngặt), `hs_kham_suc_khoe`+`hs_kham_suc_khoe_campaign` (khám sức khỏe) | ✅ |
 | Phương tiện (`vehicles`) | `VehiclePage.tsx` (1380 dòng) | `SegmentTabs.tsx` | `ts_xe`, `cp_hoat_dong_xe`, `nk_su_dung_xe` | ✅ |
 | Tài sản-Thiết bị (`equipments`) | `EquipmentPage.tsx` (3205 dòng) | `PasteImportModal`, `CustomAutocomplete`, `SegmentTabs.tsx` | `ts_thiet_bi`, `nk_thiet_bi`, `dm_phap_nhan` (lọc theo `id_don_vi`) | ✅ |
@@ -136,6 +137,44 @@ src/
 - [x] **Đồng bộ Giao diện Tab & Modal Hồ sơ Nhân sự (`PersonnelPage.tsx` & `PersonnelModal.tsx`)**: Đặt màu xanh thương hiệu `#00539c` cho khối tab lồng liền mạch cấp 1 & cấp 2, cột Họ và tên `whitespace-nowrap`, di chuyển Lịch sử KSK cá nhân vào Modal Xem Chi Tiết Hồ Sơ Nhân Sự phía trên khối Ghi chú khác.
 - [x] **Đồng bộ ATVSLĐ Nhân sự Kiêm nhiệm (`KhoaHocTab.tsx`) & Custom Confirm Modal Xóa (`SucKhoeTab.tsx`)**: Tự động quét MSNV đồng bộ trạng thái/chứng chỉ ATVSLĐ cho toàn bộ hồ sơ công tác chính và kiêm nhiệm. Đồng bộ Custom Confirm Modal phông mờ backdrop blur thay thế `window.confirm` native.
 - [x] **Tối ưu Dải Phân Trang (`Pagination.tsx`)**: Thu gọn dải phân trang chiều cao `22px - 26px`, font size `11px`.
+- [x] **Dán Bảng Danh bạ Khẩn cấp PCCC (Mẫu PC01) từ PowerPoint/Excel & Bảng đối soát 15 đầu mối (`pcccContactParser.ts`, `PcccContactPasteModal.tsx`, `hs_pccc`)**:
+  - Xây dựng tiện ích phân tích cú pháp thông minh (`src/utils/pcccContactParser.ts`) bóc tách dữ liệu bảng từ clipboard: ưu tiên parse HTML Table khi copy trực tiếp từ slide PowerPoint hoặc Excel, tự động fallback phân tích dạng plain text theo Tab (`\t`), gạch đứng (`|`) hoặc khoảng trắng.
+  - Tự động làm sạch các thẻ ngoặc vuông `[...]` (nếu có), phần mở ngoặc đơn `(...)` và chuẩn hóa số điện thoại theo định dạng chuẩn 4-3-4 bằng `formatPhoneNumber`.
+  - Nhận diện và **bỏ qua dòng 113** (Cảnh sát Phản ứng nhanh), **bỏ qua cột 5** (Ghi chú).
+  - Bổ sung 6 cột vào bảng CSDL `hs_pccc`: `ten_giam_doc`, `sdt_giam_doc`, `ten_ptkd_dvpt`, `sdt_ptkd_dvpt`, `ten_ptkd_xe`, `sdt_ptkd_xe` để lưu độc lập thông tin liên hệ của 3 vị trí Lãnh đạo Showroom/Đơn vị.
+  - Cơ chế gợi ý / fallback: Nếu chưa nhập riêng trong PCCC, tự động gợi ý/hiển thị từ Mục A (Nhân sự đơn vị). Cập nhật Popup Danh bạ Khẩn cấp ngoài trang tự động ưu tiên lấy thông tin lãnh đạo từ hồ sơ PCCC nếu Mục A chưa có.
+  - Đồng bộ đồng thời trên cả 2 phân hệ: `DepartmentPage.tsx` (Mục F. Phòng chống cháy nổ), `FireSafetyPage.tsx` (Thêm/Sửa hồ sơ PCCC) và `PcccModal.tsx`.
+
+  ##### 📋 BẢNG ĐỐI SOÁT ÁNH XẠ DỮ LIỆU DANH BẠ KHẨN CẤP PCCC (MẪU PC01)
+
+  | STT Slide | Cơ quan / Bộ phận (PowerPoint) | Từ khóa nhận diện tự động (Match Patterns) | Trường Tên DB (`hs_pccc`) | Trường SĐT DB (`hs_pccc`) | Cơ chế xử lý & Ghi chú nghiệp vụ |
+  | :---: | :--- | :--- | :--- | :--- | :--- |
+  | **1** | Cảnh sát Phản ứng nhanh (113) | `113`, `phan ung nhanh` | *(Bỏ qua)* | *(Bỏ qua)* | 🔴 **Bỏ qua hoàn toàn**, không ghi vào CSDL |
+  | **2** | Cảnh sát PCCC | `canh sat pccc`, `cs pccc`, `pccc va cnch`, `phong pccc` | `ten_ca_pccc` | `sdt_ca_pccc` | Hotline Cảnh sát PCCC & CNCH địa phương |
+  | **3** | Cấp cứu y tế | `cap cuu y te`, `cap cuu`, `115` | `ten_yte` | `sdt_yte` | Cơ sở cấp cứu y tế 115 / trung tâm y tế |
+  | **4** | Bảo vệ dân phố / Dân quân tự vệ | `dan pho`, `dan quan tu ve`, `dan quan`, `tu ve` | `ten_bv_dan_quan` | `sdt_bv_dan_quan` | Lực lượng an ninh nhân dân địa phương |
+  | **5** | Công an khu vực | `cong an khu vuc`, `ca khu vuc` | `ten_ca_khu_vuc` | `sdt_ca_khu_vuc` | Công an phụ trách địa bàn |
+  | **6** | Công an Xã/Phường | `cong an xa`, `cong an phuong`, `ca xa`, `ca phuong` | `ten_ca_xa_phuong` | `sdt_ca_xa_phuong` | Trụ sở Công an Xã/Phường sở tại |
+  | **7** | PCCC Xã/Phường | `pccc xa`, `pccc phuong` | `ten_pccc_xa_phuong` | `sdt_pccc_xa_phuong` | Đội PCCC cấp Xã/Phường |
+  | **8** | Điện lực khu vực | `dien luc`, `dien luc khu vuc` | `ten_dien_luc` | `sdt_dien_luc` | Điện lực khu vực hỗ trợ cắt điện |
+  | **9** | Giám đốc Showroom | `giam doc showroom`, `giam doc don vi`, `giam doc` | `ten_giam_doc` | `sdt_giam_doc` | 🟢 Ghi nhận trực tiếp vào PCCC; Gợi ý từ Mục A nếu chưa nhập riêng |
+  | **10** | Giám đốc / PT KD DVPT | `ban hang dvpt`, `kinh doanh dvpt`, `dvpt`, `dich vu phu tung`, `ptkd dvpt` | `ten_ptkd_dvpt` | `sdt_ptkd_dvpt` | 🟢 Ghi nhận trực tiếp vào PCCC; Gợi ý từ Mục A nếu chưa nhập riêng |
+  | **11** | Giám đốc / PT KD Xe | `ban hang xe`, `kinh doanh xe`, `kd xe`, `ptkd xe` | `ten_ptkd_xe` | `sdt_ptkd_xe` | 🟢 Ghi nhận trực tiếp vào PCCC; Gợi ý từ Mục A nếu chưa nhập riêng |
+  | **12** | Phụ trách Kho xe & Lái xe | `kho xe`, `lai xe`, `phu trach kho xe` | `ten_kho_xe` | `sdt_kho_xe` | Điều động di dời xe khi khẩn cấp |
+  | **13** | Tổ trưởng bảo vệ, đón tiếp KH | `to truong bao ve`, `don tiep khach hang`, `tt bao ve`, `don tiep kh` | `ten_tt_bao_ve` | `sdt_tt_bao_ve` | Phụ trách lực lượng bảo vệ, mở cổng thoát hiểm |
+  | **14** | Phụ trách QTVP (Hành chính) | `dich vu ho tro kd`, `ho tro kd`, `hanh chinh`, `vp cty`, `qtvp`, `hc ns` | `ten_hc_ns` | `sdt_hc_ns` | Hậu cần, cứu nạn và điều phối |
+  | **15** | Cơ sở y tế gần nhất (ký HĐ y tế) | `hop dong y te`, `y te gan nhat`, `bv lien ket`, `co so y te gan nhat` | `ten_bv_lien_ket` | `sdt_bv_lien_ket` | Bệnh viện/cơ sở y tế ký hợp đồng |
+
+  > 📌 **Script DDL Supabase Database:**
+  > ```sql
+  > ALTER TABLE hs_pccc 
+  > ADD COLUMN IF NOT EXISTS ten_giam_doc TEXT, 
+  > ADD COLUMN IF NOT EXISTS sdt_giam_doc TEXT, 
+  > ADD COLUMN IF NOT EXISTS ten_ptkd_dvpt TEXT, 
+  > ADD COLUMN IF NOT EXISTS sdt_ptkd_dvpt TEXT, 
+  > ADD COLUMN IF NOT EXISTS ten_ptkd_xe TEXT, 
+  > ADD COLUMN IF NOT EXISTS sdt_ptkd_xe TEXT;
+  > ```
 
 
 - [ ] Bảng `dm_chu_ky_atvsld` có hàm `getChuKyATVSLD()` trong `modules.ts` nhưng KHÔNG tìm thấy nơi nào trong `components/`/`pages/` gọi hàm này hoặc dùng chuỗi `'dm_chu_ky_atvsld'` trực tiếp — khả năng là bảng chưa được nối vào UI, hoặc đã lệch tên biến. Cần kiểm tra lại thủ công trước khi phát triển thêm module ATVSLĐ.

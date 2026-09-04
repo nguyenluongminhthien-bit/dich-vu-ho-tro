@@ -84,10 +84,51 @@ QTVP-ASDS App
   - `NS_HIDE_SENSITIVE`: Tự động ẩn thông tin nhạy cảm (SĐT cá nhân, Số CCCD, Ngạch lương, Thu nhập, Mô tả ngoại hình) thành dạng `***` trên toàn giao diện xem danh sách, thẻ nhân sự và chi tiết hồ sơ.
   - `NS_NO_DETAIL`: Cấm tài khoản mở xem trang Chi tiết Hồ sơ 360° của nhân viên.
 
-#### 🧯 04. Phân hệ Quản lý PCCC & CNCH (FireSafetyPage.tsx)
+#### 🧯 04. Phân hệ Quản lý PCCC & CNCH (FireSafetyPage.tsx & Mục F - DepartmentPage.tsx)
 - **Hồ sơ Đội PCCC cơ sở**: Số lượng đội viên, khả năng huy động ban ngày/ban đêm, phương án PCCC, hotline khẩn cấp (PCCC, UBND, Công an, Điện lực, Cấp nước, Y tế).
 - **Quản lý Tài sản PCCC (TS_PCCC)**: Danh mục bình chữa cháy, hệ thống báo cháy, vách tường, dụng cụ CNCH.
 - **Cảnh báo Lịch Bơm Sạc & Bảo hiểm**: Hệ thống cảnh báo tự động ngày đến hạn bơm sạc bình chữa cháy và ngày hết hạn bảo hiểm cháy nổ bắt buộc.
+- **Dán Bảng Danh bạ Khẩn cấp Mẫu PC01 từ PowerPoint / Excel (`PcccContactPasteModal.tsx`, `pcccContactParser.ts`)**:
+  - Tích hợp nút **"📋 Dán Bảng Danh bạ (PowerPoint / Excel)"** tại Mục 4 "Danh bạ Khẩn cấp & Ghi chú Tồn tại (Mẫu PC01)" trên cả trang **Hồ sơ PCCC** lẫn **Mục F (Thông tin đơn vị)**.
+  - Cho phép người dùng copy toàn bộ bảng danh bạ từ slide PowerPoint hoặc file Excel (`Ctrl + C`) và dán trực tiếp (`Ctrl + V` hoặc bấm *"Dán từ Clipboard"*).
+  - Tự động nhận diện cấu trúc HTML Table của PowerPoint/Excel hoặc phân tách chuỗi văn bản theo Tab (`\t`), gạch đứng (`|`), khoảng trắng.
+  - Tự động làm sạch các thẻ dư thừa `[...]` hoặc phần mở ngoặc `(...)` và định dạng số điện thoại chuẩn 4-3-4 (`0292 3820 170`).
+  - **Bỏ qua dòng 113:** Nhận diện dòng Cảnh sát Phản ứng nhanh (113) và tự động bỏ qua theo đúng yêu cầu nghiệp vụ.
+  - **Bỏ qua cột Ghi chú:** Không đưa các nội dung mô tả ở cột 5 vào các trường lỗi/tồn tại.
+  - **Hỗ trợ độc lập 3 vị trí Lãnh đạo Đơn vị:** Cho phép lưu trữ và chỉnh sửa trực tiếp thông tin của *Giám đốc Showroom*, *Giám đốc / PT KD DVPT*, và *Giám đốc / PT KD Xe*. Nếu đơn vị chưa nhập riêng trong PCCC, hệ thống tự động gợi ý/hiển thị thông tin từ Mục A (Nhân sự đơn vị).
+  - **Cuộc gọi nhanh từ Popup Ngoài màn hình:** Popup "Danh bạ Khẩn cấp" ngoài trang tự động ưu tiên lấy thông tin lãnh đạo từ hồ sơ PCCC nếu Mục A chưa có, hỗ trợ gọi điện 1-click tức thì khi xảy ra sự cố.
+
+##### 📋 BẢNG ĐỐI SOÁT ÁNH XẠ DỮ LIỆU DANH BẠ KHẨN CẤP PCCC (MẪU PC01)
+
+| STT Slide | Cơ quan / Bộ phận (PowerPoint) | Từ khóa nhận diện tự động (Match Keywords) | Trường Tên DB (`hs_pccc`) | Trường SĐT DB (`hs_pccc`) | Quy tắc nghiệp vụ & Ghi chú đối soát |
+| :---: | :--- | :--- | :--- | :--- | :--- |
+| **1** | Cảnh sát Phản ứng nhanh (113) | `113`, `phan ung nhanh` | *(Bỏ qua)* | *(Bỏ qua)* | 🔴 **Bỏ qua hoàn toàn**, không lưu vào DB |
+| **2** | Cảnh sát PCCC | `canh sat pccc`, `cs pccc`, `pccc va cnch`, `phong pccc` | `ten_ca_pccc` | `sdt_ca_pccc` | Đầu mối ứng cứu hỏa hoạn chính |
+| **3** | Cấp cứu y tế | `cap cuu y te`, `cap cuu`, `115` | `ten_yte` | `sdt_yte` | Cấp cứu thương vong tại chỗ |
+| **4** | Bảo vệ dân phố / Dân quân tự vệ | `dan pho`, `dan quan tu ve`, `dan quan`, `tu ve` | `ten_bv_dan_quan` | `sdt_bv_dan_quan` | Lực lượng hỗ trợ an ninh địa bàn |
+| **5** | Công an khu vực | `cong an khu vuc`, `ca khu vuc` | `ten_ca_khu_vuc` | `sdt_ca_khu_vuc` | Cán bộ CA khu vực phụ trách địa bàn |
+| **6** | Công an Xã/Phường | `cong an xa`, `cong an phuong`, `ca xa`, `ca phuong` | `ten_ca_xa_phuong` | `sdt_ca_xa_phuong` | Công an xã/phường sở tại |
+| **7** | PCCC Xã/Phường | `pccc xa`, `pccc phuong` | `ten_pccc_xa_phuong` | `sdt_pccc_xa_phuong` | Đội PCCC cấp cơ sở phường/xã |
+| **8** | Điện lực khu vực | `dien luc`, `dien luc khu vuc` | `ten_dien_luc` | `sdt_dien_luc` | Cắt điện lưới khu vực khẩn cấp |
+| **9** | Giám đốc Showroom | `giam doc showroom`, `giam doc don vi`, `giam doc` | `ten_giam_doc` | `sdt_giam_doc` | 🟢 Lưu vào PCCC; Gợi ý từ Mục A nếu chưa có |
+| **10** | Giám đốc / PT KD DVPT | `ban hang dvpt`, `kinh doanh dvpt`, `dvpt`, `dich vu phu tung`, `ptkd dvpt` | `ten_ptkd_dvpt` | `sdt_ptkd_dvpt` | 🟢 Lưu vào PCCC; Gợi ý từ Mục A nếu chưa có |
+| **11** | Giám đốc / PT KD Xe | `ban hang xe`, `kinh doanh xe`, `kd xe`, `ptkd xe` | `ten_ptkd_xe` | `sdt_ptkd_xe` | 🟢 Lưu vào PCCC; Gợi ý từ Mục A nếu chưa có |
+| **12** | Phụ trách Kho xe & Lái xe | `kho xe`, `lai xe`, `phu trach kho xe` | `ten_kho_xe` | `sdt_kho_xe` | Di dời tài sản & phương tiện |
+| **13** | Tổ trưởng bảo vệ, đón tiếp KH | `to truong bao ve`, `don tiep khach hang`, `tt bao ve`, `don tiep kh` | `ten_tt_bao_ve` | `sdt_tt_bao_ve` | Hướng dẫn thoát hiểm, mở cổng cứu hộ |
+| **14** | Phụ trách QTVP (Hành chính) | `dich vu ho tro kd`, `ho tro kd`, `hanh chinh`, `vp cty`, `qtvp`, `hc ns` | `ten_hc_ns` | `sdt_hc_ns` | Đầu mối hậu cần & thông tin tổng hợp |
+| **15** | Cơ sở y tế gần nhất (ký HĐ y tế) | `hop dong y te`, `y te gan nhat`, `bv lien ket`, `co so y te gan nhat` | `ten_bv_lien_ket` | `sdt_bv_lien_ket` | Bệnh viện liên kết khám chữa bệnh / cấp cứu |
+
+> 📌 **Câu lệnh SQL cấu trúc bảng `hs_pccc` (Supabase):**
+> ```sql
+> ALTER TABLE hs_pccc 
+> ADD COLUMN IF NOT EXISTS ten_giam_doc TEXT, 
+> ADD COLUMN IF NOT EXISTS sdt_giam_doc TEXT, 
+> ADD COLUMN IF NOT EXISTS ten_ptkd_dvpt TEXT, 
+> ADD COLUMN IF NOT EXISTS sdt_ptkd_dvpt TEXT, 
+> ADD COLUMN IF NOT EXISTS ten_ptkd_xe TEXT, 
+> ADD COLUMN IF NOT EXISTS sdt_ptkd_xe TEXT;
+> ```
+
 
 #### 🛡️ 05. Phân hệ Quản lý ATVSLĐ & Thiết bị Nghiêm ngặt (AtvsldPage.tsx)
 - **Tab 1: Hồ sơ Báo cáo Cơ sở (`HoSoTab.tsx`)**: Tự động tổng hợp số liệu huấn luyện các Nhóm 1-6 và thiết bị nghiêm ngặt từ database mà không cần nhập tay.
