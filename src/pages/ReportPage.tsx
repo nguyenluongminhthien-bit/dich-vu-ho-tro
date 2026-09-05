@@ -257,6 +257,10 @@ export default function ReportPage() {
       if (key === 'phan_loai' || key === 'year') {
         next.bo_phan_lay_so = [];
       }
+      // Nếu đổi Đơn vị (id_don_vi), reset lại Showroom (id_showroom)
+      if (key === 'id_don_vi') {
+        next.id_showroom = '';
+      }
       return next;
     });
     setPreviewReady(false);
@@ -424,7 +428,25 @@ export default function ReportPage() {
       } else if (selectedTemplate.dataSource === 'getDonVi') {
         rawData = [...donViList];
       } else if (selectedTemplate.dataSource === 'getPersonnel') {
-        rawData = [...personnelList];
+        let pList = personnelList;
+        if (selectedTemplate.id === 'personnel_by_unit') {
+          pList = pList.filter(p => String(p.trang_thai || '').trim() === 'Đang làm việc');
+        }
+        rawData = pList.map(p => {
+          const unit = donViList.find(u => String(u.id).trim() === String(p.id_don_vi).trim());
+          const showroomName = unit ? unit.ten_don_vi : (donViMap[String(p.id_don_vi)] || p.id_don_vi || '---');
+          let parentName = showroomName;
+          if (unit && unit.cap_quan_ly && unit.cap_quan_ly !== 'HO') {
+            parentName = donViMap[String(unit.cap_quan_ly)] || unit.cap_quan_ly;
+          }
+          return {
+            ...p,
+            chuc_danh: p.chuc_danh || p.phan_loai || '',
+            ngay_nhan_vien: p.ngay_nhan_viec || p.ngay_nhan_vien || '',
+            showroom: showroomName,
+            ten_don_vi: parentName
+          };
+        });
       } else if (selectedTemplate.dataSource === 'getVanBan') {
         const docs = await apiService.getVanBan();
         rawData = docs.map((doc: any) => ({
@@ -457,6 +479,9 @@ export default function ReportPage() {
             const subUnitIds = selectedUnitIds.flatMap(id => getSubUnitsRecursive(String(id)));
             filtered = filtered.filter(item => subUnitIds.includes(String(item.id_don_vi || item.id || '')));
           }
+        } else if (key === 'id_showroom') {
+          const subShowroomIds = getSubUnitsRecursive(String(val));
+          filtered = filtered.filter(item => subShowroomIds.includes(String(item.id_don_vi || '')));
         } else if (key === 'bo_phan_lay_so') {
           if (Array.isArray(val) && val.length > 0) {
             filtered = filtered.filter(item => val.includes(item.bo_phan_lay_so));
@@ -638,7 +663,8 @@ export default function ReportPage() {
       defaultVisibleCols,
       filterValues,
       donViMap,
-      user
+      user,
+      donViList
     );
   };
 
@@ -648,7 +674,25 @@ export default function ReportPage() {
     if (selectedTemplate.dataSource === 'getDonVi') {
       rawData = [...donViList];
     } else if (selectedTemplate.dataSource === 'getPersonnel') {
-      rawData = [...personnelList];
+      let pList = personnelList;
+      if (selectedTemplate.id === 'personnel_by_unit') {
+        pList = pList.filter(p => String(p.trang_thai || '').trim() === 'Đang làm việc');
+      }
+      rawData = pList.map(p => {
+        const unit = donViList.find(u => String(u.id).trim() === String(p.id_don_vi).trim());
+        const showroomName = unit ? unit.ten_don_vi : (donViMap[String(p.id_don_vi)] || p.id_don_vi || '---');
+        let parentName = showroomName;
+        if (unit && unit.cap_quan_ly && unit.cap_quan_ly !== 'HO') {
+          parentName = donViMap[String(unit.cap_quan_ly)] || unit.cap_quan_ly;
+        }
+        return {
+          ...p,
+          chuc_danh: p.chuc_danh || p.phan_loai || '',
+          ngay_nhan_vien: p.ngay_nhan_viec || p.ngay_nhan_vien || '',
+          showroom: showroomName,
+          ten_don_vi: parentName
+        };
+      });
     } else if (selectedTemplate.dataSource === 'getVanBan') {
       rawData = await apiService.getVanBan();
     } else if (selectedTemplate.dataSource === 'getQuyDinh') {

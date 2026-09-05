@@ -1028,17 +1028,28 @@ export default function PersonnelPage() {
       let l_bv_nv: any[] = [], l_bv_tt_tp: any[] = [], l_pvhc_nv: any[] = [], l_pvhc_tt_tp: any[] = [];
 
       staff.forEach(p => {
-        const bp = String(p.phong_ban || '').toLowerCase();
-        const pl = String(p.chuc_danh || '').toLowerCase();
+        const bp = String(p.phong_ban || '').trim().toLowerCase().normalize('NFC').replace(/\s+/g, ' ');
+        const pl = String(p.chuc_danh || '').trim().toLowerCase().normalize('NFC');
+        const cv = String(p.chuc_vu || '').trim().toLowerCase().normalize('NFC');
 
-        const isBV = bp.includes('bv') || bp.includes('bảo vệ') || bp.includes('đón tiếp') || pl.includes('bv, đtkh');
-        const isPVHC = bp.includes('pvhc') || bp.includes('hành chính') || bp.includes('hcns') || pl.includes('pt dvhc');
+        const isBV = 
+          bp === 'bv, đtkh' || bp === 'bv,đtkh' || bp === 'bv - đtkh' || bp === 'bv-đtkh' ||
+          bp.startsWith('bv, đtkh') || bp.startsWith('bv,đtkh') || 
+          bp.includes('bv, đtkh') || bp.includes('bv,đtkh') || 
+          bp.includes('bảo vệ, đón tiếp') || bp.includes('bảo vệ & đón tiếp') || bp.includes('bảo vệ và đón tiếp');
+
+        const isPVHC = 
+          bp === 'pvhc' || bp.startsWith('pvhc') || bp.includes('pvhc') || 
+          bp.includes('phục vụ hậu cần') || bp.includes('phục vụ - hậu cần') || bp.includes('phục vụ & hậu cần');
+
+        const isLead = pl.includes('tổ trưởng') || pl.includes('tổ phó') || pl.includes('trưởng nhóm') ||
+          cv.includes('tổ trưởng') || cv.includes('tổ phó') || cv.includes('trưởng nhóm');
 
         if (isBV) {
-          if (pl.includes('tổ trưởng') || pl.includes('tổ phó') || pl.includes('trưởng nhóm')) { bv_tt_tp++; l_bv_tt_tp.push(p); }
+          if (isLead) { bv_tt_tp++; l_bv_tt_tp.push(p); }
           else { bv_nv++; l_bv_nv.push(p); }
         } else if (isPVHC) {
-          if (pl.includes('tổ trưởng') || pl.includes('tổ phó') || pl.includes('trưởng nhóm')) { pvhc_tt_tp++; l_pvhc_tt_tp.push(p); }
+          if (isLead) { pvhc_tt_tp++; l_pvhc_tt_tp.push(p); }
           else { pvhc_nv++; l_pvhc_nv.push(p); }
         }
       });

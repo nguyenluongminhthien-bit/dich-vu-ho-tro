@@ -2,8 +2,8 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { ReportFilter } from '../../constants/reportTemplates';
 import { DonVi } from '../../types';
-import { buildHierarchicalOptions, getUnitEmoji } from '../../utils/hierarchy';
-import { Calendar, Building, ListFilter, SlidersHorizontal } from 'lucide-react';
+import { buildHierarchicalOptions, getUnitEmoji, getAllSubordinateIds } from '../../utils/hierarchy';
+import { Calendar, Building, Building2, ListFilter, SlidersHorizontal } from 'lucide-react';
 
 interface ReportFilterBarProps {
   filters: ReportFilter[];
@@ -218,16 +218,51 @@ export default function ReportFilterBar({
     return (donViList || []).filter(u => String(u.trang_thai || '').trim() !== 'Đại lý');
   }, [donViList]);
 
-  // Sắp xếp đơn vị theo dạng cây thụt lề
-  const unitOptions = buildHierarchicalOptions(cleanDonViList);
-
+  // Danh sách các Công ty (cấp quản lý cao nhất / Công ty tỉnh thành)
   const parentUnitOptions = useMemo(() => {
     const parents = cleanDonViList.filter(u => {
+      const isTop = !u.cap_quan_ly || u.cap_quan_ly === 'HO';
       const lh = String(u.loai_hinh || '').toLowerCase().trim();
-      return !lh.includes('showroom') && !lh.includes('kho') && !lh.includes('xưởng') && !lh.includes('điểm bán') && !lh.includes('điểm kinh doanh');
+      return isTop && !lh.includes('showroom') && !lh.includes('kho') && !lh.includes('xưởng') && !lh.includes('điểm bán') && !lh.includes('điểm kinh doanh');
     });
     return buildHierarchicalOptions(parents);
   }, [cleanDonViList]);
+
+  // Lấy danh sách showroom phụ thuộc vào đơn vị đã chọn
+  const showroomOptions = useMemo(() => {
+    const selectedUnitRaw = values['id_don_vi'];
+    const selectedUnitIds = Array.isArray(selectedUnitRaw)
+      ? selectedUnitRaw.filter(Boolean)
+      : (selectedUnitRaw ? [selectedUnitRaw] : []);
+
+    if (selectedUnitIds.length > 0) {
+      // Lấy toàn bộ id cấp dưới của các đơn vị đã chọn
+      const subIds = new Set<string>();
+      selectedUnitIds.forEach(uId => {
+        const children = getAllSubordinateIds(String(uId), cleanDonViList);
+        children.forEach(cId => subIds.add(cId));
+      });
+
+      // Lọc các đơn vị con
+      const childUnits = cleanDonViList.filter(u => subIds.has(u.id));
+
+      if (childUnits.length > 0) {
+        return buildHierarchicalOptions(childUnits);
+      }
+
+      // Trường hợp đơn vị được chọn không có cấp con (hoặc chính nó là đơn vị cơ sở)
+      const exactUnits = cleanDonViList.filter(u => selectedUnitIds.includes(u.id));
+      return buildHierarchicalOptions(exactUnits);
+    }
+
+    // Nếu chưa chọn Đơn vị nào: hiển thị tất cả các Showroom/Điểm KD/Xưởng/Kho trong hệ thống
+    const allShowrooms = cleanDonViList.filter(u => {
+      const lh = String(u.loai_hinh || '').toLowerCase().trim();
+      return lh.includes('showroom') || lh.includes('điểm kinh doanh') || lh.includes('xưởng') || lh.includes('kho') || (u.cap_quan_ly && u.cap_quan_ly !== 'HO');
+    });
+
+    return buildHierarchicalOptions(allShowrooms.length > 0 ? allShowrooms : cleanDonViList);
+  }, [values, cleanDonViList]);
 
   const years = useMemo(() => {
     if (dynamicOptions?.year && dynamicOptions.year.length > 0) {
@@ -269,11 +304,17 @@ export default function ReportFilterBar({
                   </label>
                   <select
                     value={value}
-                    onChange={(e) => onChange(filter.key, e.target.value)}
+                    onChange={(e) => {
+                      const newUnitVal = e.target.value;
+                      onChange(filter.key, newUnitVal);
+                      if (values['id_showroom']) {
+                        onChange('id_showroom', '');
+                      }
+                    }}
                     className="w-full p-2 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-[#05469B] text-xs font-semibold text-gray-800 bg-[#FFFFF0] min-h-[34px]"
                   >
-                    <option value="">-- Tất cả Đơn vị / Showroom --</option>
-                    {unitOptions.map((opt) => (
+                    <option value="">-- Tất cả Công ty --</option>
+                    {parentUnitOptions.map((opt) => (
                       <option key={opt.unit.id} value={opt.unit.id}>
                         {opt.prefix}{getUnitEmoji(opt.unit.loai_hinh)} {opt.unit.ten_don_vi}
                       </option>
@@ -281,6 +322,40 @@ export default function ReportFilterBar({
                   </select>
                 </div>
               );
+
+            case 'showroom': {
+              const hasUnitSelected = Boolean(values['id_don_vi']);
+              return (
+                <div key={filter.key} className="flex flex-col gap-1" style={itemStyle}>
+                  <label className="text-[11px] font-bold text-gray-500 uppercase flex items-center gap-1">
+                    <Building2 size={12} className="text-[#05469B]" /> {filter.label}
+                  </label>
+                  <select
+                    value={value}
+                    onChange={(e) => onChange(filter.key, e.target.value)}
+                    disabled={hasUnitSelected && showroomOptions.length === 0}
+                    className={`w-full p-2 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-[#05469B] text-xs font-semibold text-gray-800 bg-[#FFFFF0] min-h-[34px] ${
+                      hasUnitSelected && showroomOptions.length === 0 ? 'opacity-60 cursor-not-allowed bg-gray-100' : ''
+                    }`}
+                  >
+                    {hasUnitSelected ? (
+                      showroomOptions.length > 0 ? (
+                        <option value="">-- Tất cả Showroom thuộc Công ty ({showroomOptions.length}) --</option>
+                      ) : (
+                        <option value="">-- Công ty không có Showroom trực thuộc --</option>
+                      )
+                    ) : (
+                      <option value="">-- Tất cả Showroom --</option>
+                    )}
+                    {showroomOptions.map((opt) => (
+                      <option key={opt.unit.id} value={opt.unit.id}>
+                        {opt.prefix}{getUnitEmoji(opt.unit.loai_hinh)} {opt.unit.ten_don_vi}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              );
+            }
 
             case 'daterange':
               const startDate = values[`${filter.key}_start`] || '';

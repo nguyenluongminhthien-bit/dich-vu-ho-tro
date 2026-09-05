@@ -11,7 +11,7 @@ export interface ReportColumn {
 export interface ReportFilter {
   key: string;
   label: string;
-  type: 'unit' | 'daterange' | 'select' | 'multiselect' | 'year' | 'year_multi' | 'text' | 'unit_multi';
+  type: 'unit' | 'daterange' | 'select' | 'multiselect' | 'year' | 'year_multi' | 'text' | 'unit_multi' | 'showroom';
   options?: string[];
   placeholder?: string;
 }
@@ -114,8 +114,10 @@ export const REPORT_TEMPLATES: ReportTemplate[] = [
     columns: [
       { key: 'ma_so_nhan_vien', label: 'Mã Số Nhân Viên', width: 130, defaultVisible: true },
       { key: 'ho_ten', label: 'Họ và Tên', width: 180, defaultVisible: true },
+      { key: 'chuc_danh', label: 'Chức Danh', width: 140, defaultVisible: true },
       { key: 'chuc_vu', label: 'Chức Vụ', width: 150, defaultVisible: true },
       { key: 'phong_ban', label: 'Phòng Ban / Bộ phận', width: 150, defaultVisible: true },
+      { key: 'showroom', label: 'Showroom', width: 220, defaultVisible: true },
       { key: 'ten_don_vi', label: 'Đơn Vị Quản Lý', width: 220, defaultVisible: true },
       { key: 'sdt_ca_nhan', label: 'Số Điện Thoại Cá Nhân', width: 130, format: 'phone', defaultVisible: true },
       { key: 'sdt_cong_ty', label: 'Số Điện Thoại Công Ty', width: 130, format: 'phone', defaultVisible: true },
@@ -123,7 +125,6 @@ export const REPORT_TEMPLATES: ReportTemplate[] = [
       { key: 'gioi_tinh', label: 'Giới Tính', width: 80, defaultVisible: true },
       { key: 'nam_sinh', label: 'Năm Sinh', width: 100, format: 'date', defaultVisible: false },
       { key: 'ngay_nhan_vien', label: 'Ngày Nhận Việc', width: 110, format: 'date', defaultVisible: true },
-      { key: 'chuc_danh', label: 'Chức Danh Nhân Sự', width: 130, defaultVisible: true },
       { key: 'trinh_do_hoc_van', label: 'Trình Độ Học Vấn', width: 120, defaultVisible: false },
       { key: 'ngach_luong', label: 'Ngạch Lương', width: 120, defaultVisible: false },
       { key: 'thu_nhap', label: 'Mức Thu Nhập (Lương đóng BH)', width: 160, format: 'currency', defaultVisible: false },
@@ -132,8 +133,7 @@ export const REPORT_TEMPLATES: ReportTemplate[] = [
     ],
     filters: [
       { key: 'id_don_vi', label: 'Chọn Đơn vị', type: 'unit' },
-      { key: 'chuc_danh', label: 'Chức danh Nhân sự', type: 'select', options: ['Chính thức', 'Thử việc', 'Cộng tác viên', 'Kiêm nhiệm', 'Học việc'] },
-      { key: 'trang_thai', label: 'Trạng thái Làm việc', type: 'select', options: ['Đang làm việc', 'Đã nghỉ việc'] }
+      { key: 'id_showroom', label: 'Chọn Showroom', type: 'showroom' }
     ]
   },
   {
